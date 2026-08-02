@@ -9,6 +9,7 @@ export function ToasterProvider() {
           background: "var(--card)",
           color: "var(--card-foreground)",
           border: "1px solid var(--border)",
+          fontSize: "14px",
         },
       }}
     />

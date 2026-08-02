@@ -1,0 +1,78 @@
+﻿"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
+import {
+  LayoutDashboard,
+  ArrowLeftRight,
+  Wallet,
+  CreditCard,
+  HandCoins,
+  Briefcase,
+  Tags,
+  Menu,
+  X,
+  User,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import ThemeToggle from "./theme-toggle";
+
+interface NavItem {
+  label: string;
+  href?: string;
+  icon?: React.ElementType;
+  children?: { label: string; href: string }[];
+}
+
+const navigation: NavItem[] = [
+  { label: "Dashboard", href: "/", icon: LayoutDashboard },
+  { label: "Movimientos", href: "/movimientos", icon: ArrowLeftRight },
+  {
+    label: "Gastos",
+    icon: Wallet,
+    children: [
+      { label: "Categorías", href: "/categorias-gasto" },
+      { label: "Períodos", href: "/periodos-gasto" },
+      { label: "Gastos", href: "/gastos" },
+    ],
+  },
+  {
+    label: "Cuentas",
+    icon: Wallet,
+    children: [
+      { label: "Tipos", href: "/tipos-cuenta" },
+      { label: "Cuentas", href: "/cuentas" },
+    ],
+  },
+  {
+    label: "Tarjetas",
+    icon: CreditCard,
+    children: [
+      { label: "Tarjetas", href: "/tarjetas" },
+      { label: "Períodos", href: "/periodos-tarjeta" },
+      { label: "Movimientos", href: "/movimientos-tarjeta" },
+    ],
+  },
+  { label: "Préstamos", href: "/prestamos", icon: HandCoins },
+  {
+    label: "Trabajos",
+    icon: Briefcase,
+    children: [
+      { label: "Trabajos", href: "/trabajos" },
+      { label: "Períodos", href: "/periodos-trabajo" },
+      { label: "Jornadas", href: "/jornadas-trabajo" },
+    ],
+  },
+  {
+    label: "Maestros",
+    icon: Tags,
+    children: [
+      { label: "Conceptos", href: "/conceptos" },
+      { label: "Personas", href: "/personas" },
+      { label: "Monedas", href: "/monedas" },
+      { label: "Cotizaciones", href: "/cotizaciones" },
+      { label: "Inflación", href: "/inflacion" },
+    ],
+  },
+];

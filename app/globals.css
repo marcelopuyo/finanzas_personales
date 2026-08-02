@@ -15,8 +15,8 @@
   --color-success: var(--success);
   --color-danger: var(--danger);
   --color-warning: var(--warning);
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --font-sans: var(--font-inter), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
 }
 
 /* ============================================================
@@ -38,25 +38,27 @@
 }
 
 /* ============================================================
-   Dark Theme — Vercel-style
+   Dark Theme
    ============================================================ */
 .dark {
-  --background: #0a0a0a;
-  --foreground: #e5e5e5;
-  --primary: #3b82f6;
+  --background: #151517;
+  --foreground: #e2e4f0;
+  --primary: #4c6ef5;
   --primary-foreground: #ffffff;
-  --muted: #171717;
-  --muted-foreground: #737373;
-  --border: #262626;
-  --card: #171717;
-  --card-foreground: #e5e5e5;
-  --success: #22c55e;
-  --danger: #ef4444;
-  --warning: #f59e0b;
+  --muted: #1e1e20;
+  --muted-foreground: #9a9b9e;
+  --border: #3e3f42;
+  --card: #353638;
+  --card-foreground: #e2e4f0;
+  --success: #51cf66;
+  --danger: #ff6b6b;
+  --warning: #ffd43b;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--font-inter), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }

@@ -1,8 +1,16 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import ThemeProvider from "@/components/layout/theme-provider";
 import AppLayout from "@/components/layout/app-layout";
 import { ToasterProvider } from "@/components/layout/toaster";
 import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-inter",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Finanzas Personales",
@@ -15,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className="h-full antialiased" suppressHydrationWarning>
+    <html lang="es" className={`${inter.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -32,7 +40,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full bg-gray-50 dark:bg-[#0a0a0a]">
+      <body className="min-h-full bg-gray-50 dark:bg-[#151517] font-sans">
         <ThemeProvider>
           <AppLayout>{children}</AppLayout>
           <ToasterProvider />
