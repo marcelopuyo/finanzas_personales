@@ -40,7 +40,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full bg-gray-50 dark:bg-[#151517] font-sans">
+      <body className="min-h-full bg-background font-sans">
         <ThemeProvider>
           <AppLayout>{children}</AppLayout>
           <ToasterProvider />

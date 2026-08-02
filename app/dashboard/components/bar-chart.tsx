@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import {
   BarChart,
   Bar,
@@ -22,6 +23,7 @@ interface BarChartProps {
   }[];
   height?: number;
   className?: string;
+  action?: ReactNode;
 }
 
 export function StackedBarChart({
@@ -30,12 +32,20 @@ export function StackedBarChart({
   bars,
   height = 300,
   className = "",
+  action,
 }: BarChartProps) {
+  const header = (
+    <div className="mb-4 flex items-center justify-between">
+      <h3 className="text-[14px] font-medium text-header">{title}</h3>
+      {action}
+    </div>
+  );
+
   if (!data.length) {
     return (
-      <div className={`rounded-lg border border-[#3e3f42] bg-[#353638] p-5 ${className}`}>
-        <h3 className="mb-4 text-[14px] font-medium text-[#ffffff]">{title}</h3>
-        <div className="flex h-64 items-center justify-center text-[13px] text-[#808185]">
+      <div className={`rounded-lg border border-border bg-card p-5 ${className}`}>
+        {header}
+        <div className="flex h-64 items-center justify-center text-[13px] text-subtitle">
           Sin datos disponibles
         </div>
       </div>
@@ -43,8 +53,8 @@ export function StackedBarChart({
   }
 
   return (
-    <div className={`rounded-lg border border-[#3e3f42] bg-[#353638] p-5 ${className}`}>
-      <h3 className="mb-4 text-[14px] font-medium text-[#ffffff]">{title}</h3>
+    <div className={`rounded-lg border border-border bg-card p-5 ${className}`}>
+      {header}
       <ResponsiveContainer width="100%" height={height}>
         <BarChart data={data} barGap={0} barCategoryGap="20%">
           <CartesianGrid

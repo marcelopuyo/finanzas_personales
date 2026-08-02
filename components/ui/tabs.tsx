@@ -15,21 +15,25 @@ interface TabsProps {
 
 export function Tabs({ tabs, activeTab, onTabChange }: TabsProps) {
   return (
-    <div className="flex gap-0.5 rounded-md bg-[#1e1e20] p-0.5">
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          onClick={() => onTabChange(tab.id)}
-          className={cn(
-            "rounded px-3 py-1 text-[13px] transition-colors",
-            activeTab === tab.id
-              ? "bg-[#353638] text-[#e2e4f0]"
-              : "text-[#808185] hover:text-[#d0d1d4]"
-          )}
-        >
-          {tab.label}
-        </button>
-      ))}
+    <div className="inline-flex items-center gap-0.5 rounded-full bg-tabs p-0.5">
+      {tabs.map((tab) => {
+        const isActive = activeTab === tab.id;
+        return (
+          <button
+            key={tab.id}
+            onClick={() => onTabChange(tab.id)}
+            aria-pressed={isActive}
+            className={cn(
+              "rounded-full px-3 py-1 text-[13px] leading-5 transition-all duration-150",
+              isActive
+                ? "bg-card text-card-foreground shadow-sm"
+                : "text-subtitle hover:text-tabs-hover"
+            )}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

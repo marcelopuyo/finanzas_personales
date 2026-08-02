@@ -21,14 +21,14 @@ export function AccountCard({
   return (
     <div
       className={cn(
-        "rounded-lg border border-[#3e3f42] bg-[#353638] p-4",
+        "rounded-lg border border-border bg-card p-4",
         className
       )}
     >
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-[12px] leading-4 text-[#9a9b9e]">{title}</p>
-          <p className="mt-0.5 text-[18px] font-semibold leading-7 tracking-tight text-[#ffffff]">
+          <p className="text-[12px] leading-4 text-label">{title}</p>
+          <p className="mt-0.5 text-[18px] font-semibold leading-7 tracking-tight text-value">
             {value}
           </p>
         </div>
@@ -44,10 +44,10 @@ export function AccountCard({
 
 export function AccountCardSkeleton() {
   return (
-    <div className="animate-pulse rounded-lg border border-[#3e3f42] bg-[#353638] p-4">
-      <div className="mb-1.5 h-3 w-20 rounded bg-[#3e3f42]" />
-      <div className="mb-3 h-6 w-28 rounded bg-[#3e3f42]" />
-      <div className="h-10 w-full rounded bg-[#3e3f42]" />
+    <div className="animate-pulse rounded-lg border border-border bg-card p-4">
+      <div className="mb-1.5 h-3 w-20 rounded bg-border" />
+      <div className="mb-3 h-6 w-28 rounded bg-border" />
+      <div className="h-10 w-full rounded bg-border" />
     </div>
   );
 }

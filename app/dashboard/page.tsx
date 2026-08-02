@@ -53,14 +53,36 @@ export default function DashboardPage() {
     );
   }
 
+  const gastosTabs = (
+    <Tabs
+      tabs={[
+        { id: "resumen", label: "Resumen" },
+        { id: "historico", label: "Histórico" },
+      ]}
+      activeTab={tabGastos}
+      onTabChange={setTabGastos}
+    />
+  );
+
+  const ingresosTabs = (
+    <Tabs
+      tabs={[
+        { id: "resumen", label: "Resumen" },
+        { id: "historico", label: "Histórico" },
+      ]}
+      activeTab={tabIngresos}
+      onTabChange={setTabIngresos}
+    />
+  );
+
   return (
     <div className="space-y-6 pb-8">
       {/* Header */}
       <div>
-        <h1 className="text-[18px] font-semibold tracking-tight text-[#ffffff]">
+        <h1 className="text-[18px] font-semibold tracking-tight text-header">
           Dashboard
         </h1>
-        <p className="mt-0.5 text-[13px] text-[#808185]">
+        <p className="mt-0.5 text-[13px] text-subtitle">
           Resumen de tus finanzas personales
         </p>
       </div>
@@ -103,7 +125,7 @@ export default function DashboardPage() {
 
       {/* Account Cards */}
       <div>
-        <h2 className="mb-3 text-[14px] font-medium text-[#ffffff]">
+        <h2 className="mb-3 text-[14px] font-medium text-header">
           Cuentas y Períodos
         </h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -123,95 +145,73 @@ export default function DashboardPage() {
       </div>
 
       {/* Gastos Section */}
-      <div>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-[14px] font-medium text-[#ffffff]">Gastos</h2>
-          <Tabs
-            tabs={[
-              { id: "resumen", label: "Resumen" },
-              { id: "historico", label: "Histórico" },
+      {loading ? (
+        <ChartSkeleton />
+      ) : data ? (
+        tabGastos === "resumen" ? (
+          <StackedBarChart
+            title="Gastos"
+            action={gastosTabs}
+            data={data.gastosResumen.map((g) => ({
+              name: g.name,
+              value: g.pagado,
+              value2: g.saldo,
+            }))}
+            bars={[
+              {
+                key: "value",
+                name: "Pagado",
+                color: "var(--success)",
+                darkColor: "var(--success)",
+              },
+              {
+                key: "value2",
+                name: "Pendiente",
+                color: "var(--warning)",
+                darkColor: "var(--warning)",
+              },
             ]}
-            activeTab={tabGastos}
-            onTabChange={setTabGastos}
           />
-        </div>
-        {loading ? (
-          <ChartSkeleton />
-        ) : data ? (
-          tabGastos === "resumen" ? (
-            <StackedBarChart
-              title="Gastos por Categoría"
-              data={data.gastosResumen.map((g) => ({
-                name: g.name,
-                value: g.pagado,
-                value2: g.saldo,
-              }))}
-              bars={[
-                {
-                  key: "value",
-                  name: "Pagado",
-                  color: "var(--success)",
-                  darkColor: "var(--success)",
-                },
-                {
-                  key: "value2",
-                  name: "Pendiente",
-                  color: "var(--warning)",
-                  darkColor: "var(--warning)",
-                },
-              ]}
-            />
-          ) : (
-            <EvolutionChart
-              title="Evolución de Gastos"
-              data={data.evolucionGastos}
-              color="var(--danger)"
-            />
-          )
-        ) : null}
-      </div>
+        ) : (
+          <EvolutionChart
+            title="Gastos"
+            action={gastosTabs}
+            data={data.evolucionGastos}
+            color="var(--danger)"
+          />
+        )
+      ) : null}
 
       {/* Ingresos Section */}
-      <div>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-[14px] font-medium text-[#ffffff]">Ingresos</h2>
-          <Tabs
-            tabs={[
-              { id: "resumen", label: "Resumen" },
-              { id: "historico", label: "Histórico" },
+      {loading ? (
+        <ChartSkeleton />
+      ) : data ? (
+        tabIngresos === "resumen" ? (
+          <StackedBarChart
+            title="Ingresos"
+            action={ingresosTabs}
+            data={data.ingresosResumen.map((i) => ({
+              name: i.name,
+              value: i.value,
+            }))}
+            bars={[
+              {
+                key: "value",
+                name: "Ingresos",
+                color: "var(--success)",
+                darkColor: "var(--success)",
+              },
             ]}
-            activeTab={tabIngresos}
-            onTabChange={setTabIngresos}
           />
-        </div>
-        {loading ? (
-          <ChartSkeleton />
-        ) : data ? (
-          tabIngresos === "resumen" ? (
-            <StackedBarChart
-              title="Ingresos por Trabajo"
-              data={data.ingresosResumen.map((i) => ({
-                name: i.name,
-                value: i.value,
-              }))}
-              bars={[
-                {
-                  key: "value",
-                  name: "Ingresos",
-                  color: "var(--success)",
-                  darkColor: "var(--success)",
-                },
-              ]}
-            />
-          ) : (
-            <EvolutionChart
-              title="Evolución de Ingresos"
-              data={data.evolucionIngresos}
-              color="var(--success)"
-            />
-          )
-        ) : null}
-      </div>
+        ) : (
+          <EvolutionChart
+            title="Ingresos"
+            action={ingresosTabs}
+            data={data.evolucionIngresos}
+            color="var(--success)"
+          />
+        )
+      ) : null}
 
       {/* Evolución Resultados */}
       {loading ? (

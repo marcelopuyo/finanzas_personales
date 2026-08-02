@@ -34,16 +34,16 @@ const navigation: NavItem[] = [
   {
     label: "Dashboard",
     href: "/",
-    icon: () => <FontAwesomeIcon icon={faHouse} style={{ width: 20, height: 20, color: "#8f9094" }} />,
+    icon: () => <FontAwesomeIcon icon={faHouse} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
   },
   {
     label: "Movimientos",
     href: "/movimientos",
-    icon: () => <FontAwesomeIcon icon={faArrowRightArrowLeft} style={{ width: 20, height: 20, color: "#8f9094" }} />,
+    icon: () => <FontAwesomeIcon icon={faArrowRightArrowLeft} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
   },
   {
     label: "Gastos",
-    icon: () => <FontAwesomeIcon icon={faWallet} style={{ width: 20, height: 20, color: "#8f9094" }} />,
+    icon: () => <FontAwesomeIcon icon={faWallet} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
     children: [
       { label: "Categorías", href: "/categorias-gasto" },
       { label: "Períodos", href: "/periodos-gasto" },
@@ -52,7 +52,7 @@ const navigation: NavItem[] = [
   },
   {
     label: "Cuentas",
-    icon: () => <FontAwesomeIcon icon={faLandmark} style={{ width: 20, height: 20, color: "#8f9094" }} />,
+    icon: () => <FontAwesomeIcon icon={faLandmark} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
     children: [
       { label: "Tipos", href: "/tipos-cuenta" },
       { label: "Cuentas", href: "/cuentas" },
@@ -60,7 +60,7 @@ const navigation: NavItem[] = [
   },
   {
     label: "Tarjetas",
-    icon: () => <FontAwesomeIcon icon={faCreditCard} style={{ width: 20, height: 20, color: "#8f9094" }} />,
+    icon: () => <FontAwesomeIcon icon={faCreditCard} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
     children: [
       { label: "Tarjetas", href: "/tarjetas" },
       { label: "Períodos", href: "/periodos-tarjeta" },
@@ -70,11 +70,11 @@ const navigation: NavItem[] = [
   {
     label: "Préstamos",
     href: "/prestamos",
-    icon: () => <FontAwesomeIcon icon={faHandHoldingDollar} style={{ width: 20, height: 20, color: "#8f9094" }} />,
+    icon: () => <FontAwesomeIcon icon={faHandHoldingDollar} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
   },
   {
     label: "Trabajos",
-    icon: () => <FontAwesomeIcon icon={faBriefcase} style={{ width: 20, height: 20, color: "#8f9094" }} />,
+    icon: () => <FontAwesomeIcon icon={faBriefcase} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
     children: [
       { label: "Trabajos", href: "/trabajos" },
       { label: "Períodos", href: "/periodos-trabajo" },
@@ -83,7 +83,7 @@ const navigation: NavItem[] = [
   },
   {
     label: "Maestros",
-    icon: () => <FontAwesomeIcon icon={faTags} style={{ width: 20, height: 20, color: "#8f9094" }} />,
+    icon: () => <FontAwesomeIcon icon={faTags} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
     children: [
       { label: "Conceptos", href: "/conceptos" },
       { label: "Personas", href: "/personas" },
@@ -108,8 +108,8 @@ function NavItem({ item, pathname }: { item: NavItem; pathname: string }) {
         className={cn(
           "flex items-center gap-3 rounded-md px-3 py-[9px] text-[14px] leading-5 transition-colors",
           isActive
-            ? "bg-[#353638] text-[#ffffff]"
-            : "text-[#f0f1f2] hover:bg-[#2a2b2d]"
+            ? "bg-sidebar-active text-sidebar-active-foreground"
+            : "text-sidebar-foreground hover:bg-sidebar-hover"
         )}
       >
         {item.icon && <item.icon className="h-4 w-4 shrink-0 opacity-80" />}
@@ -127,8 +127,8 @@ function NavItem({ item, pathname }: { item: NavItem; pathname: string }) {
         className={cn(
           "flex w-full items-center gap-3 rounded-md px-3 py-[9px] text-[14px] leading-5 text-left transition-colors",
           hasActiveChild
-            ? "text-[#ffffff]"
-            : "text-[#f0f1f2] hover:bg-[#2a2b2d]"
+            ? "text-sidebar-active-foreground"
+            : "text-sidebar-foreground hover:bg-sidebar-hover"
         )}
       >
         {item.icon && <item.icon className="h-4 w-4 shrink-0 opacity-80" />}
@@ -145,8 +145,8 @@ function NavItem({ item, pathname }: { item: NavItem; pathname: string }) {
                 className={cn(
                   "block rounded-md px-3 py-[6px] text-[14px] leading-5 transition-colors",
                   isChildActive
-                    ? "text-[#ffffff] font-medium"
-                    : "text-[#f0f1f2] hover:text-[#ffffff]"
+                    ? "text-sidebar-active-foreground font-medium"
+                    : "text-sidebar-foreground hover:text-sidebar-active-foreground"
                 )}
               >
                 {child.label}
@@ -167,10 +167,10 @@ export default function Sidebar() {
     <>
       <button
         onClick={() => setMobileOpen(!mobileOpen)}
-        className="fixed top-3 left-3 z-50 rounded-lg bg-[#1b1b1c] p-2 text-[#f0f1f2] lg:hidden"
+        className="fixed top-3 left-3 z-50 rounded-lg bg-sidebar p-2 text-sidebar-foreground lg:hidden"
         aria-label="Toggle menu"
       >
-        {mobileOpen ? <X style={{ width: 20, height: 20, color: "#8f9094" }} /> : <Menu style={{ width: 20, height: 20, color: "#8f9094" }} />}
+        {mobileOpen ? <X style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} /> : <Menu style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />}
       </button>
 
       {mobileOpen && (
@@ -182,13 +182,13 @@ export default function Sidebar() {
 
       <aside
         className={cn(
-          "fixed top-0 left-0 z-40 flex h-screen w-64 flex-col bg-[#1b1b1c] transition-transform duration-200",
+          "fixed top-0 left-0 z-40 flex h-screen w-64 flex-col bg-sidebar transition-transform duration-200",
           "lg:translate-x-0 lg:static lg:z-auto lg:h-screen",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
         <div className="px-4 pt-6 pb-4">
-          <span className="text-[14px] font-semibold text-[#f0f1f2]">Finanzas</span>
+          <span className="text-[14px] font-semibold text-sidebar-foreground">Finanzas</span>
         </div>
 
         <nav className="flex-1 overflow-y-auto px-2 py-1 space-y-1">
@@ -199,7 +199,7 @@ export default function Sidebar() {
 
         <div className="px-3 py-3 flex items-center justify-between">
           <ThemeToggle />
-          <button className="flex h-7 w-7 items-center justify-center rounded-full bg-[#4c6ef5] text-[11px] font-semibold text-white">
+          <button className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
             <User className="h-3.5 w-3.5" />
           </button>
         </div>
