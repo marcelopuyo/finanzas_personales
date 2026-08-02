@@ -19,6 +19,7 @@ interface EvolutionChartProps {
   height?: number;
   className?: string;
   action?: ReactNode;
+  badge?: ReactNode;
 }
 
 export function EvolutionChart({
@@ -28,10 +29,14 @@ export function EvolutionChart({
   height = 300,
   className = "",
   action,
+  badge,
 }: EvolutionChartProps) {
   const header = (
     <div className="mb-4 flex items-center justify-between">
-      <h3 className="text-[14px] font-medium text-header">{title}</h3>
+      <div className="flex items-center gap-2">
+        <h3 className="text-[16px] font-semibold text-header">{title}</h3>
+        {badge}
+      </div>
       {action}
     </div>
   );
@@ -97,6 +102,7 @@ interface MultiLineChartProps {
   height?: number;
   className?: string;
   action?: ReactNode;
+  badge?: ReactNode;
 }
 
 export function MultiLineChart({
@@ -105,10 +111,14 @@ export function MultiLineChart({
   height = 300,
   className = "",
   action,
+  badge,
 }: MultiLineChartProps) {
   const header = (
     <div className="mb-4 flex items-center justify-between">
-      <h3 className="text-[14px] font-medium text-header">{title}</h3>
+      <div className="flex items-center gap-2">
+        <h3 className="text-[16px] font-semibold text-header">{title}</h3>
+        {badge}
+      </div>
       {action}
     </div>
   );

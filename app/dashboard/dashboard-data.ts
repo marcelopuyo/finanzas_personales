@@ -9,6 +9,7 @@ import {
 } from "@/lib/api/endpoints/reportes.api";
 import { getAllJornadasTrabajoPlane } from "@/lib/api/endpoints/trabajos.api";
 import { getAllPeriodosTrabajo } from "@/lib/api/endpoints/trabajos.api";
+import type { GastoPeriodo } from "@/types";
 import { numberToCurrency, onlyDate } from "@/lib/utils";
 
 export interface DashboardData {
@@ -26,6 +27,7 @@ export interface DashboardData {
   }[];
   gastosTotal: string;
   gastosSaldo: string;
+  gastosDetalle: GastoPeriodo[];
   ingresosResumen: {
     name: string;
     value: number;
@@ -243,6 +245,11 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     gastosResumen,
     gastosTotal: numberToCurrency(montoTotalGastos),
     gastosSaldo: numberToCurrency(montoSaldoGastos),
+    gastosDetalle: [...gastosPeriodo].sort((a, b) => {
+      const fa = a.fechaPago ? new Date(a.fechaPago).getTime() : 0;
+      const fb = b.fechaPago ? new Date(b.fechaPago).getTime() : 0;
+      return fb - fa;
+    }),
     ingresosResumen,
     ingresosTotal: numberToCurrency(totalIngresos),
     prestamosResumen,

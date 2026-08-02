@@ -198,9 +198,16 @@ export interface CuentaConEvolucion {
 }
 
 export interface GastoPeriodo {
-  categoria: { nombre: string };
+  id?: string;
+  descripcion?: string;
   monto: number;
   saldo: number;
+  fechaPago?: string | Date;
+  fechaVencimiento?: string | Date;
+  isPeriodico?: boolean;
+  periodo?: { nombre: string };
+  categoria?: { nombre: string };
+  cuenta?: { nombre: string };
 }
 
 export interface PrestamoPendiente {

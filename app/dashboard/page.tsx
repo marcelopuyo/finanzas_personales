@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { StatCard, StatCardSkeleton } from "@/components/ui/stat-card";
+import { StatBadge } from "@/components/ui/stat-badge";
 import { Tabs } from "@/components/ui/tabs";
 import { ChartSkeleton } from "@/components/ui/skeleton";
 import { AccountCard, AccountCardSkeleton } from "./components/account-card";
 import { StackedBarChart } from "./components/bar-chart";
 import { EvolutionChart, MultiLineChart } from "./components/line-chart";
+import { GastosDetalle } from "./components/gastos-detalle";
 import {
   fetchDashboardData,
   type DashboardData,
@@ -57,6 +59,7 @@ export default function DashboardPage() {
     <Tabs
       tabs={[
         { id: "resumen", label: "Resumen" },
+        { id: "detalle", label: "Detalle" },
         { id: "historico", label: "Histórico" },
       ]}
       activeTab={tabGastos}
@@ -152,6 +155,9 @@ export default function DashboardPage() {
           <StackedBarChart
             title="Gastos"
             action={gastosTabs}
+            badge={
+              <StatBadge label="Total actual" value={data.gastosTotal} />
+            }
             data={data.gastosResumen.map((g) => ({
               name: g.name,
               value: g.pagado,
@@ -172,10 +178,26 @@ export default function DashboardPage() {
               },
             ]}
           />
+        ) : tabGastos === "detalle" ? (
+          <div className="rounded-lg border border-border bg-card p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h3 className="text-[16px] font-semibold text-header">
+                  Gastos
+                </h3>
+                <StatBadge label="Total actual" value={data.gastosTotal} />
+              </div>
+              {gastosTabs}
+            </div>
+            <GastosDetalle data={data.gastosDetalle} />
+          </div>
         ) : (
           <EvolutionChart
             title="Gastos"
             action={gastosTabs}
+            badge={
+              <StatBadge label="Total actual" value={data.gastosTotal} />
+            }
             data={data.evolucionGastos}
             color="var(--danger)"
           />

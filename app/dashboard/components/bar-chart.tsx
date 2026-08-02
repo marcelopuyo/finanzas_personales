@@ -24,6 +24,7 @@ interface BarChartProps {
   height?: number;
   className?: string;
   action?: ReactNode;
+  badge?: ReactNode;
 }
 
 export function StackedBarChart({
@@ -33,10 +34,14 @@ export function StackedBarChart({
   height = 300,
   className = "",
   action,
+  badge,
 }: BarChartProps) {
   const header = (
     <div className="mb-4 flex items-center justify-between">
-      <h3 className="text-[14px] font-medium text-header">{title}</h3>
+      <div className="flex items-center gap-2">
+        <h3 className="text-[16px] font-semibold text-header">{title}</h3>
+        {badge}
+      </div>
       {action}
     </div>
   );
@@ -74,6 +79,7 @@ export function StackedBarChart({
             tickLine={false}
           />
           <Tooltip
+            cursor={false}
             contentStyle={{
               backgroundColor: "var(--card)",
               border: "1px solid var(--border)",
@@ -90,6 +96,7 @@ export function StackedBarChart({
               fill={bar.color}
               radius={[4, 4, 0, 0]}
               stackId="a"
+              activeBar={false}
             />
           ))}
         </BarChart>
