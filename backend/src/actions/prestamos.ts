@@ -1,0 +1,140 @@
+"use server";
+
+import type { z } from "zod";
+import { getDb } from "../db";
+import { Cuenta } from "../entities/cuenta.entity";
+import { Persona } from "../entities/persona.entity";
+import { Prestamo } from "../entities/prestamo.entity";
+import { dbError, refresh } from "../lib/action-helpers";
+import { getPrestamoById } from "../queries/prestamos";
+import {
+  prestamoCreateSchema,
+  prestamoUpdateSchema,
+} from "../validation/prestamos";
+
+// ============================================================
+// PRÉSTAMO (personas y cuenta por nombre; actualiza saldo de cuenta)
+// ============================================================
+export async function crearPrestamo(
+  input: z.infer<typeof prestamoCreateSchema>
+) {
+  const data = prestamoCreateSchema.parse(input);
+  const ds = await getDb();
+  const { personaOrigen, personaDestino, cuenta, ...rest } = data;
+
+  const personaOrigenEntity = await ds
+    .getRepository(Persona)
+    .findOneBy({ nombre: personaOrigen });
+  if (!personaOrigenEntity) {
+    throw new Error(`Persona "${personaOrigen}" no encontrada`);
+  }
+
+  const personaDestinoEntity = await ds
+    .getRepository(Persona)
+    .findOneBy({ nombre: personaDestino });
+  if (!personaDestinoEntity) {
+    throw new Error(`Persona "${personaDestino}" no encontrada`);
+  }
+
+  const cuentaEntity = await ds
+    .getRepository(Cuenta)
+    .findOneBy({ nombre: cuenta });
+  if (!cuentaEntity) {
+    throw new Error(`Cuenta "${cuenta}" no encontrada`);
+  }
+
+  try {
+    const repo = ds.getRepository(Prestamo);
+    const created = await repo.save(
+      repo.create({
+        ...rest,
+        personaOrigen: personaOrigenEntity,
+        personaDestino: personaDestinoEntity,
+        cuenta: cuentaEntity,
+      })
+    );
+
+    // Actualizar saldo de la cuenta según sentido
+    // otorgado → resta monto de la cuenta; obtenido → suma
+    cuentaEntity.saldo =
+      data.sentido === "otorgado"
+        ? cuentaEntity.saldo - data.monto
+        : cuentaEntity.saldo + data.monto;
+    await ds.getRepository(Cuenta).save(cuentaEntity);
+
+    refresh();
+    return getPrestamoById(created.id);
+  } catch (error) {
+    dbError(error, "Préstamo");
+  }
+}
+
+export async function actualizarPrestamo(
+  id: string,
+  input: z.infer<typeof prestamoUpdateSchema>
+) {
+  const data = prestamoUpdateSchema.parse(input);
+  const ds = await getDb();
+  const { personaOrigen, personaDestino, cuenta, ...rest } = data;
+
+  const repo = ds.getRepository(Prestamo);
+  const existing = await repo.findOneBy({ id, eliminado: false });
+  if (!existing) {
+    throw new Error(`Préstamo con id ${id} no encontrado`);
+  }
+
+  if (personaOrigen) {
+    const personaOrigenEntity = await ds
+      .getRepository(Persona)
+      .findOneBy({ nombre: personaOrigen });
+    if (!personaOrigenEntity) {
+      throw new Error(`Persona "${personaOrigen}" no encontrada`);
+    }
+    existing.personaOrigen = personaOrigenEntity;
+  }
+
+  if (personaDestino) {
+    const personaDestinoEntity = await ds
+      .getRepository(Persona)
+      .findOneBy({ nombre: personaDestino });
+    if (!personaDestinoEntity) {
+      throw new Error(`Persona "${personaDestino}" no encontrada`);
+    }
+    existing.personaDestino = personaDestinoEntity;
+  }
+
+  if (cuenta) {
+    const cuentaEntity = await ds
+      .getRepository(Cuenta)
+      .findOneBy({ nombre: cuenta });
+    if (!cuentaEntity) {
+      throw new Error(`Cuenta "${cuenta}" no encontrada`);
+    }
+    existing.cuenta = cuentaEntity;
+  }
+
+  try {
+    Object.assign(existing, rest);
+    await repo.save(existing);
+    refresh();
+    return getPrestamoById(id);
+  } catch (error) {
+    dbError(error, "Préstamo");
+  }
+}
+
+export async function eliminarPrestamo(id: string) {
+  const ds = await getDb();
+  const repo = ds.getRepository(Prestamo);
+  const row = await repo.findOneBy({ id, eliminado: false });
+  if (!row) {
+    throw new Error(`Préstamo con id ${id} no encontrado`);
+  }
+  try {
+    row.eliminado = true;
+    await repo.save(row);
+    refresh();
+  } catch (error) {
+    dbError(error, "Préstamo");
+  }
+}

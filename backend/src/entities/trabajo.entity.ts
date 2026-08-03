@@ -1,0 +1,27 @@
+import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+
+// Solo columnas. La relación inversa OneToMany (periodosTrabajo) se omite
+// para evitar ciclos; se consulta por separado cuando se necesita.
+@Entity({ name: "trabajo" })
+export class Trabajo {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column({ unique: true })
+  nombre: string;
+
+  @Column({ type: "date" })
+  fechaInicio: Date;
+
+  @Column({ type: "numeric", precision: 10, scale: 2, default: 0 })
+  precioHora: number;
+
+  @Column({ default: null })
+  memos?: string;
+
+  @Column({
+    type: "bit",
+    default: false,
+  })
+  eliminado: boolean;
+}
