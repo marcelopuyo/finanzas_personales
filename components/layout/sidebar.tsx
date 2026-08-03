@@ -85,7 +85,7 @@ const navigation: NavItem[] = [
     label: "Maestros",
     icon: () => <FontAwesomeIcon icon={faTags} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
     children: [
-      { label: "Conceptos", href: "/conceptos" },
+      { label: "Conceptos", href: "/cruds/conceptos" },
       { label: "Personas", href: "/personas" },
       { label: "Monedas", href: "/monedas" },
       { label: "Cotizaciones", href: "/cotizaciones" },
