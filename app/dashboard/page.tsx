@@ -93,40 +93,15 @@ export default function DashboardPage() {
       </div>
 
       {/* Top Stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {loading ? (
-          <>
-            <StatCardSkeleton />
-            <StatCardSkeleton />
-            <StatCardSkeleton />
-            <StatCardSkeleton />
-          </>
-        ) : data ? (
-          <>
-            <StatCard
-              title="Balance Actual"
-              value={numberToCurrency(data.balance)}
-            />
-            <StatCard
-              title="Ingresos Totales"
-              value={data.ingresosTotal}
-              trend="up"
-            />
-            <StatCard
-              title="Gastos del Período"
-              value={data.gastosTotal}
-              subtitle={`Pendiente: ${data.gastosSaldo}`}
-              trend="down"
-            />
-            <StatCard
-              title="Préstamos"
-              value={data.prestamosSaldo}
-              subtitle={`Total: ${data.prestamosTotal}`}
-              trend="neutral"
-            />
-          </>
-        ) : null}
-      </div>
+      {loading ? (
+        <StatCardSkeleton />
+      ) : data ? (
+        <StatCard
+          title="Balance Actual"
+          value={numberToCurrency(data.balance)}
+          centered
+        />
+      ) : null}
 
       {/* Account Cards */}
       <div>

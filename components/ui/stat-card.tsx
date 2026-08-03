@@ -6,6 +6,7 @@ interface StatCardProps {
   subtitle?: string;
   trend?: "up" | "down" | "neutral";
   trendValue?: string;
+  centered?: boolean;
   className?: string;
 }
 
@@ -15,12 +16,14 @@ export function StatCard({
   subtitle,
   trend,
   trendValue,
+  centered,
   className,
 }: StatCardProps) {
   return (
     <div
       className={cn(
         "rounded-lg border border-border bg-card p-4",
+        centered && "text-center",
         className
       )}
     >

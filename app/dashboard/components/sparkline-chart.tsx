@@ -30,7 +30,7 @@ export function SparkLineChart({
   const height = 40;
   const padding = 2;
 
-  const showBarTooltip = (e: MouseEvent<SVGRectElement>, index: number) => {
+  const showTooltipAt = (e: MouseEvent<SVGElement>, index: number) => {
     const rect = e.currentTarget.getBoundingClientRect();
     setTooltip({
       left: rect.left + rect.width / 2,
@@ -77,7 +77,7 @@ export function SparkLineChart({
           height={barHeight}
           rx={Math.min(barWidth / 2, 2)}
           fill="var(--primary)"
-          onMouseEnter={(e) => showBarTooltip(e, index)}
+          onMouseEnter={(e) => showTooltipAt(e, index)}
           onMouseLeave={() => setTooltip(null)}
         />
       );
@@ -97,40 +97,61 @@ export function SparkLineChart({
     );
   }
 
-  // Variante de línea (necesita al menos 2 puntos)
+  // Variante de línea (necesita al menos 2 puntos) con tooltip en todo el área
   if (data.length < 2) return null;
   const max = Math.max(...data);
   const min = Math.min(...data);
   const range = max - min || 1;
 
-  const points = data
-    .map((value, index) => {
-      const x = padding + (index / (data.length - 1)) * (width - padding * 2);
-      const y =
-        height -
-        padding -
-        ((value - min) / range) * (height - padding * 2);
-      return `${x},${y}`;
-    })
-    .join(" ");
+  const linePoints = data.map((value, index) => {
+    const x = padding + (index / (data.length - 1)) * (width - padding * 2);
+    const y =
+      height -
+      padding -
+      ((value - min) / range) * (height - padding * 2);
+    return { x, y };
+  });
+
+  const points = linePoints.map((p) => `${p.x},${p.y}`).join(" ");
 
   const isPositive = data[data.length - 1] >= data[0];
 
+  const handleMouseMove = (e: MouseEvent<SVGSVGElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const frac = (e.clientX - rect.left) / rect.width;
+    const index = Math.max(
+      0,
+      Math.min(data.length - 1, Math.round(frac * (data.length - 1)))
+    );
+    const point = linePoints[index];
+    setTooltip({
+      left: rect.left + (point.x / width) * rect.width,
+      top: rect.top + (point.y / height) * rect.height,
+      label: labels?.[index],
+      value: data[index],
+    });
+  };
+
   return (
-    <svg
-      viewBox={`0 0 ${width} ${height}`}
-      className="h-10 w-full overflow-visible"
-      preserveAspectRatio="none"
-    >
-      <polyline
-        points={points}
-        fill="none"
-        stroke={isPositive ? "var(--success)" : "var(--danger)"}
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
+    <>
+      {tooltipNode}
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="h-10 w-full overflow-visible"
+        preserveAspectRatio="none"
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => setTooltip(null)}
+      >
+        <polyline
+          points={points}
+          fill="none"
+          stroke={isPositive ? "var(--success)" : "var(--danger)"}
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+    </>
   );
 }
