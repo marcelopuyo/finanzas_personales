@@ -2,21 +2,24 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Search, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, FileDown } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { Modal } from "@/components/ui/modal";
 import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import { numberToCurrency } from "@/lib/utils";
 
-interface CrudTableProps<T> {
+interface CrudTableProps<T, TId = number> {
   title: string;
   columns: ColumnDef<T>[];
   fetchData: () => Promise<T[]>;
-  deleteItem: (id: number) => Promise<unknown>;
+  deleteItem: (id: TId) => Promise<unknown>;
   searchPlaceholder?: string;
   createHref: string;
-  editHref: (id: number) => string;
-  getId: (item: T) => number;
+  editHref: (id: TId) => string;
+  getId: (item: T) => TId;
   searchPredicate: (item: T, query: string) => boolean;
 }
 
@@ -25,7 +28,7 @@ interface CrudTableProps<T> {
  * Incluye: búsqueda, botón "Nuevo", acciones por fila (editar/eliminar)
  * y modal de confirmación de eliminado. Mobile-first.
  */
-export function CrudTable<T>({
+export function CrudTable<T, TId = number>({
   title,
   columns,
   fetchData,
@@ -35,13 +38,13 @@ export function CrudTable<T>({
   editHref,
   getId,
   searchPredicate,
-}: CrudTableProps<T>) {
+}: CrudTableProps<T, TId>) {
   const router = useRouter();
   const [items, setItems] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [deleteId, setDeleteId] = useState<TId | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const load = () => {
@@ -111,6 +114,97 @@ export function CrudTable<T>({
     [columns, router, editHref, getId]
   );
 
+  const handleExportPdf = () => {
+    if (filtered.length === 0) {
+      toast.error("No hay datos para exportar");
+      return;
+    }
+
+    const doc = new jsPDF();
+
+    type ExportCol = {
+      id?: string;
+      header?: unknown;
+      accessorKey?: string;
+      accessorFn?: (row: T) => unknown;
+      meta?:
+        | {
+            exportValue?: (item: T) => string;
+            isCurrency?: boolean;
+          }
+        | undefined;
+    };
+
+    const exportCols = columns
+      .map((c) => c as ExportCol)
+      .filter((col) => col.id !== "actions")
+      .map((col) => {
+        const meta = col.meta as
+          | { exportValue?: (item: T) => string; isCurrency?: boolean }
+          | undefined;
+        const raw = (item: T): unknown => {
+          if (col.accessorKey) {
+            return (item as Record<string, unknown>)[col.accessorKey];
+          }
+          if (col.accessorFn) return col.accessorFn(item);
+          return undefined;
+        };
+        return {
+          header:
+            typeof col.header === "string"
+              ? col.header
+              : col.id || col.accessorKey || "",
+          value: (item: T): string => {
+            if (meta?.exportValue) return meta.exportValue(item);
+            const v = raw(item);
+            if (v === null || v === undefined) return "";
+            if (typeof v === "object") return JSON.stringify(v);
+            return String(v);
+          },
+          isCurrency: !!meta?.isCurrency,
+          numeric: (item: T): number => Number(raw(item)) || 0,
+        };
+      });
+
+    // Totales de las columnas moneda
+    const totals = exportCols.map((c) =>
+      c.isCurrency
+        ? filtered.reduce((sum, item) => sum + c.numeric(item), 0)
+        : 0
+    );
+
+    const body: string[][] = filtered.map((item) =>
+      exportCols.map((c) => c.value(item))
+    );
+    if (exportCols.some((c) => c.isCurrency)) {
+      body.push(
+        exportCols.map((c, i) =>
+          i === 0 ? "Total" : c.isCurrency ? numberToCurrency(totals[i]) : ""
+        )
+      );
+    }
+
+    doc.setFontSize(14);
+    doc.text(title, 14, 16);
+
+    autoTable(doc, {
+      startY: 22,
+      head: [exportCols.map((c) => c.header)],
+      body,
+      styles: { fontSize: 9, cellPadding: 2 },
+      headStyles: { fillColor: [76, 110, 245], textColor: 255, fontSize: 10 },
+      alternateRowStyles: { fillColor: [245, 247, 250] },
+      didParseCell: (data) => {
+        if (data.row.index === body.length - 1) {
+          data.cell.styles.fontStyle = "bold";
+          data.cell.styles.fillColor = [241, 243, 246];
+        }
+      },
+    });
+
+    doc.save(`${title.toLowerCase().replace(/\s+/g, "-")}.pdf`);
+  };
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
       <h1 className="mb-4 text-[18px] font-semibold text-header">{title}</h1>
@@ -127,14 +221,24 @@ export function CrudTable<T>({
             className="w-full rounded-full border border-border bg-card py-1.5 pl-8 pr-3 text-[13px] text-card-foreground placeholder:text-subtitle focus:outline-none focus:ring-2 focus:ring-primary/40"
           />
         </div>
-        <button
-          type="button"
-          onClick={() => router.push(createHref)}
-          className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Nuevo
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleExportPdf}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-4 py-1.5 text-[13px] font-medium text-card-foreground transition-colors hover:bg-muted"
+          >
+            <FileDown className="h-3.5 w-3.5" />
+            Exportar
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push(createHref)}
+            className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Nuevo
+          </button>
+        </div>
       </div>
 
       {/* Tabla */}

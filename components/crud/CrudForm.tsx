@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Save } from "lucide-react";
 import { toast } from "sonner";
@@ -12,8 +12,9 @@ import type { ZodSchema } from "zod";
 export interface FormField {
   name: string;
   label: string;
-  type: "text" | "select" | "textarea";
+  type: "text" | "select" | "textarea" | "date" | "number";
   options?: { value: string; label: string }[];
+  optionsFrom?: () => Promise<{ value: string; label: string }[]>;
   placeholder?: string;
 }
 
@@ -42,9 +43,26 @@ export function CrudForm({
 }: CrudFormProps) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const [asyncOptions, setAsyncOptions] = useState<
+    Record<string, { value: string; label: string }[]>
+  >({});
+
+  // Cargar opciones asíncronas de los selects (ej. categorías, períodos)
+  useEffect(() => {
+    fields.forEach((field) => {
+      if (!field.optionsFrom) return;
+      field
+        .optionsFrom()
+        .then((opts) =>
+          setAsyncOptions((prev) => ({ ...prev, [field.name]: opts }))
+        )
+        .catch(() => {});
+    });
+  }, [fields]);
 
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors },
   } = useForm({
@@ -104,17 +122,29 @@ export function CrudForm({
                 {field.label}
               </label>
               {field.type === "select" ? (
-                <select
-                  id={field.name}
-                  {...register(field.name)}
-                  className={inputClasses}
-                >
-                  {field.options?.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                <Controller
+                  name={field.name}
+                  control={control}
+                  render={({ field: controllerField }) => (
+                    <select
+                      id={field.name}
+                      name={controllerField.name}
+                      value={controllerField.value ?? ""}
+                      onChange={(e) => controllerField.onChange(e.target.value)}
+                      onBlur={controllerField.onBlur}
+                      ref={controllerField.ref}
+                      className={inputClasses}
+                    >
+                      {(asyncOptions[field.name] || field.options || []).map(
+                        (opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        )
+                      )}
+                    </select>
+                  )}
+                />
               ) : field.type === "textarea" ? (
                 <textarea
                   id={field.name}

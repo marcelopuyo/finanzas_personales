@@ -33,25 +33,25 @@ export async function deleteConcepto(id: number) {
   return apiClient.delete(`${SEGMENT}/concepto/${id}`);
 }
 
-// ---- Categoria Gasto ----
+// ---- Categoria Gasto (backend lo expone bajo /gastos) ----
 export async function getAllCategoriasGasto() {
-  return apiClient.get<ResponseCategoriaGastoDto[]>(`${SEGMENT}/categoria-gasto`);
+  return apiClient.get<ResponseCategoriaGastoDto[]>("/gastos/categoria-gasto");
 }
 
 export async function getCategoriaGastoById(id: number) {
-  return apiClient.get<ResponseCategoriaGastoDto>(`${SEGMENT}/categoria-gasto/${id}`);
+  return apiClient.get<ResponseCategoriaGastoDto>(`/gastos/categoria-gasto/${id}`);
 }
 
 export async function createCategoriaGasto(data: { nombre: string }) {
-  return apiClient.post(`${SEGMENT}/categoria-gasto`, data);
+  return apiClient.post("/gastos/categoria-gasto", data);
 }
 
 export async function updateCategoriaGasto(id: number, data: { nombre?: string }) {
-  return apiClient.patch(`${SEGMENT}/categoria-gasto/${id}`, data);
+  return apiClient.patch(`/gastos/categoria-gasto/${id}`, data);
 }
 
 export async function deleteCategoriaGasto(id: number) {
-  return apiClient.delete(`${SEGMENT}/categoria-gasto/${id}`);
+  return apiClient.delete(`/gastos/categoria-gasto/${id}`);
 }
 
 // ---- Tipo Cuenta ----

@@ -29,15 +29,17 @@ export async function getAllGastos() {
   return apiClient.get<ResponseGastoDto[]>(`${SEGMENT}/gasto`);
 }
 
-export async function getGastoById(id: number) {
+export async function getGastoById(id: string) {
   return apiClient.get<ResponseGastoDto>(`${SEGMENT}/gasto/${id}`);
 }
 
 export async function createGasto(data: {
-  descripcion: string;
+  descripcion?: string;
   monto: number;
   saldo?: number;
-  fechaVencimiento: Date;
+  fechaVencimiento?: Date;
+  fechaPago?: Date;
+  isPeriodico?: boolean;
   nombreCategoria: string;
   nombrePeriodo: string;
 }) {
@@ -45,13 +47,14 @@ export async function createGasto(data: {
 }
 
 export async function updateGasto(
-  id: number,
+  id: string,
   data: Partial<{
     descripcion: string;
     monto: number;
     saldo: number;
     fechaVencimiento: Date;
     fechaPago: Date;
+    isPeriodico: boolean;
     nombreCategoria: string;
     nombrePeriodo: string;
   }>
@@ -59,6 +62,6 @@ export async function updateGasto(
   return apiClient.patch(`${SEGMENT}/gasto/${id}`, data);
 }
 
-export async function deleteGasto(id: number) {
+export async function deleteGasto(id: string) {
   return apiClient.delete(`${SEGMENT}/gasto/${id}`);
 }

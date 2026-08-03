@@ -47,7 +47,7 @@ const navigation: NavItem[] = [
     children: [
       { label: "Categorías", href: "/categorias-gasto" },
       { label: "Períodos", href: "/periodos-gasto" },
-      { label: "Gastos", href: "/gastos" },
+      { label: "Gastos", href: "/cruds/gastos" },
     ],
   },
   {

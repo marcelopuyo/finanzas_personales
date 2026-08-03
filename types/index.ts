@@ -81,13 +81,15 @@ export interface ResponsePeriodoGastoDto {
 
 export interface ResponseGastoDto {
   id: string;
-  descripcion: string;
+  descripcion?: string;
   monto: number;
   saldo: number;
-  fechaVencimiento: Date;
-  fechaPago: Date;
-  nombreCategoria: string;
-  nombrePeriodo: string;
+  fechaVencimiento?: string | Date;
+  fechaPago?: string | Date;
+  isPeriodico?: boolean;
+  categoria?: { nombre: string };
+  periodo?: { nombre: string };
+  cuenta?: { nombre: string };
 }
 
 export interface ResponseTarjetaDto {
