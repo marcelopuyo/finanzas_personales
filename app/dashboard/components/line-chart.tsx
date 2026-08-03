@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import {
   LineChart,
   Line,
+  Area,
+  ComposedChart,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -21,6 +23,7 @@ interface EvolutionChartProps {
   className?: string;
   action?: ReactNode;
   badge?: ReactNode;
+  area?: boolean;
 }
 
 export function EvolutionChart({
@@ -31,6 +34,7 @@ export function EvolutionChart({
   className = "",
   action,
   badge,
+  area = false,
 }: EvolutionChartProps) {
   const header = (
     <div className="mb-4 flex items-center justify-between">
@@ -57,7 +61,7 @@ export function EvolutionChart({
     <div className={`rounded-lg border border-border bg-card p-5 ${className}`}>
       {header}
       <ResponsiveContainer width="100%" height={height}>
-        <LineChart data={data}>
+        <ComposedChart data={data}>
           <CartesianGrid
             strokeDasharray="3 3"
             vertical={false}
@@ -75,15 +79,35 @@ export function EvolutionChart({
             tickLine={false}
           />
           <Tooltip content={<ChartTooltip />} />
-          <Line
-            type="monotone"
-            dataKey="value"
-            stroke={color}
-            strokeWidth={2}
-            dot={false}
-            activeDot={{ r: 4, fill: color }}
-          />
-        </LineChart>
+          {area ? (
+            <>
+              <defs>
+                <linearGradient id="evolutionArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+                  <stop offset="100%" stopColor={color} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <Area
+                type="monotone"
+                dataKey="value"
+                stroke={color}
+                strokeWidth={2}
+                fill="url(#evolutionArea)"
+                dot={false}
+                activeDot={{ r: 4, fill: color }}
+              />
+            </>
+          ) : (
+            <Line
+              type="monotone"
+              dataKey="value"
+              stroke={color}
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 4, fill: color }}
+            />
+          )}
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   );

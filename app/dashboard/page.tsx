@@ -7,8 +7,9 @@ import { Tabs } from "@/components/ui/tabs";
 import { ChartSkeleton } from "@/components/ui/skeleton";
 import { AccountCard, AccountCardSkeleton } from "./components/account-card";
 import { StackedBarChart } from "./components/bar-chart";
-import { EvolutionChart, MultiLineChart } from "./components/line-chart";
+import { EvolutionChart } from "./components/line-chart";
 import { GastosDetalle } from "./components/gastos-detalle";
+import { IngresosDetalle } from "./components/ingresos-detalle";
 import {
   fetchDashboardData,
   type DashboardData,
@@ -71,6 +72,7 @@ export default function DashboardPage() {
     <Tabs
       tabs={[
         { id: "resumen", label: "Resumen" },
+        { id: "detalle", label: "Detalle" },
         { id: "historico", label: "Histórico" },
       ]}
       activeTab={tabIngresos}
@@ -225,6 +227,18 @@ export default function DashboardPage() {
               },
             ]}
           />
+        ) : tabIngresos === "detalle" ? (
+          <div className="rounded-lg border border-border bg-card p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h3 className="text-[16px] font-semibold text-header">
+                  Ingresos
+                </h3>
+              </div>
+              {ingresosTabs}
+            </div>
+            <IngresosDetalle data={data.ingresosDetalle} />
+          </div>
         ) : (
           <EvolutionChart
             title="Ingresos"
@@ -239,9 +253,11 @@ export default function DashboardPage() {
       {loading ? (
         <ChartSkeleton />
       ) : data && data.evolucionResultados.length > 0 ? (
-        <MultiLineChart
+        <EvolutionChart
           title="Evolución de Resultados"
           data={data.evolucionResultados}
+          color="var(--primary)"
+          area
         />
       ) : null}
 

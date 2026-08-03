@@ -9,7 +9,7 @@ import {
 } from "@/lib/api/endpoints/reportes.api";
 import { getAllJornadasTrabajoPlane } from "@/lib/api/endpoints/trabajos.api";
 import { getAllPeriodosTrabajo } from "@/lib/api/endpoints/trabajos.api";
-import type { GastoPeriodo } from "@/types";
+import type { GastoPeriodo, ResponsePeriodoTrabajoDto } from "@/types";
 import { numberToCurrency, onlyDate } from "@/lib/utils";
 
 export interface DashboardData {
@@ -28,6 +28,7 @@ export interface DashboardData {
   gastosTotal: string;
   gastosSaldo: string;
   gastosDetalle: GastoPeriodo[];
+  ingresosDetalle: ResponsePeriodoTrabajoDto[];
   ingresosResumen: {
     name: string;
     value: number;
@@ -42,12 +43,7 @@ export interface DashboardData {
   prestamosSaldo: string;
   evolucionGastos: { name: string; value: number }[];
   evolucionIngresos: { name: string; value: number }[];
-  evolucionResultados: {
-    name: string;
-    ingresos: number;
-    gastos: number;
-    resultado: number;
-  }[];
+  evolucionResultados: { name: string; value: number }[];
 }
 
 export async function fetchDashboardData(): Promise<DashboardData> {
@@ -212,32 +208,12 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     value: e.monto || e.valor || 0,
   }));
 
-  // Combinar evolución de resultados
-  const resultadosMap = new Map<
-    string,
-    { ingresos: number; gastos: number }
-  >();
-  evolIngresos.forEach((e) => {
-    const key = e.periodo || e.id;
-    const entry = resultadosMap.get(key) || { ingresos: 0, gastos: 0 };
-    entry.ingresos = e.monto || e.valor || 0;
-    resultadosMap.set(key, entry);
-  });
-  evolGastos.forEach((e) => {
-    const key = e.periodo || e.id;
-    const entry = resultadosMap.get(key) || { ingresos: 0, gastos: 0 };
-    entry.gastos = e.monto || e.valor || 0;
-    resultadosMap.set(key, entry);
-  });
-
-  const evolucionResultados = Array.from(resultadosMap.entries())
-    .map(([name, data]) => ({
-      name,
-      ingresos: data.ingresos,
-      gastos: data.gastos,
-      resultado: data.ingresos - data.gastos,
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  // Evolución de resultados: usa el endpoint del backend getEvolucionResultados
+  // (misma lógica que el frontend original: una sola serie con el resultado neto por mes)
+  const evolucionResultados = evolResultados.map((e) => ({
+    name: e.id,
+    value: e.valor || 0,
+  }));
 
   return {
     balance,
@@ -250,6 +226,10 @@ export async function fetchDashboardData(): Promise<DashboardData> {
       const fb = b.fechaPago ? new Date(b.fechaPago).getTime() : 0;
       return fb - fa;
     }),
+    ingresosDetalle: [...periodosTrabajo].sort(
+      (a, b) =>
+        new Date(b.fechaHasta).getTime() - new Date(a.fechaHasta).getTime()
+    ),
     ingresosResumen,
     ingresosTotal: numberToCurrency(totalIngresos),
     prestamosResumen,

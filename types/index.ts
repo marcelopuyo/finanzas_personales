@@ -146,7 +146,8 @@ export interface ResponsePeriodoTrabajoDto {
   montoACobrar: number;
   fechaEstimadaCobro: Date;
   fechaDeCobro: Date;
-  nombreTrabajo: string;
+  trabajo?: { nombre: string };
+  jornadas?: ResponseJornadaTrabajoDto[];
 }
 
 export interface ResponseJornadaTrabajoDto {
