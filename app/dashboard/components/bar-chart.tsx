@@ -9,8 +9,8 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Cell,
 } from "recharts";
+import { ChartTooltip } from "./chart-tooltip";
 
 interface BarChartProps {
   title: string;
@@ -78,16 +78,7 @@ export function StackedBarChart({
             axisLine={false}
             tickLine={false}
           />
-          <Tooltip
-            cursor={false}
-            contentStyle={{
-              backgroundColor: "var(--card)",
-              border: "1px solid var(--border)",
-              borderRadius: "8px",
-              fontSize: "13px",
-              color: "var(--card-foreground)",
-            }}
-          />
+          <Tooltip cursor={false} content={<ChartTooltip />} />
           {bars.map((bar) => (
             <Bar
               key={bar.key}

@@ -3,6 +3,7 @@
 import {
   flexRender,
   getCoreRowModel,
+  getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
@@ -54,9 +55,12 @@ export function DataTable<TData, TValue>({
     onSortingChange: setSorting,
     onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
   });
+
+  const hasFooter = columns.some((c) => c.footer != null);
 
   if (!data.length) {
     return (
@@ -148,6 +152,34 @@ export function DataTable<TData, TValue>({
               </tr>
             ))}
           </tbody>
+          {hasFooter &&
+            table.getFooterGroups().map((footerGroup) => (
+              <tfoot key={footerGroup.id}>
+                <tr>
+                  {footerGroup.headers.map((footer) => {
+                    const meta = footer.column.columnDef.meta as
+                      | { align?: Align }
+                      | undefined;
+                    return (
+                      <td
+                        key={footer.id}
+                        className={cn(
+                          "border-t border-border bg-muted/40 px-3 py-2.5 font-medium text-card-foreground",
+                          alignClass(meta?.align)
+                        )}
+                      >
+                        {footer.isPlaceholder
+                          ? null
+                          : flexRender(
+                              footer.column.columnDef.footer,
+                              footer.getContext()
+                            )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              </tfoot>
+            ))}
         </table>
       </div>
 

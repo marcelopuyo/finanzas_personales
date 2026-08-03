@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import { ChartTooltip } from "./chart-tooltip";
 
 interface EvolutionChartProps {
   title: string;
@@ -73,15 +74,7 @@ export function EvolutionChart({
             axisLine={false}
             tickLine={false}
           />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: "var(--card)",
-              border: "1px solid var(--border)",
-              borderRadius: "8px",
-              fontSize: "13px",
-              color: "var(--card-foreground)",
-            }}
-          />
+          <Tooltip content={<ChartTooltip />} />
           <Line
             type="monotone"
             dataKey="value"
