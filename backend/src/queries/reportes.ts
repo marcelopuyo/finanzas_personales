@@ -1,9 +1,10 @@
-import { Between, IsNull, LessThanOrEqual, MoreThan, MoreThanOrEqual } from "typeorm";
+import { Between, In, IsNull, LessThanOrEqual, MoreThan, MoreThanOrEqual } from "typeorm";
 import { getDb } from "../db";
 import { Cuenta } from "../entities/cuenta.entity";
 import { Gasto } from "../entities/gasto.entity";
 import { HistoricoCuenta } from "../entities/historico-cuenta.entity";
 import { JornadaTrabajo } from "../entities/jornada-trabajo.entity";
+import { Movimiento } from "../entities/movimiento.entity";
 import { PeriodoGasto } from "../entities/periodo-gasto.entity";
 import { Prestamo } from "../entities/prestamo.entity";
 
@@ -37,7 +38,8 @@ export interface GastoPeriodo {
   isPeriodico: boolean;
   categoria: { nombre: string } | null;
   periodo: { nombre: string } | null;
-  cuenta: null;
+  /** Cuenta con la que se pagó el gasto (desde el Movimiento). */
+  cuenta: string | null;
 }
 
 // ============================================================
@@ -93,7 +95,7 @@ export async function getGastosPeriodo(
       },
       relations: { periodo: true, categoria: true },
     });
-    return rows.map(mapGastoPeriodo);
+    return withCuentas(rows, ds);
   }
 
   let id = idPeriodo;
@@ -114,7 +116,29 @@ export async function getGastosPeriodo(
     where: { eliminado: false, periodo: { id } },
     relations: { periodo: true, categoria: true },
   });
-  return rows.map(mapGastoPeriodo);
+  return withCuentas(rows, ds);
+}
+
+/** Resuelve las cuentas de pago para una lista de gastos en batch. */
+async function withCuentas(
+  rows: Gasto[],
+  ds: Awaited<ReturnType<typeof getDb>>
+): Promise<GastoPeriodo[]> {
+  const mapped = rows.map(mapGastoPeriodo);
+  const ids = mapped.map((g) => g.id).filter((id): id is string => !!id);
+  if (ids.length === 0) return mapped;
+
+  const movimientos = await ds.getRepository(Movimiento).find({
+    where: { gasto: { id: In(ids) }, eliminado: false },
+    relations: { cuenta: true, gasto: true },
+  });
+  const cuentas = new Map<string, string>();
+  for (const mov of movimientos) {
+    if (mov.gasto?.id && mov.cuenta?.nombre) {
+      cuentas.set(mov.gasto.id, mov.cuenta.nombre);
+    }
+  }
+  return mapped.map((g) => ({ ...g, cuenta: cuentas.get(g.id) ?? null }));
 }
 
 function mapGastoPeriodo(r: Gasto): GastoPeriodo {

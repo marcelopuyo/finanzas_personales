@@ -1,7 +1,8 @@
-import { LessThanOrEqual, MoreThan, MoreThanOrEqual } from "typeorm";
+import { In, LessThanOrEqual, MoreThan, MoreThanOrEqual } from "typeorm";
 import { getDb } from "../db";
 import { CategoriaGasto } from "../entities/categoria-gasto.entity";
 import { Gasto } from "../entities/gasto.entity";
+import { Movimiento } from "../entities/movimiento.entity";
 import { PeriodoGasto } from "../entities/periodo-gasto.entity";
 
 // ============================================================
@@ -29,7 +30,8 @@ export interface GastoOut {
   isPeriodico: boolean;
   categoria: { nombre: string } | null;
   periodo: { nombre: string } | null;
-  cuenta: null;
+  /** Cuenta con la que se pagó el gasto (desde el Movimiento). */
+  cuenta: string | null;
 }
 
 // ============================================================
@@ -124,13 +126,41 @@ function mapGasto(r: Gasto): GastoOut {
   };
 }
 
+/**
+ * Resuelve la cuenta con la que se pagó cada gasto en una sola consulta.
+ * Devuelve un mapa idGasto → nombreCuenta.
+ */
+async function resolveCuentas(
+  ds: Awaited<ReturnType<typeof getDb>>,
+  gastoIds: string[]
+): Promise<Map<string, string>> {
+  if (gastoIds.length === 0) return new Map();
+  const movimientos = await ds.getRepository(Movimiento).find({
+    where: { gasto: { id: In(gastoIds) }, eliminado: false },
+    relations: { cuenta: true, gasto: true },
+  });
+  const map = new Map<string, string>();
+  for (const mov of movimientos) {
+    if (mov.gasto?.id && mov.cuenta?.nombre) {
+      map.set(mov.gasto.id, mov.cuenta.nombre);
+    }
+  }
+  return map;
+}
+
+function withCuenta(row: GastoOut, cuentaMap: Map<string, string>): GastoOut {
+  return { ...row, cuenta: cuentaMap.get(row.id) ?? null };
+}
+
 export async function getAllGastos(): Promise<GastoOut[]> {
   const ds = await getDb();
   const rows = await ds.getRepository(Gasto).find({
     where: { eliminado: false },
     relations: { periodo: true, categoria: true },
   });
-  return rows.map(mapGasto);
+  const mapped = rows.map(mapGasto);
+  const cuentas = await resolveCuentas(ds, mapped.map((g) => g.id));
+  return mapped.map((g) => withCuenta(g, cuentas));
 }
 
 export async function getGastosPendientes(): Promise<GastoOut[]> {
@@ -139,7 +169,9 @@ export async function getGastosPendientes(): Promise<GastoOut[]> {
     where: { eliminado: false, saldo: MoreThan(0) },
     relations: { periodo: true, categoria: true },
   });
-  return rows.map(mapGasto);
+  const mapped = rows.map(mapGasto);
+  const cuentas = await resolveCuentas(ds, mapped.map((g) => g.id));
+  return mapped.map((g) => withCuenta(g, cuentas));
 }
 
 export async function getGastoById(id: string): Promise<GastoOut | null> {
@@ -148,7 +180,10 @@ export async function getGastoById(id: string): Promise<GastoOut | null> {
     where: { id, eliminado: false },
     relations: { periodo: true, categoria: true },
   });
-  return r ? mapGasto(r) : null;
+  if (!r) return null;
+  const mapped = mapGasto(r);
+  const cuentas = await resolveCuentas(ds, [mapped.id]);
+  return withCuenta(mapped, cuentas);
 }
 
 /**

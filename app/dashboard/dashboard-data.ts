@@ -10,6 +10,7 @@ import {
 import { getAllJornadasTrabajo } from "@/backend/src/queries/trabajos";
 import { getAllPeriodosTrabajo, type PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
 import type { GastoOut } from "@/backend/src/queries/gastos";
+import { getAllGastos } from "@/backend/src/queries/gastos";
 import { numberToCurrency, onlyDate } from "@/lib/utils";
 
 export interface DashboardData {
@@ -51,6 +52,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     balance,
     cuentasEvol,
     gastosPeriodo,
+    gastosTodos,
     prestamos,
     evolGastos,
     evolIngresos,
@@ -61,6 +63,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     getBalanceActual().catch(() => 0),
     getCuentasConEvolucion().catch(() => []),
     getGastosPeriodo().catch(() => [] as GastoOut[]),
+    getAllGastos().catch(() => [] as GastoOut[]),
     getPrestamosPendientesReporte().catch(() => []),
     getEvolucionGastos().catch(() => []),
     getEvolucionIngresos().catch(() => []),
@@ -221,7 +224,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     gastosResumen,
     gastosTotal: numberToCurrency(montoTotalGastos),
     gastosSaldo: numberToCurrency(montoSaldoGastos),
-    gastosDetalle: [...gastosPeriodo].sort((a, b) => {
+    gastosDetalle: [...gastosTodos].sort((a, b) => {
       const fa = a.fechaPago ? new Date(a.fechaPago).getTime() : 0;
       const fb = b.fechaPago ? new Date(b.fechaPago).getTime() : 0;
       return fb - fa;

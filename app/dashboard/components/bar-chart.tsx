@@ -37,12 +37,12 @@ export function StackedBarChart({
   badge,
 }: BarChartProps) {
   const header = (
-    <div className="mb-4 flex items-center justify-between">
-      <div className="flex items-center gap-2">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+      <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-[16px] font-semibold text-header">{title}</h3>
         {badge}
       </div>
-      {action}
+      {action && <div className="flex items-center gap-2">{action}</div>}
     </div>
   );
 
