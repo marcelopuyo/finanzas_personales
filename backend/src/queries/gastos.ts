@@ -150,3 +150,32 @@ export async function getGastoById(id: string): Promise<GastoOut | null> {
   });
   return r ? mapGasto(r) : null;
 }
+
+/**
+ * Busca descripciones de gastos guardados (no eliminados) que contengan el
+ * término, devolviendo valores únicos. Se usa para autocompletar el campo
+ * "Descripción" del Gasto Directo.
+ */
+export async function buscarDescripcionesGasto(
+  termino: string
+): Promise<string[]> {
+  const ds = await getDb();
+  const rows = await ds
+    .getRepository(Gasto)
+    .createQueryBuilder("g")
+    .select("g.descripcion", "descripcion")
+    .where("g.descripcion LIKE :termino", { termino: `%${termino}%` })
+    .andWhere("g.eliminado = :eliminado", { eliminado: false })
+    .andWhere("g.descripcion IS NOT NULL")
+    .orderBy("g.descripcion", "ASC")
+    .limit(50)
+    .getRawMany();
+
+  const unicos = new Set<string>();
+  for (const r of rows) {
+    const d = r?.descripcion;
+    if (typeof d === "string" && d.trim().length > 0) unicos.add(d.trim());
+  }
+  return Array.from(unicos).slice(0, 8);
+}
+

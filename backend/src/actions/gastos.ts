@@ -3,9 +3,11 @@
 import type { z } from "zod";
 import { getDb } from "../db";
 import { CategoriaGasto } from "../entities/categoria-gasto.entity";
+import { Cuenta } from "../entities/cuenta.entity";
 import { Gasto } from "../entities/gasto.entity";
+import { Movimiento } from "../entities/movimiento.entity";
 import { PeriodoGasto } from "../entities/periodo-gasto.entity";
-import { dbError, refresh } from "../lib/action-helpers";
+import { crearHistoricoCuenta, dbError, refresh } from "../lib/action-helpers";
 import {
   getCategoriaGastoById,
   getGastoById,
@@ -209,16 +211,38 @@ export async function actualizarGasto(
 
 export async function eliminarGasto(id: string) {
   const ds = await getDb();
-  const repo = ds.getRepository(Gasto);
-  const row = await repo.findOneBy({ id, eliminado: false });
-  if (!row) {
-    throw new Error(`Gasto con id ${id} no encontrado`);
-  }
-  try {
-    row.eliminado = true;
-    await repo.save(row);
-    refresh();
-  } catch (error) {
-    dbError(error, "Gasto");
-  }
+  await ds.transaction(async (manager) => {
+    const gastoRepo = manager.getRepository(Gasto);
+    const movRepo = manager.getRepository(Movimiento);
+    const cuentaRepo = manager.getRepository(Cuenta);
+
+    const gasto = await gastoRepo.findOne({
+      where: { id, eliminado: false },
+    });
+    if (!gasto) throw new Error(`Gasto con id ${id} no encontrado`);
+
+    // Buscar todos los movimientos de pago vinculados a este gasto
+    const movimientos = await movRepo.find({
+      where: { gasto: { id }, eliminado: false },
+      relations: { cuenta: true },
+    });
+
+    // Revertir cada movimiento: devolver el monto a la cuenta y soft-delete
+    for (const mov of movimientos) {
+      const cuenta = mov.cuenta;
+      if (cuenta) {
+        cuenta.saldo += mov.monto;
+        await cuentaRepo.save(cuenta);
+        await crearHistoricoCuenta(manager, cuenta);
+      }
+      mov.eliminado = true;
+      await movRepo.save(mov);
+    }
+
+    // Soft-delete del gasto
+    gasto.eliminado = true;
+    await gastoRepo.save(gasto);
+  });
+
+  refresh();
 }

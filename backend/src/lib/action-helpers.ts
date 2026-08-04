@@ -1,4 +1,8 @@
 import { revalidatePath } from "next/cache";
+import type { EntityManager } from "typeorm";
+import { IsNull } from "typeorm";
+import { Cuenta } from "../entities/cuenta.entity";
+import { HistoricoCuenta } from "../entities/historico-cuenta.entity";
 
 // Invalida la caché de la app tras cada mutación.
 // TODO (Fase 10): afinar a las rutas CRUD específicas de cada entidad.
@@ -14,3 +18,37 @@ export function dbError(error: unknown, entity: string): never {
   }
   throw new Error(`Error inesperado: ${err?.message ?? "desconocido"}`);
 }
+
+/**
+ * Cierra el registro abierto del histórico de la cuenta y crea uno nuevo
+ * con el saldo actual. Se usa en todos los movimientos (cobro, pago, ajuste,
+ * transferencia, reversión de gasto).
+ */
+export async function crearHistoricoCuenta(
+  manager: EntityManager,
+  cuenta: Cuenta
+) {
+  const historicoRepo = manager.getRepository(HistoricoCuenta);
+
+  const existente = await historicoRepo.findOne({
+    where: {
+      eliminado: false,
+      fechaHasta: IsNull(),
+      cuenta: { id: cuenta.id },
+    },
+    relations: { cuenta: true },
+  });
+
+  if (existente) {
+    existente.fechaHasta = new Date();
+    await historicoRepo.save(existente);
+  }
+
+  const nuevo = historicoRepo.create({
+    fechaDesde: new Date(),
+    saldo: cuenta.saldo,
+    cuenta,
+  });
+  await historicoRepo.save(nuevo);
+}
+

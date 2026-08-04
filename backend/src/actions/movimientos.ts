@@ -1,18 +1,17 @@
 "use server";
 
-import { EntityManager, IsNull, LessThanOrEqual, MoreThanOrEqual } from "typeorm";
+import { EntityManager, LessThanOrEqual, MoreThanOrEqual } from "typeorm";
 import type { z } from "zod";
 import { getDb } from "../db";
 import { CategoriaGasto } from "../entities/categoria-gasto.entity";
 import { Concepto } from "../entities/concepto.entity";
 import { Cuenta } from "../entities/cuenta.entity";
 import { Gasto } from "../entities/gasto.entity";
-import { HistoricoCuenta } from "../entities/historico-cuenta.entity";
 import { Movimiento } from "../entities/movimiento.entity";
 import { PeriodoGasto } from "../entities/periodo-gasto.entity";
 import { PeriodoTrabajo } from "../entities/periodo-trabajo.entity";
 import { Prestamo } from "../entities/prestamo.entity";
-import { dbError, refresh } from "../lib/action-helpers";
+import { crearHistoricoCuenta, dbError, refresh } from "../lib/action-helpers";
 import {
   movimiento1Schema,
   movimiento2Schema,
@@ -20,34 +19,6 @@ import {
 } from "../validation/movimientos";
 
 // ---------------------------------------------------------------------------
-// Helpers (port del servicio movimientos.service.ts)
-// ---------------------------------------------------------------------------
-
-/** Cierra el histórico abierto de la cuenta y crea uno nuevo con el saldo actual. */
-async function crearHistoricoCuenta(manager: EntityManager, cuenta: Cuenta) {
-  const historicoRepo = manager.getRepository(HistoricoCuenta);
-
-  const existente = await historicoRepo.findOne({
-    where: {
-      eliminado: false,
-      fechaHasta: IsNull(),
-      cuenta: { id: cuenta.id },
-    },
-    relations: { cuenta: true },
-  });
-
-  if (existente) {
-    existente.fechaHasta = new Date();
-    await historicoRepo.save(existente);
-  }
-
-  const nuevo = historicoRepo.create({
-    fechaDesde: new Date(),
-    saldo: cuenta.saldo,
-    cuenta,
-  });
-  await historicoRepo.save(nuevo);
-}
 
 async function findPeriodoGastoActual(manager: EntityManager) {
   const repo = manager.getRepository(PeriodoGasto);
