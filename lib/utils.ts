@@ -22,7 +22,22 @@ export function dateToLocaleDateString(date: string | Date): string {
   const d = typeof date === "string" ? new Date(date) : date;
   return d.toLocaleDateString("es-ES");
 }
+/**
+ * Convierte hora decimal (formato backend HH.MM, ej. 17.3 = 17:30) a string "HH:MM".
+ */
+export function decimalToTime(value: number): string {
+  const hours = Math.trunc(value);
+  const minutes = Math.round((value - hours) * 100);
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
 
+/**
+ * Convierte "HH:MM" a hora decimal del backend (HH.MM, ej. "17:30" -> 17.3).
+ */
+export function timeToDecimal(value: string): number {
+  const [h, m] = value.split(":").map((n) => parseInt(n, 10) || 0);
+  return h + m / 100;
+}
 /**
  * Normaliza una fecha a mediodía UTC (para comparaciones sin hora).
  */

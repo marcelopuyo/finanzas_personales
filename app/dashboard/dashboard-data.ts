@@ -2,14 +2,14 @@ import {
   getBalanceActual,
   getCuentasConEvolucion,
   getGastosPeriodo,
-  getPrestmosPendientes,
+  getPrestamosPendientesReporte,
   getEvolucionGastos,
   getEvolucionIngresos,
   getEvolucionResultados,
-} from "@/lib/api/endpoints/reportes.api";
-import { getAllJornadasTrabajoPlane } from "@/lib/api/endpoints/trabajos.api";
-import { getAllPeriodosTrabajo } from "@/lib/api/endpoints/trabajos.api";
-import type { GastoPeriodo, ResponsePeriodoTrabajoDto } from "@/types";
+} from "@/backend/src/queries/reportes";
+import { getAllJornadasTrabajo } from "@/backend/src/queries/trabajos";
+import { getAllPeriodosTrabajo, type PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
+import type { GastoOut } from "@/backend/src/queries/gastos";
 import { numberToCurrency, onlyDate } from "@/lib/utils";
 
 export interface DashboardData {
@@ -27,8 +27,8 @@ export interface DashboardData {
   }[];
   gastosTotal: string;
   gastosSaldo: string;
-  gastosDetalle: GastoPeriodo[];
-  ingresosDetalle: ResponsePeriodoTrabajoDto[];
+  gastosDetalle: GastoOut[];
+  ingresosDetalle: PeriodoTrabajoOut[];
   ingresosResumen: {
     name: string;
     value: number;
@@ -60,12 +60,12 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   ] = await Promise.all([
     getBalanceActual().catch(() => 0),
     getCuentasConEvolucion().catch(() => []),
-    getGastosPeriodo().catch(() => []),
-    getPrestmosPendientes().catch(() => []),
+    getGastosPeriodo().catch(() => [] as GastoOut[]),
+    getPrestamosPendientesReporte().catch(() => []),
     getEvolucionGastos().catch(() => []),
     getEvolucionIngresos().catch(() => []),
     getEvolucionResultados().catch(() => []),
-    getAllJornadasTrabajoPlane().catch(() => []),
+    getAllJornadasTrabajo().catch(() => []),
     getAllPeriodosTrabajo().catch(() => []),
   ]);
 
@@ -92,13 +92,13 @@ export async function fetchDashboardData(): Promise<DashboardData> {
       !fechaCobro || fechaCobro < new Date("1901-01-02");
 
     if (noCobrado && fechaHasta < now) {
-      pendienteCobro += p.montoACobrar;
+      pendienteCobro += p.montoACobrar ?? 0;
     } else if (
       noCobrado &&
       fechaHasta >= now &&
       new Date(p.fechaDesde) <= now
     ) {
-      periodosActuales += p.montoACobrar;
+      periodosActuales += p.montoACobrar ?? 0;
     }
   });
 
@@ -156,7 +156,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   let totalIngresos = 0;
 
   jornadas.forEach((j) => {
-    const nombre = j.trabajo || "Sin trabajo";
+    const nombre = (j as any).trabajo || "Sin trabajo";
     const monto = j.montoJornada + j.montoPropina;
     ingresosMap.set(nombre, (ingresosMap.get(nombre) || 0) + monto);
     totalIngresos += monto;
@@ -200,12 +200,12 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   // --- Evolución ---
   const evolucionGastos = evolGastos.map((e) => ({
     name: e.periodo,
-    value: e.monto || e.valor || 0,
+    value: e.monto,
   }));
 
   const evolucionIngresos = evolIngresos.map((e) => ({
     name: e.periodo,
-    value: e.monto || e.valor || 0,
+    value: e.monto,
   }));
 
   // Evolución de resultados: usa el endpoint del backend getEvolucionResultados

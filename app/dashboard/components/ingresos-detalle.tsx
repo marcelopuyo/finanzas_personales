@@ -2,7 +2,7 @@
 
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
-import type { ResponsePeriodoTrabajoDto } from "@/types";
+import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
 import { cn, dateTimeToString, numberToCurrency } from "@/lib/utils";
 import { SparkLineChart } from "./sparkline-chart";
 
@@ -17,8 +17,8 @@ function ImporteCell({
   montoACobrar,
   fechaDeCobro,
 }: {
-  montoACobrar: number;
-  fechaDeCobro?: string | Date;
+  montoACobrar: number | null;
+  fechaDeCobro?: string | Date | null;
 }) {
   const cobrado =
     !!fechaDeCobro && new Date(fechaDeCobro).getFullYear() >= 1901;
@@ -29,7 +29,7 @@ function ImporteCell({
         cobrado ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
       )}
     >
-      {numberToCurrency(montoACobrar)}
+      {numberToCurrency(montoACobrar ?? 0)}
     </span>
   );
 }
@@ -37,7 +37,7 @@ function ImporteCell({
 function JornadasCell({
   jornadas,
 }: {
-  jornadas?: ResponsePeriodoTrabajoDto["jornadas"];
+  jornadas?: PeriodoTrabajoOut["jornadas"];
 }) {
   const sorted = (jornadas || [])
     .slice()
@@ -55,7 +55,7 @@ function JornadasCell({
   );
 }
 
-export const ingresosDetalleColumns: ColumnDef<ResponsePeriodoTrabajoDto>[] = [
+export const ingresosDetalleColumns: ColumnDef<PeriodoTrabajoOut>[] = [
   {
     accessorKey: "fechaDesde",
     header: "Desde",
@@ -117,7 +117,7 @@ export const ingresosDetalleColumns: ColumnDef<ResponsePeriodoTrabajoDto>[] = [
 export function IngresosDetalle({
   data,
 }: {
-  data: ResponsePeriodoTrabajoDto[];
+  data: PeriodoTrabajoOut[];
 }) {
   return (
     <DataTable columns={ingresosDetalleColumns} data={data} pageSize={5} />

@@ -6,10 +6,10 @@ import { SlidersHorizontal } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { Modal } from "@/components/ui/modal";
 import { Checkbox } from "@/components/ui/checkbox";
-import type { GastoPeriodo } from "@/types";
+import type { GastoOut } from "@/backend/src/queries/gastos";
 import { cn, dateTimeToString, numberToCurrency } from "@/lib/utils";
 
-export const gastosDetalleColumns: ColumnDef<GastoPeriodo>[] = [
+export const gastosDetalleColumns: ColumnDef<GastoOut>[] = [
   {
     accessorKey: "fechaPago",
     header: "Pago",
@@ -53,7 +53,7 @@ export const gastosDetalleColumns: ColumnDef<GastoPeriodo>[] = [
 
 const SIN_CATEGORIA = "Sin categoría";
 
-export function GastosDetalle({ data }: { data: GastoPeriodo[] }) {
+export function GastosDetalle({ data }: { data: GastoOut[] }) {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [draftCategories, setDraftCategories] = useState<string[]>([]);

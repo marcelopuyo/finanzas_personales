@@ -1,0 +1,1 @@
+import { getAllMonedas } from "@/backend/src/queries/maestros"; import { MonedasListClient } from "./list-client"; export default async function MonedasPage() { const data = await getAllMonedas(); return <MonedasListClient initialData={data} />; }

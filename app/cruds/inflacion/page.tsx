@@ -1,0 +1,1 @@
+import { getAllInflaciones } from "@/backend/src/queries/maestros"; import { InflacionListClient } from "./list-client"; export default async function InflacionPage() { const data = await getAllInflaciones(); return <InflacionListClient initialData={data} />; }

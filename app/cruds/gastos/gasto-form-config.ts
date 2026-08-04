@@ -1,7 +1,6 @@
 import { z } from "zod";
 import type { FormField } from "@/components/crud/CrudForm";
-import { getAllCategoriasGasto } from "@/lib/api/endpoints/maestros.api";
-import { getAllPeriodosGasto } from "@/lib/api/endpoints/gastos.api";
+import { fetchCategoriasGasto, fetchPeriodosGasto } from "./helpers";
 
 /** Esquema zod para crear/editar Gasto */
 export const gastoSchema = z.object({
@@ -50,18 +49,12 @@ export const gastoFields: FormField[] = [
     name: "categoria",
     label: "Categoría",
     type: "select",
-    optionsFrom: async () => {
-      const categorias = await getAllCategoriasGasto();
-      return categorias.map((c) => ({ value: c.nombre, label: c.nombre }));
-    },
+    optionsFrom: fetchCategoriasGasto,
   },
   {
     name: "periodo",
     label: "Período",
     type: "select",
-    optionsFrom: async () => {
-      const periodos = await getAllPeriodosGasto();
-      return periodos.map((p) => ({ value: p.nombre, label: p.nombre }));
-    },
+    optionsFrom: fetchPeriodosGasto,
   },
 ];

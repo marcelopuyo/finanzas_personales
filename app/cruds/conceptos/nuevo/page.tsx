@@ -1,7 +1,7 @@
 "use client";
 
 import { CrudForm } from "@/components/crud/CrudForm";
-import { createConcepto } from "@/lib/api/endpoints/maestros.api";
+import { crearConcepto } from "@/backend/src/actions/maestros";
 import {
   conceptoSchema,
   conceptoFields,
@@ -14,9 +14,9 @@ export default function NuevoConceptoPage() {
       fields={conceptoFields}
       schema={conceptoSchema}
       onSubmit={async (data) => {
-        await createConcepto({
+        await crearConcepto({
           nombre: data.nombre as string,
-          categoria: data.categoria as string,
+          categoria: data.categoria as "Egreso" | "Ingreso",
         });
       }}
       cancelHref="/cruds/conceptos"

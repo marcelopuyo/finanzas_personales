@@ -123,27 +123,34 @@ export async function getPeriodoTrabajoById(
 // Jornadas de trabajo
 // ============================================================
 export async function getAllJornadasTrabajo(): Promise<
-  (JornadaTrabajoOut & { periodoTrabajo: { id: number } | null })[]
+  (JornadaTrabajoOut & { periodoTrabajo: { id: number; trabajo: string } | null })[]
 > {
   const ds = await getDb();
   const rows = await ds.getRepository(JornadaTrabajo).find({
     where: { eliminado: false },
-    relations: { periodoTrabajo: true },
+    relations: { periodoTrabajo: { trabajo: true } },
   });
   return rows.map((r) => ({
     ...mapJornada(r),
     periodoTrabajo: r.periodoTrabajo
-      ? { id: r.periodoTrabajo.id }
+      ? {
+          id: r.periodoTrabajo.id,
+          trabajo: r.periodoTrabajo.trabajo?.nombre ?? "Sin trabajo",
+        }
       : null,
+    // El dashboard usa `trabajo` como nombre del trabajo
+    trabajo: r.periodoTrabajo?.trabajo?.nombre ?? "Sin trabajo",
   }));
 }
 
 export async function getJornadaTrabajoById(
   id: string
-): Promise<JornadaTrabajoOut | null> {
+): Promise<(JornadaTrabajoOut & { periodoTrabajoId?: number }) | null> {
   const ds = await getDb();
   const r = await ds
     .getRepository(JornadaTrabajo)
     .findOne({ where: { id, eliminado: false } });
-  return r ? mapJornada(r) : null;
+  return r
+    ? { ...mapJornada(r), periodoTrabajoId: r.periodoTrabajo?.id }
+    : null;
 }

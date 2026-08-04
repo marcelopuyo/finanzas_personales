@@ -1,0 +1,1 @@
+import { getAllPeriodosGasto } from "@/backend/src/queries/gastos"; import { PeriodosGastoListClient } from "./list-client"; export default async function PeriodosGastoPage() { const data = await getAllPeriodosGasto(); return <PeriodosGastoListClient initialData={data} />; }

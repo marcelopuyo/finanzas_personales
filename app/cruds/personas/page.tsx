@@ -1,0 +1,1 @@
+import { getAllPersonas } from "@/backend/src/queries/maestros"; import { PersonasListClient } from "./list-client"; export default async function PersonasPage() { const data = await getAllPersonas(); return <PersonasListClient initialData={data} />; }

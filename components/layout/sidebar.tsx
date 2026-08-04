@@ -45,8 +45,8 @@ const navigation: NavItem[] = [
     label: "Gastos",
     icon: () => <FontAwesomeIcon icon={faWallet} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
     children: [
-      { label: "Categorías", href: "/categorias-gasto" },
-      { label: "Períodos", href: "/periodos-gasto" },
+      { label: "Categorías", href: "/cruds/categorias-gasto" },
+      { label: "Períodos", href: "/cruds/periodos-gasto" },
       { label: "Gastos", href: "/cruds/gastos" },
     ],
   },
@@ -54,31 +54,31 @@ const navigation: NavItem[] = [
     label: "Cuentas",
     icon: () => <FontAwesomeIcon icon={faLandmark} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
     children: [
-      { label: "Tipos", href: "/tipos-cuenta" },
-      { label: "Cuentas", href: "/cuentas" },
+      { label: "Tipos", href: "/cruds/tipos-cuenta" },
+      { label: "Cuentas", href: "/cruds/cuentas" },
     ],
   },
   {
     label: "Tarjetas",
     icon: () => <FontAwesomeIcon icon={faCreditCard} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
     children: [
-      { label: "Tarjetas", href: "/tarjetas" },
-      { label: "Períodos", href: "/periodos-tarjeta" },
-      { label: "Movimientos", href: "/movimientos-tarjeta" },
+      { label: "Tarjetas", href: "/cruds/tarjetas" },
+      { label: "Períodos", href: "/cruds/periodos-tarjeta" },
+      { label: "Movimientos", href: "/cruds/movimientos-tarjeta" },
     ],
   },
   {
     label: "Préstamos",
-    href: "/prestamos",
+    href: "/cruds/prestamos",
     icon: () => <FontAwesomeIcon icon={faHandHoldingDollar} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
   },
   {
     label: "Trabajos",
     icon: () => <FontAwesomeIcon icon={faBriefcase} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
     children: [
-      { label: "Trabajos", href: "/trabajos" },
-      { label: "Períodos", href: "/periodos-trabajo" },
-      { label: "Jornadas", href: "/jornadas-trabajo" },
+      { label: "Trabajos", href: "/cruds/trabajos" },
+      { label: "Períodos", href: "/cruds/periodos-trabajo" },
+      { label: "Jornadas", href: "/cruds/jornadas-trabajo" },
     ],
   },
   {
@@ -86,10 +86,10 @@ const navigation: NavItem[] = [
     icon: () => <FontAwesomeIcon icon={faTags} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
     children: [
       { label: "Conceptos", href: "/cruds/conceptos" },
-      { label: "Personas", href: "/personas" },
-      { label: "Monedas", href: "/monedas" },
-      { label: "Cotizaciones", href: "/cotizaciones" },
-      { label: "Inflación", href: "/inflacion" },
+      { label: "Personas", href: "/cruds/personas" },
+      { label: "Monedas", href: "/cruds/monedas" },
+      { label: "Cotizaciones", href: "/cruds/cotizaciones" },
+      { label: "Inflación", href: "/cruds/inflacion" },
     ],
   },
 ];

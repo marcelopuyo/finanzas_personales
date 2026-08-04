@@ -14,7 +14,10 @@ import { numberToCurrency } from "@/lib/utils";
 interface CrudTableProps<T, TId = number> {
   title: string;
   columns: ColumnDef<T>[];
-  fetchData: () => Promise<T[]>;
+  /** Datos precargados desde Server Component (patrón recomendado). */
+  initialData?: T[];
+  /** Función de fetch legacy (opcional si se usa initialData). */
+  fetchData?: () => Promise<T[]>;
   deleteItem: (id: TId) => Promise<unknown>;
   searchPlaceholder?: string;
   createHref: string;
@@ -32,6 +35,7 @@ export function CrudTable<T, TId = number>({
   title,
   columns,
   fetchData,
+  initialData,
   deleteItem,
   searchPlaceholder = "Buscar...",
   createHref,
@@ -40,14 +44,15 @@ export function CrudTable<T, TId = number>({
   searchPredicate,
 }: CrudTableProps<T, TId>) {
   const router = useRouter();
-  const [items, setItems] = useState<T[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<T[]>(initialData ?? []);
+  const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [deleteId, setDeleteId] = useState<TId | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const load = () => {
+    if (!fetchData) return;
     setLoading(true);
     setError(null);
     fetchData()
@@ -57,9 +62,14 @@ export function CrudTable<T, TId = number>({
   };
 
   useEffect(() => {
+    if (initialData !== undefined) {
+      setItems(initialData);
+      setLoading(false);
+      return;
+    }
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initialData]);
 
   const filtered = useMemo(() => {
     if (!search) return items;

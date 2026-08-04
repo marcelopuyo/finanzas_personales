@@ -1,0 +1,1 @@
+import { getAllTiposCuenta } from "@/backend/src/queries/maestros"; import { TiposCuentaListClient } from "./list-client"; export default async function TiposCuentaPage() { const data = await getAllTiposCuenta(); return <TiposCuentaListClient initialData={data} />; }
