@@ -4,9 +4,10 @@ import { EditarGastoClient } from "./edit-client";
 export default async function EditarGastoPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const gasto = await getGastoById(String(params.id));
+  const { id } = await params;
+  const gasto = await getGastoById(String(id));
   if (!gasto) {
     return (
       <div className="flex h-64 items-center justify-center">

@@ -7,7 +7,7 @@ import { dateTimeToString, numberToCurrency } from "@/lib/utils";
 const columns: ColumnDef<TrabajoOut>[] = [
   { accessorKey: "nombre", header: "Nombre" },
   { accessorKey: "fechaInicio", header: "Inicio", cell: ({ getValue }) => dateTimeToString(getValue<Date>()), meta: { align: "center" as const } },
-  { accessorKey: "precioHora", header: "Precio Hora", meta: { align: "right" as const }, cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0) },
+  { accessorKey: "precioHora", header: "Precio Hora", meta: { align: "right" as const, isCurrency: true }, cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0) },
 ];
 interface Props { initialData: TrabajoOut[] }
 export function TrabajosListClient({ initialData }: Props) {

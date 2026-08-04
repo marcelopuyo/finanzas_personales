@@ -7,7 +7,7 @@ import { dateTimeToString, numberToCurrency } from "@/lib/utils";
 const columns: ColumnDef<CotizacionOut>[] = [
   { accessorKey: "fechaInicial", header: "Desde", cell: ({ getValue }) => dateTimeToString(getValue<Date>()), meta: { align: "center" as const } },
   { accessorKey: "fechaFinal", header: "Hasta", cell: ({ getValue }) => dateTimeToString(getValue<Date>()), meta: { align: "center" as const } },
-  { accessorKey: "cotizacion", header: "Cotización", meta: { align: "right" as const }, cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0) },
+  { accessorKey: "cotizacion", header: "Cotización", meta: { align: "right" as const, isCurrency: true }, cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0) },
   { accessorFn: (r) => r.moneda?.nombre ?? "", id: "moneda", header: "Moneda" },
 ];
 interface Props { initialData: CotizacionOut[] }

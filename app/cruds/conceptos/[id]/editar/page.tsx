@@ -4,9 +4,10 @@ import { EditarConceptoClient } from "./edit-client";
 export default async function EditarConceptoPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const concepto = await getConceptoById(Number(params.id));
+  const { id } = await params;
+  const concepto = await getConceptoById(Number(id));
   if (!concepto) {
     return (
       <div className="flex h-64 items-center justify-center">

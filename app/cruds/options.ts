@@ -42,9 +42,34 @@ export async function fetchTrabajos() {
   return rows.map((r) => ({ value: r.nombre, label: r.nombre }));
 }
 
+/** Formatea "YYYY-MM-DD" (o Date) a "D/M/YYYY" sin problemas de zona horaria. */
+function formatFecha(value: string | Date): string {
+  let iso: string;
+  if (typeof value === "string") {
+    iso = value.slice(0, 10);
+  } else if (value instanceof Date && !isNaN(value.getTime())) {
+    iso = value.toISOString().slice(0, 10);
+  } else {
+    return String(value);
+  }
+  const [y, m, d] = iso.split("-");
+  if (!y || !m || !d) return iso;
+  return `${parseInt(d, 10)}/${parseInt(m, 10)}/${y}`;
+}
+
 export async function fetchPeriodosTrabajo() {
   const rows = await getAllPeriodosTrabajo();
-  return rows.map((r) => ({ value: String(r.id), label: `${r.trabajo?.nombre ?? "Trabajo"} (${String(r.fechaDesde).slice(0, 10)})` }));
+  // Solo períodos SIN fecha de cobro (null o fecha centinela < 1901-01-02,
+  // misma lógica que el dashboard para "no cobrado").
+  return rows
+    .filter((r) => {
+      if (!r.fechaDeCobro) return true;
+      return new Date(r.fechaDeCobro) < new Date("1901-01-02");
+    })
+    .map((r) => ({
+      value: String(r.id),
+      label: `${r.trabajo?.nombre ?? "Trabajo"}: ${formatFecha(r.fechaDesde)} al ${formatFecha(r.fechaHasta)}`,
+    }));
 }
 
 // Para Movimientos Tarjeta (opciones de movimiento, solo lectura de ejemplo)

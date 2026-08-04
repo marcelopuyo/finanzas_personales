@@ -237,14 +237,18 @@ export async function actualizarJornadaTrabajo(
   const data = jornadaTrabajoUpdateSchema.parse(input);
   const ds = await getDb();
 
-  const existing = await ds
-    .getRepository(JornadaTrabajo)
-    .findOneBy({ id, eliminado: false });
+  const existing = await ds.getRepository(JornadaTrabajo).findOne({
+    where: { id, eliminado: false },
+    relations: { periodoTrabajo: true },
+  });
   if (!existing) {
     throw new Error(`Jornada de trabajo con id ${id} no encontrada`);
   }
 
-  const idPeriodo = data.idPeriodo ?? existing.periodoTrabajo.id;
+  const idPeriodo = data.idPeriodo ?? existing.periodoTrabajo?.id;
+  if (!idPeriodo) {
+    throw new Error("idPeriodo es requerido");
+  }
   const periodo = await ds.getRepository(PeriodoTrabajo).findOne({
     where: { id: idPeriodo },
     relations: { trabajo: true },
@@ -260,7 +264,9 @@ export async function actualizarJornadaTrabajo(
   );
 
   try {
-    Object.assign(existing, data, { montoJornada, periodoTrabajo: periodo });
+    // Excluimos idPeriodo (no es columna; se asigna vía periodoTrabajo)
+    const { idPeriodo: _ignored, ...restData } = data;
+    Object.assign(existing, restData, { montoJornada, periodoTrabajo: periodo });
     await ds.getRepository(JornadaTrabajo).save(existing);
 
     await actualizarMontoACobrarPeriodo(idPeriodo);
@@ -275,14 +281,20 @@ export async function actualizarJornadaTrabajo(
 export async function eliminarJornadaTrabajo(id: string) {
   const ds = await getDb();
   const repo = ds.getRepository(JornadaTrabajo);
-  const row = await repo.findOneBy({ id, eliminado: false });
+  const row = await repo.findOne({
+    where: { id, eliminado: false },
+    relations: { periodoTrabajo: true },
+  });
   if (!row) {
     throw new Error(`Jornada de trabajo con id ${id} no encontrada`);
   }
+  const idPeriodo = row.periodoTrabajo?.id;
   try {
     row.eliminado = true;
     await repo.save(row);
-    await actualizarMontoACobrarPeriodo(row.periodoTrabajo.id);
+    if (idPeriodo) {
+      await actualizarMontoACobrarPeriodo(idPeriodo);
+    }
     refresh();
   } catch (error) {
     dbError(error, "Jornada de trabajo");

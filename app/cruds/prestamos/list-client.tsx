@@ -7,8 +7,8 @@ import { dateTimeToString, numberToCurrency } from "@/lib/utils";
 const columns: ColumnDef<PrestamoOut>[] = [
   { accessorKey: "detalle", header: "Detalle", cell: ({ getValue }) => getValue<string|null>() ?? "—" },
   { accessorKey: "fecha", header: "Fecha", cell: ({ getValue }) => dateTimeToString(getValue<Date>()), meta: { align: "center" as const } },
-  { accessorKey: "monto", header: "Monto", meta: { align: "right" as const }, cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0) },
-  { accessorKey: "saldo", header: "Saldo", meta: { align: "right" as const }, cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0) },
+  { accessorKey: "monto", header: "Monto", meta: { align: "right" as const, isCurrency: true }, cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0) },
+  { accessorKey: "saldo", header: "Saldo", meta: { align: "right" as const, isCurrency: true }, cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0) },
   { accessorFn: (r) => r.personaOrigen?.nombre ?? "", id: "origen", header: "Origen" },
   { accessorFn: (r) => r.personaDestino?.nombre ?? "", id: "destino", header: "Destino" },
   { accessorKey: "sentido", header: "Sentido" },

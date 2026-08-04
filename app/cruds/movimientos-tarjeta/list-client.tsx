@@ -7,7 +7,7 @@ import { dateTimeToString, numberToCurrency } from "@/lib/utils";
 const columns: ColumnDef<MovimientoTarjetaOut>[] = [
   { accessorKey: "detalle", header: "Detalle", cell: ({ getValue }) => getValue<string|null>() ?? "—" },
   { accessorKey: "fecha", header: "Fecha", cell: ({ getValue }) => dateTimeToString(getValue<Date>()), meta: { align: "center" as const } },
-  { accessorKey: "monto", header: "Monto", meta: { align: "right" as const }, cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0) },
+  { accessorKey: "monto", header: "Monto", meta: { align: "right" as const, isCurrency: true }, cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0) },
   { accessorKey: "cuotas", header: "Cuotas", meta: { align: "center" as const } },
   { accessorFn: (r) => r.persona?.nombre ?? "", id: "persona", header: "Persona" },
   { accessorFn: (r) => r.tarjeta?.nombre ?? "", id: "tarjeta", header: "Tarjeta" },

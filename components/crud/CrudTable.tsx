@@ -166,6 +166,7 @@ export function CrudTable<T, TId = number>({
               : col.id || col.accessorKey || "",
           value: (item: T): string => {
             if (meta?.exportValue) return meta.exportValue(item);
+            if (meta?.isCurrency) return numberToCurrency(Number(raw(item)) || 0);
             const v = raw(item);
             if (v === null || v === undefined) return "";
             if (typeof v === "object") return JSON.stringify(v);

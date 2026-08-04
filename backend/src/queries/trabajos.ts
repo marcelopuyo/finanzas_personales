@@ -129,6 +129,7 @@ export async function getAllJornadasTrabajo(): Promise<
   const rows = await ds.getRepository(JornadaTrabajo).find({
     where: { eliminado: false },
     relations: { periodoTrabajo: { trabajo: true } },
+    order: { fechaJornada: "DESC", fechaCarga: "DESC" },
   });
   return rows.map((r) => ({
     ...mapJornada(r),
@@ -149,7 +150,7 @@ export async function getJornadaTrabajoById(
   const ds = await getDb();
   const r = await ds
     .getRepository(JornadaTrabajo)
-    .findOne({ where: { id, eliminado: false } });
+    .findOne({ where: { id, eliminado: false }, relations: { periodoTrabajo: true } });
   return r
     ? { ...mapJornada(r), periodoTrabajoId: r.periodoTrabajo?.id }
     : null;

@@ -7,7 +7,7 @@ import { dateTimeToString, numberToCurrency } from "@/lib/utils";
 const columns: ColumnDef<PeriodoTrabajoOut>[] = [
   { accessorKey: "fechaDesde", header: "Desde", cell: ({ getValue }) => dateTimeToString(getValue<Date>()), meta: { align: "center" as const } },
   { accessorKey: "fechaHasta", header: "Hasta", cell: ({ getValue }) => dateTimeToString(getValue<Date>()), meta: { align: "center" as const } },
-  { accessorKey: "montoACobrar", header: "A Cobrar", meta: { align: "right" as const }, cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0) },
+  { accessorKey: "montoACobrar", header: "A Cobrar", meta: { align: "right" as const, isCurrency: true }, cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0) },
   { accessorKey: "fechaDeCobro", header: "Cobrado", cell: ({ getValue }) => dateTimeToString(getValue<Date|null>() ?? undefined), meta: { align: "center" as const } },
   { accessorFn: (r) => r.trabajo?.nombre ?? "", id: "trabajo", header: "Trabajo" },
 ];

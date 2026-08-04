@@ -8,8 +8,8 @@ const columns: ColumnDef<JornadaTrabajoOut>[] = [
   { accessorKey: "fechaJornada", header: "Fecha", cell: ({ getValue }) => dateTimeToString(getValue<Date>()), meta: { align: "center" as const } },
   { accessorKey: "horaDesde", header: "Desde", meta: { align: "center" as const } },
   { accessorKey: "horaHasta", header: "Hasta", meta: { align: "center" as const } },
-  { accessorKey: "montoJornada", header: "Monto", meta: { align: "right" as const }, cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0) },
-  { accessorKey: "montoPropina", header: "Propina", meta: { align: "right" as const }, cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0) },
+  { accessorKey: "montoJornada", header: "Monto", meta: { align: "right" as const, isCurrency: true }, cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0) },
+  { accessorKey: "montoPropina", header: "Propina", meta: { align: "right" as const, isCurrency: true }, cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0) },
 ];
 interface Props { initialData: JornadaTrabajoOut[] }
 export function JornadasTrabajoListClient({ initialData }: Props) {
