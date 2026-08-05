@@ -12,6 +12,7 @@ import { StackedBarChart } from "./components/bar-chart";
 import { EvolutionChart } from "./components/line-chart";
 import { GastosDetalle } from "./components/gastos-detalle";
 import { IngresosDetalle } from "./components/ingresos-detalle";
+import { HistorialModal, type CuentaHistorial } from "./components/historial-modal";
 import type { DashboardData } from "./dashboard-data";
 import type { GastoOut } from "@/backend/src/queries/gastos";
 import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
@@ -34,6 +35,8 @@ function toDateKey(v: string | Date | null | undefined): string {
 export function DashboardClient({ data }: Props) {
   const [tabGastos, setTabGastos] = useState("resumen");
   const [tabIngresos, setTabIngresos] = useState("resumen");
+  // Cuenta seleccionada para abrir su historial en popup
+  const [cuentaHist, setCuentaHist] = useState<CuentaHistorial | null>(null);
 
   // Fechas por defecto: primer día del mes actual → hoy
   const fechaPrimerDia = () => {
@@ -332,7 +335,18 @@ export function DashboardClient({ data }: Props) {
         <h2 className="mb-3 text-[14px] font-medium text-header">Cuentas y Períodos</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {data.cuentas.map((cuenta, i) => (
-            <AccountCard key={i} {...cuenta} />
+            <AccountCard
+              key={i}
+              {...cuenta}
+              onOpen={() =>
+                cuenta.id != null &&
+                setCuentaHist({
+                  id: cuenta.id,
+                  nombre: cuenta.title,
+                  saldo: cuenta.value,
+                })
+              }
+            />
           ))}
         </div>
       </div>
@@ -515,6 +529,12 @@ export function DashboardClient({ data }: Props) {
           </label>
         </div>
       </Modal>
+
+      {/* Popup de historial de cuenta */}
+      <HistorialModal
+        cuenta={cuentaHist}
+        onClose={() => setCuentaHist(null)}
+      />
     </div>
   );
 }

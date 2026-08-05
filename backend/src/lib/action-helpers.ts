@@ -26,7 +26,9 @@ export function dbError(error: unknown, entity: string): never {
  */
 export async function crearHistoricoCuenta(
   manager: EntityManager,
-  cuenta: Cuenta
+  cuenta: Cuenta,
+  /** ID del movimiento que originó este histórico (opcional, p.ej. para reversiones). */
+  movimientoId?: string
 ) {
   const historicoRepo = manager.getRepository(HistoricoCuenta);
 
@@ -48,7 +50,8 @@ export async function crearHistoricoCuenta(
     fechaDesde: new Date(),
     saldo: cuenta.saldo,
     cuenta,
-  });
+    ...(movimientoId ? { movimiento: { id: movimientoId } } : {}),
+  } as any);
   await historicoRepo.save(nuevo);
 }
 

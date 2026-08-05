@@ -91,7 +91,7 @@ export async function cobrarSueldo(input: z.infer<typeof movimiento1Schema>) {
     periodoTrabajo.fechaDeCobro = new Date();
     await periodoTrabajoRepo.save(periodoTrabajo);
 
-    await movRepo.save(
+    const mov = await movRepo.save(
       movRepo.create({
         fecha: data.fecha,
         monto: data.monto,
@@ -100,7 +100,7 @@ export async function cobrarSueldo(input: z.infer<typeof movimiento1Schema>) {
       })
     );
 
-    await crearHistoricoCuenta(manager, cuenta);
+    await crearHistoricoCuenta(manager, cuenta, mov.id);
   });
 
   refresh();
@@ -143,7 +143,7 @@ export async function pagarPrestamo(input: z.infer<typeof movimiento1Schema>) {
     prestamo.saldo -= data.monto;
     await prestamoRepo.save(prestamo);
 
-    await movRepo.save(
+    const mov = await movRepo.save(
       movRepo.create({
         fecha: data.fecha,
         monto: data.monto,
@@ -153,7 +153,7 @@ export async function pagarPrestamo(input: z.infer<typeof movimiento1Schema>) {
       })
     );
 
-    await crearHistoricoCuenta(manager, cuenta);
+    await crearHistoricoCuenta(manager, cuenta, mov.id);
   });
 
   refresh();
@@ -184,11 +184,11 @@ export async function ajustarCuenta(input: z.infer<typeof movimiento1Schema>) {
     cuenta.saldo += data.monto;
     await cuentaRepo.save(cuenta);
 
-    await movRepo.save(
+    const mov = await movRepo.save(
       movRepo.create({ fecha: data.fecha, monto: data.monto, cuenta, concepto })
     );
 
-    await crearHistoricoCuenta(manager, cuenta);
+    await crearHistoricoCuenta(manager, cuenta, mov.id);
   });
 
   refresh();
@@ -225,11 +225,11 @@ export async function pagarGasto(input: z.infer<typeof movimiento1Schema>) {
     gasto.fechaPago = data.fecha as unknown as Date;
     await gastoRepo.save(gasto);
 
-    await movRepo.save(
+    const mov = await movRepo.save(
       movRepo.create({ fecha: data.fecha, monto: data.monto, cuenta, gasto, concepto })
     );
 
-    await crearHistoricoCuenta(manager, cuenta);
+    await crearHistoricoCuenta(manager, cuenta, mov.id);
   });
 
   refresh();
@@ -281,7 +281,7 @@ export async function gastoDirecto(input: z.infer<typeof movimiento3Schema>) {
     nuevoGasto.fechaPago = data.fecha as unknown as Date;
     await gastoRepo.save(nuevoGasto);
 
-    await movRepo.save(
+    const mov = await movRepo.save(
       movRepo.create({
         fecha: data.fecha,
         monto: data.monto,
@@ -291,7 +291,7 @@ export async function gastoDirecto(input: z.infer<typeof movimiento3Schema>) {
       })
     );
 
-    await crearHistoricoCuenta(manager, cuenta);
+    await crearHistoricoCuenta(manager, cuenta, mov.id);
   });
 
   refresh();
@@ -329,7 +329,7 @@ export async function transferir(input: z.infer<typeof movimiento2Schema>) {
     await cuentaRepo.save(cuentaOrigen);
     await cuentaRepo.save(cuentaDestino);
 
-    await movRepo.save(
+    const movOrig = await movRepo.save(
       movRepo.create({
         fecha: data.fecha,
         monto: -(data.montoOrigen!),
@@ -338,7 +338,7 @@ export async function transferir(input: z.infer<typeof movimiento2Schema>) {
       })
     );
 
-    await movRepo.save(
+    const movDest = await movRepo.save(
       movRepo.create({
         fecha: data.fecha,
         monto: data.montoDestino!,
@@ -347,8 +347,8 @@ export async function transferir(input: z.infer<typeof movimiento2Schema>) {
       })
     );
 
-    await crearHistoricoCuenta(manager, cuentaOrigen);
-    await crearHistoricoCuenta(manager, cuentaDestino);
+    await crearHistoricoCuenta(manager, cuentaOrigen, movOrig.id);
+    await crearHistoricoCuenta(manager, cuentaDestino, movDest.id);
   });
 
   refresh();

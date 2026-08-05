@@ -43,21 +43,21 @@ export function timeToDecimal(value: string): number {
  */
 export function dateTimeToDate(date?: Date | string): Date {
   const param = date ? new Date(date) : new Date();
-  const anio = param.getFullYear();
-  const mes = String(param.getMonth() + 1).padStart(2, "0");
-  const dia = String(param.getDate() + 1).padStart(2, "0");
-  return new Date(`${anio}-${mes}-${dia}T12:00:00.000Z`);
+  param.setUTCHours(12, 0, 0, 0);
+  return param;
 }
 
 /**
  * Convierte Date a string dd-mm-aaaa.
+ * Las fechas llegan como medianoche UTC desde SQL Server: se formatean con
+ * partes UTC para evitar el corrimiento de día por zona horaria.
  */
 export function dateTimeToString(date?: Date | string): string {
   if (!date) return "";
   const param = new Date(date);
-  const anio = param.getFullYear();
-  const mes = String(param.getMonth() + 1).padStart(2, "0");
-  const dia = String(param.getDate() + 1).padStart(2, "0");
+  const anio = param.getUTCFullYear();
+  const mes = String(param.getUTCMonth() + 1).padStart(2, "0");
+  const dia = String(param.getUTCDate()).padStart(2, "0");
   return `${dia}-${mes}-${anio}`;
 }
 

@@ -22,6 +22,7 @@ export interface EvolucionResultado {
 }
 
 export interface CuentaConEvolucion {
+  id: number;
   nombreCuenta: string;
   saldoCuenta: number;
   serieEjeX: string[];
@@ -355,6 +356,7 @@ export async function getCuentasConEvolucion(): Promise<CuentaConEvolucion[]> {
     const { vKeys, vValues } = filtrarMayorFechaPorDia(historicos);
 
     result.push({
+      id: cuenta.id,
       nombreCuenta: cuenta.nombre,
       saldoCuenta: cuenta.saldo,
       serieEjeX: vKeys,

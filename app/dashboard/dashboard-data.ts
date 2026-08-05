@@ -16,6 +16,7 @@ import { numberToCurrency, onlyDate } from "@/lib/utils";
 export interface DashboardData {
   balance: number;
   cuentas: {
+    id?: number;
     title: string;
     value: string;
     labels: string[];
@@ -75,6 +76,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
 
   // --- Cuentas con evolución ---
   const cuentas = cuentasEvol.map((c) => ({
+    id: c.id,
     title: c.nombreCuenta,
     value: numberToCurrency(c.saldoCuenta),
     labels: c.serieEjeX || [],

@@ -1,5 +1,6 @@
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryGeneratedColumn } from "typeorm";
 import { Cuenta } from "./cuenta.entity";
+import type { Movimiento } from "./movimiento.entity";
 
 @Entity({ name: "historico_cuenta" })
 export class HistoricoCuenta {
@@ -25,4 +26,10 @@ export class HistoricoCuenta {
     onDelete: "CASCADE",
   })
   cuenta?: Cuenta;
+
+  /** Relación 1:1 con el movimiento que originó este registro. Nula para
+   * históricos iniciales o de reversión (eliminarGasto). */
+  @OneToOne("Movimiento", { nullable: true })
+  @JoinColumn()
+  movimiento?: Movimiento | null;
 }
