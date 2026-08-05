@@ -35,6 +35,7 @@ export interface DashboardData {
     value: number;
   }[];
   ingresosTotal: string;
+  ingresosMesActual: string;
   prestamosResumen: {
     name: string;
     saldo: number;
@@ -169,6 +170,23 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     ([name, value]) => ({ name, value })
   );
 
+  // --- Ingresos del mes actual (jornadas cuya fechaJornada cae en el mes en curso) ---
+  // Suma montojornada + montopropina de todos los registros de jornadatrabajo
+  // filtrados por el mes actual.
+  const hoy = new Date();
+  const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1);
+  let totalMesActual = 0;
+  jornadas.forEach((j) => {
+    // Mediodía UTC: evita que fechas a medianoche (UTC) se corran al día/mes
+    // anterior en zonas horarias con offset negativo (p. ej. GMT-3).
+    const f = new Date(j.fechaJornada);
+    f.setUTCHours(12, 0, 0, 0);
+    if (f >= inicioMes && f < finMes) {
+      totalMesActual += j.montoJornada + j.montoPropina;
+    }
+  });
+
   // --- Préstamos pendientes ---
   const prestamosMap = new Map<
     string,
@@ -235,6 +253,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     ),
     ingresosResumen,
     ingresosTotal: numberToCurrency(totalIngresos),
+    ingresosMesActual: numberToCurrency(totalMesActual),
     prestamosResumen,
     prestamosTotal: numberToCurrency(montoTotalPrestamos),
     prestamosSaldo: numberToCurrency(montoSaldoPrestamos),

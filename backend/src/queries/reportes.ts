@@ -191,13 +191,19 @@ export async function getEvolucionGastosMensual(): Promise<EvolucionItem[]> {
   const ds = await getDb();
   const gastos = await ds.getRepository(Gasto).find({
     where: { eliminado: false },
-    order: { fechaPago: "ASC" },
+    relations: { periodo: true },
   });
 
   const agrupado: Record<string, number> = {};
   for (const g of gastos) {
-    if (!g.fechaPago) continue;
-    const d = new Date(g.fechaPago);
+    // Se agrupa por el mes del PERÍODO del gasto (no por fechaPago), para que
+    // los gastos se imputen al mes al que pertenecen (p. ej. un gasto del
+    // período Mayo 26 pagado por adelantado en abril se cuenta en mayo).
+    if (!g.periodo?.fechaApertura) continue;
+    // Mediodía UTC: evita que fechas a medianoche (UTC) se corran al día/mes
+    // anterior en zonas horarias con offset negativo (p. ej. GMT-3).
+    const d = new Date(g.periodo.fechaApertura);
+    d.setUTCHours(12, 0, 0, 0);
     const mes = d.toLocaleDateString("es-ES", { month: "short" });
     const key = `${mes}-${d.getFullYear()}`;
     agrupado[key] = (agrupado[key] || 0) + g.monto;
@@ -218,7 +224,10 @@ export async function getEvolucionIngresos(): Promise<EvolucionItem[]> {
 
   const agrupado: Record<string, number> = {};
   for (const j of jornadas) {
+    // Mediodía UTC: evita que fechas a medianoche (UTC) se corran al día/mes
+    // anterior en zonas horarias con offset negativo (p. ej. GMT-3).
     const d = new Date(j.fechaJornada);
+    d.setUTCHours(12, 0, 0, 0);
     const mes = d.toLocaleDateString("es-ES", { month: "short" });
     const key = `${mes}-${d.getFullYear()}`;
     agrupado[key] = (agrupado[key] || 0) + j.montoJornada + j.montoPropina;
@@ -245,10 +254,18 @@ export async function getEvolucionResultados(): Promise<EvolucionResultado[]> {
     resultado[item.periodo] = (resultado[item.periodo] || 0) - item.monto;
   }
 
-  return Object.keys(resultado).map((key) => ({
-    id: key,
-    valor: resultado[key],
-  }));
+  // Solo se muestran los períodos que tienen gastos (se descartan los meses
+  // sin gastos, que solo reflejarían ingresos sin contrapartida de gastos).
+  const conGastos = new Set(
+    gastos.filter((g) => g.monto > 0).map((g) => g.periodo)
+  );
+
+  return Object.keys(resultado)
+    .filter((key) => conGastos.has(key))
+    .map((key) => ({
+      id: key,
+      valor: resultado[key],
+    }));
 }
 
 // ============================================================
