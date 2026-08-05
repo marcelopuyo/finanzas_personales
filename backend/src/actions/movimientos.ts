@@ -20,17 +20,18 @@ import {
 
 // ---------------------------------------------------------------------------
 
-async function findPeriodoGastoActual(manager: EntityManager) {
+/** Busca el período de gasto cuyo rango (fechaApertura..fechaCierre) contiene la fecha dada. */
+async function findPeriodoGastoPorFecha(manager: EntityManager, fecha: string) {
   const repo = manager.getRepository(PeriodoGasto);
-  const now = new Date();
+  const d = new Date(fecha);
   const periodo = await repo.findOne({
     where: {
       eliminado: false,
-      fechaApertura: LessThanOrEqual(now),
-      fechaCierre: MoreThanOrEqual(now),
+      fechaApertura: LessThanOrEqual(d),
+      fechaCierre: MoreThanOrEqual(d),
     },
   });
-  if (!periodo) throw new Error("No se encontró el período de gasto actual");
+  if (!periodo) throw new Error(`No se encontró un período de gasto para la fecha ${fecha}`);
   return periodo;
 }
 
@@ -250,8 +251,9 @@ export async function gastoDirecto(input: z.infer<typeof movimiento3Schema>) {
     const conceptoRepo = manager.getRepository(Concepto);
     const movRepo = manager.getRepository(Movimiento);
 
-    // 1. Crear el gasto
-    const periodo = await findPeriodoGastoActual(manager);
+    // 1. Crear el gasto — el período se resuelve por la FECHA ingresada (no por
+    //    el período actual), para que el gasto quede en el mes que corresponde.
+    const periodo = await findPeriodoGastoPorFecha(manager, data.fecha);
     const categoria = await findCategoriaGasto(manager, data.idCategoriaGasto);
 
     const nuevoGasto = await gastoRepo.save(
