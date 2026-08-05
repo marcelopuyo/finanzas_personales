@@ -11,13 +11,13 @@ import {
 } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faHouse,
+  faChartLine,
   faArrowRightArrowLeft,
   faWallet,
   faLandmark,
   faCreditCard,
   faHandHoldingDollar,
-  faBriefcase,
+  faScrewdriverWrench,
   faTags,
 } from "@fortawesome/free-solid-svg-icons";
 import { cn } from "@/lib/utils";
@@ -34,7 +34,7 @@ const navigation: NavItem[] = [
   {
     label: "Dashboard",
     href: "/",
-    icon: () => <FontAwesomeIcon icon={faHouse} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
+    icon: () => <FontAwesomeIcon icon={faChartLine} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
   },
   {
     label: "Movimientos",
@@ -74,7 +74,7 @@ const navigation: NavItem[] = [
   },
   {
     label: "Trabajos",
-    icon: () => <FontAwesomeIcon icon={faBriefcase} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
+    icon: () => <FontAwesomeIcon icon={faScrewdriverWrench} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
     children: [
       { label: "Trabajos", href: "/cruds/trabajos" },
       { label: "Períodos", href: "/cruds/periodos-trabajo" },

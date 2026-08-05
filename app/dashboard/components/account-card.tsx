@@ -1,6 +1,5 @@
 "use client";
 
-import { ChevronRight } from "lucide-react";
 import { SparkLineChart } from "./sparkline-chart";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +32,6 @@ export function AccountCard({
             {value}
           </p>
         </div>
-        {id != null && <ChevronRight className="h-4 w-4 text-subtitle" />}
       </div>
       {values.length > 0 && (
         <div className="mt-2">
@@ -44,7 +42,7 @@ export function AccountCard({
   );
 
   const base =
-    "rounded-lg border border-border bg-card p-4 transition-colors";
+    "flex flex-col justify-start rounded-lg border border-border bg-card p-4 transition-colors";
 
   // Si la tarjeta representa una cuenta real, al hacer click abre el historial.
   if (id != null && onOpen) {
@@ -52,11 +50,7 @@ export function AccountCard({
       <button
         type="button"
         onClick={onOpen}
-        className={cn(
-          base,
-          "w-full text-left hover:border-primary/40 hover:bg-muted",
-          className
-        )}
+        className={cn(base, "w-full text-left", className)}
       >
         {content}
       </button>

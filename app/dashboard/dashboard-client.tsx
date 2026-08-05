@@ -329,7 +329,12 @@ export function DashboardClient({ data }: Props) {
         <p className="mt-0.5 text-[13px] text-subtitle">Resumen de tus finanzas personales</p>
       </div>
 
-      <StatCard title="Balance Actual" value={numberToCurrency(data.balance)} centered />
+      <StatCard
+        title="Balance Actual"
+        value={numberToCurrency(data.balance)}
+        centered
+        className="border-primary/40 bg-linear-to-br from-primary/10 via-card to-card shadow-sm"
+      />
 
       <div>
         <h2 className="mb-3 text-[14px] font-medium text-header">Cuentas y Períodos</h2>
@@ -429,7 +434,7 @@ export function DashboardClient({ data }: Props) {
           data={data.prestamosResumen.map((p) => ({ name: p.name, value: p.pagado, value2: p.saldo }))}
           bars={[
             { key: "value", name: "Pagado", color: "var(--success)", darkColor: "var(--success)" },
-            { key: "value2", name: "Pendiente", color: "var(--danger)", darkColor: "var(--danger)" },
+            { key: "value2", name: "Pendiente", color: "var(--success)", darkColor: "var(--success)" },
           ]}
         />
       )}
