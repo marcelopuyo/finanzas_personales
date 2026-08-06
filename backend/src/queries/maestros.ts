@@ -1,4 +1,5 @@
 import { getDb } from "../db";
+import { requireUserId } from "../lib/auth";
 import { Concepto } from "../entities/concepto.entity";
 import { Cotizacion } from "../entities/cotizacion.entity";
 import { Cuenta } from "../entities/cuenta.entity";
@@ -69,11 +70,16 @@ export interface HistoricoCuentaOut {
 // ============================================================
 // Conceptos
 // ============================================================
+// Los conceptos son compartidos (sistema=true, sin dueño) o propios del usuario.
 export async function getAllConceptos(): Promise<ConceptoOut[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
-  const rows = await ds
-    .getRepository(Concepto)
-    .find({ where: { eliminado: false } });
+  const rows = await ds.getRepository(Concepto).find({
+    where: [
+      { sistema: true, eliminado: false },
+      { usuario: { id: userId }, eliminado: false },
+    ],
+  });
   return rows.map((r) => ({
     id: r.id,
     nombre: r.nombre,
@@ -84,10 +90,14 @@ export async function getAllConceptos(): Promise<ConceptoOut[]> {
 export async function getConceptoById(
   id: number
 ): Promise<ConceptoOut | null> {
+  const userId = await requireUserId();
   const ds = await getDb();
-  const r = await ds
-    .getRepository(Concepto)
-    .findOne({ where: { id, eliminado: false } });
+  const r = await ds.getRepository(Concepto).findOne({
+    where: [
+      { id, sistema: true, eliminado: false },
+      { id, usuario: { id: userId }, eliminado: false },
+    ],
+  });
   return r
     ? { id: r.id, nombre: r.nombre, categoria: r.categoria ?? null }
     : null;
@@ -137,10 +147,11 @@ export async function getMonedaById(id: number): Promise<MonedaOut | null> {
 // Personas
 // ============================================================
 export async function getAllPersonas(): Promise<PersonaOut[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const rows = await ds
     .getRepository(Persona)
-    .find({ where: { eliminado: false } });
+    .find({ where: { usuario: { id: userId }, eliminado: false } });
   return rows.map((r) => ({
     id: r.id,
     nombre: r.nombre,
@@ -150,10 +161,11 @@ export async function getAllPersonas(): Promise<PersonaOut[]> {
 }
 
 export async function getPersonaById(id: number): Promise<PersonaOut | null> {
+  const userId = await requireUserId();
   const ds = await getDb();
-  const r = await ds
-    .getRepository(Persona)
-    .findOne({ where: { id, eliminado: false } });
+  const r = await ds.getRepository(Persona).findOne({
+    where: { id, usuario: { id: userId }, eliminado: false },
+  });
   return r
     ? {
         id: r.id,
@@ -168,9 +180,10 @@ export async function getPersonaById(id: number): Promise<PersonaOut | null> {
 // Cuentas (relaciones tipo y moneda)
 // ============================================================
 export async function getAllCuentas(): Promise<CuentaOut[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const rows = await ds.getRepository(Cuenta).find({
-    where: { eliminado: false },
+    where: { usuario: { id: userId }, eliminado: false },
     relations: { tipo: true, moneda: true },
   });
   return rows.map((r) => ({
@@ -184,9 +197,10 @@ export async function getAllCuentas(): Promise<CuentaOut[]> {
 }
 
 export async function getCuentaById(id: number): Promise<CuentaOut | null> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const r = await ds.getRepository(Cuenta).findOne({
-    where: { id, eliminado: false },
+    where: { id, usuario: { id: userId }, eliminado: false },
     relations: { tipo: true, moneda: true },
   });
   return r
@@ -205,9 +219,10 @@ export async function getCuentaById(id: number): Promise<CuentaOut | null> {
 // Cotizaciones (relación moneda)
 // ============================================================
 export async function getAllCotizaciones(): Promise<CotizacionOut[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const rows = await ds.getRepository(Cotizacion).find({
-    where: { eliminado: false },
+    where: { usuario: { id: userId }, eliminado: false },
     relations: { moneda: true },
   });
   return rows.map((r) => ({
@@ -222,9 +237,10 @@ export async function getAllCotizaciones(): Promise<CotizacionOut[]> {
 export async function getCotizacionById(
   id: number
 ): Promise<CotizacionOut | null> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const r = await ds.getRepository(Cotizacion).findOne({
-    where: { id, eliminado: false },
+    where: { id, usuario: { id: userId }, eliminado: false },
     relations: { moneda: true },
   });
   return r
@@ -242,10 +258,11 @@ export async function getCotizacionById(
 // Inflación
 // ============================================================
 export async function getAllInflaciones(): Promise<InflacionOut[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const rows = await ds
     .getRepository(Inflacion)
-    .find({ where: { eliminado: false } });
+    .find({ where: { usuario: { id: userId }, eliminado: false } });
   return rows.map((r) => ({
     id: r.id,
     fechaInicial: r.fechaInicial,
@@ -257,10 +274,11 @@ export async function getAllInflaciones(): Promise<InflacionOut[]> {
 export async function getInflacionById(
   id: number
 ): Promise<InflacionOut | null> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const r = await ds
     .getRepository(Inflacion)
-    .findOne({ where: { id, eliminado: false } });
+    .findOne({ where: { id, usuario: { id: userId }, eliminado: false } });
   return r
     ? {
         id: r.id,
@@ -275,9 +293,10 @@ export async function getInflacionById(
 // Histórico de cuentas (solo lectura)
 // ============================================================
 export async function getAllHistoricosCuenta(): Promise<HistoricoCuentaOut[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const rows = await ds.getRepository(HistoricoCuenta).find({
-    where: { eliminado: false },
+    where: { eliminado: false, cuenta: { usuario: { id: userId } } },
     relations: { cuenta: true },
   });
   return rows.map((r) => ({
@@ -291,9 +310,10 @@ export async function getAllHistoricosCuenta(): Promise<HistoricoCuentaOut[]> {
 export async function getHistoricosByCuentaId(
   idCuenta: number
 ): Promise<HistoricoCuentaOut[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const rows = await ds.getRepository(HistoricoCuenta).find({
-    where: { eliminado: false, cuenta: { id: idCuenta } },
+    where: { eliminado: false, cuenta: { id: idCuenta, usuario: { id: userId } } },
     relations: { cuenta: true },
   });
   return rows.map((r) => ({

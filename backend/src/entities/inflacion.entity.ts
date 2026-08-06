@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Usuario } from "./usuario.entity";
 
 @Entity({ name: "inflacion" })
 export class Inflacion {
@@ -18,4 +19,7 @@ export class Inflacion {
     default: false,
   })
   eliminado: boolean;
+
+  @ManyToOne(() => Usuario, { onDelete: "CASCADE", nullable: false })
+  usuario: Usuario;
 }

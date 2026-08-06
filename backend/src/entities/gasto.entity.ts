@@ -1,6 +1,7 @@
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
 import { PeriodoGasto } from "./periodo-gasto.entity";
 import { CategoriaGasto } from "./categoria-gasto.entity";
+import { Usuario } from "./usuario.entity";
 
 @Entity({ name: "gasto" })
 export class Gasto {
@@ -37,4 +38,7 @@ export class Gasto {
 
   @ManyToOne(() => CategoriaGasto)
   categoria: CategoriaGasto;
+
+  @ManyToOne(() => Usuario, { onDelete: "CASCADE", nullable: false })
+  usuario: Usuario;
 }

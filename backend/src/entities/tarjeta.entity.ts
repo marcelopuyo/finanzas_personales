@@ -1,5 +1,6 @@
-import { Column, Entity, JoinColumn, OneToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryGeneratedColumn } from "typeorm";
 import { Cuenta } from "./cuenta.entity";
+import { Usuario } from "./usuario.entity";
 
 // Lado propietario de la relación OneToOne con Cuenta (crea columna cuentaId).
 // Las relaciones inversas (movimientos/periodos) se omiten para evitar ciclos.
@@ -25,4 +26,7 @@ export class Tarjeta {
   @OneToOne(() => Cuenta, { onDelete: "CASCADE" })
   @JoinColumn()
   cuenta: Cuenta;
+
+  @ManyToOne(() => Usuario, { onDelete: "CASCADE", nullable: false })
+  usuario: Usuario;
 }

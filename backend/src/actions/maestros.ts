@@ -2,6 +2,7 @@
 
 import type { z } from "zod";
 import { getDb } from "../db";
+import { requireUserId } from "../lib/auth";
 import { dbError, refresh } from "../lib/action-helpers";
 import { Concepto } from "../entities/concepto.entity";
 import { Cotizacion } from "../entities/cotizacion.entity";
@@ -42,11 +43,15 @@ import {
 export async function crearConcepto(
   input: z.infer<typeof conceptoCreateSchema>
 ) {
+  const userId = await requireUserId();
   const data = conceptoCreateSchema.parse(input);
   const ds = await getDb();
   const repo = ds.getRepository(Concepto);
   try {
-    const created = await repo.save(repo.create(data));
+    // Los conceptos nuevos son del usuario (nunca del sistema).
+    const created = await repo.save(
+      repo.create({ ...data, sistema: false, usuario: { id: userId } })
+    );
     refresh();
     return getConceptoById(created.id);
   } catch (error) {
@@ -58,14 +63,25 @@ export async function actualizarConcepto(
   id: number,
   input: z.infer<typeof conceptoUpdateSchema>
 ) {
+  const userId = await requireUserId();
   const data = conceptoUpdateSchema.parse(input);
   const ds = await getDb();
   const repo = ds.getRepository(Concepto);
-  const existing = await repo.preload({ id, ...data });
+  // Solo el dueño puede editar; los del sistema están protegidos.
+  const existing = await repo.findOne({
+    where: [
+      { id, usuario: { id: userId } },
+      { id, sistema: true },
+    ],
+  });
   if (!existing) {
     throw new Error(`Concepto con id ${id} no encontrado`);
   }
+  if (existing.sistema) {
+    throw new Error("Los conceptos del sistema no se pueden modificar");
+  }
   try {
+    Object.assign(existing, data);
     await repo.save(existing);
     refresh();
     return getConceptoById(id);
@@ -75,11 +91,20 @@ export async function actualizarConcepto(
 }
 
 export async function eliminarConcepto(id: number) {
+  const userId = await requireUserId();
   const ds = await getDb();
   const repo = ds.getRepository(Concepto);
-  const row = await repo.findOneBy({ id, eliminado: false });
+  const row = await repo.findOne({
+    where: [
+      { id, usuario: { id: userId }, eliminado: false },
+      { id, sistema: true, eliminado: false },
+    ],
+  });
   if (!row) {
     throw new Error(`Concepto con id ${id} no encontrado`);
+  }
+  if (row.sistema) {
+    throw new Error("Los conceptos del sistema no se pueden eliminar");
   }
   try {
     row.eliminado = true;
@@ -200,11 +225,14 @@ export async function eliminarMoneda(id: number) {
 // PERSONA
 // ============================================================
 export async function crearPersona(input: z.infer<typeof personaCreateSchema>) {
+  const userId = await requireUserId();
   const data = personaCreateSchema.parse(input);
   const ds = await getDb();
   const repo = ds.getRepository(Persona);
   try {
-    const created = await repo.save(repo.create(data));
+    const created = await repo.save(
+      repo.create({ ...data, usuario: { id: userId } })
+    );
     refresh();
     return getPersonaById(created.id);
   } catch (error) {
@@ -216,14 +244,16 @@ export async function actualizarPersona(
   id: number,
   input: z.infer<typeof personaUpdateSchema>
 ) {
+  const userId = await requireUserId();
   const data = personaUpdateSchema.parse(input);
   const ds = await getDb();
   const repo = ds.getRepository(Persona);
-  const existing = await repo.preload({ id, ...data });
+  const existing = await repo.findOneBy({ id, usuario: { id: userId } });
   if (!existing) {
     throw new Error(`Persona con id ${id} no encontrada`);
   }
   try {
+    Object.assign(existing, data);
     await repo.save(existing);
     refresh();
     return getPersonaById(id);
@@ -233,9 +263,10 @@ export async function actualizarPersona(
 }
 
 export async function eliminarPersona(id: number) {
+  const userId = await requireUserId();
   const ds = await getDb();
   const repo = ds.getRepository(Persona);
-  const row = await repo.findOneBy({ id, eliminado: false });
+  const row = await repo.findOneBy({ id, usuario: { id: userId }, eliminado: false });
   if (!row) {
     throw new Error(`Persona con id ${id} no encontrada`);
   }
@@ -252,6 +283,7 @@ export async function eliminarPersona(id: number) {
 // CUENTA (tipo y moneda se reciben por nombre)
 // ============================================================
 export async function crearCuenta(input: z.infer<typeof cuentaCreateSchema>) {
+  const userId = await requireUserId();
   const data = cuentaCreateSchema.parse(input);
   const ds = await getDb();
   const { tipo, tarjeta, moneda, ...rest } = data;
@@ -273,7 +305,12 @@ export async function crearCuenta(input: z.infer<typeof cuentaCreateSchema>) {
   try {
     const repo = ds.getRepository(Cuenta);
     const created = await repo.save(
-      repo.create({ ...rest, tipo: tipoCuenta, moneda: monedaEntity })
+      repo.create({
+        ...rest,
+        tipo: tipoCuenta,
+        moneda: monedaEntity,
+        usuario: { id: userId },
+      })
     );
     refresh();
     return getCuentaById(created.id);
@@ -286,13 +323,14 @@ export async function actualizarCuenta(
   id: number,
   input: z.infer<typeof cuentaUpdateSchema>
 ) {
+  const userId = await requireUserId();
   const data = cuentaUpdateSchema.parse(input);
   const ds = await getDb();
   const { tipo, tarjeta, moneda, ...rest } = data;
 
   const existing = await ds
     .getRepository(Cuenta)
-    .findOneBy({ id, eliminado: false });
+    .findOneBy({ id, usuario: { id: userId }, eliminado: false });
   if (!existing) {
     throw new Error(`Cuenta con id ${id} no encontrada`);
   }
@@ -328,9 +366,10 @@ export async function actualizarCuenta(
 }
 
 export async function eliminarCuenta(id: number) {
+  const userId = await requireUserId();
   const ds = await getDb();
   const repo = ds.getRepository(Cuenta);
-  const row = await repo.findOneBy({ id, eliminado: false });
+  const row = await repo.findOneBy({ id, usuario: { id: userId }, eliminado: false });
   if (!row) {
     throw new Error(`Cuenta con id ${id} no encontrada`);
   }
@@ -349,6 +388,7 @@ export async function eliminarCuenta(id: number) {
 export async function crearCotizacion(
   input: z.infer<typeof cotizacionCreateSchema>
 ) {
+  const userId = await requireUserId();
   const data = cotizacionCreateSchema.parse(input);
   const ds = await getDb();
 
@@ -367,6 +407,7 @@ export async function crearCotizacion(
         fechaFinal: data.fechaFinal,
         cotizacion: data.cotizacion,
         moneda: monedaEntity,
+        usuario: { id: userId },
       })
     );
     refresh();
@@ -380,12 +421,13 @@ export async function actualizarCotizacion(
   id: number,
   input: z.infer<typeof cotizacionUpdateSchema>
 ) {
+  const userId = await requireUserId();
   const data = cotizacionUpdateSchema.parse(input);
   const ds = await getDb();
 
   const existing = await ds
     .getRepository(Cotizacion)
-    .findOneBy({ id, eliminado: false });
+    .findOneBy({ id, usuario: { id: userId }, eliminado: false });
   if (!existing) {
     throw new Error(`Cotización con id ${id} no encontrada`);
   }
@@ -412,9 +454,10 @@ export async function actualizarCotizacion(
 }
 
 export async function eliminarCotizacion(id: number) {
+  const userId = await requireUserId();
   const ds = await getDb();
   const repo = ds.getRepository(Cotizacion);
-  const row = await repo.findOneBy({ id, eliminado: false });
+  const row = await repo.findOneBy({ id, usuario: { id: userId }, eliminado: false });
   if (!row) {
     throw new Error(`Cotización con id ${id} no encontrada`);
   }
@@ -433,11 +476,14 @@ export async function eliminarCotizacion(id: number) {
 export async function crearInflacion(
   input: z.infer<typeof inflacionCreateSchema>
 ) {
+  const userId = await requireUserId();
   const data = inflacionCreateSchema.parse(input);
   const ds = await getDb();
   const repo = ds.getRepository(Inflacion);
   try {
-    const created = await repo.save(repo.create(data));
+    const created = await repo.save(
+      repo.create({ ...data, usuario: { id: userId } })
+    );
     refresh();
     return getInflacionById(created.id);
   } catch (error) {
@@ -449,14 +495,16 @@ export async function actualizarInflacion(
   id: number,
   input: z.infer<typeof inflacionUpdateSchema>
 ) {
+  const userId = await requireUserId();
   const data = inflacionUpdateSchema.parse(input);
   const ds = await getDb();
   const repo = ds.getRepository(Inflacion);
-  const existing = await repo.preload({ id, ...data });
+  const existing = await repo.findOneBy({ id, usuario: { id: userId } });
   if (!existing) {
     throw new Error(`Inflación con id ${id} no encontrada`);
   }
   try {
+    Object.assign(existing, data);
     await repo.save(existing);
     refresh();
     return getInflacionById(id);
@@ -466,9 +514,10 @@ export async function actualizarInflacion(
 }
 
 export async function eliminarInflacion(id: number) {
+  const userId = await requireUserId();
   const ds = await getDb();
   const repo = ds.getRepository(Inflacion);
-  const row = await repo.findOneBy({ id, eliminado: false });
+  const row = await repo.findOneBy({ id, usuario: { id: userId }, eliminado: false });
   if (!row) {
     throw new Error(`Inflación con id ${id} no encontrada`);
   }

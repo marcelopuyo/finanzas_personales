@@ -2,6 +2,7 @@
 
 import type { z } from "zod";
 import { getDb } from "../db";
+import { requireUserId } from "../lib/auth";
 import { Cuenta } from "../entities/cuenta.entity";
 import { Persona } from "../entities/persona.entity";
 import { Prestamo } from "../entities/prestamo.entity";
@@ -18,27 +19,31 @@ import {
 export async function crearPrestamo(
   input: z.infer<typeof prestamoCreateSchema>
 ) {
+  const userId = await requireUserId();
   const data = prestamoCreateSchema.parse(input);
   const ds = await getDb();
   const { personaOrigen, personaDestino, cuenta, ...rest } = data;
 
-  const personaOrigenEntity = await ds
-    .getRepository(Persona)
-    .findOneBy({ nombre: personaOrigen });
+  const personaOrigenEntity = await ds.getRepository(Persona).findOneBy({
+    nombre: personaOrigen,
+    usuario: { id: userId },
+  });
   if (!personaOrigenEntity) {
     throw new Error(`Persona "${personaOrigen}" no encontrada`);
   }
 
-  const personaDestinoEntity = await ds
-    .getRepository(Persona)
-    .findOneBy({ nombre: personaDestino });
+  const personaDestinoEntity = await ds.getRepository(Persona).findOneBy({
+    nombre: personaDestino,
+    usuario: { id: userId },
+  });
   if (!personaDestinoEntity) {
     throw new Error(`Persona "${personaDestino}" no encontrada`);
   }
 
-  const cuentaEntity = await ds
-    .getRepository(Cuenta)
-    .findOneBy({ nombre: cuenta });
+  const cuentaEntity = await ds.getRepository(Cuenta).findOneBy({
+    nombre: cuenta,
+    usuario: { id: userId },
+  });
   if (!cuentaEntity) {
     throw new Error(`Cuenta "${cuenta}" no encontrada`);
   }
@@ -51,6 +56,7 @@ export async function crearPrestamo(
         personaOrigen: personaOrigenEntity,
         personaDestino: personaDestinoEntity,
         cuenta: cuentaEntity,
+        usuario: { id: userId },
       })
     );
 
@@ -73,20 +79,22 @@ export async function actualizarPrestamo(
   id: string,
   input: z.infer<typeof prestamoUpdateSchema>
 ) {
+  const userId = await requireUserId();
   const data = prestamoUpdateSchema.parse(input);
   const ds = await getDb();
   const { personaOrigen, personaDestino, cuenta, ...rest } = data;
 
   const repo = ds.getRepository(Prestamo);
-  const existing = await repo.findOneBy({ id, eliminado: false });
+  const existing = await repo.findOneBy({ id, usuario: { id: userId }, eliminado: false });
   if (!existing) {
     throw new Error(`Préstamo con id ${id} no encontrado`);
   }
 
   if (personaOrigen) {
-    const personaOrigenEntity = await ds
-      .getRepository(Persona)
-      .findOneBy({ nombre: personaOrigen });
+    const personaOrigenEntity = await ds.getRepository(Persona).findOneBy({
+      nombre: personaOrigen,
+      usuario: { id: userId },
+    });
     if (!personaOrigenEntity) {
       throw new Error(`Persona "${personaOrigen}" no encontrada`);
     }
@@ -94,9 +102,10 @@ export async function actualizarPrestamo(
   }
 
   if (personaDestino) {
-    const personaDestinoEntity = await ds
-      .getRepository(Persona)
-      .findOneBy({ nombre: personaDestino });
+    const personaDestinoEntity = await ds.getRepository(Persona).findOneBy({
+      nombre: personaDestino,
+      usuario: { id: userId },
+    });
     if (!personaDestinoEntity) {
       throw new Error(`Persona "${personaDestino}" no encontrada`);
     }
@@ -104,9 +113,10 @@ export async function actualizarPrestamo(
   }
 
   if (cuenta) {
-    const cuentaEntity = await ds
-      .getRepository(Cuenta)
-      .findOneBy({ nombre: cuenta });
+    const cuentaEntity = await ds.getRepository(Cuenta).findOneBy({
+      nombre: cuenta,
+      usuario: { id: userId },
+    });
     if (!cuentaEntity) {
       throw new Error(`Cuenta "${cuenta}" no encontrada`);
     }
@@ -124,9 +134,10 @@ export async function actualizarPrestamo(
 }
 
 export async function eliminarPrestamo(id: string) {
+  const userId = await requireUserId();
   const ds = await getDb();
   const repo = ds.getRepository(Prestamo);
-  const row = await repo.findOneBy({ id, eliminado: false });
+  const row = await repo.findOneBy({ id, usuario: { id: userId }, eliminado: false });
   if (!row) {
     throw new Error(`Préstamo con id ${id} no encontrado`);
   }

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
+  LogOut,
   Menu,
   X,
   User,
@@ -162,6 +163,19 @@ function NavItem({ item, pathname }: { item: NavItem; pathname: string }) {
 export default function Sidebar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      /* ignora: se navega igual */
+    } finally {
+      setLoggingOut(false);
+      window.location.href = "/login";
+    }
+  }
 
   // Bloquea el scroll del body mientras el drawer móvil está abierto (mismo
   // patrón que el Modal). En desktop (lg) el sidebar es estático, nunca drawer.
@@ -226,9 +240,19 @@ export default function Sidebar() {
 
         <div className="px-3 py-3 flex items-center justify-between">
           <ThemeToggle />
-          <button className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
-            <User className="h-3.5 w-3.5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleLogout}
+              disabled={loggingOut}
+              title="Cerrar sesión"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-sidebar-muted transition-colors hover:bg-sidebar-hover hover:text-sidebar-foreground"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+            <button className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+              <User className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       </aside>
     </>

@@ -1,4 +1,5 @@
 import { getDb } from "../db";
+import { requireUserId } from "../lib/auth";
 import { MovimientoTarjeta } from "../entities/movimiento-tarjeta.entity";
 import { PeriodoTarjeta } from "../entities/periodo-tarjeta.entity";
 import { Tarjeta } from "../entities/tarjeta.entity";
@@ -38,10 +39,11 @@ export interface MovimientoTarjetaOut {
 // Tarjetas
 // ============================================================
 export async function getAllTarjetas(): Promise<TarjetaOut[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const rows = await ds
     .getRepository(Tarjeta)
-    .find({ where: { eliminado: false }, relations: { cuenta: true } });
+    .find({ where: { usuario: { id: userId }, eliminado: false }, relations: { cuenta: true } });
   return rows.map((r) => ({
     id: r.id,
     nombre: r.nombre,
@@ -52,10 +54,11 @@ export async function getAllTarjetas(): Promise<TarjetaOut[]> {
 }
 
 export async function getTarjetaById(id: number): Promise<TarjetaOut | null> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const r = await ds
     .getRepository(Tarjeta)
-    .findOne({ where: { id, eliminado: false }, relations: { cuenta: true } });
+    .findOne({ where: { id, usuario: { id: userId }, eliminado: false }, relations: { cuenta: true } });
   return r
     ? {
         id: r.id,
@@ -71,10 +74,11 @@ export async function getTarjetaById(id: number): Promise<TarjetaOut | null> {
 // Períodos de tarjeta
 // ============================================================
 export async function getAllPeriodosTarjeta(): Promise<PeriodoTarjetaOut[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const rows = await ds
     .getRepository(PeriodoTarjeta)
-    .find({ where: { eliminado: false }, relations: { tarjeta: true } });
+    .find({ where: { tarjeta: { usuario: { id: userId } }, eliminado: false }, relations: { tarjeta: true } });
   return rows.map((r) => ({
     id: r.id,
     nombre: r.nombre,
@@ -88,9 +92,10 @@ export async function getAllPeriodosTarjeta(): Promise<PeriodoTarjetaOut[]> {
 export async function getPeriodoTarjetaById(
   id: number
 ): Promise<PeriodoTarjetaOut | null> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const r = await ds.getRepository(PeriodoTarjeta).findOne({
-    where: { id, eliminado: false },
+    where: { id, tarjeta: { usuario: { id: userId } }, eliminado: false },
     relations: { tarjeta: true },
   });
   return r
@@ -109,9 +114,10 @@ export async function getPeriodoTarjetaById(
 // Movimientos de tarjeta
 // ============================================================
 export async function getAllMovimientosTarjeta(): Promise<MovimientoTarjetaOut[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const rows = await ds.getRepository(MovimientoTarjeta).find({
-    where: { eliminado: false },
+    where: { tarjeta: { usuario: { id: userId } }, eliminado: false },
     relations: { persona: true, tarjeta: true, periodo: true },
   });
   return rows.map((r) => ({
@@ -129,9 +135,10 @@ export async function getAllMovimientosTarjeta(): Promise<MovimientoTarjetaOut[]
 export async function getMovimientoTarjetaById(
   id: string
 ): Promise<MovimientoTarjetaOut | null> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const r = await ds.getRepository(MovimientoTarjeta).findOne({
-    where: { id, eliminado: false },
+    where: { id, tarjeta: { usuario: { id: userId } }, eliminado: false },
     relations: { persona: true, tarjeta: true, periodo: true },
   });
   return r

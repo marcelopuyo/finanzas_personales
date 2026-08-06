@@ -1,5 +1,6 @@
 import { Between, In, IsNull, LessThanOrEqual, MoreThan, MoreThanOrEqual } from "typeorm";
 import { getDb } from "../db";
+import { requireUserId } from "../lib/auth";
 import { Cuenta } from "../entities/cuenta.entity";
 import { Gasto } from "../entities/gasto.entity";
 import { HistoricoCuenta } from "../entities/historico-cuenta.entity";
@@ -47,11 +48,13 @@ export interface GastoPeriodo {
 // 1) Balance actual
 // ============================================================
 export async function getBalanceActual(): Promise<number> {
+  const userId = await requireUserId();
   const ds = await getDb();
 
   // Cuentas en dólares de tipo bancaria o caja
   const cuentas = await ds.getRepository(Cuenta).find({
     where: {
+      usuario: { id: userId },
       eliminado: false,
       tipo: [{ nombre: "Cuenta Bancaria" }, { nombre: "Caja Fisica" }],
       moneda: { nombre: "Dolar Estadounidense" },
@@ -66,7 +69,7 @@ export async function getBalanceActual(): Promise<number> {
 
   // Gastos pendientes (saldo > 0)
   const gastos = await ds.getRepository(Gasto).find({
-    where: { eliminado: false, saldo: MoreThan(0) },
+    where: { usuario: { id: userId }, eliminado: false, saldo: MoreThan(0) },
   });
 
   let saldoGastos = 0;
@@ -85,12 +88,14 @@ export async function getGastosPeriodo(
   fechaDesde?: string,
   fechaHasta?: string
 ): Promise<GastoPeriodo[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const gastoRepo = ds.getRepository(Gasto);
 
   if (fechaDesde && fechaHasta) {
     const rows = await gastoRepo.find({
       where: {
+        usuario: { id: userId },
         eliminado: false,
         fechaPago: Between(new Date(fechaDesde), new Date(fechaHasta)),
       },
@@ -104,6 +109,7 @@ export async function getGastosPeriodo(
     const now = new Date();
     const actual = await ds.getRepository(PeriodoGasto).findOne({
       where: {
+        usuario: { id: userId },
         eliminado: false,
         fechaApertura: LessThanOrEqual(now),
         fechaCierre: MoreThanOrEqual(now),
@@ -114,7 +120,7 @@ export async function getGastosPeriodo(
   }
 
   const rows = await gastoRepo.find({
-    where: { eliminado: false, periodo: { id } },
+    where: { usuario: { id: userId }, eliminado: false, periodo: { id } },
     relations: { periodo: true, categoria: true },
   });
   return withCuentas(rows, ds);
@@ -161,11 +167,12 @@ function mapGastoPeriodo(r: Gasto): GastoPeriodo {
 // 3) Evolución de gastos (por período)
 // ============================================================
 export async function getEvolucionGastos(): Promise<EvolucionItem[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
   // Cargamos gastos con su periodo y agrupamos manualmente (PeriodoGasto
   // no tiene la inversa gastos para evitar ciclos de importación).
   const gastos = await ds.getRepository(Gasto).find({
-    where: { eliminado: false },
+    where: { usuario: { id: userId }, eliminado: false },
     relations: { periodo: true },
   });
 
@@ -177,7 +184,7 @@ export async function getEvolucionGastos(): Promise<EvolucionItem[]> {
 
   // Ordenamos por id del período para consistencia con el backend
   const periodos = await ds.getRepository(PeriodoGasto).find({
-    where: { eliminado: false },
+    where: { usuario: { id: userId }, eliminado: false },
     order: { id: "ASC" },
   });
   return periodos
@@ -189,9 +196,10 @@ export async function getEvolucionGastos(): Promise<EvolucionItem[]> {
 // 4) Evolución de gastos mensual (agrupado por mes-año)
 // ============================================================
 export async function getEvolucionGastosMensual(): Promise<EvolucionItem[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const gastos = await ds.getRepository(Gasto).find({
-    where: { eliminado: false },
+    where: { usuario: { id: userId }, eliminado: false },
     relations: { periodo: true },
   });
 
@@ -217,9 +225,10 @@ export async function getEvolucionGastosMensual(): Promise<EvolucionItem[]> {
 // 5) Evolución de ingresos (por mes, desde jornadas)
 // ============================================================
 export async function getEvolucionIngresos(): Promise<EvolucionItem[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const jornadas = await ds.getRepository(JornadaTrabajo).find({
-    where: { eliminado: false },
+    where: { periodoTrabajo: { trabajo: { usuario: { id: userId } } }, eliminado: false },
     order: { fechaJornada: "ASC" },
   });
 
@@ -286,9 +295,10 @@ export async function getPrestamosPendientesReporte(): Promise<
     cuenta: { nombre: string } | null;
   }[]
 > {
+  const userId = await requireUserId();
   const ds = await getDb();
   const rows = await ds.getRepository(Prestamo).find({
-    where: { eliminado: false, saldo: MoreThan(0) },
+    where: { usuario: { id: userId }, eliminado: false, saldo: MoreThan(0) },
     relations: { personaDestino: true, personaOrigen: true, cuenta: true },
   });
   return rows.map((r) => ({
@@ -323,9 +333,11 @@ export async function getMovimientosTarjetaPeriodo(
 // 9) Cuentas con evolución (sparkline del último mes)
 // ============================================================
 export async function getCuentasConEvolucion(): Promise<CuentaConEvolucion[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const cuentas = await ds.getRepository(Cuenta).find({
     where: {
+      usuario: { id: userId },
       eliminado: false,
       tipo: [{ nombre: "Cuenta Bancaria" }, { nombre: "Caja Fisica" }],
     },

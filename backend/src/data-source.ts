@@ -19,6 +19,7 @@ import { PeriodoTrabajo } from "./entities/periodo-trabajo.entity";
 import { JornadaTrabajo } from "./entities/jornada-trabajo.entity";
 import { Prestamo } from "./entities/prestamo.entity";
 import { Movimiento } from "./entities/movimiento.entity";
+import { Usuario } from "./entities/usuario.entity";
 
 // ============================================================
 // DataSource de MIGRACIONES (apunta a PostgreSQL 18 / puerto 5432).
@@ -33,6 +34,7 @@ export const ENTITIES = [
   HistoricoCuenta, Inflacion, CategoriaGasto, PeriodoGasto, Gasto,
   Tarjeta, PeriodoTarjeta, MovimientoTarjeta,
   Trabajo, PeriodoTrabajo, JornadaTrabajo, Prestamo, Movimiento,
+  Usuario,
 ];
 
 export const AppDataSource = new DataSource({

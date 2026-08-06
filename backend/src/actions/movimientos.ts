@@ -3,6 +3,7 @@
 import { EntityManager, LessThanOrEqual, MoreThanOrEqual } from "typeorm";
 import type { z } from "zod";
 import { getDb } from "../db";
+import { requireUserId } from "../lib/auth";
 import { CategoriaGasto } from "../entities/categoria-gasto.entity";
 import { Concepto } from "../entities/concepto.entity";
 import { Cuenta } from "../entities/cuenta.entity";
@@ -21,11 +22,16 @@ import {
 // ---------------------------------------------------------------------------
 
 /** Busca el período de gasto cuyo rango (fechaApertura..fechaCierre) contiene la fecha dada. */
-async function findPeriodoGastoPorFecha(manager: EntityManager, fecha: string) {
+async function findPeriodoGastoPorFecha(
+  manager: EntityManager,
+  fecha: string,
+  userId: number
+) {
   const repo = manager.getRepository(PeriodoGasto);
   const d = new Date(fecha);
   const periodo = await repo.findOne({
     where: {
+      usuario: { id: userId },
       eliminado: false,
       fechaApertura: LessThanOrEqual(d),
       fechaCierre: MoreThanOrEqual(d),
@@ -35,9 +41,9 @@ async function findPeriodoGastoPorFecha(manager: EntityManager, fecha: string) {
   return periodo;
 }
 
-async function findCategoriaGasto(manager: EntityManager, id: number) {
+async function findCategoriaGasto(manager: EntityManager, id: number, userId: number) {
   const repo = manager.getRepository(CategoriaGasto);
-  const cat = await repo.findOne({ where: { id } });
+  const cat = await repo.findOne({ where: { id, usuario: { id: userId } } });
   if (!cat) throw new Error(`Categoría de gasto con id ${id} no encontrada`);
   return cat;
 }
@@ -66,6 +72,7 @@ async function buscarConceptosTransferencia(manager: EntityManager, motivo: stri
 // 1) COBRO SUELDO
 // ============================================================
 export async function cobrarSueldo(input: z.infer<typeof movimiento1Schema>) {
+  const userId = await requireUserId();
   const data = movimiento1Schema.parse(input);
   if (!data.idPeriodoTrabajo) throw new Error("idPeriodoTrabajo es requerido");
 
@@ -76,13 +83,18 @@ export async function cobrarSueldo(input: z.infer<typeof movimiento1Schema>) {
     const periodoTrabajoRepo = manager.getRepository(PeriodoTrabajo);
     const movRepo = manager.getRepository(Movimiento);
 
-    const cuenta = await cuentaRepo.findOneBy({ id: data.idCuenta });
+    const cuenta = await cuentaRepo.findOneBy({
+      id: data.idCuenta,
+      usuario: { id: userId },
+    });
     if (!cuenta) throw new Error(`Cuenta con id ${data.idCuenta} no encontrada`);
 
     const concepto = await conceptoRepo.findOneBy({ nombre: "Cobro Sueldo" });
     if (!concepto) throw new Error("Concepto 'Cobro Sueldo' no encontrado");
 
-    const periodoTrabajo = await periodoTrabajoRepo.findOneBy({ id: data.idPeriodoTrabajo });
+    const periodoTrabajo = await periodoTrabajoRepo.findOne({
+      where: { id: data.idPeriodoTrabajo, trabajo: { usuario: { id: userId } } },
+    });
     if (!periodoTrabajo) throw new Error(`PeriodoTrabajo con id ${data.idPeriodoTrabajo} no encontrado`);
 
     cuenta.saldo += data.monto;
@@ -114,6 +126,7 @@ export async function cobrarSueldo(input: z.infer<typeof movimiento1Schema>) {
 // 2) PAGO PRÉSTAMO
 // ============================================================
 export async function pagarPrestamo(input: z.infer<typeof movimiento1Schema>) {
+  const userId = await requireUserId();
   const data = movimiento1Schema.parse(input);
   if (!data.idPrestamo) throw new Error("idPrestamo es requerido");
 
@@ -124,7 +137,10 @@ export async function pagarPrestamo(input: z.infer<typeof movimiento1Schema>) {
     const prestamoRepo = manager.getRepository(Prestamo);
     const movRepo = manager.getRepository(Movimiento);
 
-    const prestamo = await prestamoRepo.findOneBy({ id: data.idPrestamo });
+    const prestamo = await prestamoRepo.findOneBy({
+      id: data.idPrestamo,
+      usuario: { id: userId },
+    });
     if (!prestamo) throw new Error(`Préstamo con id ${data.idPrestamo} no encontrado`);
 
     const concepto = await conceptoRepo.findOneBy({
@@ -132,7 +148,10 @@ export async function pagarPrestamo(input: z.infer<typeof movimiento1Schema>) {
     });
     if (!concepto) throw new Error("Concepto de préstamo no encontrado");
 
-    const cuenta = await cuentaRepo.findOneBy({ id: data.idCuenta });
+    const cuenta = await cuentaRepo.findOneBy({
+      id: data.idCuenta,
+      usuario: { id: userId },
+    });
     if (!cuenta) throw new Error(`Cuenta con id ${data.idCuenta} no encontrada`);
 
     // Actualizar saldo de la cuenta
@@ -168,6 +187,7 @@ export async function pagarPrestamo(input: z.infer<typeof movimiento1Schema>) {
 // 3) AJUSTE CUENTA
 // ============================================================
 export async function ajustarCuenta(input: z.infer<typeof movimiento1Schema>) {
+  const userId = await requireUserId();
   const data = movimiento1Schema.parse(input);
 
   const ds = await getDb();
@@ -176,7 +196,10 @@ export async function ajustarCuenta(input: z.infer<typeof movimiento1Schema>) {
     const conceptoRepo = manager.getRepository(Concepto);
     const movRepo = manager.getRepository(Movimiento);
 
-    const cuenta = await cuentaRepo.findOneBy({ id: data.idCuenta });
+    const cuenta = await cuentaRepo.findOneBy({
+      id: data.idCuenta,
+      usuario: { id: userId },
+    });
     if (!cuenta) throw new Error(`Cuenta con id ${data.idCuenta} no encontrada`);
 
     const concepto = await conceptoRepo.findOneBy({
@@ -202,6 +225,7 @@ export async function ajustarCuenta(input: z.infer<typeof movimiento1Schema>) {
 // 4) PAGO GASTO
 // ============================================================
 export async function pagarGasto(input: z.infer<typeof movimiento1Schema>) {
+  const userId = await requireUserId();
   const data = movimiento1Schema.parse(input);
   if (!data.idGasto) throw new Error("idGasto es requerido");
 
@@ -212,10 +236,16 @@ export async function pagarGasto(input: z.infer<typeof movimiento1Schema>) {
     const gastoRepo = manager.getRepository(Gasto);
     const movRepo = manager.getRepository(Movimiento);
 
-    const cuenta = await cuentaRepo.findOneBy({ id: data.idCuenta });
+    const cuenta = await cuentaRepo.findOneBy({
+      id: data.idCuenta,
+      usuario: { id: userId },
+    });
     if (!cuenta) throw new Error(`Cuenta con id ${data.idCuenta} no encontrada`);
 
-    const gasto = await gastoRepo.findOneBy({ id: data.idGasto });
+    const gasto = await gastoRepo.findOneBy({
+      id: data.idGasto,
+      usuario: { id: userId },
+    });
     if (!gasto) throw new Error(`Gasto con id ${data.idGasto} no encontrado`);
 
     const concepto = await conceptoRepo.findOneBy({ nombre: "Pago Gasto" });
@@ -243,6 +273,7 @@ export async function pagarGasto(input: z.infer<typeof movimiento1Schema>) {
 // 5) GASTO DIRECTO (crea gasto y lo paga en un solo paso)
 // ============================================================
 export async function gastoDirecto(input: z.infer<typeof movimiento3Schema>) {
+  const userId = await requireUserId();
   const data = movimiento3Schema.parse(input);
 
   const ds = await getDb();
@@ -256,8 +287,8 @@ export async function gastoDirecto(input: z.infer<typeof movimiento3Schema>) {
 
     // 1. Crear el gasto — el período se resuelve por la FECHA ingresada (no por
     //    el período actual), para que el gasto quede en el mes que corresponde.
-    const periodo = await findPeriodoGastoPorFecha(manager, data.fecha);
-    const categoria = await findCategoriaGasto(manager, data.idCategoriaGasto);
+    const periodo = await findPeriodoGastoPorFecha(manager, data.fecha, userId);
+    const categoria = await findCategoriaGasto(manager, data.idCategoriaGasto, userId);
 
     const nuevoGasto = await gastoRepo.save(
       gastoRepo.create({
@@ -267,11 +298,15 @@ export async function gastoDirecto(input: z.infer<typeof movimiento3Schema>) {
         fechaVencimiento: data.fecha as unknown as Date,
         periodo,
         categoria,
+        usuario: { id: userId },
       })
     );
 
     // 2. Pagar el gasto
-    const cuenta = await cuentaRepo.findOneBy({ id: data.idCuenta });
+    const cuenta = await cuentaRepo.findOneBy({
+      id: data.idCuenta,
+      usuario: { id: userId },
+    });
     if (!cuenta) throw new Error(`Cuenta con id ${data.idCuenta} no encontrada`);
 
     const concepto = await conceptoRepo.findOneBy({ nombre: "Pago Gasto" });
@@ -305,6 +340,7 @@ export async function gastoDirecto(input: z.infer<typeof movimiento3Schema>) {
 // 6) TRANSFERENCIA
 // ============================================================
 export async function transferir(input: z.infer<typeof movimiento2Schema>) {
+  const userId = await requireUserId();
   const data = movimiento2Schema.parse(input);
   if (!data.idCuentaOrigen || !data.idCuentaDestino)
     throw new Error("idCuentaOrigen e idCuentaDestino son requeridos");
@@ -316,10 +352,16 @@ export async function transferir(input: z.infer<typeof movimiento2Schema>) {
     const cuentaRepo = manager.getRepository(Cuenta);
     const movRepo = manager.getRepository(Movimiento);
 
-    const cuentaOrigen = await cuentaRepo.findOneBy({ id: data.idCuentaOrigen });
+    const cuentaOrigen = await cuentaRepo.findOneBy({
+      id: data.idCuentaOrigen,
+      usuario: { id: userId },
+    });
     if (!cuentaOrigen) throw new Error(`Cuenta origen con id ${data.idCuentaOrigen} no encontrada`);
 
-    const cuentaDestino = await cuentaRepo.findOneBy({ id: data.idCuentaDestino });
+    const cuentaDestino = await cuentaRepo.findOneBy({
+      id: data.idCuentaDestino,
+      usuario: { id: userId },
+    });
     if (!cuentaDestino) throw new Error(`Cuenta destino con id ${data.idCuentaDestino} no encontrada`);
 
     const { conceptoIngreso, conceptoEgreso } = await buscarConceptosTransferencia(

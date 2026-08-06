@@ -1,4 +1,5 @@
 import { getDb } from "../db";
+import { requireUserId } from "../lib/auth";
 import { JornadaTrabajo } from "../entities/jornada-trabajo.entity";
 import { PeriodoTrabajo } from "../entities/periodo-trabajo.entity";
 import { Trabajo } from "../entities/trabajo.entity";
@@ -66,10 +67,11 @@ function mapPeriodo(r: PeriodoTrabajo): PeriodoTrabajoOut {
 // Trabajos
 // ============================================================
 export async function getAllTrabajos(): Promise<TrabajoOut[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const rows = await ds
     .getRepository(Trabajo)
-    .find({ where: { eliminado: false } });
+    .find({ where: { usuario: { id: userId }, eliminado: false } });
   return rows.map((r) => ({
     id: r.id,
     nombre: r.nombre,
@@ -80,10 +82,11 @@ export async function getAllTrabajos(): Promise<TrabajoOut[]> {
 }
 
 export async function getTrabajoById(id: number): Promise<TrabajoOut | null> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const r = await ds
     .getRepository(Trabajo)
-    .findOne({ where: { id, eliminado: false } });
+    .findOne({ where: { id, usuario: { id: userId }, eliminado: false } });
   return r
     ? {
         id: r.id,
@@ -99,9 +102,10 @@ export async function getTrabajoById(id: number): Promise<TrabajoOut | null> {
 // Períodos de trabajo (con trabajo y jornadas)
 // ============================================================
 export async function getAllPeriodosTrabajo(): Promise<PeriodoTrabajoOut[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const rows = await ds.getRepository(PeriodoTrabajo).find({
-    where: { eliminado: false },
+    where: { trabajo: { usuario: { id: userId } }, eliminado: false },
     order: { fechaDesde: "ASC" },
     relations: { trabajo: true, jornadas: true },
   });
@@ -111,9 +115,10 @@ export async function getAllPeriodosTrabajo(): Promise<PeriodoTrabajoOut[]> {
 export async function getPeriodoTrabajoById(
   id: number
 ): Promise<PeriodoTrabajoOut | null> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const r = await ds.getRepository(PeriodoTrabajo).findOne({
-    where: { id, eliminado: false },
+    where: { id, trabajo: { usuario: { id: userId } }, eliminado: false },
     relations: { trabajo: true, jornadas: true },
   });
   return r ? mapPeriodo(r) : null;
@@ -125,9 +130,10 @@ export async function getPeriodoTrabajoById(
 export async function getAllJornadasTrabajo(): Promise<
   (JornadaTrabajoOut & { periodoTrabajo: { id: number; trabajo: string } | null })[]
 > {
+  const userId = await requireUserId();
   const ds = await getDb();
   const rows = await ds.getRepository(JornadaTrabajo).find({
-    where: { eliminado: false },
+    where: { periodoTrabajo: { trabajo: { usuario: { id: userId } } }, eliminado: false },
     relations: { periodoTrabajo: { trabajo: true } },
     order: { fechaJornada: "DESC", fechaCarga: "DESC" },
   });
@@ -147,10 +153,12 @@ export async function getAllJornadasTrabajo(): Promise<
 export async function getJornadaTrabajoById(
   id: string
 ): Promise<(JornadaTrabajoOut & { periodoTrabajoId?: number }) | null> {
+  const userId = await requireUserId();
   const ds = await getDb();
-  const r = await ds
-    .getRepository(JornadaTrabajo)
-    .findOne({ where: { id, eliminado: false }, relations: { periodoTrabajo: true } });
+  const r = await ds.getRepository(JornadaTrabajo).findOne({
+    where: { id, periodoTrabajo: { trabajo: { usuario: { id: userId } } }, eliminado: false },
+    relations: { periodoTrabajo: true },
+  });
   return r
     ? { ...mapJornada(r), periodoTrabajoId: r.periodoTrabajo?.id }
     : null;

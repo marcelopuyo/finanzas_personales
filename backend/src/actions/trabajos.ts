@@ -2,6 +2,7 @@
 
 import type { z } from "zod";
 import { getDb } from "../db";
+import { requireUserId } from "../lib/auth";
 import { JornadaTrabajo } from "../entities/jornada-trabajo.entity";
 import { PeriodoTrabajo } from "../entities/periodo-trabajo.entity";
 import { Trabajo } from "../entities/trabajo.entity";
@@ -61,11 +62,14 @@ async function actualizarMontoACobrarPeriodo(idPeriodo: number) {
 // TRABAJO
 // ============================================================
 export async function crearTrabajo(input: z.infer<typeof trabajoCreateSchema>) {
+  const userId = await requireUserId();
   const data = trabajoCreateSchema.parse(input);
   const ds = await getDb();
   const repo = ds.getRepository(Trabajo);
   try {
-    const created = await repo.save(repo.create(data));
+    const created = await repo.save(
+      repo.create({ ...data, usuario: { id: userId } })
+    );
     refresh();
     return getTrabajoById(created.id);
   } catch (error) {
@@ -77,14 +81,16 @@ export async function actualizarTrabajo(
   id: number,
   input: z.infer<typeof trabajoUpdateSchema>
 ) {
+  const userId = await requireUserId();
   const data = trabajoUpdateSchema.parse(input);
   const ds = await getDb();
   const repo = ds.getRepository(Trabajo);
-  const existing = await repo.preload({ id, ...data });
+  const existing = await repo.findOneBy({ id, usuario: { id: userId } });
   if (!existing) {
     throw new Error(`Trabajo con id ${id} no encontrado`);
   }
   try {
+    Object.assign(existing, data);
     await repo.save(existing);
     refresh();
     return getTrabajoById(id);
@@ -94,9 +100,10 @@ export async function actualizarTrabajo(
 }
 
 export async function eliminarTrabajo(id: number) {
+  const userId = await requireUserId();
   const ds = await getDb();
   const repo = ds.getRepository(Trabajo);
-  const row = await repo.findOneBy({ id, eliminado: false });
+  const row = await repo.findOneBy({ id, usuario: { id: userId }, eliminado: false });
   if (!row) {
     throw new Error(`Trabajo con id ${id} no encontrado`);
   }
@@ -115,13 +122,15 @@ export async function eliminarTrabajo(id: number) {
 export async function crearPeriodoTrabajo(
   input: z.infer<typeof periodoTrabajoCreateSchema>
 ) {
+  const userId = await requireUserId();
   const data = periodoTrabajoCreateSchema.parse(input);
   const ds = await getDb();
   const { nombreTrabajo, ...rest } = data;
 
-  const trabajo = await ds
-    .getRepository(Trabajo)
-    .findOneBy({ nombre: nombreTrabajo });
+  const trabajo = await ds.getRepository(Trabajo).findOneBy({
+    nombre: nombreTrabajo,
+    usuario: { id: userId },
+  });
   if (!trabajo) {
     throw new Error(`Trabajo con nombre "${nombreTrabajo}" no encontrado`);
   }
@@ -140,20 +149,24 @@ export async function actualizarPeriodoTrabajo(
   id: number,
   input: z.infer<typeof periodoTrabajoUpdateSchema>
 ) {
+  const userId = await requireUserId();
   const data = periodoTrabajoUpdateSchema.parse(input);
   const ds = await getDb();
   const { nombreTrabajo, ...rest } = data;
 
   const repo = ds.getRepository(PeriodoTrabajo);
-  const existing = await repo.findOneBy({ id, eliminado: false });
+  const existing = await repo.findOne({
+    where: { id, trabajo: { usuario: { id: userId } }, eliminado: false },
+  });
   if (!existing) {
     throw new Error(`Período de trabajo con id ${id} no encontrado`);
   }
 
   if (nombreTrabajo) {
-    const trabajo = await ds
-      .getRepository(Trabajo)
-      .findOneBy({ nombre: nombreTrabajo });
+    const trabajo = await ds.getRepository(Trabajo).findOneBy({
+      nombre: nombreTrabajo,
+      usuario: { id: userId },
+    });
     if (!trabajo) {
       throw new Error(`Trabajo con nombre "${nombreTrabajo}" no encontrado`);
     }
@@ -171,9 +184,12 @@ export async function actualizarPeriodoTrabajo(
 }
 
 export async function eliminarPeriodoTrabajo(id: number) {
+  const userId = await requireUserId();
   const ds = await getDb();
   const repo = ds.getRepository(PeriodoTrabajo);
-  const row = await repo.findOneBy({ id, eliminado: false });
+  const row = await repo.findOne({
+    where: { id, trabajo: { usuario: { id: userId } }, eliminado: false },
+  });
   if (!row) {
     throw new Error(`Período de trabajo con id ${id} no encontrado`);
   }
@@ -192,12 +208,13 @@ export async function eliminarPeriodoTrabajo(id: number) {
 export async function crearJornadaTrabajo(
   input: z.infer<typeof jornadaTrabajoCreateSchema>
 ) {
+  const userId = await requireUserId();
   const data = jornadaTrabajoCreateSchema.parse(input);
   const ds = await getDb();
   const { idPeriodo, ...rest } = data;
 
   const periodo = await ds.getRepository(PeriodoTrabajo).findOne({
-    where: { id: idPeriodo },
+    where: { id: idPeriodo, trabajo: { usuario: { id: userId } } },
     relations: { trabajo: true },
   });
   if (!periodo) {
@@ -234,11 +251,12 @@ export async function actualizarJornadaTrabajo(
   id: string,
   input: z.infer<typeof jornadaTrabajoUpdateSchema>
 ) {
+  const userId = await requireUserId();
   const data = jornadaTrabajoUpdateSchema.parse(input);
   const ds = await getDb();
 
   const existing = await ds.getRepository(JornadaTrabajo).findOne({
-    where: { id, eliminado: false },
+    where: { id, periodoTrabajo: { trabajo: { usuario: { id: userId } } }, eliminado: false },
     relations: { periodoTrabajo: true },
   });
   if (!existing) {
@@ -250,7 +268,7 @@ export async function actualizarJornadaTrabajo(
     throw new Error("idPeriodo es requerido");
   }
   const periodo = await ds.getRepository(PeriodoTrabajo).findOne({
-    where: { id: idPeriodo },
+    where: { id: idPeriodo, trabajo: { usuario: { id: userId } } },
     relations: { trabajo: true },
   });
   if (!periodo) {
@@ -279,10 +297,11 @@ export async function actualizarJornadaTrabajo(
 }
 
 export async function eliminarJornadaTrabajo(id: string) {
+  const userId = await requireUserId();
   const ds = await getDb();
   const repo = ds.getRepository(JornadaTrabajo);
   const row = await repo.findOne({
-    where: { id, eliminado: false },
+    where: { id, periodoTrabajo: { trabajo: { usuario: { id: userId } } }, eliminado: false },
     relations: { periodoTrabajo: true },
   });
   if (!row) {

@@ -1,5 +1,6 @@
 import { In, LessThanOrEqual, MoreThan, MoreThanOrEqual } from "typeorm";
 import { getDb } from "../db";
+import { requireUserId } from "../lib/auth";
 import { CategoriaGasto } from "../entities/categoria-gasto.entity";
 import { Gasto } from "../entities/gasto.entity";
 import { Movimiento } from "../entities/movimiento.entity";
@@ -38,20 +39,22 @@ export interface GastoOut {
 // Categorías de gasto
 // ============================================================
 export async function getAllCategoriasGasto(): Promise<CategoriaGastoOut[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const rows = await ds
     .getRepository(CategoriaGasto)
-    .find({ where: { eliminado: false } });
+    .find({ where: { usuario: { id: userId }, eliminado: false } });
   return rows.map((r) => ({ id: r.id, nombre: r.nombre }));
 }
 
 export async function getCategoriaGastoById(
   id: number
 ): Promise<CategoriaGastoOut | null> {
+  const userId = await requireUserId();
   const ds = await getDb();
-  const r = await ds
-    .getRepository(CategoriaGasto)
-    .findOne({ where: { id, eliminado: false } });
+  const r = await ds.getRepository(CategoriaGasto).findOne({
+    where: { id, usuario: { id: userId }, eliminado: false },
+  });
   return r ? { id: r.id, nombre: r.nombre } : null;
 }
 
@@ -59,10 +62,11 @@ export async function getCategoriaGastoById(
 // Períodos de gasto
 // ============================================================
 export async function getAllPeriodosGasto(): Promise<PeriodoGastoOut[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const rows = await ds
     .getRepository(PeriodoGasto)
-    .find({ where: { eliminado: false } });
+    .find({ where: { usuario: { id: userId }, eliminado: false } });
   return rows.map((r) => ({
     id: r.id,
     nombre: r.nombre,
@@ -74,10 +78,11 @@ export async function getAllPeriodosGasto(): Promise<PeriodoGastoOut[]> {
 export async function getPeriodoGastoById(
   id: number
 ): Promise<PeriodoGastoOut | null> {
+  const userId = await requireUserId();
   const ds = await getDb();
-  const r = await ds
-    .getRepository(PeriodoGasto)
-    .findOne({ where: { id, eliminado: false } });
+  const r = await ds.getRepository(PeriodoGasto).findOne({
+    where: { id, usuario: { id: userId }, eliminado: false },
+  });
   return r
     ? {
         id: r.id,
@@ -89,10 +94,12 @@ export async function getPeriodoGastoById(
 }
 
 export async function getPeriodoGastoActual(): Promise<PeriodoGastoOut | null> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const now = new Date();
   const r = await ds.getRepository(PeriodoGasto).findOne({
     where: {
+      usuario: { id: userId },
       eliminado: false,
       fechaApertura: LessThanOrEqual(now),
       fechaCierre: MoreThanOrEqual(now),
@@ -153,9 +160,10 @@ function withCuenta(row: GastoOut, cuentaMap: Map<string, string>): GastoOut {
 }
 
 export async function getAllGastos(): Promise<GastoOut[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const rows = await ds.getRepository(Gasto).find({
-    where: { eliminado: false },
+    where: { usuario: { id: userId }, eliminado: false },
     relations: { periodo: true, categoria: true },
   });
   const mapped = rows.map(mapGasto);
@@ -164,9 +172,10 @@ export async function getAllGastos(): Promise<GastoOut[]> {
 }
 
 export async function getGastosPendientes(): Promise<GastoOut[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const rows = await ds.getRepository(Gasto).find({
-    where: { eliminado: false, saldo: MoreThan(0) },
+    where: { usuario: { id: userId }, eliminado: false, saldo: MoreThan(0) },
     relations: { periodo: true, categoria: true },
   });
   const mapped = rows.map(mapGasto);
@@ -175,9 +184,10 @@ export async function getGastosPendientes(): Promise<GastoOut[]> {
 }
 
 export async function getGastoById(id: string): Promise<GastoOut | null> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const r = await ds.getRepository(Gasto).findOne({
-    where: { id, eliminado: false },
+    where: { id, usuario: { id: userId }, eliminado: false },
     relations: { periodo: true, categoria: true },
   });
   if (!r) return null;
@@ -194,6 +204,7 @@ export async function getGastoById(id: string): Promise<GastoOut | null> {
 export async function buscarDescripcionesGasto(
   termino: string
 ): Promise<string[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const rows = await ds
     .getRepository(Gasto)
@@ -201,6 +212,7 @@ export async function buscarDescripcionesGasto(
     .select("g.descripcion", "descripcion")
     .where("g.descripcion LIKE :termino", { termino: `%${termino}%` })
     .andWhere("g.eliminado = :eliminado", { eliminado: false })
+    .andWhere('g."usuarioId" = :userId', { userId })
     .andWhere("g.descripcion IS NOT NULL")
     .orderBy("g.descripcion", "ASC")
     .limit(50)

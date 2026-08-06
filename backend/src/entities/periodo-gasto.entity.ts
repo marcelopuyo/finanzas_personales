@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Usuario } from "./usuario.entity";
 
 // Solo columnas. La relación inversa OneToMany (gastos) se omite para evitar
 // imports circulares; el lado propietario (Gasto.periodo) es suficiente.
@@ -20,4 +21,7 @@ export class PeriodoGasto {
     default: false,
   })
   eliminado: boolean;
+
+  @ManyToOne(() => Usuario, { onDelete: "CASCADE", nullable: false })
+  usuario: Usuario;
 }

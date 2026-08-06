@@ -1,6 +1,7 @@
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
 import { Persona } from "./persona.entity";
 import { Cuenta } from "./cuenta.entity";
+import { Usuario } from "./usuario.entity";
 
 @Entity({ name: "prestamo" })
 export class Prestamo {
@@ -41,4 +42,7 @@ export class Prestamo {
 
   @ManyToOne(() => Cuenta, { onDelete: "CASCADE" })
   cuenta: Cuenta;
+
+  @ManyToOne(() => Usuario, { onDelete: "CASCADE", nullable: false })
+  usuario: Usuario;
 }

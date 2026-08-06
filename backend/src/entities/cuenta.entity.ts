@@ -1,6 +1,7 @@
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
 import { TipoCuenta } from "./tipo-cuenta.entity";
 import { Moneda } from "./moneda.entity";
+import { Usuario } from "./usuario.entity";
 
 // Lado propietario (ManyToOne) de tipo y moneda. Las relaciones inversas
 // (historial, movimientos, prestamos, tarjeta) se agregan cuando se migren
@@ -35,4 +36,7 @@ export class Cuenta {
     onDelete: "CASCADE",
   })
   moneda?: Moneda;
+
+  @ManyToOne(() => Usuario, { onDelete: "CASCADE", nullable: false })
+  usuario: Usuario;
 }

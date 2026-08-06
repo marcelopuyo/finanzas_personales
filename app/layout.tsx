@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import ThemeProvider from "@/components/layout/theme-provider";
-import AppLayout from "@/components/layout/app-layout";
 import { ToasterProvider } from "@/components/layout/toaster";
 import "./globals.css";
 
@@ -42,7 +41,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full bg-background font-sans">
         <ThemeProvider>
-          <AppLayout>{children}</AppLayout>
+          {children}
           <ToasterProvider />
         </ThemeProvider>
       </body>

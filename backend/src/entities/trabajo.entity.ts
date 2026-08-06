@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Usuario } from "./usuario.entity";
 
 // Solo columnas. La relación inversa OneToMany (periodosTrabajo) se omite
 // para evitar ciclos; se consulta por separado cuando se necesita.
@@ -23,4 +24,7 @@ export class Trabajo {
     default: false,
   })
   eliminado: boolean;
+
+  @ManyToOne(() => Usuario, { onDelete: "CASCADE", nullable: false })
+  usuario: Usuario;
 }

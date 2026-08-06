@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Usuario } from "./usuario.entity";
 
 // Port 1:1 del backend NestJS. Relaciones a MovimientoTarjeta/Prestamo se
 // agregan cuando se migren esos módulos (Fases 4 y 6).
@@ -20,4 +21,7 @@ export class Persona {
     default: false,
   })
   eliminado: boolean;
+
+  @ManyToOne(() => Usuario, { onDelete: "CASCADE", nullable: false })
+  usuario: Usuario;
 }

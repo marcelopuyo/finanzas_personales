@@ -20,6 +20,7 @@ import { PeriodoTrabajo } from "./entities/periodo-trabajo.entity";
 import { JornadaTrabajo } from "./entities/jornada-trabajo.entity";
 import { Prestamo } from "./entities/prestamo.entity";
 import { Movimiento } from "./entities/movimiento.entity";
+import { Usuario } from "./entities/usuario.entity";
 
 // Singleton global para evitar reconexiones duplicadas durante HMR
 const globalForDb = globalThis as unknown as {
@@ -33,6 +34,7 @@ const ENTITIES = [
   HistoricoCuenta, Inflacion, CategoriaGasto, PeriodoGasto, Gasto,
   Tarjeta, PeriodoTarjeta, MovimientoTarjeta,
   Trabajo, PeriodoTrabajo, JornadaTrabajo, Prestamo, Movimiento,
+  Usuario,
 ];
 
 // El driver `pg` devuelve `numeric` (OID 1700) como string. Como los montos y

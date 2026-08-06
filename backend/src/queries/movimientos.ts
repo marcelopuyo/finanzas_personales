@@ -1,4 +1,5 @@
 import { getDb } from "../db";
+import { requireUserId } from "../lib/auth";
 import { Cuenta } from "../entities/cuenta.entity";
 import { Movimiento } from "../entities/movimiento.entity";
 
@@ -36,9 +37,10 @@ const RELATIONS = {
 } as const;
 
 export async function getAllMovimientos(): Promise<MovimientoOut[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const rows = await ds.getRepository(Movimiento).find({
-    where: { eliminado: false },
+    where: { cuenta: { usuario: { id: userId } }, eliminado: false },
     relations: RELATIONS,
   });
   return rows.map(mapMovimiento);
@@ -47,9 +49,10 @@ export async function getAllMovimientos(): Promise<MovimientoOut[]> {
 export async function getMovimientoById(
   id: string
 ): Promise<MovimientoOut | null> {
+  const userId = await requireUserId();
   const ds = await getDb();
   const r = await ds.getRepository(Movimiento).findOne({
-    where: { id, eliminado: false },
+    where: { id, cuenta: { usuario: { id: userId } }, eliminado: false },
     relations: RELATIONS,
   });
   return r ? mapMovimiento(r) : null;
@@ -69,7 +72,15 @@ export interface HistorialMovimientoOut {
 export async function getHistorialMovimientosCuenta(
   cuentaId: number
 ): Promise<HistorialMovimientoOut[]> {
+  const userId = await requireUserId();
   const ds = await getDb();
+
+  // La cuenta debe pertenecer al usuario autenticado.
+  const cuenta = await ds.getRepository(Cuenta).findOneBy({
+    id: cuentaId,
+    usuario: { id: userId },
+  });
+  if (!cuenta) return [];
 
   // Movimientos de la cuenta (no eliminados) en orden cronológico ASC,
   // con las relaciones que usa la query original (concepto + gasto).
@@ -87,8 +98,6 @@ export async function getHistorialMovimientosCuenta(
   });
 
   // Saldo de la cuenta ANTES del primer movimiento de la lista
-  const cuenta = await ds.getRepository(Cuenta).findOneBy({ id: cuentaId });
-  if (!cuenta) return [];
   let saldo = cuenta.saldo - variaciones.reduce((a, b) => a + b, 0);
 
   // Running-sum en memoria: saldoPosterior[i] = saldoBase + Σ variaciones[0..i]
