@@ -7,17 +7,16 @@ export class HistoricoCuenta {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 
-  @Column({ type: "datetime" })
+  @Column()
   fechaDesde: Date;
 
-  @Column({ type: "datetime", nullable: true })
+  @Column({ nullable: true })
   fechaHasta?: Date;
 
   @Column({ type: "numeric", precision: 10, scale: 2, default: 0 })
   saldo: number;
 
   @Column({
-    type: "bit",
     default: false,
   })
   eliminado: boolean;

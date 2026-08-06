@@ -6,7 +6,11 @@
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "migration:run": "set TS_NODE_PROJECT=tsconfig.migrations.json&& node --env-file=.env.local -r ts-node/register node_modules/typeorm/cli.js migration:run -d backend/src/data-source.ts",
+    "migration:revert": "set TS_NODE_PROJECT=tsconfig.migrations.json&& node --env-file=.env.local -r ts-node/register node_modules/typeorm/cli.js migration:revert -d backend/src/data-source.ts",
+    "migration:show": "set TS_NODE_PROJECT=tsconfig.migrations.json&& node --env-file=.env.local -r ts-node/register node_modules/typeorm/cli.js migration:show -d backend/src/data-source.ts",
+    "migration:generate": "set TS_NODE_PROJECT=tsconfig.migrations.json&& node --env-file=.env.local -r ts-node/register node_modules/typeorm/cli.js migration:generate -d backend/src/data-source.ts"
   },
   "dependencies": {
     "@fortawesome/free-solid-svg-icons": "^7.3.1",
@@ -20,6 +24,7 @@
     "lucide-react": "^1.28.0",
     "mssql": "^12.7.0",
     "next": "16.2.12",
+    "pg": "^8.22.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.84.0",
@@ -33,12 +38,14 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.20.4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
     "typescript": "^5"
   }
 }

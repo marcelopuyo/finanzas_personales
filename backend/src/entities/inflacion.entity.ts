@@ -15,7 +15,6 @@ export class Inflacion {
   indice: number;
 
   @Column({
-    type: "bit",
     default: false,
   })
   eliminado: boolean;

@@ -18,7 +18,6 @@ export class Tarjeta {
   numero: string;
 
   @Column({
-    type: "bit",
     default: false,
   })
   eliminado: boolean;

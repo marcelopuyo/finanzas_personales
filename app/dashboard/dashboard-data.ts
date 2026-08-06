@@ -75,7 +75,15 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   ]);
 
   // --- Cuentas con evolución ---
-  const cuentas = cuentasEvol.map((c) => ({
+  // `id` es opcional: las tarjetas sintéticas ("Períodos a Cobrar/Actuales")
+  // no tienen cuenta real detrás y no deben abrir el historial al hacer click.
+  const cuentas: {
+    id?: number;
+    title: string;
+    value: string;
+    labels: string[];
+    values: number[];
+  }[] = cuentasEvol.map((c) => ({
     id: c.id,
     title: c.nombreCuenta,
     value: numberToCurrency(c.saldoCuenta),

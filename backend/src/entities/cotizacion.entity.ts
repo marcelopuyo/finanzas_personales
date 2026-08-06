@@ -16,7 +16,6 @@ export class Cotizacion {
   cotizacion: number;
 
   @Column({
-    type: "bit",
     default: false,
   })
   eliminado: boolean;

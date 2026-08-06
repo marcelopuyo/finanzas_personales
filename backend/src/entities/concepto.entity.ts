@@ -11,7 +11,6 @@ export class Concepto {
   nombre: string;
 
   @Column({
-    type: "bit",
     default: false,
   })
   eliminado: boolean;

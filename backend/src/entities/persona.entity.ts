@@ -17,7 +17,6 @@ export class Persona {
   mail?: string;
 
   @Column({
-    type: "bit",
     default: false,
   })
   eliminado: boolean;

@@ -21,7 +21,6 @@ export class MovimientoTarjeta {
   cuotas: number;
 
   @Column({
-    type: "bit",
     default: false,
   })
   eliminado: boolean;

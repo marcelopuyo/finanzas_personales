@@ -25,7 +25,6 @@ export class JornadaTrabajo {
   montoPropina: number = 0;
 
   @Column({
-    type: "bit",
     default: false,
   })
   eliminado: boolean;

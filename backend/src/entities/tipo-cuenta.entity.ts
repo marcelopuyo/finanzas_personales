@@ -11,7 +11,6 @@ export class TipoCuenta {
   nombre: string;
 
   @Column({
-    type: "bit",
     default: false,
   })
   eliminado: boolean;

@@ -16,7 +16,7 @@ import { HistorialModal, type CuentaHistorial } from "./components/historial-mod
 import type { DashboardData } from "./dashboard-data";
 import type { GastoOut } from "@/backend/src/queries/gastos";
 import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
-import { cn, numberToCurrency } from "@/lib/utils";
+import { cn, numberToCurrency, todayLocalISODate } from "@/lib/utils";
 
 interface Props {
   data: DashboardData;
@@ -43,7 +43,7 @@ export function DashboardClient({ data }: Props) {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
   };
-  const fechaHoy = () => new Date().toISOString().slice(0, 10);
+  const fechaHoy = () => todayLocalISODate();
 
   const [selCat, setSelCat] = useState<string[]>([]);
   const [selCta, setSelCta] = useState<string[]>([]);

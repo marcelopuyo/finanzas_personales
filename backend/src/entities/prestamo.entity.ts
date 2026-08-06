@@ -26,7 +26,6 @@ export class Prestamo {
   sentido: string;
 
   @Column({
-    type: "bit",
     default: false,
   })
   eliminado: boolean;

@@ -88,7 +88,10 @@ export async function cobrarSueldo(input: z.infer<typeof movimiento1Schema>) {
     cuenta.saldo += data.monto;
     await cuentaRepo.save(cuenta);
 
-    periodoTrabajo.fechaDeCobro = new Date();
+    // La fecha de cobro debe coincidir con la del movimiento (data.fecha).
+    // Antes se usaba `new Date()` (ahora del servidor) y podía diferir ±1 día
+    // de la fecha ingresada en el formulario (política de fechas 2026-08-05).
+    periodoTrabajo.fechaDeCobro = data.fecha as unknown as Date;
     await periodoTrabajoRepo.save(periodoTrabajo);
 
     const mov = await movRepo.save(

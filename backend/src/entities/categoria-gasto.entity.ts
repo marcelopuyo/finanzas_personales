@@ -11,7 +11,6 @@ export class CategoriaGasto {
   nombre: string;
 
   @Column({
-    type: "bit",
     default: false,
   })
   eliminado: boolean;

@@ -20,7 +20,6 @@ export class Trabajo {
   memos?: string;
 
   @Column({
-    type: "bit",
     default: false,
   })
   eliminado: boolean;

@@ -22,11 +22,10 @@ export class Gasto {
   @Column({ type: "date", nullable: true })
   fechaPago?: Date;
 
-  @Column({ type: "bit", default: 0 })
+  @Column({ default: false })
   isPeriodico: boolean;
 
   @Column({
-    type: "bit",
     default: false,
   })
   eliminado: boolean;

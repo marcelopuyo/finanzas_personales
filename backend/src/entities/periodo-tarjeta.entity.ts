@@ -21,7 +21,6 @@ export class PeriodoTarjeta {
   fechaVencimiento: Date;
 
   @Column({
-    type: "bit",
     default: false,
   })
   eliminado: boolean;

@@ -36,7 +36,6 @@ export class PeriodoTrabajo {
   fechaDeCobro?: Date;
 
   @Column({
-    type: "bit",
     default: false,
   })
   eliminado: boolean;

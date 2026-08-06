@@ -1,5 +1,6 @@
 import "reflect-metadata";
 import { DataSource } from "typeorm";
+import pg from "pg";
 import { Concepto } from "./entities/concepto.entity";
 import { Persona } from "./entities/persona.entity";
 import { Moneda } from "./entities/moneda.entity";
@@ -23,6 +24,7 @@ import { Movimiento } from "./entities/movimiento.entity";
 // Singleton global para evitar reconexiones duplicadas durante HMR
 const globalForDb = globalThis as unknown as {
   dataSource?: DataSource;
+  initPromise?: Promise<DataSource>;
 };
 
 // Todas las entidades registradas (se usan para verificar metadatos y crear el DS)
@@ -33,7 +35,27 @@ const ENTITIES = [
   Trabajo, PeriodoTrabajo, JornadaTrabajo, Prestamo, Movimiento,
 ];
 
-/** Devuelve el DataSource inicializado (idempotente). */
+// El driver `pg` devuelve `numeric` (OID 1700) como string. Como los montos y
+// saldos son dinero (numeric(10,2)), se parsean a número para que TypeORM
+// hidrate las propiedades `number` (las sumas del backend necesitan números).
+pg.types.setTypeParser(1700, (v: string) => parseFloat(v));
+
+/** Crea un DataSource de PostgreSQL con las credenciales de `.env.local` (PG_*). */
+function createDataSource(): DataSource {
+  return new DataSource({
+    type: "postgres",
+    host: process.env.PG_HOST,
+    port: Number(process.env.PG_PORT),
+    username: process.env.PG_USERNAME,
+    password: process.env.PG_PASSWORD,
+    database: process.env.PG_DATABASE,
+    synchronize: false,
+    logging: ["error", "warn"],
+    entities: ENTITIES,
+  });
+}
+
+/** Devuelve el DataSource inicializado (idempotente y seguro ante concurrencia). */
 export async function getDb(): Promise<DataSource> {
   const ds = globalForDb.dataSource;
 
@@ -53,50 +75,43 @@ export async function getDb(): Promise<DataSource> {
         /* ignorar */
       }
       delete globalForDb.dataSource;
+      delete globalForDb.initPromise;
     }
   }
 
   if (!globalForDb.dataSource) {
-    globalForDb.dataSource = new DataSource({
-      type: "mssql",
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT),
-      username: process.env.DB_USERNAME,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      synchronize: false,
-      logging: ["error", "warn"],
-      options: { trustServerCertificate: true },
-      entities: ENTITIES,
-    });
+    globalForDb.dataSource = createDataSource();
+  }
+
+  // Cachea la promesa de inicialización: varias consultas concurrentes
+  // (ej. las 9 del dashboard) comparten UNA misma inicialización en vez de
+  // competir entre sí (evita "Connection terminated" durante el arranque).
+  if (!globalForDb.initPromise) {
+    globalForDb.initPromise = globalForDb.dataSource.initialize().catch(
+      async (err: unknown) => {
+        // Si la inicialización falla (p.ej. metadata rota por HMR), reintentar
+        // una vez con un DataSource nuevo antes de propagar el error.
+        console.error(
+          "[db] initialize falló, reintentando con un DataSource nuevo:",
+          (err as Error).message
+        );
+        try {
+          await globalForDb.dataSource?.destroy();
+        } catch {
+          /* ignorar */
+        }
+        delete globalForDb.dataSource;
+        delete globalForDb.initPromise;
+        globalForDb.dataSource = createDataSource();
+        return globalForDb.dataSource.initialize();
+      }
+    );
   }
 
   try {
-    await globalForDb.dataSource.initialize();
+    return await globalForDb.initPromise;
   } catch (err) {
-    // Si la inicialización falla (p.ej. metadata rota por HMR), reintentar una
-    // vez con un DataSource nuevo antes de propagar el error.
-    console.error("[db] initialize falló, reintentando con un DataSource nuevo:", (err as Error).message);
-    try {
-      await globalForDb.dataSource.destroy();
-    } catch {
-      /* ignorar */
-    }
-    delete globalForDb.dataSource;
-    globalForDb.dataSource = new DataSource({
-      type: "mssql",
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT),
-      username: process.env.DB_USERNAME,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      synchronize: false,
-      logging: ["error", "warn"],
-      options: { trustServerCertificate: true },
-      entities: ENTITIES,
-    });
-    await globalForDb.dataSource.initialize();
+    delete globalForDb.initPromise;
+    throw err;
   }
-
-  return globalForDb.dataSource;
 }

@@ -15,7 +15,6 @@ export class Moneda {
   nombre: string;
 
   @Column({
-    type: "bit",
     default: false,
   })
   eliminado: boolean;

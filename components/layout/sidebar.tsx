@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   Menu,
@@ -163,6 +163,29 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // Bloquea el scroll del body mientras el drawer móvil está abierto (mismo
+  // patrón que el Modal). En desktop (lg) el sidebar es estático, nunca drawer.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileOpen]);
+
+  // Si se cruza a desktop (lg+) con el drawer abierto, se cierra: esto además
+  // libera el scroll del body (el cleanup del efecto anterior) y evita que el
+  // sidebar móvil quede "abierto" sin sentido en pantallas grandes.
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onChange = (e: MediaQueryListEvent) => {
+      if (e.matches) setMobileOpen(false);
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
   return (
     <>
       <button
@@ -182,9 +205,13 @@ export default function Sidebar() {
 
       <aside
         className={cn(
-          "fixed top-0 left-0 z-40 flex h-screen w-64 flex-col bg-sidebar transition-transform duration-200",
+          "fixed top-0 left-0 z-40 flex h-screen w-64 flex-col bg-sidebar transition-[transform,visibility] duration-200",
           "lg:translate-x-0 lg:static lg:z-auto lg:h-screen",
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
+          // Cerrado en móvil: queda fuera de pantalla Y fuera del tab-order /
+          // árbol de accesibilidad (invisible), pero visible y estático en lg+.
+          mobileOpen
+            ? "translate-x-0 visible"
+            : "-translate-x-full invisible lg:visible"
         )}
       >
         <div className="px-4 pt-6 pb-4">

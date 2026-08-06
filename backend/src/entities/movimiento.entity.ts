@@ -18,7 +18,6 @@ export class Movimiento {
   monto: number;
 
   @Column({
-    type: "bit",
     default: false,
   })
   eliminado: boolean;

@@ -17,7 +17,6 @@ export class Cuenta {
   saldo: number;
 
   @Column({
-    type: "bit",
     default: false,
   })
   eliminado: boolean;

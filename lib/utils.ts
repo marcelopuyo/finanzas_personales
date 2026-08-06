@@ -75,3 +75,17 @@ export function onlyDate(date?: Date | string): number {
 export function toISODateString(date: Date): string {
   return date.toISOString().split("T")[0];
 }
+
+/**
+ * Retorna la fecha de HOY como "YYYY-MM-DD" usando componentes LOCALES
+ * (getFullYear/getMonth/getDate). NO usar `toISOString()` para "hoy": devuelve
+ * la fecha UTC y en zonas con offset negativo (ej. GMT-3) por la noche puede
+ * caer en el día SIGUIENTE, desfasando las fechas guardadas (±1 día).
+ */
+export function todayLocalISODate(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}

@@ -1,4 +1,5 @@
 import { getDb } from "../db";
+import { Cuenta } from "../entities/cuenta.entity";
 import { Movimiento } from "../entities/movimiento.entity";
 
 export interface MovimientoOut {
@@ -69,39 +70,42 @@ export async function getHistorialMovimientosCuenta(
   cuentaId: number
 ): Promise<HistorialMovimientoOut[]> {
   const ds = await getDb();
-  const raw: any[] = await ds.query(
-    `WITH firmados AS (
-       SELECT m.id, m.fecha, m.monto,
-         COALESCE(NULLIF(g.descripcion, ''), c.nombre) AS motivo,
-         c.categoria AS categoria,
-         -- Variación de la cuenta según la categoría del concepto
-         CASE WHEN LOWER(c.categoria) = 'egreso'
-              THEN -ABS(CAST(m.monto AS float))
-              ELSE ABS(CAST(m.monto AS float)) END AS variacion
-       FROM movimiento m
-       JOIN concepto c ON m.conceptoId = c.id
-       LEFT JOIN gasto g ON g.id = m.gastoId
-       WHERE m.cuentaId = @0 AND m.eliminado = 0
-     ),
-     base AS (
-       -- Saldo de la cuenta ANTES del primer movimiento de la lista
-       SELECT (SELECT saldo FROM cuenta WHERE id = @0)
-            - (SELECT COALESCE(SUM(variacion),0) FROM firmados) AS saldoBase
-     )
-     SELECT f.fecha, f.monto, f.motivo, f.categoria,
-       b.saldoBase + SUM(f.variacion) OVER (
-         ORDER BY f.fecha, f.id ROWS UNBOUNDED PRECEDING
-       ) AS saldoPosterior
-     FROM firmados f
-     CROSS JOIN base b
-     ORDER BY f.fecha DESC, f.id DESC`,
-    [cuentaId]
-  );
-  return raw.map((r: any) => ({
-    fecha: r.fecha,
-    monto: Number(r.monto),
-    motivo: r.motivo,
-    categoria: r.categoria ?? null,
-    saldoPosterior: Number(r.saldoPosterior ?? 0),
-  }));
+
+  // Movimientos de la cuenta (no eliminados) en orden cronológico ASC,
+  // con las relaciones que usa la query original (concepto + gasto).
+  const movs = await ds.getRepository(Movimiento).find({
+    where: { cuenta: { id: cuentaId }, eliminado: false },
+    relations: { concepto: true, gasto: true },
+    order: { fecha: "ASC", id: "ASC" },
+  });
+  if (movs.length === 0) return [];
+
+  // Variación de la cuenta según la categoría del concepto (egreso → resta)
+  const variaciones = movs.map((m) => {
+    const esEgreso = m.concepto?.categoria?.toLowerCase() === "egreso";
+    return esEgreso ? -Math.abs(m.monto) : Math.abs(m.monto);
+  });
+
+  // Saldo de la cuenta ANTES del primer movimiento de la lista
+  const cuenta = await ds.getRepository(Cuenta).findOneBy({ id: cuentaId });
+  if (!cuenta) return [];
+  let saldo = cuenta.saldo - variaciones.reduce((a, b) => a + b, 0);
+
+  // Running-sum en memoria: saldoPosterior[i] = saldoBase + Σ variaciones[0..i]
+  const result: HistorialMovimientoOut[] = [];
+  for (let i = 0; i < movs.length; i++) {
+    const m = movs[i];
+    saldo += variaciones[i];
+    const desc = m.gasto?.descripcion;
+    result.push({
+      fecha: m.fecha,
+      monto: m.monto,
+      motivo: desc ? desc : (m.concepto?.nombre ?? ""),
+      categoria: m.concepto?.categoria ?? null,
+      saldoPosterior: saldo,
+    });
+  }
+
+  // Salida en orden cronológico DESC (como el ORDER BY final del SQL)
+  return result.reverse();
 }

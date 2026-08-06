@@ -17,7 +17,6 @@ export class PeriodoGasto {
   fechaCierre: Date;
 
   @Column({
-    type: "bit",
     default: false,
   })
   eliminado: boolean;
