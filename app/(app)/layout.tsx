@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getSessionUserId } from "@/backend/src/lib/auth";
+import { getSessionUser } from "@/backend/src/lib/auth";
 import AppLayout from "@/components/layout/app-layout";
 
 // Layout del grupo protegido (app): si no hay sesión válida, redirige a /login.
@@ -7,8 +7,8 @@ import AppLayout from "@/components/layout/app-layout";
 export default async function ProtectedLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const userId = await getSessionUserId();
-  if (!userId) redirect("/login");
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
 
-  return <AppLayout>{children}</AppLayout>;
+  return <AppLayout esAdmin={user.esAdmin}>{children}</AppLayout>;
 }

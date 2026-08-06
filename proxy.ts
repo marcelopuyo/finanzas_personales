@@ -1,10 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
-// Middleware de autenticación: valida el JWT en la cookie `auth_token` y
-// protege todas las rutas excepto /login, /register y /api/auth/*.
-// Las páginas bajo (app) además se autoprotegen en su layout; esto es
-// defensa en profundidad + redirección temprana.
+// Proxy de autenticación (Next 16: middleware.ts → proxy.ts): valida el JWT en
+// la cookie `auth_token` y protege todas las rutas excepto /login, /register y
+// /api/auth/*. Las páginas bajo (app) además se autoprotegen en su layout; esto
+// es defensa en profundidad + redirección temprana.
 
 const COOKIE_NAME = "auth_token";
 const PUBLIC_PATHS = ["/login", "/register"];
@@ -26,7 +26,7 @@ async function isAuthed(req: NextRequest): Promise<boolean> {
   }
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const isApiAuth = pathname.startsWith("/api/auth");
   const isPublic = PUBLIC_PATHS.some(

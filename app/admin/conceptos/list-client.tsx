@@ -44,8 +44,8 @@ export function ConceptosListClient({ initialData }: Props) {
       initialData={initialData}
       deleteItem={eliminarConcepto}
       searchPlaceholder="Buscar concepto..."
-      createHref="/cruds/conceptos/nuevo"
-      editHref={(id) => `/cruds/conceptos/${id}/editar`}
+      createHref="/admin/conceptos/nuevo"
+      editHref={(id) => `/admin/conceptos/${id}/editar`}
       getId={(item) => item.id}
       searchPredicate={(item, query) =>
         item.nombre.toLowerCase().includes(query)

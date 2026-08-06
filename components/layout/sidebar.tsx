@@ -20,6 +20,7 @@ import {
   faHandHoldingDollar,
   faScrewdriverWrench,
   faTags,
+  faUserShield,
 } from "@fortawesome/free-solid-svg-icons";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "./theme-toggle";
@@ -28,7 +29,9 @@ interface NavItem {
   label: string;
   href?: string;
   icon?: React.ComponentType<{ className?: string }>;
-  children?: { label: string; href: string }[];
+  /** Solo visible para usuarios con privilegios de administrador. */
+  adminOnly?: boolean;
+  children?: { label: string; href: string; adminOnly?: boolean }[];
 }
 
 const navigation: NavItem[] = [
@@ -54,10 +57,7 @@ const navigation: NavItem[] = [
   {
     label: "Cuentas",
     icon: () => <FontAwesomeIcon icon={faLandmark} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
-    children: [
-      { label: "Tipos", href: "/cruds/tipos-cuenta" },
-      { label: "Cuentas", href: "/cruds/cuentas" },
-    ],
+    children: [{ label: "Cuentas", href: "/cruds/cuentas" }],
   },
   {
     label: "Tarjetas",
@@ -86,14 +86,33 @@ const navigation: NavItem[] = [
     label: "Maestros",
     icon: () => <FontAwesomeIcon icon={faTags} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
     children: [
-      { label: "Conceptos", href: "/cruds/conceptos" },
       { label: "Personas", href: "/cruds/personas" },
-      { label: "Monedas", href: "/cruds/monedas" },
       { label: "Cotizaciones", href: "/cruds/cotizaciones" },
       { label: "Inflación", href: "/cruds/inflacion" },
     ],
   },
+  {
+    label: "Panel Admin",
+    href: "/admin",
+    adminOnly: true,
+    icon: () => <FontAwesomeIcon icon={faUserShield} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
+  },
 ];
+
+// Filtra los items según los privilegios del usuario. Un grupo cuyos hijos
+// quedaron vacíos (todos admin-only y usuario no admin) se oculta por completo.
+function filterNavigation(esAdmin: boolean): NavItem[] {
+  return navigation
+    .map((item) => {
+      if (item.adminOnly && !esAdmin) return null;
+      if (!item.children) return item;
+      const children = item.children.filter(
+        (c) => !c.adminOnly || esAdmin
+      );
+      return children.length ? { ...item, children } : null;
+    })
+    .filter((i): i is NavItem => i !== null);
+}
 
 function NavItem({ item, pathname }: { item: NavItem; pathname: string }) {
   const [open, setOpen] = useState(() =>
@@ -160,10 +179,11 @@ function NavItem({ item, pathname }: { item: NavItem; pathname: string }) {
   );
 }
 
-export default function Sidebar() {
+export default function Sidebar({ esAdmin }: { esAdmin: boolean }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const nav = filterNavigation(esAdmin);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -233,7 +253,7 @@ export default function Sidebar() {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-2 py-1 space-y-1">
-          {navigation.map((item, i) => (
+          {nav.map((item, i) => (
             <NavItem key={i} item={item} pathname={pathname} />
           ))}
         </nav>

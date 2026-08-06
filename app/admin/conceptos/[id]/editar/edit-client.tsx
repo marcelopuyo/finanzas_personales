@@ -31,7 +31,7 @@ export function EditarConceptoClient({ data }: Props) {
           categoria: formData.categoria as "Egreso" | "Ingreso",
         });
       }}
-      cancelHref="/cruds/conceptos"
+      cancelHref="/admin/conceptos"
       successMessage="Concepto actualizado correctamente"
     />
   );

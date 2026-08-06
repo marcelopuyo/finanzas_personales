@@ -28,6 +28,10 @@ export class Usuario {
   @Column({ default: true })
   activo: boolean;
 
+  /** True = usuario con privilegios de administrador (CRUD de Conceptos, etc.). */
+  @Column({ default: false })
+  esAdmin: boolean;
+
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   creadoEn: Date;
 }

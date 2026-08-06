@@ -1,1 +1,9 @@
-"use client"; import { CrudForm } from "@/components/crud/CrudForm"; import { crearMoneda } from "@/backend/src/actions/maestros"; import { monedaSchema, monedaFields } from "../moneda-form-config"; export default function NuevaMonedaPage() { return <CrudForm title="Nueva Moneda" fields={monedaFields} schema={monedaSchema} onSubmit={async (d) => { await crearMoneda({ simbolo: d.simbolo as string, nombre: d.nombre as string }); }} cancelHref="/cruds/monedas" successMessage="Moneda creada correctamente" />; }
+import { redirect } from "next/navigation";
+import { isAdmin } from "@/backend/src/lib/auth";
+import { NuevaMonedaClient } from "./nuevo-client";
+
+export default async function NuevaMonedaPage() {
+  // CRUD de monedas (tabla compartida): solo administradores.
+  if (!(await isAdmin())) redirect("/dashboard");
+  return <NuevaMonedaClient />;
+}

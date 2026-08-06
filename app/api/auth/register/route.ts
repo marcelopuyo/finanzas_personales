@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { registerSchema } from "@/backend/src/validation/auth";
 import { hashPassword, signToken } from "@/backend/src/lib/auth";
+import { enviarEmailVerificacion } from "@/backend/src/lib/email";
 import {
   createUsuario,
   findUsuarioByEmail,
@@ -9,9 +10,11 @@ import {
 /**
  * Registro abierto (decisión 2026-08-06): cualquiera crea su cuenta.
  * Requiere verificar el email antes de poder operar.
- * En dev no hay servicio de email: la URL de verificación se devuelve en
- * `devVerifyUrl` para que el cliente la muestre/abra (en prod se enviaría por
- * email; integración con SendGrid/Resend diferida).
+ *
+ * El email de verificación se envía con `nodemailer`:
+ *  - Con SMTP configurado (SMTP_HOST) → correo real (producción/hosting).
+ *  - Sin SMTP → Ethereal (dev), se devuelve `previewUrl` para verlo.
+ *  - Si el envío falla en dev → se devuelve `devVerifyUrl` (link directo).
  */
 export async function POST(req: Request) {
   try {
@@ -31,15 +34,25 @@ export async function POST(req: Request) {
 
     // Token de verificación de email (scope "verify", 24h).
     const verifyToken = await signToken(usuario.id, "verify");
-    const base =
-      process.env.NODE_ENV === "production"
-        ? ""
-        : `http://localhost:${process.env.PORT ?? 3001}`;
-    const devVerifyUrl = `${base}/api/auth/verify?token=${verifyToken}`;
+
+    let previewUrl: string | undefined;
+    let devVerifyUrl: string | undefined;
+    try {
+      const r = await enviarEmailVerificacion(parsed.email, verifyToken);
+      previewUrl = r.previewUrl;
+    } catch {
+      // No se pudo enviar (sin SMTP ni conexión a Ethereal). Solo en dev se
+      // expone el link directo para no bloquear el flujo de prueba.
+      if (process.env.NODE_ENV !== "production") {
+        const base = `http://localhost:${process.env.PORT ?? 3001}`;
+        devVerifyUrl = `${base}/api/auth/verify?token=${verifyToken}`;
+      }
+    }
 
     return NextResponse.json({
       ok: true,
       usuario,
+      previewUrl,
       devVerifyUrl,
     });
   } catch (err) {

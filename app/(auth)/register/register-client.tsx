@@ -11,6 +11,8 @@ export default function RegisterClient() {
   const [nombre, setNombre] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [devVerifyUrl, setDevVerifyUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -29,10 +31,11 @@ export default function RegisterClient() {
         setError(data.error ?? "Error al registrarse");
         return;
       }
-      // En dev el backend devuelve la URL de verificación (no hay servicio de email).
-      if (data.devVerifyUrl) {
-        setDevVerifyUrl(data.devVerifyUrl);
-      }
+      setSuccess(true);
+      // Sin SMTP configurado, en dev el backend devuelve la preview de
+      // Ethereal o el link directo de verificación.
+      if (data.previewUrl) setPreviewUrl(data.previewUrl);
+      if (data.devVerifyUrl) setDevVerifyUrl(data.devVerifyUrl);
     } catch {
       setError("Error de conexión con el servidor");
     } finally {
@@ -50,20 +53,46 @@ export default function RegisterClient() {
           </p>
         </div>
 
-        {devVerifyUrl ? (
+        {success ? (
           <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <p className="text-[13px] text-header">
               Cuenta creada. Verificá tu email para habilitarla.
             </p>
-            <p className="mt-2 text-[12px] text-subtitle">
-              (En desarrollo no hay servicio de email: usá el enlace de abajo)
-            </p>
-            <a
-              href={devVerifyUrl}
-              className="mt-4 block w-full rounded-md bg-primary py-2.5 text-center text-[13px] font-semibold text-primary-foreground hover:opacity-90"
-            >
-              Verificar email (dev)
-            </a>
+
+            {devVerifyUrl ? (
+              <>
+                <p className="mt-2 text-[12px] text-subtitle">
+                  (Sin SMTP configurado: usá el enlace de abajo)
+                </p>
+                <a
+                  href={devVerifyUrl}
+                  className="mt-4 block w-full rounded-md bg-primary py-2.5 text-center text-[13px] font-semibold text-primary-foreground hover:opacity-90"
+                >
+                  Verificar email (dev)
+                </a>
+              </>
+            ) : previewUrl ? (
+              <>
+                <p className="mt-2 text-[12px] text-subtitle">
+                  El correo se envió por Ethereal (desarrollo). Abrí la bandeja de
+                  entrada para verlo.
+                </p>
+                <a
+                  href={previewUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-4 block w-full rounded-md bg-primary py-2.5 text-center text-[13px] font-semibold text-primary-foreground hover:opacity-90"
+                >
+                  Ver email (Ethereal)
+                </a>
+              </>
+            ) : (
+              <p className="mt-2 text-[12px] text-subtitle">
+                Te enviamos un email a <strong className="text-header">{email}</strong>.
+                Abrí tu casilla y seguí el enlace para habilitar la cuenta.
+              </p>
+            )}
+
             <p className="mt-3 text-center text-[12px] text-subtitle">
               Ya verificaste?{" "}
               <Link href="/login" className="font-medium text-primary hover:underline">

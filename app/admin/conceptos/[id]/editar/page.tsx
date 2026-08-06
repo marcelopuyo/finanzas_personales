@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { isAdmin } from "@/backend/src/lib/auth";
 import { getConceptoById } from "@/backend/src/queries/maestros";
 import { EditarConceptoClient } from "./edit-client";
 
@@ -6,6 +8,7 @@ export default async function EditarConceptoPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  if (!(await isAdmin())) redirect("/dashboard");
   const { id } = await params;
   const concepto = await getConceptoById(Number(id));
   if (!concepto) {

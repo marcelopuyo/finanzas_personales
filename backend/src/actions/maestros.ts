@@ -2,7 +2,7 @@
 
 import type { z } from "zod";
 import { getDb } from "../db";
-import { requireUserId } from "../lib/auth";
+import { requireAdmin, requireUserId } from "../lib/auth";
 import { dbError, refresh } from "../lib/action-helpers";
 import { Concepto } from "../entities/concepto.entity";
 import { Cotizacion } from "../entities/cotizacion.entity";
@@ -43,15 +43,12 @@ import {
 export async function crearConcepto(
   input: z.infer<typeof conceptoCreateSchema>
 ) {
-  const userId = await requireUserId();
+  await requireAdmin();
   const data = conceptoCreateSchema.parse(input);
   const ds = await getDb();
   const repo = ds.getRepository(Concepto);
   try {
-    // Los conceptos nuevos son del usuario (nunca del sistema).
-    const created = await repo.save(
-      repo.create({ ...data, sistema: false, usuario: { id: userId } })
-    );
+    const created = await repo.save(repo.create(data));
     refresh();
     return getConceptoById(created.id);
   } catch (error) {
@@ -63,22 +60,14 @@ export async function actualizarConcepto(
   id: number,
   input: z.infer<typeof conceptoUpdateSchema>
 ) {
-  const userId = await requireUserId();
+  await requireAdmin();
   const data = conceptoUpdateSchema.parse(input);
   const ds = await getDb();
   const repo = ds.getRepository(Concepto);
-  // Solo el dueño puede editar; los del sistema están protegidos.
-  const existing = await repo.findOne({
-    where: [
-      { id, usuario: { id: userId } },
-      { id, sistema: true },
-    ],
-  });
+  // Solo admin puede editar (los conceptos son globales).
+  const existing = await repo.findOne({ where: { id } });
   if (!existing) {
     throw new Error(`Concepto con id ${id} no encontrado`);
-  }
-  if (existing.sistema) {
-    throw new Error("Los conceptos del sistema no se pueden modificar");
   }
   try {
     Object.assign(existing, data);
@@ -91,20 +80,14 @@ export async function actualizarConcepto(
 }
 
 export async function eliminarConcepto(id: number) {
-  const userId = await requireUserId();
+  await requireAdmin();
   const ds = await getDb();
   const repo = ds.getRepository(Concepto);
   const row = await repo.findOne({
-    where: [
-      { id, usuario: { id: userId }, eliminado: false },
-      { id, sistema: true, eliminado: false },
-    ],
+    where: { id, eliminado: false },
   });
   if (!row) {
     throw new Error(`Concepto con id ${id} no encontrado`);
-  }
-  if (row.sistema) {
-    throw new Error("Los conceptos del sistema no se pueden eliminar");
   }
   try {
     row.eliminado = true;
@@ -121,6 +104,7 @@ export async function eliminarConcepto(id: number) {
 export async function crearTipoCuenta(
   input: z.infer<typeof tipoCuentaCreateSchema>
 ) {
+  await requireAdmin();
   const data = tipoCuentaCreateSchema.parse(input);
   const ds = await getDb();
   const repo = ds.getRepository(TipoCuenta);
@@ -137,6 +121,7 @@ export async function actualizarTipoCuenta(
   id: number,
   input: z.infer<typeof tipoCuentaUpdateSchema>
 ) {
+  await requireAdmin();
   const data = tipoCuentaUpdateSchema.parse(input);
   const ds = await getDb();
   const repo = ds.getRepository(TipoCuenta);
@@ -154,6 +139,7 @@ export async function actualizarTipoCuenta(
 }
 
 export async function eliminarTipoCuenta(id: number) {
+  await requireAdmin();
   const ds = await getDb();
   const repo = ds.getRepository(TipoCuenta);
   const row = await repo.findOneBy({ id, eliminado: false });
@@ -173,6 +159,7 @@ export async function eliminarTipoCuenta(id: number) {
 // MONEDA
 // ============================================================
 export async function crearMoneda(input: z.infer<typeof monedaCreateSchema>) {
+  await requireAdmin();
   const data = monedaCreateSchema.parse(input);
   const ds = await getDb();
   const repo = ds.getRepository(Moneda);
@@ -189,6 +176,7 @@ export async function actualizarMoneda(
   id: number,
   input: z.infer<typeof monedaUpdateSchema>
 ) {
+  await requireAdmin();
   const data = monedaUpdateSchema.parse(input);
   const ds = await getDb();
   const repo = ds.getRepository(Moneda);
@@ -206,6 +194,7 @@ export async function actualizarMoneda(
 }
 
 export async function eliminarMoneda(id: number) {
+  await requireAdmin();
   const ds = await getDb();
   const repo = ds.getRepository(Moneda);
   const row = await repo.findOneBy({ id, eliminado: false });

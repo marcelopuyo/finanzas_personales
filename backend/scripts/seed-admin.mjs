@@ -18,17 +18,26 @@ const EMAIL = process.env.ADMIN_EMAIL ?? "admin@finanzas.local";
 const PASSWORD = process.env.ADMIN_PASSWORD ?? "Admin123!";
 
 async function main() {
-  const exists = await pool.query("SELECT id FROM usuario WHERE email = $1", [EMAIL]);
+  const exists = await pool.query(
+    "SELECT id, \"esAdmin\" FROM usuario WHERE email = $1",
+    [EMAIL]
+  );
   if (exists.rowCount > 0) {
-    console.log(`Admin ya existe (id ${exists.rows[0].id}).`);
+    const row = exists.rows[0];
+    if (row.esAdmin) {
+      console.log(`Admin ya existe (id ${row.id}).`);
+    } else {
+      await pool.query("UPDATE usuario SET \"esAdmin\" = true WHERE id = $1", [row.id]);
+      console.log(`Admin existente marcado como administrador (id ${row.id}).`);
+    }
     await pool.end();
     return;
   }
   const hash = await bcrypt.hash(PASSWORD, 10);
   const r = await pool.query(
-    `INSERT INTO usuario (email, "passwordHash", nombre, "emailVerificado", activo)
-     VALUES ($1, $2, 'Admin', true, true)
-     RETURNING id, email`,
+    `INSERT INTO usuario (email, "passwordHash", nombre, "emailVerificado", activo, "esAdmin")
+     VALUES ($1, $2, 'Admin', true, true, true)
+     RETURNING id, email, "esAdmin"`,
     [EMAIL, hash]
   );
   console.log("Admin creado:", JSON.stringify(r.rows[0]));

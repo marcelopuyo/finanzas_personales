@@ -12,7 +12,7 @@ import type { ZodSchema } from "zod";
 export interface FormField {
   name: string;
   label: string;
-  type: "text" | "select" | "textarea" | "date" | "number" | "time";
+  type: "text" | "select" | "textarea" | "date" | "number" | "time" | "password";
   options?: { value: string; label: string }[];
   optionsFrom?: () => Promise<{ value: string; label: string }[]>;
   placeholder?: string;

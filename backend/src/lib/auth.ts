@@ -1,6 +1,8 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
+import { getDb } from "../db";
+import { Usuario } from "../entities/usuario.entity";
 
 /**
  * Helpers de autenticación multiusuario.
@@ -8,7 +10,7 @@ import bcrypt from "bcryptjs";
  * - JWT firmados con `jose` (HS256) usando `JWT_SECRET` de `.env.local`.
  * - La sesión se guarda en una cookie httpOnly (`auth_token`), inmune a XSS.
  *
- * El middleware (`middleware.ts`) valida el JWT y redirige a /login en rutas
+ * El proxy (`proxy.ts`, Next 16) valida el JWT y redirige a /login en rutas
  * protegidas; aquí los Server Components/Actions leen la cookie directamente
  * para obtener el userId (fuente de verdad de la sesión).
  */
@@ -81,6 +83,27 @@ export async function requireUserId(): Promise<number> {
   const userId = await getSessionUserId();
   if (!userId) throw new Error("No autenticado");
   return userId;
+}
+
+/** Devuelve el usuario autenticado completo (o null si no hay sesión). */
+export async function getSessionUser(): Promise<Usuario | null> {
+  const userId = await getSessionUserId();
+  if (!userId) return null;
+  const ds = await getDb();
+  return ds.getRepository(Usuario).findOneBy({ id: userId });
+}
+
+/** True si el usuario autenticado tiene privilegios de administrador. */
+export async function isAdmin(): Promise<boolean> {
+  const user = await getSessionUser();
+  return user?.esAdmin === true;
+}
+
+/** Para Server Components/Actions: lanza error si el usuario no es admin. */
+export async function requireAdmin(): Promise<void> {
+  if (!(await isAdmin())) {
+    throw new Error("Se requieren privilegios de administrador");
+  }
 }
 
 // ----------------------------------------------------------------- cookies

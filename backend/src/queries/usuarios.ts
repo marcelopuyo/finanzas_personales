@@ -9,6 +9,8 @@ export type UsuarioOut = {
   nombre: string | null;
   emailVerificado: boolean;
   activo: boolean;
+  esAdmin: boolean;
+  creadoEn: Date;
 };
 
 function toOut(u: Usuario): UsuarioOut {
@@ -18,6 +20,8 @@ function toOut(u: Usuario): UsuarioOut {
     nombre: u.nombre ?? null,
     emailVerificado: u.emailVerificado,
     activo: u.activo,
+    esAdmin: u.esAdmin,
+    creadoEn: u.creadoEn,
   };
 }
 
@@ -57,6 +61,19 @@ export async function marcarEmailVerificado(id: number): Promise<boolean> {
   usuario.emailVerificado = true;
   await ds.getRepository(Usuario).save(usuario);
   return true;
+}
+
+/** Listado completo de usuarios (solo admin). Devuelve la forma segura (sin passwordHash). */
+export async function getAllUsuarios(): Promise<UsuarioOut[]> {
+  const ds = await getDb();
+  const rows = await ds.getRepository(Usuario).find({ order: { id: "ASC" } });
+  return rows.map(toOut);
+}
+
+/** Devuelve un usuario en forma segura (sin passwordHash), o null. */
+export async function getUsuarioOut(id: number): Promise<UsuarioOut | null> {
+  const usuario = await findUsuarioById(id);
+  return usuario ? toOut(usuario) : null;
 }
 
 export { toOut as usuarioToOut };

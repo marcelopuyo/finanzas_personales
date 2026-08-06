@@ -1,15 +1,17 @@
-import { Column, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryGeneratedColumn, Unique } from "typeorm";
 import { Cuenta } from "./cuenta.entity";
 import { Usuario } from "./usuario.entity";
 
 // Lado propietario de la relación OneToOne con Cuenta (crea columna cuentaId).
 // Las relaciones inversas (movimientos/periodos) se omiten para evitar ciclos.
+// El nombre es único POR USUARIO (no global).
 @Entity({ name: "tarjeta" })
+@Unique(["nombre", "usuario"])
 export class Tarjeta {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ unique: true })
+  @Column()
   nombre: string;
 
   @Column()

@@ -70,15 +70,13 @@ export interface HistoricoCuentaOut {
 // ============================================================
 // Conceptos
 // ============================================================
-// Los conceptos son compartidos (sistema=true, sin dueño) o propios del usuario.
+// Tabla GLOBAL/compartida (NO multiusuario): todos los usuarios ven los mismos
+// conceptos no eliminados. El CRUD (crear/editar/eliminar) está restringido a
+// administradores en las acciones y en las páginas.
 export async function getAllConceptos(): Promise<ConceptoOut[]> {
-  const userId = await requireUserId();
   const ds = await getDb();
   const rows = await ds.getRepository(Concepto).find({
-    where: [
-      { sistema: true, eliminado: false },
-      { usuario: { id: userId }, eliminado: false },
-    ],
+    where: { eliminado: false },
   });
   return rows.map((r) => ({
     id: r.id,
@@ -90,13 +88,9 @@ export async function getAllConceptos(): Promise<ConceptoOut[]> {
 export async function getConceptoById(
   id: number
 ): Promise<ConceptoOut | null> {
-  const userId = await requireUserId();
   const ds = await getDb();
   const r = await ds.getRepository(Concepto).findOne({
-    where: [
-      { id, sistema: true, eliminado: false },
-      { id, usuario: { id: userId }, eliminado: false },
-    ],
+    where: { id, eliminado: false },
   });
   return r
     ? { id: r.id, nombre: r.nombre, categoria: r.categoria ?? null }
