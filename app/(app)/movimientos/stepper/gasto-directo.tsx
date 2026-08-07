@@ -10,6 +10,7 @@ import {
   AutoCompleteField,
 } from "./ui";
 import { buscarDescripcionesGastoAction } from "../buscar-descripciones";
+import { STEP_CONFIRMACION } from "./types";
 
 export function GastoDirecto() {
   const { data, handleSetData, navigateTo, options } = useMovimientoStepper();
@@ -28,7 +29,7 @@ export function GastoDirecto() {
       footer={
         <NavButtons
           onBack={() => navigateTo(0)}
-          onNext={() => navigateTo(7)}
+          onNext={() => navigateTo(STEP_CONFIRMACION)}
           nextDisabled={!isValid}
         />
       }

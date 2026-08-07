@@ -12,6 +12,7 @@ import {
   getPeriodoTrabajoById,
   getTrabajoById,
 } from "../queries/trabajos";
+import { calcularMontoACobrar, calcularMontoJornada } from "../lib/jornadas";
 import {
   jornadaTrabajoCreateSchema,
   jornadaTrabajoUpdateSchema,
@@ -24,18 +25,6 @@ import {
 // ---------------------------------------------------------------------------
 // Helpers de lógica de jornadas (port del servicio JornadaTrabajoService)
 // ---------------------------------------------------------------------------
-function calcularMontoJornada(
-  horaDesde: number,
-  horaHasta: number,
-  precioHora: number
-): number {
-  const horaDesdeDecimal =
-    ((horaDesde - Math.floor(horaDesde)) * 100) / 60 + Math.trunc(horaDesde);
-  const horaHastaDecimal =
-    ((horaHasta - Math.floor(horaHasta)) * 100) / 60 + Math.trunc(horaHasta);
-  return (horaHastaDecimal - horaDesdeDecimal) * precioHora;
-}
-
 async function actualizarMontoACobrarPeriodo(idPeriodo: number) {
   const ds = await getDb();
   const repo = ds.getRepository(PeriodoTrabajo);
@@ -47,14 +36,9 @@ async function actualizarMontoACobrarPeriodo(idPeriodo: number) {
     throw new Error(`PeriodoTrabajo con id ${idPeriodo} no encontrado`);
   }
 
-  let montoACobrar = 0;
-  for (const jornada of periodo.jornadas ?? []) {
-    if (!jornada.eliminado) {
-      montoACobrar += jornada.montoJornada + jornada.montoPropina;
-    }
-  }
-
-  periodo.montoACobrar = montoACobrar;
+  // La propina NO forma parte del monto a cobrar (tarjetas "Períodos a
+  // Cobrar/Actuales" del dashboard; decisión 2026-08-06). Ver lib/jornadas.
+  periodo.montoACobrar = calcularMontoACobrar(periodo.jornadas ?? []);
   await repo.save(periodo);
 }
 

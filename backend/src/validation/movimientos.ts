@@ -40,3 +40,14 @@ export const movimiento3Schema = z.object({
   idCuenta: z.number(),
   idCategoriaGasto: z.number(),
 });
+
+// Movimiento tipo 4 — Jornada de trabajo desde el wizard.
+// Crea la jornada (como el CRUD) y, si montoPropina > 0, la deposita en idCuenta.
+export const jornadaStepperSchema = z.object({
+  fecha: dateString,
+  horaDesde: z.number(),
+  horaHasta: z.number(),
+  montoPropina: z.number().optional().default(0),
+  idPeriodo: z.number(),
+  idCuenta: z.number().optional(),
+});

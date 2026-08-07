@@ -8,6 +8,7 @@ import { AjusteCuenta } from "./stepper/ajuste-cuenta";
 import { PagoGasto } from "./stepper/pago-gasto";
 import { GastoDirecto } from "./stepper/gasto-directo";
 import { Transferencia } from "./stepper/transferencia";
+import { JornadaTrabajo } from "./stepper/jornada-trabajo";
 import { Confirmacion } from "./stepper/confirmacion";
 import type { MovimientoOptions } from "./stepper/types";
 
@@ -19,6 +20,7 @@ const STEPS = [
   PagoGasto,
   GastoDirecto,
   Transferencia,
+  JornadaTrabajo,
   Confirmacion,
 ];
 

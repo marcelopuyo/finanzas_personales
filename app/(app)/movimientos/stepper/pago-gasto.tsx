@@ -10,6 +10,7 @@ import {
   formatFecha,
 } from "./ui";
 import { numberToCurrency } from "@/lib/utils";
+import { STEP_CONFIRMACION } from "./types";
 
 export function PagoGasto() {
   const { data, handleSetData, navigateTo, options } = useMovimientoStepper();
@@ -25,7 +26,7 @@ export function PagoGasto() {
       footer={
         <NavButtons
           onBack={() => navigateTo(0)}
-          onNext={() => navigateTo(7)}
+          onNext={() => navigateTo(STEP_CONFIRMACION)}
           nextDisabled={!isValid}
         />
       }

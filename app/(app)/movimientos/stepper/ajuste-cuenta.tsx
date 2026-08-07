@@ -2,6 +2,7 @@
 
 import { useMovimientoStepper } from "./stepper-context";
 import { StepShell, NavButtons, DateField, SelectField, NumberField } from "./ui";
+import { STEP_CONFIRMACION } from "./types";
 
 export function AjusteCuenta() {
   const { data, handleSetData, navigateTo, options } = useMovimientoStepper();
@@ -16,7 +17,7 @@ export function AjusteCuenta() {
       footer={
         <NavButtons
           onBack={() => navigateTo(0)}
-          onNext={() => navigateTo(7)}
+          onNext={() => navigateTo(STEP_CONFIRMACION)}
           nextDisabled={!isValid}
         />
       }

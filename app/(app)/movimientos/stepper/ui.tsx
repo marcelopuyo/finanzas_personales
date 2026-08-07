@@ -122,6 +122,27 @@ export function DateField({
   );
 }
 
+export function TimeField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <Campo label={label}>
+      <input
+        type="time"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={inputCls}
+      />
+    </Campo>
+  );
+}
+
 /**
  * Campo de texto con autocompletado: cuando se ingresan `minChars` (default 3)
  * caracteres, ejecuta `buscar` (con debounce) y muestra sugerencias para

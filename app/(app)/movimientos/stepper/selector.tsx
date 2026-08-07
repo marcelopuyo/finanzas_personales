@@ -14,6 +14,7 @@ const OPCIONES: { value: MovimientoConcepto; label: string; desc: string }[] = [
   // { value: "PagoGasto", label: "Pago Gasto", desc: "Pagar un gasto pendiente" },
   { value: "GastoDirecto", label: "Gasto", desc: "Cargar un gasto" },
   { value: "Transferencia", label: "Transferencia", desc: "Mover dinero entre cuentas" },
+  { value: "JornadaTrabajo", label: "Jornada trabajo", desc: "Cargar una nueva jornada de trabajo" },
 ];
 
 export function Selector() {

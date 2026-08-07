@@ -6,7 +6,7 @@ import { Save, X, ArrowLeft } from "lucide-react";
 import { useMovimientoStepper } from "./stepper-context";
 import { StepShell, Fila, formatFecha } from "./ui";
 import { CONCEPTO_STEP, MOTIVOS_TRANSFERENCIA, type MovimientoConcepto } from "./types";
-import { numberToCurrency } from "@/lib/utils";
+import { numberToCurrency, timeToDecimal } from "@/lib/utils";
 import {
   cobrarSueldo,
   pagarPrestamo,
@@ -14,6 +14,7 @@ import {
   pagarGasto,
   gastoDirecto,
   transferir,
+  cargarJornadaTrabajo,
 } from "@/backend/src/actions/movimientos";
 
 const TITULOS: Record<MovimientoConcepto, string> = {
@@ -23,6 +24,7 @@ const TITULOS: Record<MovimientoConcepto, string> = {
   PagoGasto: "Revisar la información y confirmar el pago de gasto.",
   GastoDirecto: "Revisar la información y confirmar el gasto directo.",
   Transferencia: "Revisar la información y confirmar la transferencia.",
+  JornadaTrabajo: "Revisar la información y confirmar la carga de la jornada.",
 };
 
 export function Confirmacion() {
@@ -106,6 +108,29 @@ export function Confirmacion() {
       { label: "Cuenta destino", value: cuentaNombre(data.cuentaDestino) },
       { label: "Monto destino", value: numberToCurrency(data.montoDestino) }
     );
+  } else if (concepto === "JornadaTrabajo") {
+    const periodoJ = options.periodosTrabajo.find(
+      (p) => p.id === data.periodoTrabajo
+    );
+    filas.push(
+      { label: "Fecha", value: formatFecha(data.fecha) },
+      {
+        label: "Período de trabajo",
+        value: periodoJ
+          ? `${periodoJ.trabajo?.nombre ?? "Trabajo"}: ${formatFecha(
+              periodoJ.fechaDesde
+            )} al ${formatFecha(periodoJ.fechaHasta)}`
+          : "—",
+      },
+      { label: "Hora desde", value: data.horaDesde || "—" },
+      { label: "Hora hasta", value: data.horaHasta || "—" }
+    );
+    if (data.montoPropina > 0) {
+      filas.push(
+        { label: "Propina", value: numberToCurrency(data.montoPropina) },
+        { label: "Cuenta (propina)", value: cuentaNombre(data.cuentaPropina) }
+      );
+    }
   }
 
   const guardar = async () => {
@@ -161,6 +186,16 @@ export function Confirmacion() {
             idCuentaOrigen: data.cuentaOrigen,
             montoDestino: data.montoDestino,
             idCuentaDestino: data.cuentaDestino,
+          });
+          break;
+        case "JornadaTrabajo":
+          await cargarJornadaTrabajo({
+            fecha: data.fecha,
+            horaDesde: timeToDecimal(data.horaDesde),
+            horaHasta: timeToDecimal(data.horaHasta),
+            montoPropina: data.montoPropina,
+            idPeriodo: data.periodoTrabajo,
+            idCuenta: data.montoPropina > 0 ? data.cuentaPropina : undefined,
           });
           break;
       }

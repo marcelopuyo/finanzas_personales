@@ -8,7 +8,7 @@ import {
   SelectField,
   NumberField,
 } from "./ui";
-import { MOTIVOS_TRANSFERENCIA } from "./types";
+import { MOTIVOS_TRANSFERENCIA, STEP_CONFIRMACION } from "./types";
 
 export function Transferencia() {
   const { data, handleSetData, navigateTo, options } = useMovimientoStepper();
@@ -34,7 +34,7 @@ export function Transferencia() {
       footer={
         <NavButtons
           onBack={() => navigateTo(0)}
-          onNext={() => navigateTo(7)}
+          onNext={() => navigateTo(STEP_CONFIRMACION)}
           nextDisabled={!isValid}
         />
       }

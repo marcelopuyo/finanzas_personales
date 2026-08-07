@@ -47,6 +47,10 @@ export function MovimientoProvider({
     idCategoriaGasto: 0,
     motivo: "",
     descripcion: "",
+    horaDesde: "",
+    horaHasta: "",
+    montoPropina: 0,
+    cuentaPropina: 0,
   }));
 
   const handleSetData = (partial: Partial<MovimientoData>) =>
@@ -66,6 +70,10 @@ export function MovimientoProvider({
       idCategoriaGasto: 0,
       motivo: "",
       descripcion: "",
+      horaDesde: "",
+      horaHasta: "",
+      montoPropina: 0,
+      cuentaPropina: 0,
     }));
 
   const navigateTo = (step: number) => setActiveStep(step);
@@ -84,6 +92,10 @@ export function MovimientoProvider({
       idCategoriaGasto: 0,
       motivo: "",
       descripcion: "",
+      horaDesde: "",
+      horaHasta: "",
+      montoPropina: 0,
+      cuentaPropina: 0,
     }));
 
   return (

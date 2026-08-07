@@ -8,12 +8,15 @@ import { CategoriaGasto } from "../entities/categoria-gasto.entity";
 import { Concepto } from "../entities/concepto.entity";
 import { Cuenta } from "../entities/cuenta.entity";
 import { Gasto } from "../entities/gasto.entity";
+import { JornadaTrabajo } from "../entities/jornada-trabajo.entity";
 import { Movimiento } from "../entities/movimiento.entity";
 import { PeriodoGasto } from "../entities/periodo-gasto.entity";
 import { PeriodoTrabajo } from "../entities/periodo-trabajo.entity";
 import { Prestamo } from "../entities/prestamo.entity";
 import { crearHistoricoCuenta, dbError, refresh } from "../lib/action-helpers";
+import { calcularMontoACobrar, calcularMontoJornada } from "../lib/jornadas";
 import {
+  jornadaStepperSchema,
   movimiento1Schema,
   movimiento2Schema,
   movimiento3Schema,
@@ -394,6 +397,102 @@ export async function transferir(input: z.infer<typeof movimiento2Schema>) {
 
     await crearHistoricoCuenta(manager, cuentaOrigen, movOrig.id);
     await crearHistoricoCuenta(manager, cuentaDestino, movDest.id);
+  });
+
+  refresh();
+  return true;
+}
+
+// ============================================================
+// 7) JORNADA DE TRABAJO desde el wizard + depósito de propina
+// ============================================================
+export async function cargarJornadaTrabajo(
+  input: z.infer<typeof jornadaStepperSchema>
+) {
+  const userId = await requireUserId();
+  const data = jornadaStepperSchema.parse(input);
+  if (data.montoPropina && data.montoPropina > 0 && !data.idCuenta) {
+    throw new Error("Seleccioná la cuenta para depositar la propina");
+  }
+
+  const ds = await getDb();
+  await ds.transaction(async (manager) => {
+    const jornadaRepo = manager.getRepository(JornadaTrabajo);
+    const periodoTrabajoRepo = manager.getRepository(PeriodoTrabajo);
+    const cuentaRepo = manager.getRepository(Cuenta);
+    const conceptoRepo = manager.getRepository(Concepto);
+    const movRepo = manager.getRepository(Movimiento);
+
+    const periodo = await periodoTrabajoRepo.findOne({
+      where: { id: data.idPeriodo, trabajo: { usuario: { id: userId } } },
+      relations: { trabajo: true },
+    });
+    if (!periodo) {
+      throw new Error(
+        `Período de trabajo con id ${data.idPeriodo} no encontrado`
+      );
+    }
+
+    // 1. Crear la jornada (misma lógica que crearJornadaTrabajo del CRUD).
+    const montoJornada = calcularMontoJornada(
+      data.horaDesde,
+      data.horaHasta,
+      periodo.trabajo.precioHora
+    );
+    await jornadaRepo.save(
+      jornadaRepo.create({
+        fechaJornada: data.fecha as unknown as Date,
+        fechaCarga: new Date(),
+        horaDesde: data.horaDesde,
+        horaHasta: data.horaHasta,
+        montoJornada,
+        montoPropina: data.montoPropina ?? 0,
+        periodoTrabajo: periodo,
+      })
+    );
+
+    // 2. Recalcular el monto a cobrar del período (SIN propina).
+    const periodoActualizado = await periodoTrabajoRepo.findOne({
+      where: { id: data.idPeriodo },
+      relations: { jornadas: true },
+    });
+    if (periodoActualizado) {
+      periodoActualizado.montoACobrar = calcularMontoACobrar(
+        periodoActualizado.jornadas ?? []
+      );
+      await periodoTrabajoRepo.save(periodoActualizado);
+    }
+
+    // 3. Si hay propina, depositarla en la cuenta seleccionada.
+    const propina = data.montoPropina ?? 0;
+    if (propina > 0 && data.idCuenta) {
+      const cuenta = await cuentaRepo.findOneBy({
+        id: data.idCuenta,
+        usuario: { id: userId },
+      });
+      if (!cuenta) {
+        throw new Error(`Cuenta con id ${data.idCuenta} no encontrada`);
+      }
+      const concepto = await conceptoRepo.findOneBy({
+        nombre: "Cobro Propina",
+      });
+      if (!concepto) {
+        throw new Error("Concepto 'Cobro Propina' no encontrado");
+      }
+
+      cuenta.saldo += propina;
+      await cuentaRepo.save(cuenta);
+
+      const mov = await movRepo.save(
+        movRepo.create({
+          fecha: data.fecha,
+          monto: propina,
+          cuenta,
+          concepto,
+        })
+      );
+      await crearHistoricoCuenta(manager, cuenta, mov.id);
+    }
   });
 
   refresh();
