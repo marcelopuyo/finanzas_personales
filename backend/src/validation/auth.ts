@@ -13,4 +13,5 @@ export const registerSchema = z.object({
 export const loginSchema = z.object({
   email: z.string().email("Email inválido"),
   password: z.string().min(1, "La contraseña es requerida"),
+  recordar: z.boolean().optional(),
 });

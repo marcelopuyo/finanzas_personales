@@ -10,5 +10,8 @@ export default async function ProtectedLayout({
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
-  return <AppLayout esAdmin={user.esAdmin}>{children}</AppLayout>;
+  // Primera letra del nombre/email para el avatar de "Perfil" en el sidebar.
+  const initial = (user.nombre ?? user.email ?? "U").charAt(0).toUpperCase();
+
+  return <AppLayout initial={initial}>{children}</AppLayout>;
 }

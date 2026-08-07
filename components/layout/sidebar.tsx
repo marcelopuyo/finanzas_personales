@@ -3,13 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import {
-  LayoutDashboard,
-  LogOut,
-  Menu,
-  X,
-  User,
-} from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faChartLine,
@@ -18,26 +12,21 @@ import {
   faLandmark,
   faCreditCard,
   faHandHoldingDollar,
-  faScrewdriverWrench,
-  faTags,
-  faUserShield,
+  faHardHat,
 } from "@fortawesome/free-solid-svg-icons";
 import { cn } from "@/lib/utils";
-import ThemeToggle from "./theme-toggle";
 
 interface NavItem {
   label: string;
   href?: string;
   icon?: React.ComponentType<{ className?: string }>;
-  /** Solo visible para usuarios con privilegios de administrador. */
-  adminOnly?: boolean;
-  children?: { label: string; href: string; adminOnly?: boolean }[];
+  children?: { label: string; href: string }[];
 }
 
 const navigation: NavItem[] = [
   {
     label: "Dashboard",
-    href: "/",
+    href: "/dashboard",
     icon: () => <FontAwesomeIcon icon={faChartLine} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
   },
   {
@@ -70,58 +59,36 @@ const navigation: NavItem[] = [
   },
   {
     label: "Préstamos",
-    href: "/cruds/prestamos",
     icon: () => <FontAwesomeIcon icon={faHandHoldingDollar} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
+    children: [
+      { label: "Préstamos", href: "/cruds/prestamos" },
+      { label: "Personas", href: "/cruds/personas" },
+    ],
   },
   {
     label: "Trabajos",
-    icon: () => <FontAwesomeIcon icon={faScrewdriverWrench} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
+    icon: () => <FontAwesomeIcon icon={faHardHat} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
     children: [
       { label: "Trabajos", href: "/cruds/trabajos" },
       { label: "Períodos", href: "/cruds/periodos-trabajo" },
       { label: "Jornadas", href: "/cruds/jornadas-trabajo" },
     ],
   },
-  {
-    label: "Maestros",
-    icon: () => <FontAwesomeIcon icon={faTags} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
-    children: [
-      { label: "Personas", href: "/cruds/personas" },
-      { label: "Cotizaciones", href: "/cruds/cotizaciones" },
-      { label: "Inflación", href: "/cruds/inflacion" },
-    ],
-  },
-  {
-    label: "Panel Admin",
-    href: "/admin",
-    adminOnly: true,
-    icon: () => <FontAwesomeIcon icon={faUserShield} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
-  },
 ];
 
-// Filtra los items según los privilegios del usuario. Un grupo cuyos hijos
-// quedaron vacíos (todos admin-only y usuario no admin) se oculta por completo.
-function filterNavigation(esAdmin: boolean): NavItem[] {
-  return navigation
-    .map((item) => {
-      if (item.adminOnly && !esAdmin) return null;
-      if (!item.children) return item;
-      const children = item.children.filter(
-        (c) => !c.adminOnly || esAdmin
-      );
-      return children.length ? { ...item, children } : null;
-    })
-    .filter((i): i is NavItem => i !== null);
-}
-
-function NavItem({ item, pathname }: { item: NavItem; pathname: string }) {
-  const [open, setOpen] = useState(() =>
-    item.children?.some((c) => pathname.startsWith(c.href))
-  );
-
+function NavItem({
+  item,
+  pathname,
+  open,
+  onToggle,
+}: {
+  item: NavItem;
+  pathname: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
   if (!item.children) {
-    const isActive =
-      item.href === "/" ? pathname === "/" : pathname.startsWith(item.href || "");
+    const isActive = pathname.startsWith(item.href || "");
     return (
       <Link
         href={item.href || "#"}
@@ -132,7 +99,11 @@ function NavItem({ item, pathname }: { item: NavItem; pathname: string }) {
             : "text-sidebar-foreground hover:bg-sidebar-hover"
         )}
       >
-        {item.icon && <item.icon className="h-4 w-4 shrink-0 opacity-80" />}
+        {item.icon && (
+          <span className="flex w-5 shrink-0 items-center justify-end">
+            <item.icon />
+          </span>
+        )}
         {item.label}
       </Link>
     );
@@ -143,15 +114,19 @@ function NavItem({ item, pathname }: { item: NavItem; pathname: string }) {
   return (
     <div>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={onToggle}
         className={cn(
           "flex w-full items-center gap-3 rounded-md px-3 py-[9px] text-[14px] leading-5 text-left transition-colors",
           hasActiveChild
-            ? "text-sidebar-active-foreground"
+            ? "bg-sidebar-active text-sidebar-active-foreground"
             : "text-sidebar-foreground hover:bg-sidebar-hover"
         )}
       >
-        {item.icon && <item.icon className="h-4 w-4 shrink-0 opacity-80" />}
+        {item.icon && (
+          <span className="flex w-5 shrink-0 items-center justify-end">
+            <item.icon />
+          </span>
+        )}
         {item.label}
       </button>
       {open && (
@@ -165,7 +140,7 @@ function NavItem({ item, pathname }: { item: NavItem; pathname: string }) {
                 className={cn(
                   "block rounded-md px-3 py-[6px] text-[14px] leading-5 transition-colors",
                   isChildActive
-                    ? "text-sidebar-active-foreground font-medium"
+                    ? "bg-sidebar-active text-sidebar-active-foreground font-medium"
                     : "text-sidebar-foreground hover:text-sidebar-active-foreground"
                 )}
               >
@@ -179,23 +154,34 @@ function NavItem({ item, pathname }: { item: NavItem; pathname: string }) {
   );
 }
 
-export default function Sidebar({ esAdmin }: { esAdmin: boolean }) {
+export default function Sidebar({ initial = "U" }: { initial?: string }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
-  const nav = filterNavigation(esAdmin);
+  // "Perfil" es un avatar tipo DeepSeek: círculo algo más grande que los demás
+  // íconos, tono distinto y la primera letra del nombre/email del usuario.
+  const nav: NavItem[] = [
+    ...navigation,
+    {
+      label: "Perfil",
+      href: "/perfil",
+      icon: () => (
+        <span
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#414346] text-[15px] font-semibold text-[#f0f1f2]"
+          style={{ width: 32, height: 32 }}
+        >
+          {initial}
+        </span>
+      ),
+    },
+  ];
 
-  async function handleLogout() {
-    setLoggingOut(true);
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-    } catch {
-      /* ignora: se navega igual */
-    } finally {
-      setLoggingOut(false);
-      window.location.href = "/login";
-    }
-  }
+  // Acordeón: solo un grupo abierto a la vez. Inicialmente se abre el del item activo.
+  const [openGroup, setOpenGroup] = useState<string | null>(() => {
+    const activeGroup = nav.find((item) =>
+      item.children?.some((c) => pathname.startsWith(c.href))
+    );
+    return activeGroup?.label ?? null;
+  });
 
   // Bloquea el scroll del body mientras el drawer móvil está abierto (mismo
   // patrón que el Modal). En desktop (lg) el sidebar es estático, nunca drawer.
@@ -253,27 +239,18 @@ export default function Sidebar({ esAdmin }: { esAdmin: boolean }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-2 py-1 space-y-1">
-          {nav.map((item, i) => (
-            <NavItem key={i} item={item} pathname={pathname} />
+          {nav.map((item) => (
+            <NavItem
+              key={item.label}
+              item={item}
+              pathname={pathname}
+              open={item.children ? openGroup === item.label : false}
+              onToggle={() =>
+                setOpenGroup((cur) => (cur === item.label ? null : item.label))
+              }
+            />
           ))}
         </nav>
-
-        <div className="px-3 py-3 flex items-center justify-between">
-          <ThemeToggle />
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleLogout}
-              disabled={loggingOut}
-              title="Cerrar sesión"
-              className="flex h-7 w-7 items-center justify-center rounded-md text-sidebar-muted transition-colors hover:bg-sidebar-hover hover:text-sidebar-foreground"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-            <button className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
-              <User className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
       </aside>
     </>
   );

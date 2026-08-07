@@ -7,12 +7,21 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Save } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch";
 import type { ZodSchema } from "zod";
 
 export interface FormField {
   name: string;
   label: string;
-  type: "text" | "select" | "textarea" | "date" | "number" | "time" | "password";
+  type:
+    | "text"
+    | "select"
+    | "textarea"
+    | "date"
+    | "number"
+    | "time"
+    | "password"
+    | "boolean";
   options?: { value: string; label: string }[];
   optionsFrom?: () => Promise<{ value: string; label: string }[]>;
   placeholder?: string;
@@ -143,6 +152,20 @@ export function CrudForm({
                         )
                       )}
                     </select>
+                  )}
+                />
+              ) : field.type === "boolean" ? (
+                <Controller
+                  name={field.name}
+                  control={control}
+                  render={({ field: controllerField }) => (
+                    <Switch
+                      id={field.name}
+                      checked={controllerField.value === "true"}
+                      onChange={(checked) =>
+                        controllerField.onChange(checked ? "true" : "false")
+                      }
+                    />
                   )}
                 />
               ) : field.type === "textarea" ? (

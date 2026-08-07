@@ -43,13 +43,14 @@ export type TokenScope = "access" | "refresh" | "verify";
 /** Firma un JWT con el userId en el subject. */
 export async function signToken(
   userId: number,
-  scope: TokenScope = "access"
+  scope: TokenScope = "access",
+  expiresIn?: string
 ): Promise<string> {
   return new SignJWT({ scope })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(String(userId))
     .setIssuedAt()
-    .setExpirationTime(scope === "refresh" ? "7d" : "24h")
+    .setExpirationTime(expiresIn ?? (scope === "refresh" ? "7d" : "24h"))
     .sign(getSecret());
 }
 
@@ -90,7 +91,8 @@ export async function getSessionUser(): Promise<Usuario | null> {
   const userId = await getSessionUserId();
   if (!userId) return null;
   const ds = await getDb();
-  return ds.getRepository(Usuario).findOneBy({ id: userId });
+  // Excluye usuarios "eliminados" (soft-delete): su sesión deja de ser válida.
+  return ds.getRepository(Usuario).findOneBy({ id: userId, eliminado: false });
 }
 
 /** True si el usuario autenticado tiene privilegios de administrador. */
@@ -107,16 +109,27 @@ export async function requireAdmin(): Promise<void> {
 }
 
 // ----------------------------------------------------------------- cookies
-/** Setea la cookie httpOnly de sesión (24h) para un usuario autenticado. */
-export async function setAuthCookie(userId: number): Promise<void> {
-  const token = await signToken(userId, "access");
+// Duración de la sesión "por defecto" (24h) vs. "mantener la sesión" (30 días).
+const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24; // 24h
+const REMEMBER_MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 días
+
+/**
+ * Setea la cookie httpOnly de sesión para un usuario autenticado.
+ * - `remember=false`: cookie de sesión (sin maxAge) → se borra al cerrar el navegador.
+ * - `remember=true`: cookie persistente por 30 días → reingreso automático al abrir el navegador.
+ */
+export async function setAuthCookie(
+  userId: number,
+  remember = false
+): Promise<void> {
+  const token = await signToken(userId, "access", remember ? "30d" : "24h");
   const store = await cookies();
   store.set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
     path: "/",
-    maxAge: 60 * 60 * 24,
+    ...(remember ? { maxAge: REMEMBER_MAX_AGE_SECONDS } : {}),
   });
 }
 

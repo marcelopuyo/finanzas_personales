@@ -2,13 +2,9 @@ import { z } from "zod";
 import type { FormField } from "@/components/crud/CrudForm";
 
 // Schemas y campos del CRUD de usuarios (panel admin).
-// Los selects Sí/No usan strings "true"/"false" (CrudForm trabaja con strings);
-// el onSubmit los convierte a boolean antes de llamar a la action.
-
-const SI_NO = [
-  { value: "true", label: "Sí" },
-  { value: "false", label: "No" },
-];
+// Los campos lógicos usan type "boolean" (slider). Internamente manejan strings
+// "true"/"false" (CrudForm trabaja con strings); el onSubmit los convierte a
+// boolean antes de llamar a la action.
 
 export const usuarioCreateFormSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -36,8 +32,8 @@ export const usuarioCreateFields: FormField[] = [
     placeholder: "Mínimo 8 caracteres",
   },
   { name: "nombre", label: "Nombre", type: "text", placeholder: "Nombre del usuario" },
-  { name: "activo", label: "Activo", type: "select", options: SI_NO },
-  { name: "esAdmin", label: "Administrador", type: "select", options: SI_NO },
+  { name: "activo", label: "Activo", type: "boolean" },
+  { name: "esAdmin", label: "Administrador", type: "boolean" },
 ];
 
 export const usuarioEditFields: FormField[] = [
@@ -49,7 +45,7 @@ export const usuarioEditFields: FormField[] = [
     placeholder: "Dejar vacío para no cambiar",
   },
   { name: "nombre", label: "Nombre", type: "text" },
-  { name: "emailVerificado", label: "Email verificado", type: "select", options: SI_NO },
-  { name: "activo", label: "Activo", type: "select", options: SI_NO },
-  { name: "esAdmin", label: "Administrador", type: "select", options: SI_NO },
+  { name: "emailVerificado", label: "Email verificado", type: "boolean" },
+  { name: "activo", label: "Activo", type: "boolean" },
+  { name: "esAdmin", label: "Administrador", type: "boolean" },
 ];

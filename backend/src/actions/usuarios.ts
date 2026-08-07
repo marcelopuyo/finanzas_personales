@@ -35,6 +35,7 @@ export async function crearUsuarioAdmin(
         emailVerificado: true,
         activo: data.activo,
         esAdmin: data.esAdmin,
+        eliminado: false,
       })
     );
     refresh();
@@ -83,7 +84,7 @@ export async function eliminarUsuarioAdmin(id: number) {
   await requireAdmin();
   const me = await getSessionUser();
   if (me?.id === id) {
-    throw new Error("No podés desactivar tu propia cuenta");
+    throw new Error("No podés eliminar tu propia cuenta");
   }
 
   const ds = await getDb();
@@ -92,9 +93,9 @@ export async function eliminarUsuarioAdmin(id: number) {
   if (!row) throw new Error(`Usuario con id ${id} no encontrado`);
 
   try {
-    // Soft-delete: se desactiva (activo=false) en vez de borrar. Borrar haría
+    // Soft-delete: se marca eliminado=true en vez de borrar. Borrar haría
     // CASCADE por la FK usuarioId y eliminaría TODOS sus datos.
-    row.activo = false;
+    row.eliminado = true;
     await repo.save(row);
     refresh();
   } catch (error) {

@@ -114,8 +114,6 @@ export function SparkLineChart({
 
   const points = linePoints.map((p) => `${p.x},${p.y}`).join(" ");
 
-  const isPositive = data[data.length - 1] >= data[0];
-
   const handleMouseMove = (e: MouseEvent<SVGSVGElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const frac = (e.clientX - rect.left) / rect.width;
@@ -145,7 +143,7 @@ export function SparkLineChart({
         <polyline
           points={points}
           fill="none"
-          stroke={isPositive ? "var(--success)" : "var(--danger)"}
+          stroke="var(--success)"
           strokeWidth="1.5"
           strokeLinecap="round"
           strokeLinejoin="round"

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Checkbox } from "@/components/ui/checkbox";
+import { NO_REMEMBER, PENDING_CLEAR } from "@/lib/session-flags";
 
 const inputCls =
   "w-full rounded-md border border-border bg-card px-3 py-2 text-[13px] text-card-foreground placeholder:text-subtitle focus:outline-none focus:ring-2 focus:ring-primary/40";
@@ -15,6 +17,7 @@ export default function LoginClient() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [recordar, setRecordar] = useState(false);
   const [error, setError] = useState(errorParam === "token-invalido" ? "Token de verificación inválido o expirado" : "");
   const [loading, setLoading] = useState(false);
 
@@ -26,12 +29,20 @@ export default function LoginClient() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, recordar }),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Error al iniciar sesión");
         return;
+      }
+      // Sesión "no recordar": la guardia por pestaña solo actúa si está este flag.
+      if (recordar) {
+        sessionStorage.removeItem(NO_REMEMBER);
+        sessionStorage.removeItem(PENDING_CLEAR);
+      } else {
+        sessionStorage.setItem(NO_REMEMBER, "1");
+        sessionStorage.removeItem(PENDING_CLEAR);
       }
       router.push("/dashboard");
       router.refresh();
@@ -90,6 +101,14 @@ export default function LoginClient() {
             placeholder="••••••••"
             className={inputCls}
           />
+
+          <div className="mt-4">
+            <Checkbox
+              checked={recordar}
+              onChange={setRecordar}
+              label="Mantener la sesión iniciada en este dispositivo"
+            />
+          </div>
 
           <button
             type="submit"

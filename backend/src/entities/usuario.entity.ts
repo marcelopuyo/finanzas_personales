@@ -32,6 +32,10 @@ export class Usuario {
   @Column({ default: false })
   esAdmin: boolean;
 
+  /** Soft-delete: true = usuario "eliminado" (no se borra de la BD). */
+  @Column({ default: false })
+  eliminado: boolean;
+
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   creadoEn: Date;
 }

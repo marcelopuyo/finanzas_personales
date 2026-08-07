@@ -48,6 +48,7 @@ export async function createUsuario(
       nombre,
       emailVerificado: false,
       activo: true,
+      eliminado: false,
     })
   );
   return toOut(usuario);
@@ -63,10 +64,12 @@ export async function marcarEmailVerificado(id: number): Promise<boolean> {
   return true;
 }
 
-/** Listado completo de usuarios (solo admin). Devuelve la forma segura (sin passwordHash). */
+/** Listado completo de usuarios (solo admin). Excluye los eliminados (soft-delete). */
 export async function getAllUsuarios(): Promise<UsuarioOut[]> {
   const ds = await getDb();
-  const rows = await ds.getRepository(Usuario).find({ order: { id: "ASC" } });
+  const rows = await ds
+    .getRepository(Usuario)
+    .find({ where: { eliminado: false }, order: { id: "ASC" } });
   return rows.map(toOut);
 }
 
