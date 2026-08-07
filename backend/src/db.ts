@@ -21,6 +21,7 @@ import { JornadaTrabajo } from "./entities/jornada-trabajo.entity";
 import { Prestamo } from "./entities/prestamo.entity";
 import { Movimiento } from "./entities/movimiento.entity";
 import { Usuario } from "./entities/usuario.entity";
+import { pgSslOption } from "./lib/pg-ssl";
 
 // Singleton global para evitar reconexiones duplicadas durante HMR
 const globalForDb = globalThis as unknown as {
@@ -51,6 +52,8 @@ function createDataSource(): DataSource {
     username: process.env.PG_USERNAME,
     password: process.env.PG_PASSWORD,
     database: process.env.PG_DATABASE,
+    // SSL condicional: requerido por proveedores cloud (Supabase/Neon) vía PG_SSL=true.
+    ssl: pgSslOption(),
     synchronize: false,
     logging: ["error", "warn"],
     entities: ENTITIES,

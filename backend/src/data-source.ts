@@ -20,6 +20,7 @@ import { JornadaTrabajo } from "./entities/jornada-trabajo.entity";
 import { Prestamo } from "./entities/prestamo.entity";
 import { Movimiento } from "./entities/movimiento.entity";
 import { Usuario } from "./entities/usuario.entity";
+import { pgSslOption } from "./lib/pg-ssl";
 
 // ============================================================
 // DataSource de MIGRACIONES (apunta a PostgreSQL 18 / puerto 5432).
@@ -44,6 +45,8 @@ export const AppDataSource = new DataSource({
   username: process.env.PG_USERNAME ?? "postgres",
   password: process.env.PG_PASSWORD ?? "",
   database: process.env.PG_DATABASE ?? "",
+  // SSL condicional: requerido por proveedores cloud (Supabase/Neon) vía PG_SSL=true.
+  ssl: pgSslOption(),
   synchronize: false,
   logging: ["error", "warn"],
   entities: ENTITIES,
