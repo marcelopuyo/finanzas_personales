@@ -30,7 +30,10 @@ export function SparkLineChart({
   const height = 40;
   const padding = 2;
 
-  const showTooltipAt = (e: MouseEvent<SVGElement>, index: number) => {
+  const showTooltipAt = (
+    e: MouseEvent<SVGElement> | TouchEvent<SVGElement>,
+    index: number
+  ) => {
     const rect = e.currentTarget.getBoundingClientRect();
     setTooltip({
       left: rect.left + rect.width / 2,
@@ -64,6 +67,26 @@ export function SparkLineChart({
     const barWidth = Math.max(slot * 0.6, 1);
     const chartHeight = height - padding * 2;
 
+    // Soporte táctil (móvil): al deslizar el dedo sobre las barras se muestra
+    // el tooltip de la barra que queda debajo del dedo, igual que el hover en
+    // desktop. El touchstart/move se manejan a nivel del <svg>.
+    const handleBarTouch = (e: TouchEvent<SVGSVGElement>) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clientX = e.touches[0]?.clientX ?? 0;
+      const frac = (clientX - rect.left) / rect.width;
+      const index = Math.max(
+        0,
+        Math.min(data.length - 1, Math.floor(frac * data.length))
+      );
+      const barCenterX = padding + index * slot + slot / 2;
+      setTooltip({
+        left: rect.left + (barCenterX / width) * rect.width,
+        top: rect.top,
+        label: labels?.[index],
+        value: data[index],
+      });
+    };
+
     const bars = data.map((value, index) => {
       const barHeight = max > 0 ? (value / max) * chartHeight : 0;
       const x = padding + index * slot + (slot - barWidth) / 2;
@@ -90,6 +113,9 @@ export function SparkLineChart({
           viewBox={`0 0 ${width} ${height}`}
           className="h-10 w-full overflow-visible"
           preserveAspectRatio="none"
+          onTouchStart={handleBarTouch}
+          onTouchMove={handleBarTouch}
+          onTouchEnd={() => setTooltip(null)}
         >
           {bars}
         </svg>
