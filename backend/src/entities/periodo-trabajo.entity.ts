@@ -43,9 +43,13 @@ export class PeriodoTrabajo {
   @ManyToOne(() => Trabajo)
   trabajo: Trabajo;
 
-  // Relación inversa con STRING TARGET (evita import circular en runtime con
-  // JornadaTrabajo). El lado propietario está en jornada-trabajo.entity.
-  @OneToMany("JornadaTrabajo", (jornada: JornadaTrabajo) => jornada.periodoTrabajo, {
+  // Relación inversa con STRING TARGET = NOMBRE DE TABLA ("jornada_trabajo"),
+  // no el nombre de clase: evita import circular en runtime con JornadaTrabajo
+  // y sobrevive la minificación de Turbopack en producción (los nombres de
+  // clase se manglean y `@OneToMany("JornadaTrabajo")` deja de resolver el
+  // target → EntityMetadataNotFoundError). El lado propietario está en
+  // jornada-trabajo.entity.
+  @OneToMany("jornada_trabajo", (jornada: JornadaTrabajo) => jornada.periodoTrabajo, {
     cascade: true,
     eager: false,
   })

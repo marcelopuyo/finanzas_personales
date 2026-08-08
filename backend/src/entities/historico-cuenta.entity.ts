@@ -27,8 +27,13 @@ export class HistoricoCuenta {
   cuenta?: Cuenta;
 
   /** Relación 1:1 con el movimiento que originó este registro. Nula para
-   * históricos iniciales o de reversión (eliminarGasto). */
-  @OneToOne("Movimiento", { nullable: true })
+   * históricos iniciales o de reversión (eliminarGasto).
+   * Se usa el NOMBRE DE TABLA ("movimiento") en vez del nombre de clase:
+   * Turbopack minifica los nombres de clase en producción y
+   * `@OneToOne("Movimiento")` deja de resolver el target
+   * (EntityMetadataNotFoundError "s#movimiento"). El nombre de tabla es
+   * estable (givenTableName), por eso sí resuelve. */
+  @OneToOne("movimiento", { nullable: true })
   @JoinColumn()
   movimiento?: Movimiento | null;
 }
