@@ -183,6 +183,13 @@ export default function Sidebar({ initial = "U" }: { initial?: string }) {
     return activeGroup?.label ?? null;
   });
 
+  // Mobile-first: al navegar (el pathname cambia al tocar una opción del menú)
+  // se cierra el drawer automáticamente. En desktop no tiene efecto (el drawer
+  // solo existe en lg-, donde el sidebar es estático).
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
   // Bloquea el scroll del body mientras el drawer móvil está abierto (mismo
   // patrón que el Modal). En desktop (lg) el sidebar es estático, nunca drawer.
   useEffect(() => {

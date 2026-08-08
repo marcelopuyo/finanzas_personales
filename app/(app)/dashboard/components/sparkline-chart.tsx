@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { MouseEvent } from "react";
+import type { MouseEvent, TouchEvent } from "react";
 import { numberToCurrency } from "@/lib/utils";
 
 interface SparkLineChartProps {
@@ -114,9 +114,15 @@ export function SparkLineChart({
 
   const points = linePoints.map((p) => `${p.x},${p.y}`).join(" ");
 
-  const handleMouseMove = (e: MouseEvent<SVGSVGElement>) => {
+  // Soporta mouse (onMouseMove) y dedo en móvil (onTouchStart/onTouchMove): el
+  // tooltip se actualiza según la posición horizontal sobre el gráfico.
+  const handleMove = (
+    e: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>
+  ) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const frac = (e.clientX - rect.left) / rect.width;
+    const clientX =
+      "touches" in e ? (e.touches[0]?.clientX ?? 0) : e.clientX;
+    const frac = (clientX - rect.left) / rect.width;
     const index = Math.max(
       0,
       Math.min(data.length - 1, Math.round(frac * (data.length - 1)))
@@ -137,8 +143,11 @@ export function SparkLineChart({
         viewBox={`0 0 ${width} ${height}`}
         className="h-10 w-full overflow-visible"
         preserveAspectRatio="none"
-        onMouseMove={handleMouseMove}
+        onMouseMove={handleMove}
         onMouseLeave={() => setTooltip(null)}
+        onTouchStart={handleMove}
+        onTouchMove={handleMove}
+        onTouchEnd={() => setTooltip(null)}
       >
         <polyline
           points={points}
