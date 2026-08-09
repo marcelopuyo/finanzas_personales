@@ -40,9 +40,14 @@ export async function POST(req: Request) {
     try {
       const r = await enviarEmailVerificacion(parsed.email, verifyToken);
       previewUrl = r.previewUrl;
-    } catch {
-      // No se pudo enviar (sin SMTP ni conexión a Ethereal). Solo en dev se
-      // expone el link directo para no bloquear el flujo de prueba.
+    } catch (err) {
+      // No se pudo enviar (sin SMTP ni conexión a Ethereal). En prod el error
+      // se loguea para diagnóstico (aparece en los logs de Vercel). Solo en
+      // dev se expone el link directo para no bloquear el flujo de prueba.
+      console.error(
+        "[register] No se pudo enviar el email de verificación:",
+        err
+      );
       if (process.env.NODE_ENV !== "production") {
         const base = `http://localhost:${process.env.PORT ?? 3001}`;
         devVerifyUrl = `${base}/api/auth/verify?token=${verifyToken}`;

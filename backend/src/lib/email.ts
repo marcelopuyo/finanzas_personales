@@ -62,8 +62,13 @@ export async function enviarEmailVerificacion(
 ): Promise<EnvioVerificacionResult> {
   const link = `${getAppUrl()}/api/auth/verify?token=${encodeURIComponent(token)}`;
   const transporter = await getTransporter();
+  // Si no se define SMTP_FROM, usar la cuenta autenticada (Outlook exige que
+  // el remitente coincida con el usuario SMTP, si no rechaza el envío).
   const from =
-    process.env.SMTP_FROM ?? "Finanzas Personales <no-reply@finanzas.local>";
+    process.env.SMTP_FROM ??
+    (process.env.SMTP_USER
+      ? `Finanzas Personales <${process.env.SMTP_USER}>`
+      : "Finanzas Personales <no-reply@finanzas.local>");
 
   const info = await transporter.sendMail({
     from,
