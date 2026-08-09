@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Unbounded } from "next/font/google";
 import { cookies } from "next/headers";
 import ThemeProvider from "@/components/layout/theme-provider";
 import { ToasterProvider } from "@/components/layout/toaster";
@@ -11,6 +11,15 @@ const inter = Inter({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
   variable: "--font-inter",
+  display: "swap",
+});
+
+// Fuente del wordmark del logo ("finanzas") — Unbounded, elegida por el usuario (2026-08-09).
+// Se expone como variable CSS para poder usarla también en Client Components.
+const unbounded = Unbounded({
+  subsets: ["latin"],
+  weight: ["600"],
+  variable: "--font-unbounded",
   display: "swap",
 });
 
@@ -32,7 +41,7 @@ export default async function RootLayout({
   return (
     <html
       lang="es"
-      className={`${inter.variable} h-full antialiased${isDark ? " dark" : ""}`}
+      className={`${inter.variable} ${unbounded.variable} h-full antialiased${isDark ? " dark" : ""}`}
       suppressHydrationWarning
     >
       <head>

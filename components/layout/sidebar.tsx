@@ -15,6 +15,7 @@ import {
   faHardHat,
 } from "@fortawesome/free-solid-svg-icons";
 import { cn } from "@/lib/utils";
+import Logo from "./logo";
 
 interface NavItem {
   label: string;
@@ -215,13 +216,19 @@ export default function Sidebar({ initial = "U" }: { initial?: string }) {
 
   return (
     <>
-      <button
-        onClick={() => setMobileOpen(!mobileOpen)}
-        className="fixed top-3 left-3 z-50 rounded-lg bg-sidebar p-2 text-sidebar-foreground lg:hidden"
-        aria-label="Toggle menu"
-      >
-        {mobileOpen ? <X style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} /> : <Menu style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />}
-      </button>
+      {/* Top bar móvil: logo SIEMPRE visible + toggle del drawer (solo <lg).
+          En desktop (lg+) el logo vive en el header del sidebar estático. */}
+      <header className="fixed top-0 right-0 left-0 z-50 flex h-14 items-center gap-2 border-b border-border bg-sidebar px-4 lg:hidden">
+        <button
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className="rounded-lg p-2 text-sidebar-foreground hover:bg-sidebar-hover"
+          aria-label="Toggle menu"
+          aria-expanded={mobileOpen}
+        >
+          {mobileOpen ? <X style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} /> : <Menu style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />}
+        </button>
+        <Logo size={20} />
+      </header>
 
       {mobileOpen && (
         <div
@@ -233,6 +240,9 @@ export default function Sidebar({ initial = "U" }: { initial?: string }) {
       <aside
         className={cn(
           "fixed top-0 left-0 z-40 flex h-screen w-64 flex-col bg-sidebar transition-[transform,visibility] duration-200",
+          // En móvil el drawer arranca debajo de la top bar (h-14) para no
+          // quedar oculto tras ella; en lg+ el sidebar es estático.
+          "pt-14 lg:pt-0",
           "lg:translate-x-0 lg:static lg:z-auto lg:h-screen",
           // Cerrado en móvil: queda fuera de pantalla Y fuera del tab-order /
           // árbol de accesibilidad (invisible), pero visible y estático en lg+.
@@ -241,8 +251,8 @@ export default function Sidebar({ initial = "U" }: { initial?: string }) {
             : "-translate-x-full invisible lg:visible"
         )}
       >
-        <div className="px-4 pt-6 pb-4">
-          <span className="text-[14px] font-semibold text-sidebar-foreground">Finanzas</span>
+        <div className="hidden px-4 pt-6 pb-4 lg:block">
+          <Logo />
         </div>
 
         <nav className="flex-1 overflow-y-auto px-2 py-1 space-y-1">
