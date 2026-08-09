@@ -247,17 +247,51 @@ export function NumberField({
   allowNegative?: boolean;
   placeholder?: string;
 }) {
+  // `type="text"` + `inputMode="decimal"`: en móvil `type="number"` no muestra
+  // la tecla de separador decimal (iOS y algunos Android según el locale).
+  // Se sanitiza la entrada: dígitos, un único separador (`.` o `,`) y signo
+  // `-` al inicio si `allowNegative`. Se conserva el texto mientras se edita
+  // para no perder el `.`/`,` al tipear.
+  const [text, setText] = useState(value === 0 ? "" : String(value));
+  const editedBySelf = useRef(false);
+
+  useEffect(() => {
+    // Si el cambio de `value` vino de nuestro propio onChange ya está en
+    // `text`; si es externo (autofill de montos), se sincroniza.
+    if (editedBySelf.current) {
+      editedBySelf.current = false;
+      return;
+    }
+    setText(value === 0 ? "" : String(value));
+  }, [value]);
+
+  const handleChange = (raw: string) => {
+    let s = raw.replace(/,/g, ".");
+    s = s.replace(/[^0-9.-]/g, "");
+    const firstDot = s.indexOf(".");
+    if (firstDot !== -1) {
+      s = s.slice(0, firstDot + 1) + s.slice(firstDot + 1).replace(/\./g, "");
+    }
+    if (allowNegative) {
+      s = s.replace(/(?!^)-/g, "");
+      s = s.replace(/^-+/, "-");
+    } else {
+      s = s.replace(/-/g, "");
+    }
+    setText(s);
+    editedBySelf.current = true;
+    const n = s === "" || s === "-" || s === "." || s === "-." ? 0 : Number(s);
+    onChange(Number.isFinite(n) ? n : 0);
+  };
+
   return (
     <Campo label={label}>
       <input
-        type="number"
+        type="text"
         inputMode="decimal"
-        step="0.01"
-        min={allowNegative ? undefined : 0}
-        value={value === 0 ? "" : String(value)}
-        onChange={(e) =>
-          onChange(e.target.value === "" ? 0 : Number(e.target.value))
-        }
+        autoComplete="off"
+        value={text}
+        onChange={(e) => handleChange(e.target.value)}
         placeholder={placeholder}
         className={inputCls}
       />

@@ -38,6 +38,18 @@ interface CrudFormProps {
 }
 
 /**
+ * Sanea un campo numérico: solo dígitos y un único separador decimal
+ * (acepta `.` o `,` y lo normaliza a `.`). Evita que el teclado móvil
+ * bloquee los decimales (ver NumberField del stepper).
+ */
+function sanitizeNumber(raw: string): string {
+  let s = raw.replace(/,/g, ".").replace(/[^0-9.]/g, "");
+  const i = s.indexOf(".");
+  if (i !== -1) s = s.slice(0, i + 1) + s.slice(i + 1).replace(/\./g, "");
+  return s;
+}
+
+/**
  * Formulario CRUD genérico reutilizable (crear y editar).
  * Usa react-hook-form + zod para validación. Diseño mobile-first.
  */
@@ -174,6 +186,20 @@ export function CrudForm({
                   {...register(field.name)}
                   placeholder={field.placeholder}
                   rows={3}
+                  className={inputClasses}
+                />
+              ) : field.type === "number" ? (
+                <input
+                  id={field.name}
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  {...register(field.name)}
+                  onChange={(e) => {
+                    e.target.value = sanitizeNumber(e.target.value);
+                    register(field.name).onChange(e);
+                  }}
+                  placeholder={field.placeholder}
                   className={inputClasses}
                 />
               ) : (
