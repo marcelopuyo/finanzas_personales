@@ -77,6 +77,16 @@ const navigation: NavItem[] = [
   },
 ];
 
+/** ¿`pathname` está dentro de `href` (para marcar activo el item del sidebar)?
+ * Excepción: las rutas directas de movimientos (`/movimientos/nuevo/...`,
+ * sin stepper) NO activan el item "Movimientos". */
+function isActivePath(href: string, pathname: string): boolean {
+  if (href === "/movimientos" && pathname.startsWith("/movimientos/nuevo")) {
+    return false;
+  }
+  return pathname.startsWith(href);
+}
+
 function NavItem({
   item,
   pathname,
@@ -89,7 +99,7 @@ function NavItem({
   onToggle: () => void;
 }) {
   if (!item.children) {
-    const isActive = pathname.startsWith(item.href || "");
+    const isActive = isActivePath(item.href || "", pathname);
     return (
       <Link
         href={item.href || "#"}
@@ -110,7 +120,7 @@ function NavItem({
     );
   }
 
-  const hasActiveChild = item.children.some((c) => pathname.startsWith(c.href));
+  const hasActiveChild = item.children.some((c) => isActivePath(c.href, pathname));
 
   return (
     <div>
@@ -133,7 +143,7 @@ function NavItem({
       {open && (
         <div className="ml-7 mt-1 flex flex-col gap-0.5">
           {item.children.map((child) => {
-            const isChildActive = pathname.startsWith(child.href);
+            const isChildActive = isActivePath(child.href, pathname);
             return (
               <Link
                 key={child.href}
@@ -179,7 +189,7 @@ export default function Sidebar({ initial = "U" }: { initial?: string }) {
   // Acordeón: solo un grupo abierto a la vez. Inicialmente se abre el del item activo.
   const [openGroup, setOpenGroup] = useState<string | null>(() => {
     const activeGroup = nav.find((item) =>
-      item.children?.some((c) => pathname.startsWith(c.href))
+      item.children?.some((c) => isActivePath(c.href, pathname))
     );
     return activeGroup?.label ?? null;
   });

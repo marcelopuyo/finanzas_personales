@@ -6,12 +6,20 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { MovimientoConcepto, MovimientoData, MovimientoOptions } from "./types";
+import {
+  CONCEPTO_STEP,
+  type MovimientoConcepto,
+  type MovimientoData,
+  type MovimientoInitial,
+  type MovimientoOptions,
+} from "./types";
 
 interface StepperContextValue {
   activeStep: number;
   data: MovimientoData;
   options: MovimientoOptions;
+  /** Modo directo (sin stepper): oculta el progreso y la navegación de pasos. */
+  direct: boolean;
   handleSetData: (partial: Partial<MovimientoData>) => void;
   /** Selecciona el tipo de movimiento y limpia los campos del flujo anterior. */
   seleccionarConcepto: (concepto: MovimientoConcepto) => void;
@@ -26,32 +34,52 @@ const StepperContext = createContext<StepperContextValue | undefined>(
 export function MovimientoProvider({
   options,
   fechaHoy,
+  initial,
+  direct = false,
   children,
 }: {
   options: MovimientoOptions;
   /** Fecha por defecto (YYYY-MM-DD) provista por el Server Component para evitar hydration mismatch. */
   fechaHoy: string;
+  /** Pre-carga opcional desde query params (tarjetas del dashboard): salta al paso del concepto y precarga la cuenta. */
+  initial?: MovimientoInitial;
+  /** Modo directo (sin stepper): oculta selector/progreso; el flujo es formulario → confirmación. */
+  direct?: boolean;
   children: ReactNode;
 }) {
-  const [activeStep, setActiveStep] = useState(0);
-  const [data, setData] = useState<MovimientoData>(() => ({
-    concepto: "",
-    fecha: fechaHoy,
-    montoOrigen: 0,
-    montoDestino: 0,
-    cuentaOrigen: 0,
-    cuentaDestino: 0,
-    periodoTrabajo: 0,
-    idPrestamo: "",
-    idGasto: "",
-    idCategoriaGasto: 0,
-    motivo: "",
-    descripcion: "",
-    horaDesde: "",
-    horaHasta: "",
-    montoPropina: 0,
-    cuentaPropina: 0,
-  }));
+  const [activeStep, setActiveStep] = useState(() =>
+    initial ? CONCEPTO_STEP[initial.concepto] : 0
+  );
+  const [data, setData] = useState<MovimientoData>(() => {
+    const base: MovimientoData = {
+      concepto: "",
+      fecha: fechaHoy,
+      montoOrigen: 0,
+      montoDestino: 0,
+      cuentaOrigen: 0,
+      cuentaDestino: 0,
+      periodoTrabajo: 0,
+      idPrestamo: "",
+      idGasto: "",
+      idCategoriaGasto: 0,
+      motivo: "",
+      descripcion: "",
+      horaDesde: "",
+      horaHasta: "",
+      montoPropina: 0,
+      cuentaPropina: 0,
+    };
+    if (!initial) return base;
+    // En Jornada trabajo la cuenta precargada va al depósito de propina.
+    const esJornada = initial.concepto === "JornadaTrabajo";
+    return {
+      ...base,
+      concepto: initial.concepto,
+      cuentaOrigen: esJornada ? 0 : (initial.cuenta ?? initial.origen ?? 0),
+      cuentaDestino: initial.destino ?? 0,
+      cuentaPropina: esJornada ? (initial.cuenta ?? 0) : 0,
+    };
+  });
 
   const handleSetData = (partial: Partial<MovimientoData>) =>
     setData((prev) => ({ ...prev, ...partial }));
@@ -104,6 +132,7 @@ export function MovimientoProvider({
         activeStep,
         data,
         options,
+        direct,
         handleSetData,
         seleccionarConcepto,
         navigateTo,

@@ -60,6 +60,28 @@ export const CONCEPTO_STEP: Record<MovimientoConcepto, number> = {
 /** Índice del paso de Confirmación (el último del wizard). */
 export const STEP_CONFIRMACION = 8;
 
+/** Pre-carga del wizard desde las tarjetas del dashboard (query params). */
+export interface MovimientoInitial {
+  concepto: MovimientoConcepto;
+  /** Cuenta para movimientos de una sola cuenta (cuentaOrigen, o cuentaPropina en Jornada). */
+  cuenta?: number;
+  /** Transferencia: cuenta origen. */
+  origen?: number;
+  /** Transferencia: cuenta destino. */
+  destino?: number;
+}
+
+/** Valor de `?tipo=` en la URL para cada concepto (lo usan las tarjetas y el page). */
+export const MOVIMIENTO_TIPO_PARAM: Record<MovimientoConcepto, string> = {
+  CobroSueldo: "cobro",
+  PagoPrestamo: "pago-prestamo",
+  AjusteCuenta: "ajuste",
+  PagoGasto: "pago-gasto",
+  GastoDirecto: "gasto",
+  Transferencia: "transferencia",
+  JornadaTrabajo: "jornada",
+};
+
 /** Motivos posibles de transferencia (igual que el enum backend). */
 export const MOTIVOS_TRANSFERENCIA = [
   "Transferencia",

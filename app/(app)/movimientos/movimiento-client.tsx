@@ -10,7 +10,7 @@ import { GastoDirecto } from "./stepper/gasto-directo";
 import { Transferencia } from "./stepper/transferencia";
 import { JornadaTrabajo } from "./stepper/jornada-trabajo";
 import { Confirmacion } from "./stepper/confirmacion";
-import type { MovimientoOptions } from "./stepper/types";
+import type { MovimientoInitial, MovimientoOptions } from "./stepper/types";
 
 const STEPS = [
   Selector,
@@ -27,12 +27,23 @@ const STEPS = [
 export function MovimientoClient({
   options,
   fechaHoy,
+  initial,
+  direct = false,
 }: {
   options: MovimientoOptions;
   fechaHoy: string;
+  /** Pre-carga opcional desde query params (tarjetas del dashboard). */
+  initial?: MovimientoInitial;
+  /** Modo directo (sin stepper): oculta selector/progreso; formulario → confirmación. */
+  direct?: boolean;
 }) {
   return (
-    <MovimientoProvider options={options} fechaHoy={fechaHoy}>
+    <MovimientoProvider
+      options={options}
+      fechaHoy={fechaHoy}
+      initial={initial}
+      direct={direct}
+    >
       <StepperBody />
     </MovimientoProvider>
   );

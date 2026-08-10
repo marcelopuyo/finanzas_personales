@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useMovimientoStepper } from "./stepper-context";
 
 export const inputCls =
   "w-full rounded-md border border-border bg-card px-3 py-2 text-[13px] text-card-foreground placeholder:text-subtitle focus:outline-none focus:ring-2 focus:ring-primary/40";
@@ -22,7 +24,8 @@ export function formatFecha(value: string | Date | null | undefined): string {
   return `${parseInt(d, 10)}/${parseInt(m, 10)}/${y}`;
 }
 
-/** Contenedor del wizard: título, indicador de progreso y tarjeta con contenido. */
+/** Contenedor del wizard: título, indicador de progreso y tarjeta con contenido.
+ * En modo directo oculta el indicador y el "Paso X de Y" (sin stepper). */
 export function StepShell({
   title,
   step,
@@ -36,18 +39,23 @@ export function StepShell({
   children: ReactNode;
   footer: ReactNode;
 }) {
+  const { direct } = useMovimientoStepper();
   return (
     <div className="mx-auto max-w-xl px-4 py-8">
       <h1 className="mb-1 text-[18px] font-semibold text-header">Movimientos</h1>
-      <p className="mb-3 text-[13px] text-subtitle">
-        Paso {step} de {total}
-      </p>
-      <div className="mb-4 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-        <div
-          className="h-full rounded-full bg-primary transition-all duration-300"
-          style={{ width: `${(step / total) * 100}%` }}
-        />
-      </div>
+      {!direct && (
+        <p className="mb-3 text-[13px] text-subtitle">
+          Paso {step} de {total}
+        </p>
+      )}
+      {!direct && (
+        <div className="mb-4 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className="h-full rounded-full bg-primary transition-all duration-300"
+            style={{ width: `${(step / total) * 100}%` }}
+          />
+        </div>
+      )}
 
       <div className="rounded-lg border border-border bg-card p-5">
         <h2 className="mb-4 text-[15px] font-semibold text-header">{title}</h2>
@@ -330,7 +338,8 @@ export function SelectField({
   );
 }
 
-/** Botones Atrás / Siguiente del wizard. */
+/** Botones del wizard. En modo directo: Cancelar (→ dashboard) + Siguiente.
+ * En modo stepper: Atrás + Siguiente (comportamiento original). */
 export function NavButtons({
   onBack,
   onNext,
@@ -344,15 +353,27 @@ export function NavButtons({
   nextLabel?: string;
   backLabel?: string;
 }) {
+  const { direct } = useMovimientoStepper();
+  const router = useRouter();
   return (
     <div className="flex items-center justify-between gap-2">
-      <button
-        type="button"
-        onClick={onBack}
-        className="rounded-lg border border-border px-4 py-2 text-[13px] font-medium text-subtitle transition-colors hover:bg-muted hover:text-header"
-      >
-        {backLabel}
-      </button>
+      {direct ? (
+        <button
+          type="button"
+          onClick={() => router.push("/dashboard")}
+          className="rounded-lg border border-border px-4 py-2 text-[13px] font-medium text-subtitle transition-colors hover:bg-muted hover:text-header"
+        >
+          Cancelar
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={onBack}
+          className="rounded-lg border border-border px-4 py-2 text-[13px] font-medium text-subtitle transition-colors hover:bg-muted hover:text-header"
+        >
+          {backLabel}
+        </button>
+      )}
       <button
         type="button"
         onClick={onNext}

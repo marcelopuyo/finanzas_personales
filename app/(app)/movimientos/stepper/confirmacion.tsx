@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Save, X, ArrowLeft } from "lucide-react";
 import { useMovimientoStepper } from "./stepper-context";
@@ -28,7 +29,8 @@ const TITULOS: Record<MovimientoConcepto, string> = {
 };
 
 export function Confirmacion() {
-  const { data, navigateTo, resetData, options } = useMovimientoStepper();
+  const { data, navigateTo, resetData, options, direct } = useMovimientoStepper();
+  const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
 
   const concepto = data.concepto as MovimientoConcepto | "";
@@ -200,6 +202,11 @@ export function Confirmacion() {
           break;
       }
       toast.success("Movimiento guardado correctamente");
+      // En modo directo (sin stepper) se vuelve al dashboard tras guardar.
+      if (direct) {
+        router.push("/dashboard");
+        return;
+      }
       resetData();
       navigateTo(0);
     } catch (err) {
@@ -232,6 +239,10 @@ export function Confirmacion() {
             <button
               type="button"
               onClick={() => {
+                if (direct) {
+                  router.push("/dashboard");
+                  return;
+                }
                 resetData();
                 navigateTo(0);
               }}

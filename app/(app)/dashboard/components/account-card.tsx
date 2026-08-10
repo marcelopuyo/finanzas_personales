@@ -1,6 +1,9 @@
 "use client";
 
+import { useState } from "react";
+import { MoreVertical } from "lucide-react";
 import { SparkLineChart } from "./sparkline-chart";
+import { AccountActionsSheet } from "./account-actions-sheet";
 import { cn } from "@/lib/utils";
 
 interface AccountCardProps {
@@ -23,6 +26,9 @@ export function AccountCard({
   className,
   onOpen,
 }: AccountCardProps) {
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const esCuentaReal = id != null && onOpen != null;
+
   const content = (
     <>
       <div className="flex items-start justify-between">
@@ -49,20 +55,50 @@ export function AccountCard({
   );
 
   const base =
-    "flex flex-col justify-start rounded-lg border border-border bg-card p-4 transition-colors";
+    "relative flex flex-col justify-start rounded-lg border border-border bg-card p-4 transition-colors";
 
-  // Si la tarjeta representa una cuenta real, al hacer click abre el historial.
-  if (id != null && onOpen) {
+  // Tarjeta de cuenta real: clicable (abre historial) + botón de opciones (⋮)
+  // que abre el bottom sheet de acciones. Se usa un <div> con role="button"
+  // (no un <button>) para no anidar botones (el menú es un <button> real).
+  if (esCuentaReal) {
     return (
-      <button
-        type="button"
-        onClick={onOpen}
-        className={cn(base, "w-full text-left", className)}
-      >
-        {content}
-      </button>
+      <>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={onOpen}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onOpen();
+            }
+          }}
+          className={cn(base, "w-full cursor-pointer text-left", className)}
+        >
+          {content}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSheetOpen(true);
+            }}
+            className="absolute right-2 top-2 rounded p-1 text-subtitle transition-colors hover:bg-muted hover:text-header"
+            aria-label={`Opciones de ${title}`}
+            title="Opciones de la cuenta"
+          >
+            <MoreVertical className="h-4 w-4" />
+          </button>
+        </div>
+        <AccountActionsSheet
+          cuenta={{ id: id!, nombre: title, saldo: value }}
+          open={sheetOpen}
+          onClose={() => setSheetOpen(false)}
+          onVerHistorial={onOpen}
+        />
+      </>
     );
   }
+
   return <div className={cn(base, className)}>{content}</div>;
 }
 
