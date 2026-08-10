@@ -47,6 +47,8 @@ export async function getAllPrestamos(): Promise<PrestamoOut[]> {
   const rows = await ds.getRepository(Prestamo).find({
     where: { usuario: { id: userId }, eliminado: false },
     relations: PRESTAMO_RELATIONS,
+    // Más recientes primero.
+    order: { fecha: "DESC" },
   });
   return rows.map(mapPrestamo);
 }

@@ -64,9 +64,11 @@ export async function getCategoriaGastoById(
 export async function getAllPeriodosGasto(): Promise<PeriodoGastoOut[]> {
   const userId = await requireUserId();
   const ds = await getDb();
-  const rows = await ds
-    .getRepository(PeriodoGasto)
-    .find({ where: { usuario: { id: userId }, eliminado: false } });
+  const rows = await ds.getRepository(PeriodoGasto).find({
+    where: { usuario: { id: userId }, eliminado: false },
+    // Más reciente primero.
+    order: { fechaApertura: "DESC" },
+  });
   return rows.map((r) => ({
     id: r.id,
     nombre: r.nombre,
@@ -165,6 +167,8 @@ export async function getAllGastos(): Promise<GastoOut[]> {
   const rows = await ds.getRepository(Gasto).find({
     where: { usuario: { id: userId }, eliminado: false },
     relations: { periodo: true, categoria: true },
+    // Más recientes primero (por fecha de pago).
+    order: { fechaPago: "DESC" },
   });
   const mapped = rows.map(mapGasto);
   const cuentas = await resolveCuentas(ds, mapped.map((g) => g.id));

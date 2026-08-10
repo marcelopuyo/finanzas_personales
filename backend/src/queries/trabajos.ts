@@ -106,7 +106,8 @@ export async function getAllPeriodosTrabajo(): Promise<PeriodoTrabajoOut[]> {
   const ds = await getDb();
   const rows = await ds.getRepository(PeriodoTrabajo).find({
     where: { trabajo: { usuario: { id: userId } }, eliminado: false },
-    order: { fechaDesde: "ASC" },
+    // Más recientes primero (por la columna Desde).
+    order: { fechaDesde: "DESC" },
     relations: { trabajo: true, jornadas: true },
   });
   return rows.map(mapPeriodo);

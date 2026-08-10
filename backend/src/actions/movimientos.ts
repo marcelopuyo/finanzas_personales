@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { EntityManager, LessThanOrEqual, MoreThanOrEqual } from "typeorm";
 import type { z } from "zod";
 import { getDb } from "../db";
@@ -115,6 +116,9 @@ export async function cobrarSueldo(input: z.infer<typeof movimiento1Schema>) {
         monto: data.monto,
         cuenta,
         concepto,
+        // Vínculo al período cobrado: permite revertir el cobro limpiando el
+        // fechaDeCobro del período exacto.
+        periodoTrabajo,
       })
     );
 
@@ -377,12 +381,17 @@ export async function transferir(input: z.infer<typeof movimiento2Schema>) {
     await cuentaRepo.save(cuentaOrigen);
     await cuentaRepo.save(cuentaDestino);
 
+    // Grupo compartido: vincula los 2 movimientos de la transferencia para
+    // poder revertirlos juntos (y solo juntos) desde el histórico.
+    const grupoId = randomUUID();
+
     const movOrig = await movRepo.save(
       movRepo.create({
         fecha: data.fecha,
         monto: -(data.montoOrigen!),
         cuenta: cuentaOrigen,
         concepto: conceptoEgreso,
+        grupoId,
       })
     );
 
@@ -392,6 +401,7 @@ export async function transferir(input: z.infer<typeof movimiento2Schema>) {
         monto: data.montoDestino!,
         cuenta: cuentaDestino,
         concepto: conceptoIngreso,
+        grupoId,
       })
     );
 
@@ -439,7 +449,7 @@ export async function cargarJornadaTrabajo(
       data.horaHasta,
       periodo.trabajo.precioHora
     );
-    await jornadaRepo.save(
+    const jornada = await jornadaRepo.save(
       jornadaRepo.create({
         fechaJornada: data.fecha as unknown as Date,
         fechaCarga: new Date(),
@@ -489,6 +499,9 @@ export async function cargarJornadaTrabajo(
           monto: propina,
           cuenta,
           concepto,
+          // Vínculo a la jornada: al borrar la jornada (eliminarJornadaTrabajo)
+          // se localiza este movimiento para revertir el depósito.
+          jornadaTrabajo: jornada,
         })
       );
       await crearHistoricoCuenta(manager, cuenta, mov.id);

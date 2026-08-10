@@ -6,7 +6,9 @@ import { requireUserId } from "../lib/auth";
 import { JornadaTrabajo } from "../entities/jornada-trabajo.entity";
 import { PeriodoTrabajo } from "../entities/periodo-trabajo.entity";
 import { Trabajo } from "../entities/trabajo.entity";
-import { dbError, refresh } from "../lib/action-helpers";
+import { Cuenta } from "../entities/cuenta.entity";
+import { Movimiento } from "../entities/movimiento.entity";
+import { crearHistoricoCuenta, dbError, refresh } from "../lib/action-helpers";
 import {
   getJornadaTrabajoById,
   getPeriodoTrabajoById,
@@ -293,8 +295,33 @@ export async function eliminarJornadaTrabajo(id: string) {
   }
   const idPeriodo = row.periodoTrabajo?.id;
   try {
-    row.eliminado = true;
-    await repo.save(row);
+    await ds.transaction(async (manager) => {
+      const jornadaRepo = manager.getRepository(JornadaTrabajo);
+      const movRepo = manager.getRepository(Movimiento);
+      const cuentaRepo = manager.getRepository(Cuenta);
+
+      // Revertir el/los depósitos de propina vinculados a esta jornada
+      // (creados por "cargarJornadaTrabajo" del wizard). Si la jornada se
+      // creó por el CRUD no hubo depósito → no hay movimientos que revertir.
+      const propinas = await movRepo.find({
+        where: { jornadaTrabajo: { id: row.id }, eliminado: false },
+        relations: { cuenta: true },
+      });
+      for (const mov of propinas) {
+        const cuenta = mov.cuenta;
+        if (cuenta) {
+          cuenta.saldo -= mov.monto;
+          await cuentaRepo.save(cuenta);
+          await crearHistoricoCuenta(manager, cuenta);
+        }
+        mov.eliminado = true;
+        await movRepo.save(mov);
+      }
+
+      row.eliminado = true;
+      await jornadaRepo.save(row);
+    });
+
     if (idPeriodo) {
       await actualizarMontoACobrarPeriodo(idPeriodo);
     }

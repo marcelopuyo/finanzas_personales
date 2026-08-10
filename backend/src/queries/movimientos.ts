@@ -62,6 +62,8 @@ export async function getMovimientoById(
 // Historial cronológico de movimientos por cuenta (con saldo posterior)
 // ============================================================
 export interface HistorialMovimientoOut {
+  /** Id del movimiento (para anularlo desde el popup). */
+  id: string;
   fecha: Date;
   monto: number;
   motivo: string;
@@ -107,6 +109,7 @@ export async function getHistorialMovimientosCuenta(
     saldo += variaciones[i];
     const desc = m.gasto?.descripcion;
     result.push({
+      id: m.id,
       fecha: m.fecha,
       monto: m.monto,
       motivo: desc ? desc : (m.concepto?.nombre ?? ""),
