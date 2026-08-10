@@ -83,6 +83,8 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     value: string;
     labels: string[];
     values: number[];
+    /** Tarjeta sintética con menú de una sola acción (ej. Períodos Actuales → jornada). */
+    menuAccion?: "jornada" | "cobro";
   }[] = cuentasEvol.map((c) => ({
     id: c.id,
     title: c.nombreCuenta,
@@ -122,6 +124,8 @@ export async function fetchDashboardData(): Promise<DashboardData> {
       value: numberToCurrency(pendienteCobro),
       labels: [],
       values: [],
+      // Menú con "Cobro Sueldo" (cobrar los períodos pendientes).
+      menuAccion: "cobro",
     });
   }
 
@@ -131,6 +135,8 @@ export async function fetchDashboardData(): Promise<DashboardData> {
       value: numberToCurrency(periodosActuales),
       labels: [],
       values: [],
+      // Menú con "Jornada trabajo" (agregar jornadas a los períodos actuales).
+      menuAccion: "jornada",
     });
   }
 

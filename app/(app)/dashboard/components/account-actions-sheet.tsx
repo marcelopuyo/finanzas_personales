@@ -16,30 +16,54 @@ import {
 import { Modal } from "@/components/ui/modal";
 
 export interface CuentaAcciones {
-  id: number;
+  /** Solo en cuentas reales; en tarjetas sintéticas (soloMovimiento) puede faltar. */
+  id?: number;
   nombre: string;
   /** Saldo ya formateado como moneda. */
   saldo: string;
 }
 
+/** Acción única para tarjetas sintéticas (sin cuenta real detrás). */
+export type AccionSintetica = "jornada" | "cobro";
+
 /**
  * Bottom sheet (mobile) / diálogo centrado (desktop) con las acciones de una
  * cuenta: ver historial y disparar los movimientos en los que interviene.
- * Reutiliza `Modal` (ya es bottom sheet en móvil).
+ * Con `soloMovimiento` (tarjetas sintéticas como "Períodos Actuales"/"Períodos
+ * a Cobrar") muestra únicamente esa opción. Reutiliza `Modal`.
  */
 export function AccountActionsSheet({
   cuenta,
   open,
   onClose,
   onVerHistorial,
+  soloMovimiento,
 }: {
   cuenta: CuentaAcciones | null;
   open: boolean;
   onClose: () => void;
-  onVerHistorial: () => void;
+  onVerHistorial?: () => void;
+  /** Modo con una sola acción (tarjetas sintéticas, sin cuenta real). */
+  soloMovimiento?: AccionSintetica;
 }) {
   const router = useRouter();
   if (!cuenta) return null;
+
+  const SOLO_ACCIONES: Record<
+    AccionSintetica,
+    { icon: LucideIcon; label: string; href: string }
+  > = {
+    jornada: {
+      icon: Briefcase,
+      label: "Jornada trabajo",
+      href: "/movimientos/nuevo/jornada",
+    },
+    cobro: {
+      icon: Banknote,
+      label: "Cobro Sueldo",
+      href: "/movimientos/nuevo/cobro",
+    },
+  };
 
   /** Navega al wizard en modo directo con el concepto y el rol de la cuenta precargados. */
   const go = (tipo: string, param: "cuenta" | "origen" | "destino") => {
@@ -48,23 +72,35 @@ export function AccountActionsSheet({
     onClose();
   };
 
-  const rows: { icon: LucideIcon; label: string; onClick: () => void }[] = [
-    {
-      icon: History,
-      label: "Ver historial",
-      onClick: () => {
-        onVerHistorial();
-        onClose();
-      },
-    },
-    { icon: Banknote, label: "Cobro Sueldo", onClick: () => go("cobro", "cuenta") },
-    { icon: HandCoins, label: "Pago Préstamo", onClick: () => go("pago-prestamo", "cuenta") },
-    { icon: Settings2, label: "Ajuste Cuenta", onClick: () => go("ajuste", "cuenta") },
-    { icon: Receipt, label: "Gasto", onClick: () => go("gasto", "cuenta") },
-    { icon: Send, label: "Transferir desde", onClick: () => go("transferencia", "origen") },
-    { icon: Download, label: "Transferir hacia", onClick: () => go("transferencia", "destino") },
-    { icon: Briefcase, label: "Jornada trabajo", onClick: () => go("jornada", "cuenta") },
-  ];
+  const rows: { icon: LucideIcon; label: string; onClick: () => void }[] =
+    soloMovimiento
+      ? [
+          {
+            icon: SOLO_ACCIONES[soloMovimiento].icon,
+            label: SOLO_ACCIONES[soloMovimiento].label,
+            onClick: () => {
+              router.push(SOLO_ACCIONES[soloMovimiento].href);
+              onClose();
+            },
+          },
+        ]
+      : [
+          {
+            icon: History,
+            label: "Ver historial",
+            onClick: () => {
+              onVerHistorial?.();
+              onClose();
+            },
+          },
+          { icon: Banknote, label: "Cobro Sueldo", onClick: () => go("cobro", "cuenta") },
+          { icon: HandCoins, label: "Pago Préstamo", onClick: () => go("pago-prestamo", "cuenta") },
+          { icon: Settings2, label: "Ajuste Cuenta", onClick: () => go("ajuste", "cuenta") },
+          { icon: Receipt, label: "Gasto", onClick: () => go("gasto", "cuenta") },
+          { icon: Send, label: "Transferir desde", onClick: () => go("transferencia", "origen") },
+          { icon: Download, label: "Transferir hacia", onClick: () => go("transferencia", "destino") },
+          { icon: Briefcase, label: "Jornada trabajo", onClick: () => go("jornada", "cuenta") },
+        ];
 
   return (
     <Modal
