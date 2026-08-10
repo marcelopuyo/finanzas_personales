@@ -7,7 +7,6 @@ import { Menu, X } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faChartLine,
-  faArrowRightArrowLeft,
   faWallet,
   faLandmark,
   faCreditCard,
@@ -30,11 +29,9 @@ const navigation: NavItem[] = [
     href: "/dashboard",
     icon: () => <FontAwesomeIcon icon={faChartLine} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
   },
-  {
-    label: "Movimientos",
-    href: "/movimientos",
-    icon: () => <FontAwesomeIcon icon={faArrowRightArrowLeft} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
-  },
+  // "Movimientos" (stepper) OCULTO del sidebar: los movimientos se disparan
+  // desde las tarjetas del dashboard (menú ⋮ → rutas directas
+  // /movimientos/nuevo/...). El stepper sigue vivo en /movimientos.
   {
     label: "Gastos",
     icon: () => <FontAwesomeIcon icon={faWallet} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
