@@ -5,7 +5,6 @@ import { getDb } from "../db";
 import { requireAdmin, requireUserId } from "../lib/auth";
 import { dbError, refresh } from "../lib/action-helpers";
 import { Concepto } from "../entities/concepto.entity";
-import { Cotizacion } from "../entities/cotizacion.entity";
 import { Cuenta } from "../entities/cuenta.entity";
 import { Inflacion } from "../entities/inflacion.entity";
 import { Moneda } from "../entities/moneda.entity";
@@ -13,7 +12,6 @@ import { Persona } from "../entities/persona.entity";
 import { TipoCuenta } from "../entities/tipo-cuenta.entity";
 import {
   getConceptoById,
-  getCotizacionById,
   getCuentaById,
   getInflacionById,
   getMonedaById,
@@ -23,8 +21,6 @@ import {
 import {
   conceptoCreateSchema,
   conceptoUpdateSchema,
-  cotizacionCreateSchema,
-  cotizacionUpdateSchema,
   cuentaCreateSchema,
   cuentaUpdateSchema,
   inflacionCreateSchema,
@@ -372,93 +368,6 @@ export async function eliminarCuenta(id: number) {
 }
 
 // ============================================================
-// COTIZACIÓN (moneda por nombre)
-// ============================================================
-export async function crearCotizacion(
-  input: z.infer<typeof cotizacionCreateSchema>
-) {
-  const userId = await requireUserId();
-  const data = cotizacionCreateSchema.parse(input);
-  const ds = await getDb();
-
-  const monedaEntity = await ds
-    .getRepository(Moneda)
-    .findOneBy({ nombre: data.moneda, eliminado: false });
-  if (!monedaEntity) {
-    throw new Error(`Moneda con nombre "${data.moneda}" no encontrada`);
-  }
-
-  try {
-    const repo = ds.getRepository(Cotizacion);
-    const created = await repo.save(
-      repo.create({
-        fechaInicial: data.fechaInicial,
-        fechaFinal: data.fechaFinal,
-        cotizacion: data.cotizacion,
-        moneda: monedaEntity,
-        usuario: { id: userId },
-      })
-    );
-    refresh();
-    return getCotizacionById(created.id);
-  } catch (error) {
-    dbError(error, "Cotización");
-  }
-}
-
-export async function actualizarCotizacion(
-  id: number,
-  input: z.infer<typeof cotizacionUpdateSchema>
-) {
-  const userId = await requireUserId();
-  const data = cotizacionUpdateSchema.parse(input);
-  const ds = await getDb();
-
-  const existing = await ds
-    .getRepository(Cotizacion)
-    .findOneBy({ id, usuario: { id: userId }, eliminado: false });
-  if (!existing) {
-    throw new Error(`Cotización con id ${id} no encontrada`);
-  }
-
-  if (data.moneda) {
-    const monedaEntity = await ds
-      .getRepository(Moneda)
-      .findOneBy({ nombre: data.moneda, eliminado: false });
-    if (!monedaEntity) {
-      throw new Error(`Moneda con nombre "${data.moneda}" no encontrada`);
-    }
-    existing.moneda = monedaEntity;
-  }
-
-  try {
-    const { moneda, ...rest } = data;
-    Object.assign(existing, rest);
-    await ds.getRepository(Cotizacion).save(existing);
-    refresh();
-    return getCotizacionById(id);
-  } catch (error) {
-    dbError(error, "Cotización");
-  }
-}
-
-export async function eliminarCotizacion(id: number) {
-  const userId = await requireUserId();
-  const ds = await getDb();
-  const repo = ds.getRepository(Cotizacion);
-  const row = await repo.findOneBy({ id, usuario: { id: userId }, eliminado: false });
-  if (!row) {
-    throw new Error(`Cotización con id ${id} no encontrada`);
-  }
-  try {
-    row.eliminado = true;
-    await repo.save(row);
-    refresh();
-  } catch (error) {
-    dbError(error, "Cotización");
-  }
-}
-
 // ============================================================
 // INFLACIÓN
 // ============================================================

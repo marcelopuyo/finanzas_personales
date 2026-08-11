@@ -6,7 +6,7 @@ import { KeyRound, LogOut, Moon, ShieldCheck, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "@/components/layout/theme-provider";
 import { Modal } from "@/components/ui/modal";
-import { cambiarPassword } from "@/backend/src/actions/cuenta";
+import { cambiarPassword, actualizarMonedaPredeterminada } from "@/backend/src/actions/cuenta";
 import { NO_REMEMBER, PENDING_CLEAR } from "@/lib/session-flags";
 import { cn } from "@/lib/utils";
 
@@ -22,11 +22,15 @@ export default function PerfilClient({
   email,
   esAdmin,
   initials,
+  monedas,
+  monedaPredeterminadaId,
 }: {
   nombre: string;
   email: string;
   esAdmin: boolean;
   initials: string;
+  monedas: { id: number; nombre: string; codigoISO: string }[];
+  monedaPredeterminadaId: number;
 }) {
   const { theme, setTheme } = useTheme();
   const [passOpen, setPassOpen] = useState(false);
@@ -36,6 +40,8 @@ export default function PerfilClient({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [monedaId, setMonedaId] = useState(monedaPredeterminadaId);
+  const [savingMoneda, setSavingMoneda] = useState(false);
 
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
@@ -71,6 +77,18 @@ export default function PerfilClient({
       sessionStorage.removeItem(NO_REMEMBER);
       sessionStorage.removeItem(PENDING_CLEAR);
       window.location.href = "/login";
+    }
+  }
+
+  async function handleGuardarMoneda() {
+    setSavingMoneda(true);
+    try {
+      await actualizarMonedaPredeterminada({ monedaId });
+      toast.success("Moneda predeterminada actualizada");
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setSavingMoneda(false);
     }
   }
 
@@ -133,6 +151,35 @@ export default function PerfilClient({
               )}
             >
               <Moon className="h-4 w-4" /> Oscuro
+            </button>
+          </div>
+        </section>
+
+        {/* Moneda predeterminada */}
+        <section className="rounded-xl border border-border bg-card p-5">
+          <h2 className="text-[14px] font-medium text-header">Moneda predeterminada</h2>
+          <p className="mt-1 text-[12px] text-subtitle">
+            Se usa para mostrar el balance actual y las tarjetas sintéticas del dashboard.
+          </p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <select
+              value={monedaId}
+              onChange={(e) => setMonedaId(Number(e.target.value))}
+              className={inputCls}
+            >
+              {monedas.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.nombre} ({m.codigoISO})
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={handleGuardarMoneda}
+              disabled={savingMoneda || monedaId === monedaPredeterminadaId}
+              className="shrink-0 rounded-md bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {savingMoneda ? "Guardando..." : "Guardar"}
             </button>
           </div>
         </section>

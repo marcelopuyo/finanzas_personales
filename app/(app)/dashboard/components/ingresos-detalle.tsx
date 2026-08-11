@@ -16,9 +16,11 @@ function formatCobroDate(value?: string | Date): string {
 function ImporteCell({
   montoACobrar,
   fechaDeCobro,
+  currency,
 }: {
   montoACobrar: number | null;
   fechaDeCobro?: string | Date | null;
+  currency: string;
 }) {
   const cobrado =
     !!fechaDeCobro && new Date(fechaDeCobro).getFullYear() >= 1901;
@@ -29,7 +31,7 @@ function ImporteCell({
         cobrado ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
       )}
     >
-      {numberToCurrency(montoACobrar ?? 0)}
+      {numberToCurrency(montoACobrar ?? 0, currency)}
     </span>
   );
 }
@@ -55,7 +57,10 @@ function JornadasCell({
   );
 }
 
-export const ingresosDetalleColumns: ColumnDef<PeriodoTrabajoOut>[] = [
+export function ingresosDetalleColumns(
+  currency: string
+): ColumnDef<PeriodoTrabajoOut>[] {
+  return [
   {
     accessorKey: "fechaDesde",
     header: "Desde",
@@ -83,6 +88,7 @@ export const ingresosDetalleColumns: ColumnDef<PeriodoTrabajoOut>[] = [
       <ImporteCell
         montoACobrar={row.original.montoACobrar}
         fechaDeCobro={row.original.fechaDeCobro}
+        currency={currency}
       />
     ),
     footer: ({ table }) => {
@@ -91,7 +97,7 @@ export const ingresosDetalleColumns: ColumnDef<PeriodoTrabajoOut>[] = [
         (acc, row) => acc + (row.original.montoACobrar || 0),
         0
       );
-      return numberToCurrency(total);
+      return numberToCurrency(total, currency);
     },
   },
   {
@@ -112,14 +118,21 @@ export const ingresosDetalleColumns: ColumnDef<PeriodoTrabajoOut>[] = [
     meta: { align: "center" },
     cell: ({ row }) => <JornadasCell jornadas={row.original.jornadas} />,
   },
-];
+  ];
+}
 
 export function IngresosDetalle({
   data,
+  currency,
 }: {
   data: PeriodoTrabajoOut[];
+  currency: string;
 }) {
   return (
-    <DataTable columns={ingresosDetalleColumns} data={data} pageSize={5} />
+    <DataTable
+      columns={ingresosDetalleColumns(currency)}
+      data={data}
+      pageSize={5}
+    />
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useMovimientoStepper } from "./stepper-context";
 import {
   StepShell,
@@ -9,6 +10,7 @@ import {
   NumberField,
 } from "./ui";
 import { MOTIVOS_TRANSFERENCIA, STEP_CONFIRMACION } from "./types";
+import { convertirMontoParaUI } from "@/backend/src/actions/cotizaciones";
 
 export function Transferencia() {
   const { data, handleSetData, navigateTo, options } = useMovimientoStepper();
@@ -23,8 +25,47 @@ export function Transferencia() {
 
   const cuentaOptions = options.cuentas.map((c) => ({
     value: String(c.id),
-    label: c.nombre,
+    label: c.moneda
+      ? `${c.nombre} (${c.moneda.codigoISO})`
+      : c.nombre,
   }));
+
+  // Monedas de las cuentas seleccionadas (para autocomputar entre monedas).
+  const cuentaOrigen = options.cuentas.find((c) => c.id === data.cuentaOrigen);
+  const cuentaDestino = options.cuentas.find((c) => c.id === data.cuentaDestino);
+  const monedaOrigenISO = cuentaOrigen?.moneda?.codigoISO ?? "ARS";
+  const monedaDestinoISO = cuentaDestino?.moneda?.codigoISO ?? "ARS";
+  const mismaMoneda = monedaOrigenISO === monedaDestinoISO;
+
+  // Autocomputa el monto destino cuando las monedas difieren y el usuario aún
+  // no editó el destino (se mantiene el patrón original de "sincronizar").
+  useEffect(() => {
+    if (
+      mismaMoneda ||
+      data.montoDestino !== 0 ||
+      data.montoOrigen <= 0 ||
+      !cuentaOrigen ||
+      !cuentaDestino
+    ) {
+      return;
+    }
+    let cancelado = false;
+    convertirMontoParaUI({
+      monto: data.montoOrigen,
+      origenCodigoISO: monedaOrigenISO,
+      destinoCodigoISO: monedaDestinoISO,
+    })
+      .then((r) => {
+        if (!cancelado) handleSetData({ montoDestino: r.monto });
+      })
+      .catch(() => {
+        /* deja el destino sin tocar */
+      });
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.montoOrigen, data.cuentaOrigen, data.cuentaDestino]);
 
   return (
     <StepShell
@@ -65,13 +106,14 @@ export function Transferencia() {
       />
 
       <NumberField
-        label="Monto origen"
+        label={`Monto origen (${monedaOrigenISO})`}
         value={data.montoOrigen}
         onChange={(v) =>
           // Mantener en sincronía el monto destino si aún no se editó (patrón original).
           handleSetData({
             montoOrigen: v,
-            montoDestino: data.montoDestino === 0 ? v : data.montoDestino,
+            montoDestino:
+              mismaMoneda && data.montoDestino === 0 ? v : data.montoDestino,
           })
         }
       />
@@ -84,10 +126,18 @@ export function Transferencia() {
       />
 
       <NumberField
-        label="Monto destino"
+        label={`Monto destino (${monedaDestinoISO})`}
         value={data.montoDestino}
         onChange={(v) => handleSetData({ montoDestino: v })}
       />
+
+      {!mismaMoneda && cuentaOrigen && cuentaDestino && (
+        <p className="text-[12px] text-subtitle">
+          Las cuentas tienen monedas distintas ({monedaOrigenISO} →{" "}
+          {monedaDestinoISO}). El monto destino se autocomputa con la
+          cotización del día y podés editarlo.
+        </p>
+      )}
 
       {data.cuentaOrigen > 0 &&
         data.cuentaDestino > 0 &&

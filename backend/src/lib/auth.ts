@@ -92,7 +92,11 @@ export async function getSessionUser(): Promise<Usuario | null> {
   if (!userId) return null;
   const ds = await getDb();
   // Excluye usuarios "eliminados" (soft-delete): su sesión deja de ser válida.
-  return ds.getRepository(Usuario).findOneBy({ id: userId, eliminado: false });
+  // Carga `monedaPredeterminada` (la usa el perfil y el dashboard).
+  return ds.getRepository(Usuario).findOne({
+    where: { id: userId, eliminado: false },
+    relations: { monedaPredeterminada: true },
+  });
 }
 
 /** True si el usuario autenticado tiene privilegios de administrador. */

@@ -12,6 +12,7 @@ const TABS = [
   { label: "Conceptos", href: "/admin/conceptos" },
   { label: "Monedas", href: "/admin/monedas" },
   { label: "Tipos de Cuenta", href: "/admin/tipos-cuenta" },
+  { label: "Cotizaciones", href: "/admin/cotizaciones" },
 ];
 
 /**

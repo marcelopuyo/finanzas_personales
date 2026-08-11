@@ -44,17 +44,9 @@ export const personaUpdateSchema = personaCreateSchema.partial();
 export const monedaCreateSchema = z.object({
   simbolo: z.string().min(1),
   nombre: z.string().min(1),
+  codigoISO: z.string().min(1).transform((v) => v.trim().toUpperCase()),
 });
 export const monedaUpdateSchema = monedaCreateSchema.partial();
-
-// ---- Cotización ----
-export const cotizacionCreateSchema = z.object({
-  fechaInicial: dateString,
-  fechaFinal: dateString,
-  cotizacion: z.number().positive(),
-  moneda: z.string().min(1), // nombre de la moneda
-});
-export const cotizacionUpdateSchema = cotizacionCreateSchema.partial();
 
 // ---- Inflación ----
 export const inflacionCreateSchema = z.object({

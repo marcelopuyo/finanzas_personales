@@ -14,6 +14,7 @@ export function NuevaMonedaClient() {
         await crearMoneda({
           simbolo: d.simbolo as string,
           nombre: d.nombre as string,
+          codigoISO: d.codigoISO as string,
         });
       }}
       cancelHref="/admin/monedas"

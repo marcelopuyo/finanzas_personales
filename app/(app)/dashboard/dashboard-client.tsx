@@ -10,9 +10,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { AccountCard } from "./components/account-card";
 import { StackedBarChart } from "./components/bar-chart";
 import { EvolutionChart } from "./components/line-chart";
+import { PrestamosChart } from "./components/prestamos-chart";
 import { GastosDetalle } from "./components/gastos-detalle";
 import { IngresosDetalle } from "./components/ingresos-detalle";
 import { HistorialModal, type CuentaHistorial } from "./components/historial-modal";
+import { PeriodosModal, type TipoPeriodos } from "./components/periodos-modal";
 import type { DashboardData } from "./dashboard-data";
 import type { GastoOut } from "@/backend/src/queries/gastos";
 import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
@@ -37,6 +39,8 @@ export function DashboardClient({ data }: Props) {
   const [tabIngresos, setTabIngresos] = useState("resumen");
   // Cuenta seleccionada para abrir su historial en popup
   const [cuentaHist, setCuentaHist] = useState<CuentaHistorial | null>(null);
+  // Popup de las tarjetas sintéticas de períodos (a cobrar / actuales).
+  const [periodosModal, setPeriodosModal] = useState<TipoPeriodos | null>(null);
 
   // Fechas por defecto: primer día del mes actual → hoy
   const fechaPrimerDia = () => {
@@ -68,6 +72,35 @@ export function DashboardClient({ data }: Props) {
 
   const todosLosGastos: GastoOut[] = data.gastosDetalle;
   const todosLosIngresos: PeriodoTrabajoOut[] = data.ingresosDetalle;
+
+  const hoy = todayLocalISODate();
+
+  // Listados de períodos para los popups de las tarjetas sintéticas:
+  // - "Períodos a Cobrar": cerrados (fecha final < hoy) y no cobrados.
+  // - "Períodos Actuales": con fecha final >= hoy.
+  const periodosCobrar = useMemo(
+    () =>
+      todosLosIngresos
+        .filter((p) => {
+          const noCobrado =
+            !p.fechaDeCobro || toDateKey(p.fechaDeCobro) < "1901-01-02";
+          return noCobrado && toDateKey(p.fechaHasta) < hoy;
+        })
+        .sort((a, b) =>
+          toDateKey(b.fechaHasta).localeCompare(toDateKey(a.fechaHasta))
+        ),
+    [todosLosIngresos, hoy]
+  );
+
+  const periodosActuales = useMemo(
+    () =>
+      todosLosIngresos
+        .filter((p) => toDateKey(p.fechaHasta) >= hoy)
+        .sort((a, b) =>
+          toDateKey(a.fechaHasta).localeCompare(toDateKey(b.fechaHasta))
+        ),
+    [todosLosIngresos, hoy]
+  );
 
   const filteredGastos = useMemo(() => {
     let r = todosLosGastos;
@@ -331,7 +364,7 @@ export function DashboardClient({ data }: Props) {
 
       <StatCard
         title="Balance Actual"
-        value={numberToCurrency(data.balance)}
+        value={numberToCurrency(data.balance, data.monedaPredeterminadaISO)}
         centered
         className="border-primary/40 bg-linear-to-br from-primary/10 via-card to-card shadow-sm"
       />
@@ -343,14 +376,21 @@ export function DashboardClient({ data }: Props) {
             <AccountCard
               key={i}
               {...cuenta}
-              onOpen={() =>
-                cuenta.id != null &&
-                setCuentaHist({
-                  id: cuenta.id,
-                  nombre: cuenta.title,
-                  saldo: cuenta.value,
-                })
-              }
+              onOpen={() => {
+                if (cuenta.id != null) {
+                  setCuentaHist({
+                    id: cuenta.id,
+                    nombre: cuenta.title,
+                    saldo: cuenta.value,
+                    monedaISO: cuenta.monedaISO ?? "ARS",
+                    monedaPredeterminadaISO: data.monedaPredeterminadaISO,
+                  });
+                } else if (cuenta.menuAccion === "cobro") {
+                  setPeriodosModal("cobrar");
+                } else if (cuenta.menuAccion === "jornada") {
+                  setPeriodosModal("actuales");
+                }
+              }}
             />
           ))}
         </div>
@@ -362,6 +402,7 @@ export function DashboardClient({ data }: Props) {
           title="Gastos"
           action={<div className="flex items-center gap-2">{filterBtn("hidden sm:inline-flex")}{gastosTabs}</div>}
           badge={<><StatBadge label="Mes actual" value={data.gastosTotal} />{filterBtn("sm:hidden")}</>}
+          currency={data.monedaPredeterminadaISO}
           data={filteredResumen.map((g) => ({ name: g.name, value: g.pagado, value2: g.saldo }))}
           bars={[
             { key: "value", name: "Pagado", color: "var(--success)", darkColor: "var(--success)" },
@@ -378,13 +419,18 @@ export function DashboardClient({ data }: Props) {
             </div>
             <div className="flex items-center gap-2">{filterBtn("hidden sm:inline-flex")}{gastosTabs}</div>
           </div>
-          <GastosDetalle data={filteredGastos} total={todosLosGastos.length} />
+          <GastosDetalle
+            data={filteredGastos}
+            total={todosLosGastos.length}
+            currency={data.monedaPredeterminadaISO}
+          />
         </div>
       ) : (
         <EvolutionChart
           title="Gastos"
           action={<div className="flex items-center gap-2">{filterBtn("hidden sm:inline-flex")}{gastosTabs}</div>}
           badge={<><StatBadge label="Mes actual" value={data.gastosTotal} />{filterBtn("sm:hidden")}</>}
+          currency={data.monedaPredeterminadaISO}
           data={filteredEvolucion}
           color="var(--primary)"
           area
@@ -399,6 +445,7 @@ export function DashboardClient({ data }: Props) {
           badge={<><StatBadge label="Mes actual" value={data.ingresosMesActual} />{ingFilterBtn("sm:hidden")}</>}
           data={filteredIngresosResumen.map((i) => ({ name: i.name, value: i.value }))}
           bars={[{ key: "value", name: "Ingresos", color: "var(--success)", darkColor: "var(--success)" }]}
+          currency={data.monedaPredeterminadaISO}
         />
       ) : tabIngresos === "detalle" ? (
         <div className="rounded-lg border border-border bg-card p-5">
@@ -410,7 +457,10 @@ export function DashboardClient({ data }: Props) {
             </div>
             <div className="flex items-center gap-2">{ingFilterBtn("hidden sm:inline-flex")}{ingresosTabs}</div>
           </div>
-          <IngresosDetalle data={filteredIngresos} />
+          <IngresosDetalle
+            data={filteredIngresos}
+            currency={data.monedaPredeterminadaISO}
+          />
         </div>
       ) : (
         <EvolutionChart
@@ -420,22 +470,32 @@ export function DashboardClient({ data }: Props) {
           data={filteredIngresosEvolucion}
           color="var(--primary)"
           area
+          currency={data.monedaPredeterminadaISO}
         />
       )}
 
       {data.evolucionResultados.length > 0 && (
-        <EvolutionChart title="Evolución de Resultados" data={data.evolucionResultados} color="var(--primary)" area />
+        <EvolutionChart
+          title="Evolución de Resultados"
+          data={data.evolucionResultados}
+          color="var(--primary)"
+          area
+          currency={data.monedaPredeterminadaISO}
+        />
       )}
 
-      {data.prestamosResumen.length > 0 && (
-        <StackedBarChart
+      {data.prestamosChart.data.length > 0 && (
+        <PrestamosChart
           title="Préstamos Pendientes"
-          badge={<StatBadge label="Total" value={data.prestamosTotal} />}
-          data={data.prestamosResumen.map((p) => ({ name: p.name, value: p.pagado, value2: p.saldo }))}
-          bars={[
-            { key: "value", name: "Pagado", color: "var(--success)", darkColor: "var(--success)" },
-            { key: "value2", name: "Pendiente", color: "var(--success)", darkColor: "var(--success)" },
-          ]}
+          badge={
+            <div className="flex flex-wrap items-center gap-2">
+              {data.prestamosTotales.map((t) => (
+                <StatBadge key={t.currency} label={t.currency} value={t.value} />
+              ))}
+            </div>
+          }
+          data={data.prestamosChart.data}
+          series={data.prestamosChart.series}
         />
       )}
 
@@ -539,6 +599,14 @@ export function DashboardClient({ data }: Props) {
       <HistorialModal
         cuenta={cuentaHist}
         onClose={() => setCuentaHist(null)}
+      />
+
+      {/* Popup de las tarjetas sintéticas de períodos */}
+      <PeriodosModal
+        tipo={periodosModal}
+        data={periodosModal === "cobrar" ? periodosCobrar : periodosActuales}
+        currency={data.monedaPredeterminadaISO}
+        onClose={() => setPeriodosModal(null)}
       />
     </div>
   );

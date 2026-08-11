@@ -1,5 +1,5 @@
 import { getDb } from "../db";
-import { requireUserId } from "../lib/auth";
+import { requireAdmin, requireUserId } from "../lib/auth";
 import { Concepto } from "../entities/concepto.entity";
 import { Cotizacion } from "../entities/cotizacion.entity";
 import { Cuenta } from "../entities/cuenta.entity";
@@ -27,6 +27,7 @@ export interface MonedaOut {
   id: number;
   simbolo: string;
   nombre: string;
+  codigoISO: string;
 }
 
 export interface PersonaOut {
@@ -42,15 +43,16 @@ export interface CuentaOut {
   saldo: number;
   tipo: { nombre: string } | null;
   tarjeta: null;
-  moneda: { nombre: string } | null;
+  moneda: { nombre: string; codigoISO: string } | null;
 }
 
 export interface CotizacionOut {
   id: number;
   fechaInicial: Date;
-  fechaFinal: Date;
+  fechaFinal: Date | null;
   cotizacion: number;
-  moneda: { nombre: string } | null;
+  monedaOrigen: { nombre: string; codigoISO: string } | null;
+  monedaDestino: { nombre: string; codigoISO: string } | null;
 }
 
 export interface InflacionOut {
@@ -126,7 +128,7 @@ export async function getAllMonedas(): Promise<MonedaOut[]> {
   const rows = await ds
     .getRepository(Moneda)
     .find({ where: { eliminado: false } });
-  return rows.map((r) => ({ id: r.id, simbolo: r.simbolo, nombre: r.nombre }));
+  return rows.map((r) => ({ id: r.id, simbolo: r.simbolo, nombre: r.nombre, codigoISO: r.codigoISO }));
 }
 
 export async function getMonedaById(id: number): Promise<MonedaOut | null> {
@@ -134,7 +136,7 @@ export async function getMonedaById(id: number): Promise<MonedaOut | null> {
   const r = await ds
     .getRepository(Moneda)
     .findOne({ where: { id, eliminado: false } });
-  return r ? { id: r.id, simbolo: r.simbolo, nombre: r.nombre } : null;
+  return r ? { id: r.id, simbolo: r.simbolo, nombre: r.nombre, codigoISO: r.codigoISO } : null;
 }
 
 // ============================================================
@@ -186,7 +188,9 @@ export async function getAllCuentas(): Promise<CuentaOut[]> {
     saldo: r.saldo,
     tipo: r.tipo ? { nombre: r.tipo.nombre } : null,
     tarjeta: null,
-    moneda: r.moneda ? { nombre: r.moneda.nombre } : null,
+    moneda: r.moneda
+      ? { nombre: r.moneda.nombre, codigoISO: r.moneda.codigoISO }
+      : null,
   }));
 }
 
@@ -204,7 +208,9 @@ export async function getCuentaById(id: number): Promise<CuentaOut | null> {
         saldo: r.saldo,
         tipo: r.tipo ? { nombre: r.tipo.nombre } : null,
         tarjeta: null,
-        moneda: r.moneda ? { nombre: r.moneda.nombre } : null,
+        moneda: r.moneda
+          ? { nombre: r.moneda.nombre, codigoISO: r.moneda.codigoISO }
+          : null,
       }
     : null;
 }
@@ -212,40 +218,28 @@ export async function getCuentaById(id: number): Promise<CuentaOut | null> {
 // ============================================================
 // Cotizaciones (relación moneda)
 // ============================================================
+// Cotizaciones (GLOBALES — solo admin; sin entrada manual)
+// ============================================================
 export async function getAllCotizaciones(): Promise<CotizacionOut[]> {
-  const userId = await requireUserId();
+  await requireAdmin();
   const ds = await getDb();
   const rows = await ds.getRepository(Cotizacion).find({
-    where: { usuario: { id: userId }, eliminado: false },
-    relations: { moneda: true },
+    where: { eliminado: false },
+    relations: { monedaOrigen: true, monedaDestino: true },
+    order: { fechaInicial: "DESC", id: "DESC" },
   });
   return rows.map((r) => ({
     id: r.id,
     fechaInicial: r.fechaInicial,
-    fechaFinal: r.fechaFinal,
+    fechaFinal: r.fechaFinal ?? null,
     cotizacion: r.cotizacion,
-    moneda: r.moneda ? { nombre: r.moneda.nombre } : null,
+    monedaOrigen: r.monedaOrigen
+      ? { nombre: r.monedaOrigen.nombre, codigoISO: r.monedaOrigen.codigoISO }
+      : null,
+    monedaDestino: r.monedaDestino
+      ? { nombre: r.monedaDestino.nombre, codigoISO: r.monedaDestino.codigoISO }
+      : null,
   }));
-}
-
-export async function getCotizacionById(
-  id: number
-): Promise<CotizacionOut | null> {
-  const userId = await requireUserId();
-  const ds = await getDb();
-  const r = await ds.getRepository(Cotizacion).findOne({
-    where: { id, usuario: { id: userId }, eliminado: false },
-    relations: { moneda: true },
-  });
-  return r
-    ? {
-        id: r.id,
-        fechaInicial: r.fechaInicial,
-        fechaFinal: r.fechaFinal,
-        cotizacion: r.cotizacion,
-        moneda: r.moneda ? { nombre: r.moneda.nombre } : null,
-      }
-    : null;
 }
 
 // ============================================================

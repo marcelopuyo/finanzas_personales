@@ -80,9 +80,11 @@ export async function anularMovimiento(movimientoId: string) {
         const esEgreso = m.concepto?.categoria?.toLowerCase() === "egreso";
         // Origen (egreso): saldo -= |monto|  → revertir += |monto|
         // Destino (ingreso): saldo += |monto| → revertir -= |monto|
+        // Se usa el monto en la moneda de la cuenta (montoCuentaMonedaOrigen),
+        // porque `monto` quedó en la moneda predeterminada del usuario.
         m.cuenta.saldo = esEgreso
-          ? m.cuenta.saldo + Math.abs(m.monto)
-          : m.cuenta.saldo - Math.abs(m.monto);
+          ? m.cuenta.saldo + Math.abs(m.montoCuentaMonedaOrigen)
+          : m.cuenta.saldo - Math.abs(m.montoCuentaMonedaOrigen);
         await cuentaRepo.save(m.cuenta);
         await crearHistoricoCuenta(manager, m.cuenta);
         m.eliminado = true;
@@ -101,8 +103,8 @@ export async function anularMovimiento(movimientoId: string) {
     if (mov.gasto) {
       // ---- Pago Gasto / Gasto Directo ----
       const gasto = mov.gasto;
-      cuenta.saldo += mov.monto;
-      gasto.saldo += mov.monto;
+      cuenta.saldo += mov.montoCuentaMonedaOrigen;
+      gasto.saldo += mov.montoCuentaMonedaOrigen;
 
       // Recalcular fechaPago con los pagos activos restantes (excluyendo este).
       const pagosRestantes = await movRepo.find({
@@ -132,13 +134,13 @@ export async function anularMovimiento(movimientoId: string) {
       const prestamo = mov.prestamo;
       cuenta.saldo =
         prestamo.sentido === "otorgado"
-          ? cuenta.saldo - mov.monto
-          : cuenta.saldo + mov.monto;
-      prestamo.saldo += mov.monto;
+          ? cuenta.saldo - mov.montoCuentaMonedaOrigen
+          : cuenta.saldo + mov.montoCuentaMonedaOrigen;
+      prestamo.saldo += mov.montoCuentaMonedaOrigen;
       await prestamoRepo.save(prestamo);
     } else if (conceptoNombre === "Cobro Sueldo") {
       // ---- Cobro Sueldo ----
-      cuenta.saldo -= mov.monto;
+      cuenta.saldo -= mov.montoCuentaMonedaOrigen;
       if (mov.periodoTrabajo) {
         // Los cobros legacy (sin vínculo) no limpian fechaDeCobro (decisión).
         // ⚠️ TypeORM ignora `undefined` al guardar; `null` sí limpia la columna.
@@ -148,9 +150,9 @@ export async function anularMovimiento(movimientoId: string) {
       }
     } else {
       // ---- Cobro Propina / Ajuste (y cualquier otro de cuenta única) ----
-      // El monto guardado ya tiene el signo del efecto en la cuenta, así que
-      // revertir es restar exactamente lo que se sumó.
-      cuenta.saldo -= mov.monto;
+      // El monto de cuenta ya tiene el signo del efecto en la cuenta, así que
+      // revertir es restar exactamente lo que se sumó (moneda de la cuenta).
+      cuenta.saldo -= mov.montoCuentaMonedaOrigen;
     }
 
     await cuentaRepo.save(cuenta);

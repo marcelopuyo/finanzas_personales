@@ -8,6 +8,7 @@ import { Usuario } from "../entities/usuario.entity";
 import {
   findUsuarioByEmail,
   getUsuarioOut,
+  monedaPredeterminadaPorDefecto,
 } from "../queries/usuarios";
 import { usuarioCreateSchema, usuarioUpdateSchema } from "../validation/usuarios";
 
@@ -25,6 +26,7 @@ export async function crearUsuarioAdmin(
 
   const ds = await getDb();
   const hash = await hashPassword(data.password);
+  const monedaUsd = await monedaPredeterminadaPorDefecto();
   try {
     // Creado por un admin → el email se considera verificado.
     const created = await ds.getRepository(Usuario).save(
@@ -36,6 +38,7 @@ export async function crearUsuarioAdmin(
         activo: data.activo,
         esAdmin: data.esAdmin,
         eliminado: false,
+        monedaPredeterminada: monedaUsd,
       })
     );
     refresh();

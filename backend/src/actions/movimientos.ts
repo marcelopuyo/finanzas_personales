@@ -16,6 +16,7 @@ import { PeriodoTrabajo } from "../entities/periodo-trabajo.entity";
 import { Prestamo } from "../entities/prestamo.entity";
 import { crearHistoricoCuenta, dbError, refresh } from "../lib/action-helpers";
 import { calcularMontoACobrar, calcularMontoJornada } from "../lib/jornadas";
+import { montoEnMonedaPredeterminada } from "../lib/cotizaciones";
 import {
   jornadaStepperSchema,
   movimiento1Schema,
@@ -80,6 +81,13 @@ export async function cobrarSueldo(input: z.infer<typeof movimiento1Schema>) {
   const data = movimiento1Schema.parse(input);
   if (!data.idPeriodoTrabajo) throw new Error("idPeriodoTrabajo es requerido");
 
+  // Conversión a la moneda predeterminada del usuario (fuera del tx).
+  const montoPredeterminada = await montoEnMonedaPredeterminada(
+    data.idCuenta,
+    data.monto,
+    new Date(data.fecha)
+  );
+
   const ds = await getDb();
   await ds.transaction(async (manager) => {
     const cuentaRepo = manager.getRepository(Cuenta);
@@ -113,7 +121,8 @@ export async function cobrarSueldo(input: z.infer<typeof movimiento1Schema>) {
     const mov = await movRepo.save(
       movRepo.create({
         fecha: data.fecha,
-        monto: data.monto,
+        monto: montoPredeterminada,
+        montoCuentaMonedaOrigen: data.monto,
         cuenta,
         concepto,
         // Vínculo al período cobrado: permite revertir el cobro limpiando el
@@ -136,6 +145,13 @@ export async function pagarPrestamo(input: z.infer<typeof movimiento1Schema>) {
   const userId = await requireUserId();
   const data = movimiento1Schema.parse(input);
   if (!data.idPrestamo) throw new Error("idPrestamo es requerido");
+
+  // Conversión a la moneda predeterminada del usuario (fuera del tx).
+  const montoPredeterminada = await montoEnMonedaPredeterminada(
+    data.idCuenta,
+    data.monto,
+    new Date(data.fecha)
+  );
 
   const ds = await getDb();
   await ds.transaction(async (manager) => {
@@ -175,7 +191,8 @@ export async function pagarPrestamo(input: z.infer<typeof movimiento1Schema>) {
     const mov = await movRepo.save(
       movRepo.create({
         fecha: data.fecha,
-        monto: data.monto,
+        monto: montoPredeterminada,
+        montoCuentaMonedaOrigen: data.monto,
         cuenta,
         prestamo,
         concepto,
@@ -196,6 +213,13 @@ export async function pagarPrestamo(input: z.infer<typeof movimiento1Schema>) {
 export async function ajustarCuenta(input: z.infer<typeof movimiento1Schema>) {
   const userId = await requireUserId();
   const data = movimiento1Schema.parse(input);
+
+  // Conversión a la moneda predeterminada del usuario (fuera del tx).
+  const montoPredeterminada = await montoEnMonedaPredeterminada(
+    data.idCuenta,
+    data.monto,
+    new Date(data.fecha)
+  );
 
   const ds = await getDb();
   await ds.transaction(async (manager) => {
@@ -218,7 +242,13 @@ export async function ajustarCuenta(input: z.infer<typeof movimiento1Schema>) {
     await cuentaRepo.save(cuenta);
 
     const mov = await movRepo.save(
-      movRepo.create({ fecha: data.fecha, monto: data.monto, cuenta, concepto })
+      movRepo.create({
+        fecha: data.fecha,
+        monto: montoPredeterminada,
+        montoCuentaMonedaOrigen: data.monto,
+        cuenta,
+        concepto,
+      })
     );
 
     await crearHistoricoCuenta(manager, cuenta, mov.id);
@@ -235,6 +265,13 @@ export async function pagarGasto(input: z.infer<typeof movimiento1Schema>) {
   const userId = await requireUserId();
   const data = movimiento1Schema.parse(input);
   if (!data.idGasto) throw new Error("idGasto es requerido");
+
+  // Conversión a la moneda predeterminada del usuario (fuera del tx).
+  const montoPredeterminada = await montoEnMonedaPredeterminada(
+    data.idCuenta,
+    data.monto,
+    new Date(data.fecha)
+  );
 
   const ds = await getDb();
   await ds.transaction(async (manager) => {
@@ -266,7 +303,14 @@ export async function pagarGasto(input: z.infer<typeof movimiento1Schema>) {
     await gastoRepo.save(gasto);
 
     const mov = await movRepo.save(
-      movRepo.create({ fecha: data.fecha, monto: data.monto, cuenta, gasto, concepto })
+      movRepo.create({
+        fecha: data.fecha,
+        monto: montoPredeterminada,
+        montoCuentaMonedaOrigen: data.monto,
+        cuenta,
+        gasto,
+        concepto,
+      })
     );
 
     await crearHistoricoCuenta(manager, cuenta, mov.id);
@@ -282,6 +326,13 @@ export async function pagarGasto(input: z.infer<typeof movimiento1Schema>) {
 export async function gastoDirecto(input: z.infer<typeof movimiento3Schema>) {
   const userId = await requireUserId();
   const data = movimiento3Schema.parse(input);
+
+  // Conversión a la moneda predeterminada del usuario (fuera del tx).
+  const montoPredeterminada = await montoEnMonedaPredeterminada(
+    data.idCuenta,
+    data.monto,
+    new Date(data.fecha)
+  );
 
   const ds = await getDb();
   await ds.transaction(async (manager) => {
@@ -329,7 +380,8 @@ export async function gastoDirecto(input: z.infer<typeof movimiento3Schema>) {
     const mov = await movRepo.save(
       movRepo.create({
         fecha: data.fecha,
-        monto: data.monto,
+        monto: montoPredeterminada,
+        montoCuentaMonedaOrigen: data.monto,
         cuenta,
         gasto: nuevoGasto,
         concepto,
@@ -353,6 +405,18 @@ export async function transferir(input: z.infer<typeof movimiento2Schema>) {
     throw new Error("idCuentaOrigen e idCuentaDestino son requeridos");
   if (!data.montoOrigen || !data.montoDestino)
     throw new Error("montoOrigen y montoDestino son requeridos");
+
+  // Conversión de cada pierna a la moneda predeterminada (fuera del tx).
+  const montoOrigenPredeterminada = await montoEnMonedaPredeterminada(
+    data.idCuentaOrigen,
+    data.montoOrigen,
+    new Date(data.fecha)
+  );
+  const montoDestinoPredeterminada = await montoEnMonedaPredeterminada(
+    data.idCuentaDestino,
+    data.montoDestino,
+    new Date(data.fecha)
+  );
 
   const ds = await getDb();
   await ds.transaction(async (manager) => {
@@ -388,7 +452,8 @@ export async function transferir(input: z.infer<typeof movimiento2Schema>) {
     const movOrig = await movRepo.save(
       movRepo.create({
         fecha: data.fecha,
-        monto: -(data.montoOrigen!),
+        monto: -montoOrigenPredeterminada,
+        montoCuentaMonedaOrigen: -(data.montoOrigen!),
         cuenta: cuentaOrigen,
         concepto: conceptoEgreso,
         grupoId,
@@ -398,7 +463,8 @@ export async function transferir(input: z.infer<typeof movimiento2Schema>) {
     const movDest = await movRepo.save(
       movRepo.create({
         fecha: data.fecha,
-        monto: data.montoDestino!,
+        monto: montoDestinoPredeterminada,
+        montoCuentaMonedaOrigen: data.montoDestino!,
         cuenta: cuentaDestino,
         concepto: conceptoIngreso,
         grupoId,
@@ -424,6 +490,17 @@ export async function cargarJornadaTrabajo(
   if (data.montoPropina && data.montoPropina > 0 && !data.idCuenta) {
     throw new Error("Seleccioná la cuenta para depositar la propina");
   }
+
+  // Conversión de la propina a la moneda predeterminada (fuera del tx).
+  const propina = data.montoPropina ?? 0;
+  const propinaPredeterminada =
+    propina > 0 && data.idCuenta
+      ? await montoEnMonedaPredeterminada(
+          data.idCuenta,
+          propina,
+          new Date(data.fecha)
+        )
+      : propina;
 
   const ds = await getDb();
   await ds.transaction(async (manager) => {
@@ -474,7 +551,6 @@ export async function cargarJornadaTrabajo(
     }
 
     // 3. Si hay propina, depositarla en la cuenta seleccionada.
-    const propina = data.montoPropina ?? 0;
     if (propina > 0 && data.idCuenta) {
       const cuenta = await cuentaRepo.findOneBy({
         id: data.idCuenta,
@@ -496,7 +572,8 @@ export async function cargarJornadaTrabajo(
       const mov = await movRepo.save(
         movRepo.create({
           fecha: data.fecha,
-          monto: propina,
+          monto: propinaPredeterminada,
+          montoCuentaMonedaOrigen: propina,
           cuenta,
           concepto,
           // Vínculo a la jornada: al borrar la jornada (eliminarJornadaTrabajo)

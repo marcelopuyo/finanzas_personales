@@ -14,7 +14,8 @@ export function ChartTooltip({
   active,
   payload,
   label,
-}: Partial<TooltipContentProps<number, string>>) {
+  currency = "ARS",
+}: Partial<TooltipContentProps<number, string>> & { currency?: string }) {
   if (!active || !payload?.length) return null;
 
   const total = payload.reduce((acc, p) => acc + (Number(p.value) || 0), 0);
@@ -23,7 +24,7 @@ export function ChartTooltip({
     <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-lg">
       <p className="text-[12px] font-medium text-subtitle">{label}</p>
       <p className="mt-0.5 text-[16px] font-semibold text-card-foreground">
-        {numberToCurrency(total)}
+        {numberToCurrency(total, currency)}
       </p>
     </div>
   );

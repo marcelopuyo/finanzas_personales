@@ -25,6 +25,8 @@ interface BarChartProps {
   className?: string;
   action?: ReactNode;
   badge?: ReactNode;
+  /** Código ISO para formatear el tooltip (default ARS). */
+  currency?: string;
 }
 
 export function StackedBarChart({
@@ -35,6 +37,7 @@ export function StackedBarChart({
   className = "",
   action,
   badge,
+  currency,
 }: BarChartProps) {
   const header = (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
@@ -78,7 +81,7 @@ export function StackedBarChart({
             axisLine={false}
             tickLine={false}
           />
-          <Tooltip cursor={false} content={<ChartTooltip />} />
+          <Tooltip cursor={false} content={<ChartTooltip currency={currency} />} />
           {bars.map((bar) => (
             <Bar
               key={bar.key}

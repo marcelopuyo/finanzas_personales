@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Moneda } from "./moneda.entity";
 
 /**
  * Usuario del sistema multiusuario. Cada usuario ve y opera solo con sus datos
@@ -35,6 +36,12 @@ export class Usuario {
   /** Soft-delete: true = usuario "eliminado" (no se borra de la BD). */
   @Column({ default: false })
   eliminado: boolean;
+
+  /** Moneda predeterminada del usuario: se usa para el balance actual y las
+   * tarjetas sintéticas del dashboard. Default al registrarse: Dólar
+   * Estadounidense. El usuario la puede cambiar desde su perfil. */
+  @ManyToOne(() => Moneda, { nullable: false })
+  monedaPredeterminada?: Moneda;
 
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   creadoEn: Date;

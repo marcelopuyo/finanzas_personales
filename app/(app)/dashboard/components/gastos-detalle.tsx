@@ -5,7 +5,8 @@ import { DataTable } from "@/components/ui/data-table";
 import type { GastoOut } from "@/backend/src/queries/gastos";
 import { dateTimeToString, numberToCurrency } from "@/lib/utils";
 
-export const gastosDetalleColumns: ColumnDef<GastoOut>[] = [
+export function gastosDetalleColumns(currency = "ARS"): ColumnDef<GastoOut>[] {
+  return [
   {
     accessorKey: "fechaPago",
     header: "Pago",
@@ -28,14 +29,14 @@ export const gastosDetalleColumns: ColumnDef<GastoOut>[] = [
     accessorKey: "monto",
     header: "Importe",
     meta: { align: "right" },
-    cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0),
+    cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0, currency),
     footer: ({ table }) => {
       const rows = table.getFilteredRowModel().rows;
       const total = rows.reduce(
         (acc, row) => acc + (row.original.monto || 0),
         0
       );
-      return numberToCurrency(total);
+      return numberToCurrency(total, currency);
     },
   },
   {
@@ -53,9 +54,18 @@ export const gastosDetalleColumns: ColumnDef<GastoOut>[] = [
       return v ? v : "—";
     },
   },
-];
+  ];
+}
 
-export function GastosDetalle({ data, total }: { data: GastoOut[]; total: number }) {
+export function GastosDetalle({
+  data,
+  total,
+  currency = "ARS",
+}: {
+  data: GastoOut[];
+  total: number;
+  currency?: string;
+}) {
   return (
     <>
       <div className="mb-3 flex items-center justify-between gap-2">
@@ -63,7 +73,7 @@ export function GastosDetalle({ data, total }: { data: GastoOut[]; total: number
           {data.length} de {total} gastos
         </p>
       </div>
-      <DataTable columns={gastosDetalleColumns} data={data} pageSize={10} />
+      <DataTable columns={gastosDetalleColumns(currency)} data={data} pageSize={10} />
     </>
   );
 }

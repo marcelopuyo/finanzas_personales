@@ -88,7 +88,7 @@ export function JornadaTrabajo() {
         onChange={(v) => handleSetData({ cuentaPropina: Number(v) })}
         options={options.cuentas.map((c) => ({
           value: String(c.id),
-          label: c.nombre,
+          label: c.moneda ? `${c.nombre} (${c.moneda.codigoISO})` : c.nombre,
         }))}
       />
     </StepShell>

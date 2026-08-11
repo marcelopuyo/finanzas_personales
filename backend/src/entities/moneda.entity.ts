@@ -14,6 +14,10 @@ export class Moneda {
   @Column({ unique: true })
   nombre: string;
 
+  /** Código ISO 4217 (ej. "ARS", "USD") — usado por el formateo de montos. */
+  @Column()
+  codigoISO: string;
+
   @Column({
     default: false,
   })

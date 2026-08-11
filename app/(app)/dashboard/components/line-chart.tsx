@@ -24,6 +24,8 @@ interface EvolutionChartProps {
   action?: ReactNode;
   badge?: ReactNode;
   area?: boolean;
+  /** Código ISO para formatear el tooltip (default ARS). */
+  currency?: string;
 }
 
 export function EvolutionChart({
@@ -35,6 +37,7 @@ export function EvolutionChart({
   action,
   badge,
   area = false,
+  currency,
 }: EvolutionChartProps) {
   const header = (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
@@ -78,7 +81,7 @@ export function EvolutionChart({
             axisLine={false}
             tickLine={false}
           />
-          <Tooltip content={<ChartTooltip />} />
+          <Tooltip content={<ChartTooltip currency={currency} />} />
           {area ? (
             <>
               <defs>

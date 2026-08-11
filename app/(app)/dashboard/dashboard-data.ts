@@ -11,16 +11,23 @@ import { getAllJornadasTrabajo } from "@/backend/src/queries/trabajos";
 import { getAllPeriodosTrabajo, type PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
 import type { GastoOut } from "@/backend/src/queries/gastos";
 import { getAllGastos } from "@/backend/src/queries/gastos";
+import { getSessionUser } from "@/backend/src/lib/auth";
 import { numberToCurrency, onlyDate } from "@/lib/utils";
 
 export interface DashboardData {
   balance: number;
+  /** Código ISO de la moneda predeterminada del usuario (balance + sintéticas). */
+  monedaPredeterminadaISO: string;
   cuentas: {
     id?: number;
     title: string;
     value: string;
     labels: string[];
     values: number[];
+    /** Código ISO de la moneda de la cuenta (para el historial). */
+    monedaISO?: string;
+    /** Tarjeta sintética con menú de una sola acción (ej. Períodos Actuales → jornada). */
+    menuAccion?: "jornada" | "cobro";
   }[];
   gastosResumen: {
     name: string;
@@ -37,13 +44,14 @@ export interface DashboardData {
   }[];
   ingresosTotal: string;
   ingresosMesActual: string;
-  prestamosResumen: {
-    name: string;
-    saldo: number;
-    pagado: number;
-  }[];
-  prestamosTotal: string;
-  prestamosSaldo: string;
+  /** Totales de préstamos pendientes por moneda (para el badge del gráfico). */
+  prestamosTotales: { currency: string; value: string }[];
+  /** Datos del gráfico de préstamos: una fila por persona; cada préstamo es un
+   * segmento apilado y las monedas distintas generan barras agrupadas. */
+  prestamosChart: {
+    data: Record<string, string | number>[];
+    series: { key: string; detalle: string; currency: string }[];
+  };
   evolucionGastos: { name: string; value: number }[];
   evolucionIngresos: { name: string; value: number }[];
   evolucionResultados: { name: string; value: number }[];
@@ -74,6 +82,12 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     getAllPeriodosTrabajo().catch(() => []),
   ]);
 
+  // Moneda predeterminada del usuario: se usa para formatear el balance actual
+  // y las tarjetas sintéticas (Períodos a Cobrar/Actuales).
+  const sessionUser = await getSessionUser();
+  const monedaPredeterminadaISO =
+    sessionUser?.monedaPredeterminada?.codigoISO ?? "USD";
+
   // --- Cuentas con evolución ---
   // `id` es opcional: las tarjetas sintéticas ("Períodos a Cobrar/Actuales")
   // no tienen cuenta real detrás y no deben abrir el historial al hacer click.
@@ -83,14 +97,17 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     value: string;
     labels: string[];
     values: number[];
+    /** Código ISO de la moneda de la cuenta (para el historial). */
+    monedaISO?: string;
     /** Tarjeta sintética con menú de una sola acción (ej. Períodos Actuales → jornada). */
     menuAccion?: "jornada" | "cobro";
   }[] = cuentasEvol.map((c) => ({
     id: c.id,
     title: c.nombreCuenta,
-    value: numberToCurrency(c.saldoCuenta),
+    value: numberToCurrency(c.saldoCuenta, c.monedaCodigoISO ?? "ARS"),
     labels: c.serieEjeX || [],
     values: c.valoresEjeX || [],
+    monedaISO: c.monedaCodigoISO ?? "ARS",
   }));
 
   // Periodos pendientes de cobro (cerrados no cobrados)
@@ -121,7 +138,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   if (pendienteCobro > 0) {
     cuentas.push({
       title: "Períodos a Cobrar",
-      value: numberToCurrency(pendienteCobro),
+      value: numberToCurrency(pendienteCobro, monedaPredeterminadaISO),
       labels: [],
       values: [],
       // Menú con "Cobro Sueldo" (cobrar los períodos pendientes).
@@ -132,7 +149,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   if (periodosActuales > 0) {
     cuentas.push({
       title: "Períodos Actuales",
-      value: numberToCurrency(periodosActuales),
+      value: numberToCurrency(periodosActuales, monedaPredeterminadaISO),
       labels: [],
       values: [],
       // Menú con "Jornada trabajo" (agregar jornadas a los períodos actuales).
@@ -203,34 +220,84 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     }
   });
 
-  // --- Préstamos pendientes ---
-  const prestamosMap = new Map<
+  // --- Préstamos pendientes (gráfico) ---
+  // Barras agrupadas por persona; por cada moneda distinta se genera una barra
+  // independiente, y los préstamos de la misma persona y moneda se apilan como
+  // segmentos (cada préstamo = una serie, tooltip con detalle + monto).
+  const prestamosPorPersona = new Map<
     string,
-    { saldo: number; pagado: number; total: number }
+    Map<string, { detalle: string; monto: number; monedaISO: string }>
   >();
-  let montoTotalPrestamos = 0;
-  let montoSaldoPrestamos = 0;
-
   prestamos.forEach((p) => {
     const nombre = p.personaDestino?.nombre || "Sin nombre";
-    const entry = prestamosMap.get(nombre) || {
-      saldo: 0,
-      pagado: 0,
-      total: 0,
-    };
-    entry.saldo += p.saldo;
-    entry.pagado += p.monto - p.saldo;
-    entry.total += p.monto;
-    prestamosMap.set(nombre, entry);
-    montoTotalPrestamos += p.monto;
-    montoSaldoPrestamos += p.saldo;
+    const monedaISO = p.monedaISO ?? "ARS";
+    let persona = prestamosPorPersona.get(nombre);
+    if (!persona) {
+      persona = new Map();
+      prestamosPorPersona.set(nombre, persona);
+    }
+    persona.set(`p-${p.id}`, {
+      detalle: p.detalle || "Préstamo",
+      monto: p.monto,
+      monedaISO,
+    });
   });
 
-  const prestamosResumen = Array.from(prestamosMap.entries()).map(
-    ([name, data]) => ({
-      name,
-      saldo: data.saldo,
-      pagado: data.pagado,
+  // Todas las claves de préstamo: cada fila de persona lleva la misma forma
+  // (Recharts alinea las barras por dataKey, con 0 donde no hay préstamo).
+  const todasLasClaves = new Set<string>();
+  prestamosPorPersona.forEach((persona) =>
+    persona.forEach((_v, k) => todasLasClaves.add(k))
+  );
+
+  const prestamosChartData: Record<string, string | number>[] = [];
+  const prestamosChartSeries: {
+    key: string;
+    detalle: string;
+    currency: string;
+  }[] = [];
+  prestamosPorPersona.forEach((persona, nombre) => {
+    const row: Record<string, string | number> = { name: nombre };
+    todasLasClaves.forEach((k) => {
+      row[k] = persona.get(k)?.monto ?? 0;
+    });
+    prestamosChartData.push(row);
+  });
+  // Orden estable de series: por moneda y luego por detalle.
+  const prestamosOrdenados: {
+    key: string;
+    detalle: string;
+    currency: string;
+  }[] = [];
+  prestamosPorPersona.forEach((persona) =>
+    persona.forEach((v, k) =>
+      prestamosOrdenados.push({
+        key: k,
+        detalle: v.detalle,
+        currency: v.monedaISO,
+      })
+    )
+  );
+  prestamosOrdenados.sort(
+    (a, b) =>
+      a.currency.localeCompare(b.currency) ||
+      a.detalle.localeCompare(b.detalle)
+  );
+  prestamosChartSeries.push(...prestamosOrdenados);
+
+  // Totales por moneda para el badge (las barras mantienen su propia moneda).
+  const totalPorMoneda = new Map<string, number>();
+  prestamos.forEach((p) => {
+    const monedaISO = p.monedaISO ?? "ARS";
+    totalPorMoneda.set(
+      monedaISO,
+      (totalPorMoneda.get(monedaISO) || 0) + p.monto
+    );
+  });
+  const prestamosTotales = Array.from(totalPorMoneda.entries()).map(
+    ([currency, total]) => ({
+      currency,
+      value: numberToCurrency(total, currency),
     })
   );
 
@@ -254,10 +321,11 @@ export async function fetchDashboardData(): Promise<DashboardData> {
 
   return {
     balance,
+    monedaPredeterminadaISO,
     cuentas,
     gastosResumen,
-    gastosTotal: numberToCurrency(montoTotalGastos),
-    gastosSaldo: numberToCurrency(montoSaldoGastos),
+    gastosTotal: numberToCurrency(montoTotalGastos, monedaPredeterminadaISO),
+    gastosSaldo: numberToCurrency(montoSaldoGastos, monedaPredeterminadaISO),
     gastosDetalle: [...gastosTodos].sort((a, b) => {
       const fa = a.fechaPago ? new Date(a.fechaPago).getTime() : 0;
       const fb = b.fechaPago ? new Date(b.fechaPago).getTime() : 0;
@@ -268,11 +336,13 @@ export async function fetchDashboardData(): Promise<DashboardData> {
         new Date(b.fechaHasta).getTime() - new Date(a.fechaHasta).getTime()
     ),
     ingresosResumen,
-    ingresosTotal: numberToCurrency(totalIngresos),
-    ingresosMesActual: numberToCurrency(totalMesActual),
-    prestamosResumen,
-    prestamosTotal: numberToCurrency(montoTotalPrestamos),
-    prestamosSaldo: numberToCurrency(montoSaldoPrestamos),
+    ingresosTotal: numberToCurrency(totalIngresos, monedaPredeterminadaISO),
+    ingresosMesActual: numberToCurrency(totalMesActual, monedaPredeterminadaISO),
+    prestamosTotales,
+    prestamosChart: {
+      data: prestamosChartData,
+      series: prestamosChartSeries,
+    },
     evolucionGastos,
     evolucionIngresos,
     evolucionResultados,

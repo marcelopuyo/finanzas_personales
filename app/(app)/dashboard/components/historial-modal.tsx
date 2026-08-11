@@ -17,6 +17,10 @@ export interface CuentaHistorial {
   nombre: string;
   /** Saldo actual ya formateado como moneda. */
   saldo: string;
+  /** ISO de la moneda de la cuenta (monto y saldo del historial). */
+  monedaISO: string;
+  /** ISO de la moneda predeterminada del usuario (columna secundaria). */
+  monedaPredeterminadaISO: string;
 }
 
 /** Popup con el historial cronológico de movimientos de una cuenta. */
@@ -80,6 +84,28 @@ export function HistorialModal({
     [rows]
   );
 
+  // Solo se muestra la columna "En tu moneda" cuando la moneda de la cuenta es
+  // DISTINTA a la predeterminada: si coinciden, ambos montos son idénticos y no
+  // tiene sentido duplicar la información.
+  const mostrarMonedaPredeterminada =
+    !!cuenta && cuenta.monedaISO !== cuenta.monedaPredeterminadaISO;
+
+  const columnaMonedaPredeterminada: ColumnDef<HistorialMovimientoOut>[] = [
+    {
+      accessorKey: "montoPredeterminada",
+      header: "En tu moneda",
+      meta: { align: "right" } as const,
+      cell: ({ getValue }) => (
+        <span className="text-subtitle">
+          {numberToCurrency(
+            Number(getValue<number>() ?? 0),
+            cuenta?.monedaPredeterminadaISO ?? "ARS"
+          )}
+        </span>
+      ),
+    },
+  ];
+
   const columns: ColumnDef<HistorialMovimientoOut>[] = [
     {
       accessorKey: "fecha",
@@ -102,11 +128,12 @@ export function HistorialModal({
               esEgreso ? "text-danger" : "text-success"
             )}
           >
-            {numberToCurrency(mostrar)}
+            {numberToCurrency(mostrar, cuenta?.monedaISO ?? "ARS")}
           </span>
         );
       },
     },
+    ...(mostrarMonedaPredeterminada ? columnaMonedaPredeterminada : []),
     {
       accessorKey: "motivo",
       header: "Motivo",
@@ -119,7 +146,10 @@ export function HistorialModal({
       header: "Saldo",
       meta: { align: "right" } as const,
       cell: ({ getValue }) =>
-        numberToCurrency(Number(getValue<number>() ?? 0)),
+        numberToCurrency(
+          Number(getValue<number>() ?? 0),
+          cuenta?.monedaISO ?? "ARS"
+        ),
     },
     {
       id: "actions",
@@ -236,7 +266,8 @@ export function HistorialModal({
                   {numberToCurrency(
                     (pendingAnular.categoria ?? "").toLowerCase() === "egreso"
                       ? -Math.abs(Number(pendingAnular.monto))
-                      : Math.abs(Number(pendingAnular.monto))
+                      : Math.abs(Number(pendingAnular.monto)),
+                    cuenta?.monedaISO ?? "ARS"
                   )}
                 </span>
               </div>

@@ -19,6 +19,12 @@ export class Movimiento {
   @Column({ type: "numeric", precision: 10, scale: 2, default: 0 })
   monto: number;
 
+  /** Monto real en la moneda de la cuenta (el delta que aplica al saldo).
+   * `monto` queda en la moneda predeterminada del usuario (convertido).
+   * Se guarda para que reversiones e historial no dependan de tasa histórica. */
+  @Column({ type: "numeric", precision: 10, scale: 2 })
+  montoCuentaMonedaOrigen: number;
+
   @Column({
     default: false,
   })

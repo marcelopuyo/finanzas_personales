@@ -28,6 +28,8 @@ export interface CuentaConEvolucion {
   saldoCuenta: number;
   serieEjeX: string[];
   valoresEjeX: number[];
+  /** Código ISO 4217 de la moneda de la cuenta (para formatear el saldo). */
+  monedaCodigoISO: string | null;
 }
 
 export interface GastoPeriodo {
@@ -193,29 +195,29 @@ export async function getEvolucionGastos(): Promise<EvolucionItem[]> {
 }
 
 // ============================================================
-// 4) Evolución de gastos mensual (agrupado por mes-año)
+// 4) Evolución de gastos mensual — desde MOVIMIENTOS (moneda predeterminada)
 // ============================================================
-export async function getEvolucionGastosMensual(): Promise<EvolucionItem[]> {
+export async function getEvolucionGastosMovimientos(): Promise<EvolucionItem[]> {
   const userId = await requireUserId();
   const ds = await getDb();
-  const gastos = await ds.getRepository(Gasto).find({
-    where: { usuario: { id: userId }, eliminado: false },
-    relations: { periodo: true },
+  const movs = await ds.getRepository(Movimiento).find({
+    where: { cuenta: { usuario: { id: userId } }, eliminado: false },
+    relations: { gasto: true },
   });
 
   const agrupado: Record<string, number> = {};
-  for (const g of gastos) {
-    // Se agrupa por el mes del PERÍODO del gasto (no por fechaPago), para que
-    // los gastos se imputen al mes al que pertenecen (p. ej. un gasto del
-    // período Mayo 26 pagado por adelantado en abril se cuenta en mayo).
-    if (!g.periodo?.fechaApertura) continue;
-    // Mediodía UTC: evita que fechas a medianoche (UTC) se corran al día/mes
-    // anterior en zonas horarias con offset negativo (p. ej. GMT-3).
-    const d = new Date(g.periodo.fechaApertura);
+  for (const m of movs) {
+    // Solo movimientos de gasto (Pago Gasto / Gasto Directo). `monto` ya está
+    // en la moneda predeterminada del usuario (se convierte al guardarse),
+    // aunque el movimiento se haya hecho en otra moneda.
+    if (!m.gasto) continue;
+    // Se agrupa por el MES DEL MOVIMIENTO (fecha de pago): el período del gasto
+    // se corresponde con la fecha de pago (decisión 2026-08-10).
+    const d = new Date(m.fecha);
     d.setUTCHours(12, 0, 0, 0);
     const mes = d.toLocaleDateString("es-ES", { month: "short" });
     const key = `${mes}-${d.getFullYear()}`;
-    agrupado[key] = (agrupado[key] || 0) + g.monto;
+    agrupado[key] = (agrupado[key] || 0) + m.monto;
   }
 
   return Object.entries(agrupado).map(([periodo, monto]) => ({ periodo, monto }));
@@ -252,9 +254,12 @@ export async function getEvolucionIngresos(): Promise<EvolucionItem[]> {
 export async function getEvolucionResultados(): Promise<EvolucionResultado[]> {
   const [ingresos, gastos] = await Promise.all([
     getEvolucionIngresos(),
-    getEvolucionGastosMensual(),
+    getEvolucionGastosMovimientos(),
   ]);
 
+  // Ingresos (jornadas) y gastos (movimientos de gasto) ya están en la moneda
+  // predeterminada del usuario (decisión 2026-08-10): las jornadas se cargan en
+  // esa moneda y `movimiento.monto` se convierte al guardarse.
   const resultado: Record<string, number> = {};
 
   for (const item of ingresos) {
@@ -290,6 +295,8 @@ export async function getPrestamosPendientesReporte(): Promise<
     saldo: number;
     cuotas: number;
     sentido: string;
+    /** ISO de la moneda del préstamo (moneda de su cuenta). */
+    monedaISO: string;
     personaOrigen: { nombre: string } | null;
     personaDestino: { nombre: string } | null;
     cuenta: { nombre: string } | null;
@@ -299,7 +306,11 @@ export async function getPrestamosPendientesReporte(): Promise<
   const ds = await getDb();
   const rows = await ds.getRepository(Prestamo).find({
     where: { usuario: { id: userId }, eliminado: false, saldo: MoreThan(0) },
-    relations: { personaDestino: true, personaOrigen: true, cuenta: true },
+    relations: {
+      personaDestino: true,
+      personaOrigen: true,
+      cuenta: { moneda: true },
+    },
   });
   return rows.map((r) => ({
     id: r.id,
@@ -309,6 +320,7 @@ export async function getPrestamosPendientesReporte(): Promise<
     saldo: r.saldo,
     cuotas: r.cuotas,
     sentido: r.sentido,
+    monedaISO: r.cuenta?.moneda?.codigoISO ?? "ARS",
     personaOrigen: r.personaOrigen
       ? { nombre: r.personaOrigen.nombre }
       : null,
@@ -341,7 +353,7 @@ export async function getCuentasConEvolucion(): Promise<CuentaConEvolucion[]> {
       eliminado: false,
       tipo: [{ nombre: "Cuenta Bancaria" }, { nombre: "Caja Fisica" }],
     },
-    relations: { tipo: true },
+    relations: { tipo: true, moneda: true },
   });
 
   const unMes = new Date();
@@ -373,6 +385,7 @@ export async function getCuentasConEvolucion(): Promise<CuentaConEvolucion[]> {
       saldoCuenta: cuenta.saldo,
       serieEjeX: vKeys,
       valoresEjeX: vValues,
+      monedaCodigoISO: cuenta.moneda?.codigoISO ?? null,
     });
   }
 

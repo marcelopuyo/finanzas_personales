@@ -108,12 +108,32 @@ export function AccountCard({
   }
 
   // Tarjeta sintética con menú de una sola acción (Períodos a Cobrar → cobro,
-  // Períodos Actuales → jornada): no es clicable pero tiene el botón ⋮ y un
-  // sheet con solo esa opción.
+  // Períodos Actuales → jornada): clicable (abre el popup de períodos, si se
+  // provee onOpen) + botón ⋮ con el sheet de esa única acción.
   if (menuAccion) {
+    const clicable = onOpen != null;
     return (
       <>
-        <div className={cn(base, className)}>
+        <div
+          role={clicable ? "button" : undefined}
+          tabIndex={clicable ? 0 : undefined}
+          onClick={clicable ? onOpen : undefined}
+          onKeyDown={
+            clicable
+              ? (e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onOpen();
+                  }
+                }
+              : undefined
+          }
+          className={cn(
+            base,
+            clicable && "w-full cursor-pointer text-left",
+            className
+          )}
+        >
           {content}
           {menuButton}
         </div>

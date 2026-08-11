@@ -65,7 +65,10 @@ export interface HistorialMovimientoOut {
   /** Id del movimiento (para anularlo desde el popup). */
   id: string;
   fecha: Date;
+  /** Monto en la moneda de la cuenta (el saldo se guarda en esa moneda). */
   monto: number;
+  /** Equivalente en la moneda predeterminada del usuario (secundario). */
+  montoPredeterminada: number;
   motivo: string;
   categoria: string | null;
   saldoPosterior: number;
@@ -93,10 +96,14 @@ export async function getHistorialMovimientosCuenta(
   });
   if (movs.length === 0) return [];
 
-  // Variación de la cuenta según la categoría del concepto (egreso → resta)
+  // Variación de la cuenta según la categoría del concepto (egreso → resta).
+  // Se usa el monto en la moneda de la cuenta (el saldo y el historial se
+  // guardan en la moneda de la cuenta; `monto` quedó en la predeterminada).
   const variaciones = movs.map((m) => {
     const esEgreso = m.concepto?.categoria?.toLowerCase() === "egreso";
-    return esEgreso ? -Math.abs(m.monto) : Math.abs(m.monto);
+    return esEgreso
+      ? -Math.abs(m.montoCuentaMonedaOrigen)
+      : Math.abs(m.montoCuentaMonedaOrigen);
   });
 
   // Saldo de la cuenta ANTES del primer movimiento de la lista
@@ -111,7 +118,9 @@ export async function getHistorialMovimientosCuenta(
     result.push({
       id: m.id,
       fecha: m.fecha,
-      monto: m.monto,
+      monto: m.montoCuentaMonedaOrigen,
+      // Equivalente en la moneda predeterminada del usuario (secundario).
+      montoPredeterminada: m.monto,
       motivo: desc ? desc : (m.concepto?.nombre ?? ""),
       categoria: m.concepto?.categoria ?? null,
       saldoPosterior: saldo,

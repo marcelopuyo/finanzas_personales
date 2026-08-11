@@ -1,5 +1,6 @@
 import { getDb } from "../db";
 import { Usuario } from "../entities/usuario.entity";
+import { Moneda } from "../entities/moneda.entity";
 
 // Acceso a la tabla `usuario` (usado por los endpoints de auth).
 
@@ -35,12 +36,31 @@ export async function findUsuarioById(id: number): Promise<Usuario | null> {
   return ds.getRepository(Usuario).findOneBy({ id });
 }
 
+/**
+ * Moneda predeterminada para usuarios nuevos: Dólar Estadounidense
+ * (decisión 2026-08-10). Se usa en el registro y en el alta admin.
+ */
+export async function monedaPredeterminadaPorDefecto(): Promise<Moneda> {
+  const ds = await getDb();
+  const moneda = await ds.getRepository(Moneda).findOneBy({
+    nombre: "Dolar Estadounidense",
+    eliminado: false,
+  });
+  if (!moneda) {
+    throw new Error(
+      "No se encontró la moneda por defecto (Dolar Estadounidense)"
+    );
+  }
+  return moneda;
+}
+
 export async function createUsuario(
   email: string,
   passwordHash: string,
   nombre?: string
 ): Promise<UsuarioOut> {
   const ds = await getDb();
+  const monedaUsd = await monedaPredeterminadaPorDefecto();
   const usuario = await ds.getRepository(Usuario).save(
     ds.getRepository(Usuario).create({
       email,
@@ -49,6 +69,7 @@ export async function createUsuario(
       emailVerificado: false,
       activo: true,
       eliminado: false,
+      monedaPredeterminada: monedaUsd,
     })
   );
   return toOut(usuario);

@@ -6,12 +6,13 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Formatea un número como moneda ARS.
+ * Formatea un número como moneda. Por defecto ARS; se puede pasar el código
+ * ISO 4217 (ej. "USD") para que el símbolo corresponda a la moneda.
  */
-export function numberToCurrency(value: number): string {
+export function numberToCurrency(value: number, currency = "ARS"): string {
   return value.toLocaleString("es-AR", {
     style: "currency",
-    currency: "ARS",
+    currency,
   });
 }
 
