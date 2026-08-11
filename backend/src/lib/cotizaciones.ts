@@ -11,12 +11,24 @@ import { getSessionUser } from "./auth";
 // Política de refresco (2026-08-10):
 // - El PRIMER pedido del día (independiente del usuario; las cotizaciones son
 //   globales) y SOLO si ya pasó la apertura del mercado de divisas (hora de
-//   Argentina, `FX_MARKET_OPEN_HOUR`, default 10) consulta la API; si trae
+//   Argentina, `FX_MARKET_OPEN_HOUR`, obligatoria) consulta la API; si trae
 //   resultados cierra el período anterior y crea el nuevo (vigente).
 // - Los pedidos siguientes dentro del mismo día usan el registro existente.
 // - Fecha pasada sin registro / fallo de API → última cotización guardada.
 
-const FX_API_URL = process.env.FX_API_URL ?? "https://open.er-api.com/v6/latest/USD";
+// Las variables de cotización se toman SIEMPRE de variables de entorno
+// (obligatorias; NO hay valores por defecto en el código).
+function envRequerida(nombre: string): string {
+  const valor = process.env[nombre];
+  if (!valor) {
+    throw new Error(
+      `Falta la variable de entorno requerida "${nombre}". Definila antes de iniciar la app.`
+    );
+  }
+  return valor;
+}
+
+const FX_API_URL = envRequerida("FX_API_URL");
 
 function redondear(v: number): number {
   return Math.round(v * 100) / 100;
@@ -37,8 +49,13 @@ function diaISO(fecha: Date): string {
 }
 
 // Hora de apertura del mercado de divisas (hora de Argentina, GMT-3).
-// Configurable vía env `FX_MARKET_OPEN_HOUR` (default 10).
-const FX_MARKET_OPEN_HOUR = Number(process.env.FX_MARKET_OPEN_HOUR ?? 10);
+// Obligatoria vía env `FX_MARKET_OPEN_HOUR` (sin default en el código).
+const FX_MARKET_OPEN_HOUR = Number(envRequerida("FX_MARKET_OPEN_HOUR"));
+if (!Number.isFinite(FX_MARKET_OPEN_HOUR)) {
+  throw new Error(
+    'La variable de entorno "FX_MARKET_OPEN_HOUR" debe ser un número válido.'
+  );
+}
 
 function horaEnArgentina(): number {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -151,7 +168,7 @@ async function abrirVigente(
  * Política de refresco (2026-08-10):
  * - El PRIMER pedido del día (independiente del usuario; las cotizaciones son
  *   globales) y SOLO si ya pasó la apertura del mercado de divisas (hora de
- *   Argentina, `FX_MARKET_OPEN_HOUR`, default 10) consulta la API. Si trae
+ *   Argentina, `FX_MARKET_OPEN_HOUR`, obligatoria) consulta la API. Si trae
  *   resultados: cierra el período anterior y crea el nuevo (vigente).
  * - Los pedidos siguientes dentro del mismo día usan el registro existente.
  * - Fecha pasada sin registro / fallo de API → última cotización guardada.

@@ -36,6 +36,10 @@ export function Confirmacion() {
   const concepto = data.concepto as MovimientoConcepto | "";
   const cuentaNombre = (id: number) =>
     options.cuentas.find((c) => c.id === id)?.nombre ?? "—";
+  // ISO de la moneda de una cuenta (formatea los montos con el símbolo correcto
+  // según la moneda de la cuenta en la confirmación).
+  const cuentaISO = (id: number) =>
+    options.cuentas.find((c) => c.id === id)?.moneda?.codigoISO ?? "ARS";
 
   const periodo = options.periodosTrabajo.find(
     (p) => p.id === data.periodoTrabajo
@@ -58,17 +62,26 @@ export function Confirmacion() {
           : "—",
       },
       { label: "Cuenta", value: cuentaNombre(data.cuentaOrigen) },
-      { label: "Monto", value: numberToCurrency(data.montoOrigen) }
+      {
+        label: "Monto",
+        value: numberToCurrency(data.montoOrigen, cuentaISO(data.cuentaOrigen)),
+      }
     );
   } else if (concepto === "PagoPrestamo") {
     filas.push(
       { label: "Fecha", value: formatFecha(data.fecha) },
       { label: "Cuenta", value: cuentaNombre(data.cuentaOrigen) },
-      { label: "Monto a pagar", value: numberToCurrency(data.montoOrigen) },
+      {
+        label: "Monto a pagar",
+        value: numberToCurrency(data.montoOrigen, cuentaISO(data.cuentaOrigen)),
+      },
       {
         label: "Préstamo",
         value: prestamo
-          ? `${prestamo.detalle ?? "Préstamo"} — Saldo ${numberToCurrency(prestamo.saldo)} (${prestamo.personaOrigen?.nombre ?? "—"} → ${prestamo.personaDestino?.nombre ?? "—"})`
+          ? `${prestamo.detalle ?? "Préstamo"} — Saldo ${numberToCurrency(
+              prestamo.saldo,
+              cuentaISO(data.cuentaOrigen)
+            )} (${prestamo.personaOrigen?.nombre ?? "—"} → ${prestamo.personaDestino?.nombre ?? "—"})`
           : "—",
       }
     );
@@ -78,18 +91,27 @@ export function Confirmacion() {
       { label: "Cuenta", value: cuentaNombre(data.cuentaOrigen) },
       {
         label: "Monto",
-        value: `${data.montoOrigen > 0 ? "+" : ""}${numberToCurrency(data.montoOrigen)}`,
+        value: `${data.montoOrigen > 0 ? "+" : ""}${numberToCurrency(
+          data.montoOrigen,
+          cuentaISO(data.cuentaOrigen)
+        )}`,
       }
     );
   } else if (concepto === "PagoGasto") {
     filas.push(
       { label: "Fecha", value: formatFecha(data.fecha) },
       { label: "Cuenta", value: cuentaNombre(data.cuentaOrigen) },
-      { label: "Monto a pagar", value: numberToCurrency(data.montoOrigen) },
+      {
+        label: "Monto a pagar",
+        value: numberToCurrency(data.montoOrigen, cuentaISO(data.cuentaOrigen)),
+      },
       {
         label: "Gasto",
         value: gasto
-          ? `${gasto.descripcion ?? "Gasto"} — Saldo ${numberToCurrency(gasto.saldo)} · Vence ${formatFecha(gasto.fechaVencimiento)}`
+          ? `${gasto.descripcion ?? "Gasto"} — Saldo ${numberToCurrency(
+              gasto.saldo,
+              cuentaISO(data.cuentaOrigen)
+            )} · Vence ${formatFecha(gasto.fechaVencimiento)}`
           : "—",
       }
     );
@@ -98,7 +120,10 @@ export function Confirmacion() {
       { label: "Descripción", value: data.descripcion || "—" },
       { label: "Fecha", value: formatFecha(data.fecha) },
       { label: "Cuenta", value: cuentaNombre(data.cuentaOrigen) },
-      { label: "Monto", value: numberToCurrency(data.montoOrigen) },
+      {
+        label: "Monto",
+        value: numberToCurrency(data.montoOrigen, cuentaISO(data.cuentaOrigen)),
+      },
       { label: "Categoría", value: categoria?.nombre ?? "—" }
     );
   } else if (concepto === "Transferencia") {
@@ -106,9 +131,15 @@ export function Confirmacion() {
       { label: "Fecha", value: formatFecha(data.fecha) },
       { label: "Motivo", value: data.motivo },
       { label: "Cuenta origen", value: cuentaNombre(data.cuentaOrigen) },
-      { label: "Monto origen", value: numberToCurrency(data.montoOrigen) },
+      {
+        label: "Monto origen",
+        value: numberToCurrency(data.montoOrigen, cuentaISO(data.cuentaOrigen)),
+      },
       { label: "Cuenta destino", value: cuentaNombre(data.cuentaDestino) },
-      { label: "Monto destino", value: numberToCurrency(data.montoDestino) }
+      {
+        label: "Monto destino",
+        value: numberToCurrency(data.montoDestino, cuentaISO(data.cuentaDestino)),
+      }
     );
   } else if (concepto === "JornadaTrabajo") {
     const periodoJ = options.periodosTrabajo.find(
@@ -129,7 +160,10 @@ export function Confirmacion() {
     );
     if (data.montoPropina > 0) {
       filas.push(
-        { label: "Propina", value: numberToCurrency(data.montoPropina) },
+        {
+          label: "Propina",
+          value: numberToCurrency(data.montoPropina, cuentaISO(data.cuentaPropina)),
+        },
         { label: "Cuenta (propina)", value: cuentaNombre(data.cuentaPropina) }
       );
     }
