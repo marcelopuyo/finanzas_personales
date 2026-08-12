@@ -298,7 +298,9 @@ export async function pagarGasto(input: z.infer<typeof movimiento1Schema>) {
     cuenta.saldo -= data.monto;
     await cuentaRepo.save(cuenta);
 
-    gasto.saldo -= data.monto;
+    // `gasto.saldo` está en la moneda predeterminada (convertido al crearse),
+    // por lo que el pago se resta ya convertido a esa moneda.
+    gasto.saldo -= montoPredeterminada;
     gasto.fechaPago = data.fecha as unknown as Date;
     await gastoRepo.save(gasto);
 
@@ -351,8 +353,11 @@ export async function gastoDirecto(input: z.infer<typeof movimiento3Schema>) {
     const nuevoGasto = await gastoRepo.save(
       gastoRepo.create({
         descripcion: data.descripcion,
-        monto: data.monto,
-        saldo: data.monto,
+        // `monto`/`saldo` se guardan en la MONEDA PREDETERMINADA del usuario
+        // (convertidos), igual que `movimiento.monto`: el dashboard suma estos
+        // montos y los formatea con la moneda predeterminada.
+        monto: montoPredeterminada,
+        saldo: montoPredeterminada,
         fechaVencimiento: data.fecha as unknown as Date,
         periodo,
         categoria,

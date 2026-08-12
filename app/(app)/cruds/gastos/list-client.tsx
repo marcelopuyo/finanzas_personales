@@ -6,72 +6,83 @@ import { eliminarGasto } from "@/backend/src/actions/gastos";
 import type { ColumnDef } from "@tanstack/react-table";
 import { dateTimeToString, numberToCurrency } from "@/lib/utils";
 
-const columns: ColumnDef<GastoOut>[] = [
-  {
-    accessorKey: "descripcion",
-    header: "Descripción",
-    cell: ({ getValue }) => (getValue<string | null>() ?? "-"),
-  },
-  {
-    accessorKey: "monto",
-    header: "Monto",
-    meta: {
-      align: "right" as const,
-      isCurrency: true,
-      exportValue: (row: GastoOut) => numberToCurrency(row.monto),
+function gastosColumns(currency: string): ColumnDef<GastoOut>[] {
+  return [
+    {
+      accessorKey: "descripcion",
+      header: "Descripción",
+      cell: ({ getValue }) => (getValue<string | null>() ?? "-"),
     },
-    cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0),
-  },
-  {
-    accessorKey: "saldo",
-    header: "Saldo",
-    meta: {
-      align: "right" as const,
-      isCurrency: true,
-      exportValue: (row: GastoOut) => numberToCurrency(row.saldo),
+    {
+      accessorKey: "monto",
+      header: "Monto",
+      meta: {
+        align: "right" as const,
+        isCurrency: true,
+        exportValue: (row: GastoOut) => numberToCurrency(row.monto, currency),
+      },
+      cell: ({ getValue }) =>
+        numberToCurrency(getValue<number>() ?? 0, currency),
     },
-    cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0),
-  },
-  {
-    accessorKey: "fechaVencimiento",
-    header: "Vencimiento",
-    meta: {
-      align: "center" as const,
-      exportValue: (row: GastoOut) => dateTimeToString(row.fechaVencimiento ?? undefined),
+    {
+      accessorKey: "saldo",
+      header: "Saldo",
+      meta: {
+        align: "right" as const,
+        isCurrency: true,
+        exportValue: (row: GastoOut) => numberToCurrency(row.saldo, currency),
+      },
+      cell: ({ getValue }) =>
+        numberToCurrency(getValue<number>() ?? 0, currency),
     },
-    cell: ({ getValue }) => dateTimeToString(getValue<string | Date | null>() ?? undefined),
-  },
-  {
-    accessorKey: "fechaPago",
-    header: "Pago",
-    meta: {
-      align: "center" as const,
-      exportValue: (row: GastoOut) => dateTimeToString(row.fechaPago ?? undefined),
+    {
+      accessorKey: "fechaVencimiento",
+      header: "Vencimiento",
+      meta: {
+        align: "center" as const,
+        exportValue: (row: GastoOut) =>
+          dateTimeToString(row.fechaVencimiento ?? undefined),
+      },
+      cell: ({ getValue }) =>
+        dateTimeToString(getValue<string | Date | null>() ?? undefined),
     },
-    cell: ({ getValue }) => dateTimeToString(getValue<string | Date | null>() ?? undefined),
-  },
-  {
-    accessorFn: (row) => row.categoria?.nombre ?? "",
-    id: "categoria",
-    header: "Categoría",
-  },
-  {
-    accessorFn: (row) => row.periodo?.nombre ?? "",
-    id: "periodo",
-    header: "Período",
-  },
-];
+    {
+      accessorKey: "fechaPago",
+      header: "Pago",
+      meta: {
+        align: "center" as const,
+        exportValue: (row: GastoOut) =>
+          dateTimeToString(row.fechaPago ?? undefined),
+      },
+      cell: ({ getValue }) =>
+        dateTimeToString(getValue<string | Date | null>() ?? undefined),
+    },
+    {
+      accessorFn: (row) => row.categoria?.nombre ?? "",
+      id: "categoria",
+      header: "Categoría",
+    },
+    {
+      accessorFn: (row) => row.periodo?.nombre ?? "",
+      id: "periodo",
+      header: "Período",
+    },
+  ];
+}
 
 interface Props {
   initialData: GastoOut[];
+  /** ISO de la moneda predeterminada del usuario (símbolo de montos/saldos). */
+  currency?: string;
 }
 
-export function GastosListClient({ initialData }: Props) {
+export function GastosListClient({ initialData, currency = "USD" }: Props) {
   return (
     <CrudTable<GastoOut, string>
       title="Gastos"
-      columns={columns}
+      columns={gastosColumns(currency)}
       initialData={initialData}
+      currency={currency}
       deleteItem={eliminarGasto}
       searchPlaceholder="Buscar gasto..."
       createHref="/cruds/gastos/nuevo"

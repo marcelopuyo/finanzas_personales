@@ -104,7 +104,9 @@ export async function anularMovimiento(movimientoId: string) {
       // ---- Pago Gasto / Gasto Directo ----
       const gasto = mov.gasto;
       cuenta.saldo += mov.montoCuentaMonedaOrigen;
-      gasto.saldo += mov.montoCuentaMonedaOrigen;
+      // `gasto.saldo` está en la moneda predeterminada (convertido), por lo que
+      // la reversión suma el monto convertido del movimiento (no el de la cuenta).
+      gasto.saldo += mov.monto;
 
       // Recalcular fechaPago con los pagos activos restantes (excluyendo este).
       const pagosRestantes = await movRepo.find({

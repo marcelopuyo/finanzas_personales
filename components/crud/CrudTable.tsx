@@ -24,6 +24,8 @@ interface CrudTableProps<T, TId = number> {
   editHref: (id: TId) => string;
   getId: (item: T) => TId;
   searchPredicate: (item: T, query: string) => boolean;
+  /** ISO 4217 para formatear columnas currency en la exportación PDF (default ARS). */
+  currency?: string;
 }
 
 /**
@@ -42,6 +44,7 @@ export function CrudTable<T, TId = number>({
   editHref,
   getId,
   searchPredicate,
+  currency = "ARS",
 }: CrudTableProps<T, TId>) {
   const router = useRouter();
   const [items, setItems] = useState<T[]>(initialData ?? []);
@@ -166,7 +169,7 @@ export function CrudTable<T, TId = number>({
               : col.id || col.accessorKey || "",
           value: (item: T): string => {
             if (meta?.exportValue) return meta.exportValue(item);
-            if (meta?.isCurrency) return numberToCurrency(Number(raw(item)) || 0);
+            if (meta?.isCurrency) return numberToCurrency(Number(raw(item)) || 0, currency);
             const v = raw(item);
             if (v === null || v === undefined) return "";
             if (typeof v === "object") return JSON.stringify(v);
@@ -190,7 +193,7 @@ export function CrudTable<T, TId = number>({
     if (exportCols.some((c) => c.isCurrency)) {
       body.push(
         exportCols.map((c, i) =>
-          i === 0 ? "Total" : c.isCurrency ? numberToCurrency(totals[i]) : ""
+          i === 0 ? "Total" : c.isCurrency ? numberToCurrency(totals[i], currency) : ""
         )
       );
     }

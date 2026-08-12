@@ -14,6 +14,8 @@ export interface PrestamoOut {
   personaOrigen: { nombre: string } | null;
   personaDestino: { nombre: string } | null;
   cuenta: { nombre: string } | null;
+  /** ISO 4217 de la moneda del préstamo (moneda de su cuenta). */
+  monedaISO: string;
 }
 
 function mapPrestamo(r: Prestamo): PrestamoOut {
@@ -32,13 +34,14 @@ function mapPrestamo(r: Prestamo): PrestamoOut {
       ? { nombre: r.personaDestino.nombre }
       : null,
     cuenta: r.cuenta ? { nombre: r.cuenta.nombre } : null,
+    monedaISO: r.cuenta?.moneda?.codigoISO ?? "ARS",
   };
 }
 
 const PRESTAMO_RELATIONS = {
   personaOrigen: true,
   personaDestino: true,
-  cuenta: true,
+  cuenta: { moneda: true },
 } as const;
 
 export async function getAllPrestamos(): Promise<PrestamoOut[]> {

@@ -6,7 +6,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { numberToCurrency } from "@/lib/utils";
 const columns: ColumnDef<CuentaOut>[] = [
   { accessorKey: "nombre", header: "Nombre" },
-  { accessorKey: "saldo", header: "Saldo", meta: { align: "right" as const, isCurrency: true }, cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0) },
+  { accessorKey: "saldo", header: "Saldo", meta: { align: "right" as const, isCurrency: true, exportValue: (row: CuentaOut) => numberToCurrency(row.saldo, row.moneda?.codigoISO ?? "ARS") }, cell: ({ getValue, row }) => numberToCurrency(getValue<number>() ?? 0, row.original.moneda?.codigoISO ?? "ARS") },
   { accessorFn: (r) => r.tipo?.nombre ?? "", id: "tipo", header: "Tipo" },
   { accessorFn: (r) => r.moneda?.nombre ?? "", id: "moneda", header: "Moneda" },
 ];
