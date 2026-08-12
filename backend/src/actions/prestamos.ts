@@ -53,6 +53,9 @@ export async function crearPrestamo(
     const created = await repo.save(
       repo.create({
         ...rest,
+        // El saldo inicial SIEMPRE es igual al monto (decisión 2026-08-12);
+        // el saldo solo cambia con los pagos del préstamo.
+        saldo: data.monto,
         personaOrigen: personaOrigenEntity,
         personaDestino: personaDestinoEntity,
         cuenta: cuentaEntity,

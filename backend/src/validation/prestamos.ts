@@ -11,7 +11,6 @@ export const prestamoCreateSchema = z.object({
   detalle: z.string().optional(),
   fecha: dateString,
   monto: z.number().positive(),
-  saldo: z.number(),
   cuotas: z.number().positive(),
   sentido: sentidoSchema,
   personaOrigen: z.string().min(1), // nombre

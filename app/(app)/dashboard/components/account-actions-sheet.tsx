@@ -6,7 +6,7 @@ import {
   Banknote,
   Briefcase,
   ChevronRight,
-  Download,
+  Coins,
   HandCoins,
   History,
   Receipt,
@@ -95,11 +95,20 @@ export function AccountActionsSheet({
           },
           { icon: Banknote, label: "Cobro Sueldo", onClick: () => go("cobro", "cuenta") },
           { icon: HandCoins, label: "Pago Préstamo", onClick: () => go("pago-prestamo", "cuenta") },
+          {
+            icon: Coins,
+            label: "Nuevo préstamo",
+            onClick: () => {
+              // El alta de préstamo es un CRUD: se precarga la cuenta (por
+              // NOMBRE, como espera el formulario) desde la que se dispara.
+              const qs = new URLSearchParams({ cuenta: cuenta.nombre });
+              router.push(`/cruds/prestamos/nuevo?${qs.toString()}`);
+              onClose();
+            },
+          },
           { icon: Settings2, label: "Ajuste Cuenta", onClick: () => go("ajuste", "cuenta") },
           { icon: Receipt, label: "Gasto", onClick: () => go("gasto", "cuenta") },
-          { icon: Send, label: "Transferir desde", onClick: () => go("transferencia", "origen") },
-          { icon: Download, label: "Transferir hacia", onClick: () => go("transferencia", "destino") },
-          { icon: Briefcase, label: "Jornada trabajo", onClick: () => go("jornada", "cuenta") },
+          { icon: Send, label: "Transferir", onClick: () => go("transferencia", "origen") },
         ];
 
   return (

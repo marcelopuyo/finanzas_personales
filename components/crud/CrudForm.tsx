@@ -156,6 +156,12 @@ export function CrudForm({
                       ref={controllerField.ref}
                       className={inputClasses}
                     >
+                      {/* Opción placeholder: sin ella, un select sin valor
+                          muestra la PRIMERA opción como si estuviera elegida,
+                          pero su valor real es "" y la validación falla. */}
+                      <option value="">
+                        {field.placeholder || "Seleccionar..."}
+                      </option>
                       {(asyncOptions[field.name] || field.options || []).map(
                         (opt) => (
                           <option key={opt.value} value={opt.value}>
