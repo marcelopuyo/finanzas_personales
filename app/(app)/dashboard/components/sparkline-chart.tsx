@@ -8,6 +8,8 @@ interface SparkLineChartProps {
   data: number[];
   labels?: string[];
   variant?: "line" | "bar";
+  /** Código ISO de la moneda de los valores (formatea el tooltip). */
+  currency?: string;
 }
 
 interface TooltipState {
@@ -21,6 +23,7 @@ export function SparkLineChart({
   data,
   labels,
   variant = "line",
+  currency = "ARS",
 }: SparkLineChartProps) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
@@ -54,7 +57,7 @@ export function SparkLineChart({
         </p>
       )}
       <p className="text-[11px] font-semibold leading-tight text-card-foreground">
-        {numberToCurrency(tooltip.value)}
+        {numberToCurrency(tooltip.value, currency)}
       </p>
     </div>
   ) : null;

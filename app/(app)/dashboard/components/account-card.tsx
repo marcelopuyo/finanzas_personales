@@ -12,6 +12,8 @@ interface AccountCardProps {
   value: string;
   labels: string[];
   values: number[];
+  /** Código ISO de la moneda de la cuenta (formatea el tooltip del sparkline). */
+  monedaISO?: string;
   className?: string;
   /** Se invoca al hacer click en una tarjeta de cuenta real (abre el historial). */
   onOpen?: () => void;
@@ -25,6 +27,7 @@ export function AccountCard({
   value,
   labels,
   values,
+  monedaISO,
   className,
   onOpen,
   menuAccion,
@@ -49,7 +52,7 @@ export function AccountCard({
           con 0 o 1 punto se deja el espacio reservado. */}
       <div className="mt-2">
         {values.length >= 2 ? (
-          <SparkLineChart data={values} labels={labels} />
+          <SparkLineChart data={values} labels={labels} currency={monedaISO} />
         ) : (
           <div className="h-10" aria-hidden="true" />
         )}

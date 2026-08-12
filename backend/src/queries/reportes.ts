@@ -362,16 +362,19 @@ export async function getCuentasConEvolucion(): Promise<CuentaConEvolucion[]> {
   const result: CuentaConEvolucion[] = [];
 
   for (const cuenta of cuentas) {
+    // Se filtra por ID (NO por nombre): puede haber varias cuentas con el mismo
+    // nombre (ej. dos "Billetera" en monedas distintas) y filtrar por nombre
+    // mezclaría los históricos de todas ellas, corrompiendo la serie.
     const historicos = await ds.getRepository(HistoricoCuenta).find({
       where: [
         {
           eliminado: false,
-          cuenta: { nombre: cuenta.nombre },
+          cuenta: { id: cuenta.id },
           fechaHasta: MoreThanOrEqual(unMes),
         },
         {
           eliminado: false,
-          cuenta: { nombre: cuenta.nombre },
+          cuenta: { id: cuenta.id },
           fechaHasta: IsNull(),
         },
       ],

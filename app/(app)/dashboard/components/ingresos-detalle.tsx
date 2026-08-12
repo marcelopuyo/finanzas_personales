@@ -38,8 +38,10 @@ function ImporteCell({
 
 function JornadasCell({
   jornadas,
+  currency,
 }: {
   jornadas?: PeriodoTrabajoOut["jornadas"];
+  currency: string;
 }) {
   const sorted = (jornadas || [])
     .slice()
@@ -53,6 +55,7 @@ function JornadasCell({
       variant="bar"
       data={sorted.map((j) => (j.montoJornada || 0) + (j.montoPropina || 0))}
       labels={sorted.map((j) => dateTimeToString(j.fechaJornada))}
+      currency={currency}
     />
   );
 }
@@ -116,7 +119,12 @@ export function ingresosDetalleColumns(
     id: "jornadas",
     header: "Jornadas",
     meta: { align: "center" },
-    cell: ({ row }) => <JornadasCell jornadas={row.original.jornadas} />,
+    cell: ({ row }) => (
+      <JornadasCell
+        jornadas={row.original.jornadas}
+        currency={currency}
+      />
+    ),
   },
   ];
 }
