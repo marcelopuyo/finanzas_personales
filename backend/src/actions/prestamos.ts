@@ -6,7 +6,7 @@ import { requireUserId } from "../lib/auth";
 import { Cuenta } from "../entities/cuenta.entity";
 import { Persona } from "../entities/persona.entity";
 import { Prestamo } from "../entities/prestamo.entity";
-import { dbError, refresh } from "../lib/action-helpers";
+import { crearHistoricoCuenta, dbError, refresh } from "../lib/action-helpers";
 import { getPrestamoById } from "../queries/prestamos";
 import {
   prestamoCreateSchema,
@@ -70,6 +70,12 @@ export async function crearPrestamo(
         ? cuentaEntity.saldo - data.monto
         : cuentaEntity.saldo + data.monto;
     await ds.getRepository(Cuenta).save(cuentaEntity);
+
+    // El alta de préstamo cambia el saldo de la cuenta → se actualiza el
+    // histórico (cierra el vigente y crea uno nuevo con el saldo actual).
+    // Sin esto, el sparkline/historial de la cuenta queda desactualizado
+    // (el punto derecho muestra un saldo viejo, no el actual).
+    await crearHistoricoCuenta(ds.manager, cuentaEntity);
 
     refresh();
     return getPrestamoById(created.id);

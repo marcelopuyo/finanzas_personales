@@ -383,6 +383,19 @@ export async function getCuentasConEvolucion(): Promise<CuentaConEvolucion[]> {
 
     const { vKeys, vValues } = filtrarMayorFechaPorDia(historicos);
 
+    // Asegura que la serie SIEMPRE termine en el saldo actual de la cuenta
+    // (punto "hoy"): cubre snapshots vigentes desactualizados (p. ej. cambios
+    // de saldo que no generaron histórico) para que el sparkline refleje la
+    // tendencia real y su extremo derecho coincida con la tarjeta.
+    const hoyISO = new Date().toISOString().split("T")[0];
+    if (vValues.length > 0) {
+      vValues[vValues.length - 1] = cuenta.saldo;
+      vKeys[vKeys.length - 1] = hoyISO;
+    } else {
+      vKeys.push(hoyISO);
+      vValues.push(cuenta.saldo);
+    }
+
     result.push({
       id: cuenta.id,
       nombreCuenta: cuenta.nombre,
