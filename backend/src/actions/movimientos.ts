@@ -14,7 +14,7 @@ import { Movimiento } from "../entities/movimiento.entity";
 import { PeriodoGasto } from "../entities/periodo-gasto.entity";
 import { PeriodoTrabajo } from "../entities/periodo-trabajo.entity";
 import { Prestamo } from "../entities/prestamo.entity";
-import { crearHistoricoCuenta, dbError, refresh } from "../lib/action-helpers";
+import { crearHistoricoCuenta, refresh } from "../lib/action-helpers";
 import { calcularMontoACobrar, calcularMontoJornada } from "../lib/jornadas";
 import { montoEnMonedaPredeterminada } from "../lib/cotizaciones";
 import {
@@ -338,8 +338,6 @@ export async function gastoDirecto(input: z.infer<typeof movimiento3Schema>) {
 
   const ds = await getDb();
   await ds.transaction(async (manager) => {
-    const periodoRepo = manager.getRepository(PeriodoGasto);
-    const categoriaRepo = manager.getRepository(CategoriaGasto);
     const gastoRepo = manager.getRepository(Gasto);
     const cuentaRepo = manager.getRepository(Cuenta);
     const conceptoRepo = manager.getRepository(Concepto);
