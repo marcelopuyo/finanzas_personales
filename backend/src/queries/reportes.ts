@@ -375,6 +375,10 @@ export async function getCuentasConEvolucion(): Promise<CuentaConEvolucion[]> {
           fechaHasta: IsNull(),
         },
       ],
+      // Orden cronológico: `historico_cuenta.id` es UUID (aleatorio), por lo
+      // que sin ORDER BY la serie del sparkline llegaba barajada y podía
+      // verse una tendencia ascendente cuando el saldo en realidad bajó.
+      order: { fechaHasta: "ASC" },
     });
 
     const { vKeys, vValues } = filtrarMayorFechaPorDia(historicos);
@@ -398,18 +402,30 @@ export async function getCuentasConEvolucion(): Promise<CuentaConEvolucion[]> {
 function filtrarMayorFechaPorDia(
   lista: { fechaHasta?: Date | null; fechaDesde: Date; saldo: number }[]
 ): { vKeys: string[]; vValues: number[] } {
-  const agrupado: Record<string, number> = {};
+  // "Último saldo de cada día": por cada día se conserva el saldo del histórico
+  // con la fecha MÁS reciente (mayor fechaHasta; NULL = vigente actual).
+  const porDia = new Map<string, { saldo: number; fechaHastaMs: number }>();
 
   for (const item of lista) {
     const dia = item.fechaHasta
       ? item.fechaHasta.toISOString().split("T")[0]
       : item.fechaDesde.toISOString().split("T")[0];
-    agrupado[dia] = item.saldo;
+    const fechaHastaMs = item.fechaHasta
+      ? new Date(item.fechaHasta).getTime()
+      : Number.MAX_SAFE_INTEGER; // vigente (NULL) = la más reciente
+    const prev = porDia.get(dia);
+    if (!prev || fechaHastaMs > prev.fechaHastaMs) {
+      porDia.set(dia, { saldo: item.saldo, fechaHastaMs });
+    }
   }
 
-  const entries = Object.entries(agrupado);
+  // Orden cronológico: las fechas ISO "YYYY-MM-DD" ordenan igual que el
+  // orden cronológico, así la tendencia del sparkline es la real.
+  const entries = Array.from(porDia.entries()).sort(([a], [b]) =>
+    a.localeCompare(b)
+  );
   return {
     vKeys: entries.map(([k]) => k),
-    vValues: entries.map(([, v]) => v),
+    vValues: entries.map(([, v]) => v.saldo),
   };
 }
