@@ -263,6 +263,13 @@ export function NumberField({
   const [text, setText] = useState(value === 0 ? "" : String(value));
   const editedBySelf = useRef(false);
 
+  /** Convierte el texto editado a número (misma regla que handleChange). */
+  const textToNumber = (s: string): number => {
+    if (s === "" || s === "-" || s === "." || s === "-.") return 0;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : 0;
+  };
+
   useEffect(() => {
     // Si el cambio de `value` vino de nuestro propio onChange ya está en
     // `text`; si es externo (autofill de montos), se sincroniza.
@@ -288,21 +295,49 @@ export function NumberField({
     }
     setText(s);
     editedBySelf.current = true;
-    const n = s === "" || s === "-" || s === "." || s === "-." ? 0 : Number(s);
-    onChange(Number.isFinite(n) ? n : 0);
+    onChange(textToNumber(s));
+  };
+
+  /** Alterna el signo del monto (solo si `allowNegative`). */
+  const toggleSign = () => {
+    editedBySelf.current = true;
+    if (text.startsWith("-")) {
+      const positive = text.slice(1);
+      setText(positive);
+      onChange(textToNumber(positive));
+    } else {
+      const negative = `-${text}`;
+      setText(negative);
+      onChange(textToNumber(negative));
+    }
   };
 
   return (
     <Campo label={label}>
-      <input
-        type="text"
-        inputMode="decimal"
-        autoComplete="off"
-        value={text}
-        onChange={(e) => handleChange(e.target.value)}
-        placeholder={placeholder}
-        className={inputCls}
-      />
+      <div className="relative">
+        <input
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
+          value={text}
+          onChange={(e) => handleChange(e.target.value)}
+          placeholder={placeholder}
+          className={cn(inputCls, allowNegative && "pr-12")}
+        />
+        {allowNegative && (
+          <button
+            type="button"
+            onClick={toggleSign}
+            aria-label={
+              text.startsWith("-") ? "Cambiar a positivo" : "Cambiar a negativo"
+            }
+            title="+/−"
+            className="absolute inset-y-1 right-1 flex w-10 items-center justify-center rounded-md border border-border bg-muted text-[16px] font-semibold text-card-foreground transition-colors hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-primary/40"
+          >
+            {text.startsWith("-") ? "+" : "−"}
+          </button>
+        )}
+      </div>
     </Campo>
   );
 }
