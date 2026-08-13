@@ -183,6 +183,10 @@ export async function getAllCuentas(): Promise<CuentaOut[]> {
   const rows = await ds.getRepository(Cuenta).find({
     where: { usuario: { id: userId }, eliminado: false },
     relations: { tipo: true, moneda: true },
+    // Orden estable: evita que el listado "salte" de orden entre refrescos
+    // (cada toggle dispara un refresh() y un orden inestable hacía que los
+    // switches parecieran cambiar de cuenta).
+    order: { id: "ASC" },
   });
   return rows.map((r) => ({
     id: r.id,

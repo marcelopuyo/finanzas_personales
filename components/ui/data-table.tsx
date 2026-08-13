@@ -33,6 +33,9 @@ interface DataTableProps<TData, TValue> {
   data: TData[];
   emptyMessage?: string;
   pageSize?: number;
+  /** Devuelve un id estable por fila (default: índice). Evita que React reutilice
+   * filas equivocadas cuando el orden de los datos cambia (p. ej. switches). */
+  getRowId?: (originalRow: TData, index: number) => string;
 }
 
 /**
@@ -44,6 +47,7 @@ export function DataTable<TData, TValue>({
   data,
   emptyMessage = "Sin datos disponibles",
   pageSize = 10,
+  getRowId,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize });
@@ -54,6 +58,7 @@ export function DataTable<TData, TValue>({
     state: { sorting, pagination },
     onSortingChange: setSorting,
     onPaginationChange: setPagination,
+    getRowId,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),

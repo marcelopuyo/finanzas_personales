@@ -273,7 +273,14 @@ export function CrudTable<T, TId = number>({
             </button>
           </div>
         ) : (
-          <DataTable columns={allColumns} data={filtered} pageSize={10} />
+          <DataTable
+            columns={allColumns}
+            data={filtered}
+            pageSize={10}
+            // Row key estable por id real (evita que los switches/estado de cada
+            // fila "salten" a otra cuenta si el orden de los datos cambia).
+            getRowId={(row) => String(getId(row))}
+          />
         )}
       </div>
 
