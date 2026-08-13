@@ -14,6 +14,7 @@ import { Movimiento } from "../entities/movimiento.entity";
 import { PeriodoGasto } from "../entities/periodo-gasto.entity";
 import { PeriodoTrabajo } from "../entities/periodo-trabajo.entity";
 import { Prestamo } from "../entities/prestamo.entity";
+import { Trabajo } from "../entities/trabajo.entity";
 import { crearHistoricoCuenta, refresh } from "../lib/action-helpers";
 import { calcularMontoACobrar, calcularMontoJornada } from "../lib/jornadas";
 import { montoEnMonedaPredeterminada } from "../lib/cotizaciones";
@@ -513,14 +514,40 @@ export async function cargarJornadaTrabajo(
     const conceptoRepo = manager.getRepository(Concepto);
     const movRepo = manager.getRepository(Movimiento);
 
-    const periodo = await periodoTrabajoRepo.findOne({
-      where: { id: data.idPeriodo, trabajo: { usuario: { id: userId } } },
-      relations: { trabajo: true },
-    });
-    if (!periodo) {
-      throw new Error(
-        `Período de trabajo con id ${data.idPeriodo} no encontrado`
+    // Período de trabajo: si se marcó "crear período automático" se genera un
+    // período de una sola jornada (fechaDesde = fechaHasta = fecha de la
+    // jornada); si no, se usa el período existente seleccionado por el usuario.
+    let periodo: PeriodoTrabajo | null = null;
+    if (data.crearPeriodoAutomatico) {
+      if (!data.idTrabajo) {
+        throw new Error(
+          "Seleccioná el trabajo para crear el período automático"
+        );
+      }
+      const trabajo = await manager.getRepository(Trabajo).findOneBy({
+        id: data.idTrabajo,
+        usuario: { id: userId },
+      });
+      if (!trabajo) {
+        throw new Error(`Trabajo con id ${data.idTrabajo} no encontrado`);
+      }
+      const d = data.fecha as unknown as Date;
+      periodo = await periodoTrabajoRepo.save(
+        periodoTrabajoRepo.create({ fechaDesde: d, fechaHasta: d, trabajo })
       );
+    } else {
+      if (!data.idPeriodo) {
+        throw new Error("Seleccioná el período de trabajo");
+      }
+      periodo = await periodoTrabajoRepo.findOne({
+        where: { id: data.idPeriodo, trabajo: { usuario: { id: userId } } },
+        relations: { trabajo: true },
+      });
+      if (!periodo) {
+        throw new Error(
+          `Período de trabajo con id ${data.idPeriodo} no encontrado`
+        );
+      }
     }
 
     // 1. Crear la jornada (misma lógica que crearJornadaTrabajo del CRUD).
@@ -543,7 +570,7 @@ export async function cargarJornadaTrabajo(
 
     // 2. Recalcular el monto a cobrar del período (SIN propina).
     const periodoActualizado = await periodoTrabajoRepo.findOne({
-      where: { id: data.idPeriodo },
+      where: { id: periodo.id },
       relations: { jornadas: true },
     });
     if (periodoActualizado) {

@@ -195,25 +195,67 @@ export async function crearJornadaTrabajo(
   input: z.infer<typeof jornadaTrabajoCreateSchema>
 ) {
   const userId = await requireUserId();
-  const data = jornadaTrabajoCreateSchema.parse(input);
-  const ds = await getDb();
-  const { idPeriodo, ...rest } = data;
-
-  const periodo = await ds.getRepository(PeriodoTrabajo).findOne({
-    where: { id: idPeriodo, trabajo: { usuario: { id: userId } } },
-    relations: { trabajo: true },
-  });
-  if (!periodo) {
-    throw new Error(`Período de trabajo con id ${idPeriodo} no encontrado`);
+  // safeParse: evita el bug de serialización de ZodError en Server Actions
+  // ("Cannot set property message ... only a getter") y deja ver el error real.
+  const parsed = jornadaTrabajoCreateSchema.safeParse(input);
+  if (!parsed.success) {
+    const msg = parsed.error.issues
+      .map((i) => `${i.path.join(".") || "?"}: ${i.message}`)
+      .join("; ");
+    console.error("⚠️ crearJornadaTrabajo PARSE ERROR:", msg, JSON.stringify(input));
+    throw new Error(`Datos inválidos: ${msg}`);
   }
-
-  const montoJornada = calcularMontoJornada(
-    data.horaDesde,
-    data.horaHasta,
-    periodo.trabajo.precioHora
-  );
+  const data = parsed.data;
+  const ds = await getDb();
+  const { idPeriodo, crearPeriodoAutomatico, idTrabajo, ...rest } = data;
 
   try {
+    // Período de trabajo: si se eligió "crear período automático" se genera un
+    // período de una sola jornada (fechaDesde = fechaHasta = fecha de la
+    // jornada); si no, se usa el período existente seleccionado.
+    let periodo: PeriodoTrabajo | null = null;
+    let trabajo: Trabajo | null = null;
+    if (crearPeriodoAutomatico) {
+      if (!idTrabajo) {
+        throw new Error("Seleccioná el trabajo para crear el período automático");
+      }
+      trabajo = await ds.getRepository(Trabajo).findOneBy({
+        id: idTrabajo,
+        usuario: { id: userId },
+      });
+      if (!trabajo) {
+        throw new Error(`Trabajo con id ${idTrabajo} no encontrado`);
+      }
+      // String directo (patrón de fechaJornada): evita el desfase de zona
+      // horaria al guardar en columnas `date` (un Date a medianoche UTC en
+      // GMT-4 cae en el día anterior).
+      const d = data.fechaJornada as unknown as Date;
+      periodo = await ds.getRepository(PeriodoTrabajo).save(
+        ds.getRepository(PeriodoTrabajo).create({ fechaDesde: d, fechaHasta: d, trabajo })
+      );
+    } else {
+      if (!idPeriodo) {
+        throw new Error("Seleccioná el período de trabajo");
+      }
+      periodo = await ds.getRepository(PeriodoTrabajo).findOne({
+        where: { id: idPeriodo, trabajo: { usuario: { id: userId } } },
+        relations: { trabajo: true },
+      });
+      if (!periodo) {
+        throw new Error(`Período de trabajo con id ${idPeriodo} no encontrado`);
+      }
+    }
+
+    const precioHora = trabajo?.precioHora ?? periodo?.trabajo?.precioHora;
+    if (!periodo || !precioHora) {
+      throw new Error("No se pudo determinar el trabajo del período");
+    }
+    const montoJornada = calcularMontoJornada(
+      data.horaDesde,
+      data.horaHasta,
+      precioHora
+    );
+
     const repo = ds.getRepository(JornadaTrabajo);
     const created = await repo.save(
       repo.create({
@@ -224,7 +266,7 @@ export async function crearJornadaTrabajo(
       })
     );
 
-    await actualizarMontoACobrarPeriodo(idPeriodo);
+    await actualizarMontoACobrarPeriodo(periodo.id);
 
     refresh();
     return getJornadaTrabajoById(created.id);

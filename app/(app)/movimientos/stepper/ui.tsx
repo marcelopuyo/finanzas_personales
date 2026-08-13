@@ -348,19 +348,22 @@ export function SelectField({
   onChange,
   options,
   placeholder = "Seleccionar...",
+  disabled = false,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: { value: string; label: string }[];
   placeholder?: string;
+  disabled?: boolean;
 }) {
   return (
     <Campo label={label}>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={inputCls}
+        disabled={disabled}
+        className={cn(inputCls, disabled && "cursor-not-allowed opacity-60")}
       >
         <option value="">{placeholder}</option>
         {options.map((o) => (

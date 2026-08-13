@@ -145,11 +145,18 @@ export function Confirmacion() {
     const periodoJ = options.periodosTrabajo.find(
       (p) => p.id === data.periodoTrabajo
     );
+    const trabajoJ = options.trabajos.find((t) => t.id === data.idTrabajo);
     filas.push(
       { label: "Fecha", value: formatFecha(data.fecha) },
       {
-        label: "Período de trabajo",
-        value: periodoJ
+        label: data.crearPeriodoAutomatico
+          ? "Trabajo (período automático)"
+          : "Período de trabajo",
+        value: data.crearPeriodoAutomatico
+          ? `${trabajoJ?.nombre ?? "Trabajo"} — período del ${formatFecha(
+              data.fecha
+            )}`
+          : periodoJ
           ? `${periodoJ.trabajo?.nombre ?? "Trabajo"}: ${formatFecha(
               periodoJ.fechaDesde
             )} al ${formatFecha(periodoJ.fechaHasta)}`
@@ -230,8 +237,14 @@ export function Confirmacion() {
             horaDesde: timeToDecimal(data.horaDesde),
             horaHasta: timeToDecimal(data.horaHasta),
             montoPropina: data.montoPropina,
-            idPeriodo: data.periodoTrabajo,
+            idPeriodo: data.crearPeriodoAutomatico
+              ? undefined
+              : data.periodoTrabajo,
             idCuenta: data.montoPropina > 0 ? data.cuentaPropina : undefined,
+            crearPeriodoAutomatico: data.crearPeriodoAutomatico,
+            idTrabajo: data.crearPeriodoAutomatico
+              ? data.idTrabajo
+              : undefined,
           });
           break;
       }

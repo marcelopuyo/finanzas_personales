@@ -48,6 +48,14 @@ export const jornadaStepperSchema = z.object({
   horaDesde: z.number(),
   horaHasta: z.number(),
   montoPropina: z.number().optional().default(0),
-  idPeriodo: z.number(),
+  // idPeriodo es opcional: si llega crearPeriodoAutomatico = true se crea un
+  // período de una sola jornada (fechaDesde = fechaHasta = fecha) y NO se usa
+  // un período existente.
+  idPeriodo: z.number().optional(),
   idCuenta: z.number().optional(),
+  // Período automático: el usuario lo elige EXPLÍCITAMENTE (opción del select)
+  // para crear el período junto con la jornada (evita creación accidental).
+  // Requiere idTrabajo para saber a qué trabajo pertenece el período nuevo.
+  crearPeriodoAutomatico: z.boolean().optional().default(false),
+  idTrabajo: z.number().optional(),
 });

@@ -42,6 +42,12 @@ export async function fetchTrabajos() {
   return rows.map((r) => ({ value: r.nombre, label: r.nombre }));
 }
 
+// Variante con value = ID (para el período automático de las jornadas).
+export async function fetchTrabajosId() {
+  const rows = await getAllTrabajos();
+  return rows.map((r) => ({ value: String(r.id), label: r.nombre }));
+}
+
 /** Formatea "YYYY-MM-DD" (o Date) a "D/M/YYYY" sin problemas de zona horaria. */
 function formatFecha(value: string | Date): string {
   let iso: string;

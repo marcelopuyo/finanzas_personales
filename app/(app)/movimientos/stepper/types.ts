@@ -1,5 +1,8 @@
 import type { CuentaOut } from "@/backend/src/queries/maestros";
-import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
+import type {
+  PeriodoTrabajoOut,
+  TrabajoOut,
+} from "@/backend/src/queries/trabajos";
 import type { PrestamoOut } from "@/backend/src/queries/prestamos";
 import type { CategoriaGastoOut, GastoOut } from "@/backend/src/queries/gastos";
 
@@ -32,6 +35,10 @@ export interface MovimientoData {
   montoPropina: number;
   /** Cuenta donde se deposita la propina (si montoPropina > 0). */
   cuentaPropina: number;
+  /** Jornada: crear el período de trabajo automáticamente (período de una sola jornada). */
+  crearPeriodoAutomatico: boolean;
+  /** Jornada: trabajo del período automático (requerido si crearPeriodoAutomatico). */
+  idTrabajo: number;
 }
 
 /** Opciones precargadas en el Server Component para los selects del wizard. */
@@ -39,6 +46,8 @@ export interface MovimientoOptions {
   cuentas: CuentaOut[];
   /** Solo períodos de trabajo sin fecha de cobro (pendientes de cobrar). */
   periodosTrabajo: PeriodoTrabajoOut[];
+  /** Trabajos del usuario (para crear un período automático al cargar jornada). */
+  trabajos: TrabajoOut[];
   /** Préstamos pendientes (saldo > 0). */
   prestamos: PrestamoOut[];
   /** Gastos pendientes (saldo > 0). */

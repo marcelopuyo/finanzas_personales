@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Save } from "lucide-react";
 import { toast } from "sonner";
@@ -25,6 +25,10 @@ export interface FormField {
   options?: { value: string; label: string }[];
   optionsFrom?: () => Promise<{ value: string; label: string }[]>;
   placeholder?: string;
+  /** Opciones extra que se agregan al final del select (además de options/optionsFrom). */
+  extraOptions?: { value: string; label: string }[];
+  /** Muestra el campo solo si la condición sobre los valores del formulario es true. */
+  showIf?: (values: Record<string, unknown>) => boolean;
 }
 
 interface CrudFormProps {
@@ -91,6 +95,10 @@ export function CrudForm({
     defaultValues: defaultValues || {},
   });
 
+  // Valores actuales del formulario (reactivos): se usan para evaluar la
+  // visibilidad condicional de los campos (showIf).
+  const values = useWatch({ control });
+
   const onSubmitHandler = async (
     data: Record<string, unknown>
   ) => {
@@ -134,7 +142,9 @@ export function CrudForm({
           className="space-y-4"
           noValidate
         >
-          {fields.map((field) => (
+          {fields
+            .filter((field) => !field.showIf || field.showIf(values))
+            .map((field) => (
             <div key={field.name}>
               <label
                 htmlFor={field.name}
@@ -169,6 +179,11 @@ export function CrudForm({
                           </option>
                         )
                       )}
+                      {field.extraOptions?.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
                     </select>
                   )}
                 />

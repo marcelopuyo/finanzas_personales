@@ -30,6 +30,11 @@ export const jornadaTrabajoCreateSchema = z.object({
   horaDesde: z.number(),
   horaHasta: z.number(),
   montoPropina: z.number().optional().default(0),
-  idPeriodo: z.number(), // id del período de trabajo
+  // idPeriodo es opcional: si llega crearPeriodoAutomatico = true se crea un
+  // período de una sola jornada (fechaDesde = fechaHasta = fecha) y NO se usa
+  // un período existente.
+  idPeriodo: z.number().optional(),
+  crearPeriodoAutomatico: z.boolean().optional().default(false),
+  idTrabajo: z.number().optional(),
 });
 export const jornadaTrabajoUpdateSchema = jornadaTrabajoCreateSchema.partial();

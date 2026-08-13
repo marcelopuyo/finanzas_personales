@@ -5,6 +5,15 @@ import { jornadaTrabajoSchema, jornadaTrabajoFields } from "../jornada-trabajo-f
 import { timeToDecimal } from "@/lib/utils";
 export default function NuevaJornadaTrabajoPage() {
   return <CrudForm title="Nueva Jornada de Trabajo" fields={jornadaTrabajoFields} schema={jornadaTrabajoSchema} onSubmit={async (d) => {
-    await crearJornadaTrabajo({ fechaJornada: d.fechaJornada as string, horaDesde: timeToDecimal(d.horaDesde as string), horaHasta: timeToDecimal(d.horaHasta as string), montoPropina: d.montoPropina ? Number(d.montoPropina) : 0, idPeriodo: Number(d.idPeriodo) });
+    const idPeriodo = d.idPeriodo as string;
+    await crearJornadaTrabajo({
+      fechaJornada: d.fechaJornada as string,
+      horaDesde: timeToDecimal(d.horaDesde as string),
+      horaHasta: timeToDecimal(d.horaHasta as string),
+      montoPropina: d.montoPropina ? Number(d.montoPropina) : 0,
+      ...(idPeriodo === "auto"
+        ? { crearPeriodoAutomatico: true, idTrabajo: Number(d.idTrabajo) }
+        : { idPeriodo: Number(idPeriodo), crearPeriodoAutomatico: false }),
+    });
   }} cancelHref="/cruds/jornadas-trabajo" successMessage="Jornada creada correctamente" />;
 }

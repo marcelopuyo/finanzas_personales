@@ -25,10 +25,14 @@ export function JornadaTrabajo() {
   const horaValida =
     !!data.horaDesde && !!data.horaHasta && data.horaDesde < data.horaHasta;
   const requiereCuenta = data.montoPropina > 0;
+  // Con "crear período automático" se exige elegir el trabajo (no el período).
+  const periodoValido = data.crearPeriodoAutomatico
+    ? data.idTrabajo > 0
+    : data.periodoTrabajo > 0;
   const isValid =
     !!data.fecha &&
     horaValida &&
-    data.periodoTrabajo > 0 &&
+    periodoValido &&
     (!requiereCuenta || data.cuentaPropina > 0);
 
   return (
@@ -68,19 +72,52 @@ export function JornadaTrabajo() {
         onChange={(v) => handleSetData({ montoPropina: v })}
       />
 
+      {/* Select de período: incluye la opción "Cargar período automático".
+          Al elegirla se pide el TRABAJO (se creará un período de una sola
+          jornada); si no, se usa el período existente seleccionado. */}
       <SelectField
         label="Período de trabajo"
-        value={data.periodoTrabajo ? String(data.periodoTrabajo) : ""}
-        onChange={(v) => handleSetData({ periodoTrabajo: Number(v) })}
-        options={options.periodosTrabajo.map((p) => ({
-          value: String(p.id),
-          label: `${p.trabajo?.nombre ?? "Trabajo"}: ${formatFecha(
-            p.fechaDesde
-          )} al ${formatFecha(p.fechaHasta)} — ${numberToCurrency(
-            p.montoACobrar ?? 0
-          )}`,
-        }))}
+        value={
+          data.crearPeriodoAutomatico
+            ? "auto"
+            : data.periodoTrabajo
+            ? String(data.periodoTrabajo)
+            : ""
+        }
+        onChange={(v) => {
+          if (v === "auto") {
+            handleSetData({ periodoTrabajo: 0, crearPeriodoAutomatico: true });
+          } else {
+            handleSetData({
+              periodoTrabajo: v ? Number(v) : 0,
+              crearPeriodoAutomatico: false,
+            });
+          }
+        }}
+        options={[
+          ...options.periodosTrabajo.map((p) => ({
+            value: String(p.id),
+            label: `${p.trabajo?.nombre ?? "Trabajo"}: ${formatFecha(
+              p.fechaDesde
+            )} al ${formatFecha(p.fechaHasta)} — ${numberToCurrency(
+              p.montoACobrar ?? 0
+            )}`,
+          })),
+          { value: "auto", label: "Cargar período automático" },
+        ]}
       />
+
+      {data.crearPeriodoAutomatico && (
+        <SelectField
+          label="Trabajo"
+          value={data.idTrabajo ? String(data.idTrabajo) : ""}
+          onChange={(v) => handleSetData({ idTrabajo: Number(v) })}
+          options={options.trabajos.map((t) => ({
+            value: String(t.id),
+            label: t.nombre,
+          }))}
+        />
+      )}
 
       <SelectField
         label="Cuenta (propina)"

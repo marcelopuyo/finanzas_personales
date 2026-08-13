@@ -1,6 +1,9 @@
 // Capa de datos del wizard de Movimientos (se ejecuta en Server Component).
 import { getAllCuentas } from "@/backend/src/queries/maestros";
-import { getAllPeriodosTrabajo } from "@/backend/src/queries/trabajos";
+import {
+  getAllPeriodosTrabajo,
+  getAllTrabajos,
+} from "@/backend/src/queries/trabajos";
 import { getPrestamosPendientes } from "@/backend/src/queries/prestamos";
 import {
   getAllCategoriasGasto,
@@ -9,17 +12,25 @@ import {
 import type { MovimientoOptions } from "./stepper/types";
 
 export async function getMovimientoOptions(): Promise<MovimientoOptions> {
-  const [cuentas, periodosTrabajo, prestamos, gastos, categoriasGasto] =
-    await Promise.all([
-      getAllCuentas(),
-      getAllPeriodosTrabajo(),
-      getPrestamosPendientes(),
-      getGastosPendientes(),
-      getAllCategoriasGasto(),
-    ]);
+  const [
+    cuentas,
+    periodosTrabajo,
+    trabajos,
+    prestamos,
+    gastos,
+    categoriasGasto,
+  ] = await Promise.all([
+    getAllCuentas(),
+    getAllPeriodosTrabajo(),
+    getAllTrabajos(),
+    getPrestamosPendientes(),
+    getGastosPendientes(),
+    getAllCategoriasGasto(),
+  ]);
 
   return {
     cuentas,
+    trabajos,
     prestamos,
     gastos,
     categoriasGasto,

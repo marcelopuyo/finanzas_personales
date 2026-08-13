@@ -68,6 +68,8 @@ export function MovimientoProvider({
       horaHasta: "",
       montoPropina: 0,
       cuentaPropina: 0,
+      crearPeriodoAutomatico: false,
+      idTrabajo: 0,
     };
     if (!initial) return base;
     // En Jornada trabajo la cuenta precargada va al depósito de propina.
@@ -102,6 +104,8 @@ export function MovimientoProvider({
       horaHasta: "",
       montoPropina: 0,
       cuentaPropina: 0,
+      crearPeriodoAutomatico: false,
+      idTrabajo: 0,
     }));
 
   const navigateTo = (step: number) => setActiveStep(step);
@@ -124,6 +128,8 @@ export function MovimientoProvider({
       horaHasta: "",
       montoPropina: 0,
       cuentaPropina: 0,
+      crearPeriodoAutomatico: false,
+      idTrabajo: 0,
     }));
 
   return (
