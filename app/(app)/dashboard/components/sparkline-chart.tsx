@@ -126,20 +126,32 @@ export function SparkLineChart({
     );
   }
 
-  // Variante de línea (necesita al menos 2 puntos) con tooltip en todo el área
-  if (data.length < 2) return null;
+  // Variante de línea: con un único punto dibuja una línea recta horizontal en
+  // ese valor (caso "0 o 1 movimiento" en las tarjetas de cuenta); con 2+ puntos
+  // traza la tendencia. Tooltip en todo el área.
   const max = Math.max(...data);
   const min = Math.min(...data);
   const range = max - min || 1;
 
-  const linePoints = data.map((value, index) => {
-    const x = padding + (index / (data.length - 1)) * (width - padding * 2);
-    const y =
-      height -
-      padding -
-      ((value - min) / range) * (height - padding * 2);
-    return { x, y };
-  });
+  const toY = (value: number) =>
+    height -
+    padding -
+    ((value - min) / range) * (height - padding * 2);
+
+  // Con un único punto: dos puntos virtuales a los extremos a la misma altura
+  // -> polyline = línea recta horizontal en el valor del punto.
+  const linePoints =
+    data.length === 1
+      ? [
+          { x: padding, y: toY(data[0]) },
+          { x: width - padding, y: toY(data[0]) },
+        ]
+      : data.map((value, index) => {
+          const x =
+            padding + (index / (data.length - 1)) * (width - padding * 2);
+          const y = toY(value);
+          return { x, y };
+        });
 
   const points = linePoints.map((p) => `${p.x},${p.y}`).join(" ");
 
@@ -156,7 +168,12 @@ export function SparkLineChart({
       0,
       Math.min(data.length - 1, Math.round(frac * (data.length - 1)))
     );
-    const point = linePoints[index];
+    // Con un único punto el tooltip se centra (no se apoya en el borde
+    // izquierdo); en los demás casos sigue la posición horizontal del puntero.
+    const point =
+      data.length === 1
+        ? { x: width / 2, y: linePoints[0].y }
+        : linePoints[index];
     setTooltip({
       left: rect.left + (point.x / width) * rect.width,
       top: rect.top + (point.y / height) * rect.height,

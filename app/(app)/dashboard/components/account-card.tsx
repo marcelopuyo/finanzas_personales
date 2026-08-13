@@ -46,12 +46,13 @@ export function AccountCard({
         </div>
       </div>
       {/* El área del gráfico siempre ocupa la misma altura (mt-2 + h-10 = 48px):
-          si no hay datos suficientes se reserva el espacio vacío para que TODAS
-          las tarjetas tengan el mismo alto en mobile (con o sin sparkline).
-          La variante "line" del sparkline necesita >= 2 puntos para dibujar;
-          con 0 o 1 punto se deja el espacio reservado. */}
+          si no hay datos se reserva el espacio vacío para que TODAS las tarjetas
+          tengan el mismo alto en mobile (con o sin sparkline).
+          Con 1 valor el sparkline dibuja una línea horizontal (0 o 1 movimiento
+          en el último mes); solo las tarjetas SIN valores (sintéticas) dejan el
+          espacio reservado. */}
       <div className="mt-2">
-        {values.length >= 2 ? (
+        {values.length >= 1 ? (
           <SparkLineChart data={values} labels={labels} currency={monedaISO} />
         ) : (
           <div className="h-10" aria-hidden="true" />
