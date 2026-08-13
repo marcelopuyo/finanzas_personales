@@ -358,7 +358,7 @@ export function DashboardClient({ data }: Props) {
   return (
     <div className="space-y-6 pb-8">
       <div>
-        <h1 className="text-[18px] font-semibold tracking-tight text-header">Dashboard</h1>
+        <h1 className="text-[18px] font-semibold tracking-tight text-header">Resumen</h1>
         <p className="mt-0.5 text-[13px] text-subtitle">Resumen de tus finanzas personales</p>
       </div>
 

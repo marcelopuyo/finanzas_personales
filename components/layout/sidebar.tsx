@@ -25,7 +25,7 @@ interface NavItem {
 
 const navigation: NavItem[] = [
   {
-    label: "Dashboard",
+    label: "Resumen",
     href: "/dashboard",
     icon: () => <FontAwesomeIcon icon={faChartLine} style={{ width: 20, height: 20, color: "var(--sidebar-muted)" }} />,
   },
@@ -89,17 +89,21 @@ function NavItem({
   pathname,
   open,
   onToggle,
+  onSelect,
 }: {
   item: NavItem;
   pathname: string;
   open: boolean;
   onToggle: () => void;
+  /** Se ejecuta al hacer click en un item sin hijos (cierra el grupo abierto). */
+  onSelect?: () => void;
 }) {
   if (!item.children) {
     const isActive = isActivePath(item.href || "", pathname);
     return (
       <Link
         href={item.href || "#"}
+        onClick={onSelect}
         className={cn(
           "flex items-center gap-3 rounded-md px-3 py-[9px] text-[14px] leading-5 transition-colors",
           isActive
@@ -272,6 +276,9 @@ export default function Sidebar({ initial = "U" }: { initial?: string }) {
               onToggle={() =>
                 setOpenGroup((cur) => (cur === item.label ? null : item.label))
               }
+              // Item hoja (Dashboard, Perfil): al hacer click colapsa cualquier
+              // grupo expandido (mismo comportamiento de acordeón que los demás).
+              onSelect={() => setOpenGroup(null)}
             />
           ))}
         </nav>
