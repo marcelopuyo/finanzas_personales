@@ -11,6 +11,16 @@ import {
 } from "@/backend/src/queries/gastos";
 import type { MovimientoOptions } from "./stepper/types";
 
+// Nombres de las tarjetas/cuentas SINTÉTICAS del dashboard ("Períodos a
+// Cobrar" y "Períodos Actuales"). No son cuentas reales (se calculan en
+// dashboard-data.ts) y NUNCA deben ofrecerse en los selects de cuenta del
+// stepper. Si en el futuro se crearan cuentas con estos nombres, quedan
+// excluidas aquí (garantía defensiva; hoy no existen en la BD).
+const NOMBRES_CUENTAS_SINTETICAS = new Set([
+  "Períodos a Cobrar",
+  "Períodos Actuales",
+]);
+
 export async function getMovimientoOptions(): Promise<MovimientoOptions> {
   const [
     cuentas,
@@ -29,7 +39,9 @@ export async function getMovimientoOptions(): Promise<MovimientoOptions> {
   ]);
 
   return {
-    cuentas,
+    // Excluye las cuentas sintéticas de TODOS los selects de cuenta del
+    // stepper (wizard y modo directo /movimientos/nuevo/<tipo>).
+    cuentas: cuentas.filter((c) => !NOMBRES_CUENTAS_SINTETICAS.has(c.nombre)),
     trabajos,
     prestamos,
     gastos,
