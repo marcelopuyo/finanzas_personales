@@ -341,9 +341,7 @@ export async function getPrestamosPendientesReporte(): Promise<
 // ============================================================
 // 8) Movimientos de tarjeta del período (no implementado en backend)
 // ============================================================
-export async function getMovimientosTarjetaPeriodo(
-  _idTarjeta?: number
-): Promise<null> {
+export async function getMovimientosTarjetaPeriodo(): Promise<null> {
   // No implementado en el backend original; devuelve null
   return null;
 }

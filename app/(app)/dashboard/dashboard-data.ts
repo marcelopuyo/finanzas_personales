@@ -12,7 +12,7 @@ import { getAllPeriodosTrabajo, type PeriodoTrabajoOut } from "@/backend/src/que
 import type { GastoOut } from "@/backend/src/queries/gastos";
 import { getAllGastos } from "@/backend/src/queries/gastos";
 import { getSessionUser } from "@/backend/src/lib/auth";
-import { numberToCurrency, onlyDate } from "@/lib/utils";
+import { numberToCurrency } from "@/lib/utils";
 
 export interface DashboardData {
   balance: number;
@@ -193,7 +193,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   let totalIngresos = 0;
 
   jornadas.forEach((j) => {
-    const nombre = (j as any).trabajo || "Sin trabajo";
+    const nombre = j.trabajo || "Sin trabajo";
     const monto = j.montoJornada + j.montoPropina;
     ingresosMap.set(nombre, (ingresosMap.get(nombre) || 0) + monto);
     totalIngresos += monto;

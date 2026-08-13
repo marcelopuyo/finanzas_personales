@@ -113,8 +113,8 @@ export async function requireAdmin(): Promise<void> {
 }
 
 // ----------------------------------------------------------------- cookies
-// Duración de la sesión "por defecto" (24h) vs. "mantener la sesión" (30 días).
-const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24; // 24h
+// Duración de la sesión "mantener la sesión" (30 días). La sesión por defecto
+// es una cookie sin maxAge (se borra al cerrar el navegador).
 const REMEMBER_MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 días
 
 /**

@@ -130,7 +130,10 @@ export async function getPeriodoTrabajoById(
 // Jornadas de trabajo
 // ============================================================
 export async function getAllJornadasTrabajo(): Promise<
-  (JornadaTrabajoOut & { periodoTrabajo: { id: number; trabajo: string } | null })[]
+  (JornadaTrabajoOut & {
+    periodoTrabajo: { id: number; trabajo: string } | null;
+    trabajo: string;
+  })[]
 > {
   const userId = await requireUserId();
   const ds = await getDb();

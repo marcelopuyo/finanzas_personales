@@ -421,13 +421,11 @@ export async function actualizarJornadaTrabajo(
         await movRepo.save(mov);
       }
 
-      // Guardar la jornada actualizada. Excluimos idPeriodo (no es columna; se
-      // asigna vía periodoTrabajo) e idCuenta (no es columna de la jornada).
-      const {
-        idPeriodo: _ignored,
-        idCuenta: _cuentaIgnored,
-        ...restData
-      } = data;
+      // Guardar la jornada actualizada. Excluimos idPeriodo/idCuenta (no son
+      // columnas de la jornada; se asignan vía periodoTrabajo / depósito).
+      const restData = { ...data };
+      delete restData.idPeriodo;
+      delete restData.idCuenta;
       Object.assign(existing, restData, {
         montoPropina: propina,
         montoJornada,

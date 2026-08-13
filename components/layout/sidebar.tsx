@@ -105,7 +105,7 @@ function NavItem({
         href={item.href || "#"}
         onClick={onSelect}
         className={cn(
-          "flex items-center gap-3 rounded-md px-3 py-[9px] text-[14px] leading-5 transition-colors",
+          "flex items-center gap-3 rounded-md px-3 py-2.25 text-[14px] leading-5 transition-colors",
           isActive
             ? "bg-sidebar-active text-sidebar-active-foreground"
             : "text-sidebar-foreground hover:bg-sidebar-hover"
@@ -128,7 +128,7 @@ function NavItem({
       <button
         onClick={onToggle}
         className={cn(
-          "flex w-full items-center gap-3 rounded-md px-3 py-[9px] text-[14px] leading-5 text-left transition-colors",
+          "flex w-full items-center gap-3 rounded-md px-3 py-2.25 text-[14px] leading-5 text-left transition-colors",
           hasActiveChild
             ? "bg-sidebar-active text-sidebar-active-foreground"
             : "text-sidebar-foreground hover:bg-sidebar-hover"
@@ -150,7 +150,7 @@ function NavItem({
                 key={child.href}
                 href={child.href}
                 className={cn(
-                  "block rounded-md px-3 py-[6px] text-[14px] leading-5 transition-colors",
+                  "block rounded-md px-3 py-1.5 text-[14px] leading-5 transition-colors",
                   isChildActive
                     ? "bg-sidebar-active text-sidebar-active-foreground font-medium"
                     : "text-sidebar-foreground hover:text-sidebar-active-foreground"

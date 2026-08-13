@@ -1,5 +1,5 @@
 import { revalidatePath } from "next/cache";
-import type { EntityManager } from "typeorm";
+import type { DeepPartial, EntityManager } from "typeorm";
 import { IsNull } from "typeorm";
 import { Cuenta } from "../entities/cuenta.entity";
 import { HistoricoCuenta } from "../entities/historico-cuenta.entity";
@@ -51,7 +51,7 @@ export async function crearHistoricoCuenta(
     saldo: cuenta.saldo,
     cuenta,
     ...(movimientoId ? { movimiento: { id: movimientoId } } : {}),
-  } as any);
+  } as DeepPartial<HistoricoCuenta>);
   await historicoRepo.save(nuevo);
 }
 

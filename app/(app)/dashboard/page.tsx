@@ -2,9 +2,9 @@ import { fetchDashboardData } from "./dashboard-data";
 import { DashboardClient } from "./dashboard-client";
 
 export default async function DashboardPage() {
+  let data: Awaited<ReturnType<typeof fetchDashboardData>>;
   try {
-    const data = await fetchDashboardData();
-    return <DashboardClient data={data} />;
+    data = await fetchDashboardData();
   } catch (error) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -19,4 +19,5 @@ export default async function DashboardPage() {
       </div>
     );
   }
+  return <DashboardClient data={data} />;
 }

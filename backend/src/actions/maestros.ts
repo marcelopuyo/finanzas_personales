@@ -271,7 +271,7 @@ export async function crearCuenta(input: z.infer<typeof cuentaCreateSchema>) {
   const userId = await requireUserId();
   const data = cuentaCreateSchema.parse(input);
   const ds = await getDb();
-  const { tipo, tarjeta, moneda, ...rest } = data;
+  const { tipo, moneda, ...rest } = data;
 
   const tipoCuenta = await ds
     .getRepository(TipoCuenta)
@@ -311,7 +311,7 @@ export async function actualizarCuenta(
   const userId = await requireUserId();
   const data = cuentaUpdateSchema.parse(input);
   const ds = await getDb();
-  const { tipo, tarjeta, moneda, incluirEnBalance, ...rest } = data;
+  const { tipo, moneda, incluirEnBalance, ...rest } = data;
 
   const existing = await ds
     .getRepository(Cuenta)
