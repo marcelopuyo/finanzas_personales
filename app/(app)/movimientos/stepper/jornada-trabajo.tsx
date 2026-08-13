@@ -119,15 +119,19 @@ export function JornadaTrabajo() {
         />
       )}
 
-      <SelectField
-        label="Cuenta (propina)"
-        value={data.cuentaPropina ? String(data.cuentaPropina) : ""}
-        onChange={(v) => handleSetData({ cuentaPropina: Number(v) })}
-        options={options.cuentas.map((c) => ({
-          value: String(c.id),
-          label: c.moneda ? `${c.nombre} (${c.moneda.codigoISO})` : c.nombre,
-        }))}
-      />
+      {/* El select de cuenta se muestra SOLO si la propina es mayor que 0
+          (si no hay propina no hay nada que depositar). */}
+      {requiereCuenta && (
+        <SelectField
+          label="Cuenta (propina)"
+          value={data.cuentaPropina ? String(data.cuentaPropina) : ""}
+          onChange={(v) => handleSetData({ cuentaPropina: Number(v) })}
+          options={options.cuentas.map((c) => ({
+            value: String(c.id),
+            label: c.moneda ? `${c.nombre} (${c.moneda.codigoISO})` : c.nombre,
+          }))}
+        />
+      )}
     </StepShell>
   );
 }

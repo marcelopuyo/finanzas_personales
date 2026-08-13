@@ -4,32 +4,7 @@ import { CrudTable } from "@/components/crud/CrudTable";
 import type { UsuarioOut } from "@/backend/src/queries/usuarios";
 import { eliminarUsuarioAdmin } from "@/backend/src/actions/usuarios";
 import type { ColumnDef } from "@tanstack/react-table";
-import { cn } from "@/lib/utils";
-
-function Badge({
-  ok,
-  label,
-}: {
-  ok: boolean;
-  label?: string;
-}) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[12px] font-medium",
-        ok ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
-      )}
-    >
-      <span
-        className={cn(
-          "h-1.5 w-1.5 rounded-full",
-          ok ? "bg-success" : "bg-danger"
-        )}
-      />
-      {label ?? (ok ? "Sí" : "No")}
-    </span>
-  );
-}
+import { Badge } from "@/components/ui/badge";
 
 const columns: ColumnDef<UsuarioOut>[] = [
   {

@@ -3,12 +3,14 @@
 import type { z } from "zod";
 import { getDb } from "../db";
 import { requireUserId } from "../lib/auth";
+import { Concepto } from "../entities/concepto.entity";
 import { JornadaTrabajo } from "../entities/jornada-trabajo.entity";
 import { PeriodoTrabajo } from "../entities/periodo-trabajo.entity";
 import { Trabajo } from "../entities/trabajo.entity";
 import { Cuenta } from "../entities/cuenta.entity";
 import { Movimiento } from "../entities/movimiento.entity";
 import { crearHistoricoCuenta, dbError, refresh } from "../lib/action-helpers";
+import { montoEnMonedaPredeterminada } from "../lib/cotizaciones";
 import {
   getJornadaTrabajoById,
   getPeriodoTrabajoById,
@@ -207,69 +209,138 @@ export async function crearJornadaTrabajo(
   }
   const data = parsed.data;
   const ds = await getDb();
-  const { idPeriodo, crearPeriodoAutomatico, idTrabajo, ...rest } = data;
+  const { idPeriodo, crearPeriodoAutomatico, idTrabajo, idCuenta, ...rest } = data;
 
+  // Propina: si > 0 se deposita en la cuenta elegida (igual que el wizard
+  // cargarJornadaTrabajo). La conversión a moneda predeterminada va fuera del tx.
+  const propina = data.montoPropina ?? 0;
+  if (propina > 0 && !idCuenta) {
+    throw new Error("Seleccioná la cuenta para depositar la propina");
+  }
+  const propinaPredeterminada =
+    propina > 0 && idCuenta
+      ? await montoEnMonedaPredeterminada(
+          idCuenta,
+          propina,
+          new Date(data.fechaJornada)
+        )
+      : propina;
+
+  let createdId = "";
   try {
-    // Período de trabajo: si se eligió "crear período automático" se genera un
-    // período de una sola jornada (fechaDesde = fechaHasta = fecha de la
-    // jornada); si no, se usa el período existente seleccionado.
-    let periodo: PeriodoTrabajo | null = null;
-    let trabajo: Trabajo | null = null;
-    if (crearPeriodoAutomatico) {
-      if (!idTrabajo) {
-        throw new Error("Seleccioná el trabajo para crear el período automático");
+    await ds.transaction(async (manager) => {
+      const periodoTrabajoRepo = manager.getRepository(PeriodoTrabajo);
+      const jornadaRepo = manager.getRepository(JornadaTrabajo);
+      const trabajoRepo = manager.getRepository(Trabajo);
+      const cuentaRepo = manager.getRepository(Cuenta);
+      const conceptoRepo = manager.getRepository(Concepto);
+      const movRepo = manager.getRepository(Movimiento);
+
+      // Período de trabajo: si se eligió "crear período automático" se genera
+      // un período de una sola jornada (fechaDesde = fechaHasta = fecha de la
+      // jornada); si no, se usa el período existente seleccionado.
+      let periodo: PeriodoTrabajo | null = null;
+      let trabajo: Trabajo | null = null;
+      if (crearPeriodoAutomatico) {
+        if (!idTrabajo) {
+          throw new Error("Seleccioná el trabajo para crear el período automático");
+        }
+        trabajo = await trabajoRepo.findOneBy({
+          id: idTrabajo,
+          usuario: { id: userId },
+        });
+        if (!trabajo) {
+          throw new Error(`Trabajo con id ${idTrabajo} no encontrado`);
+        }
+        // String directo (patrón de fechaJornada): evita el desfase de zona
+        // horaria al guardar en columnas `date` (un Date a medianoche UTC en
+        // GMT-4 cae en el día anterior).
+        const d = data.fechaJornada as unknown as Date;
+        periodo = await periodoTrabajoRepo.save(
+          periodoTrabajoRepo.create({ fechaDesde: d, fechaHasta: d, trabajo })
+        );
+      } else {
+        if (!idPeriodo) {
+          throw new Error("Seleccioná el período de trabajo");
+        }
+        periodo = await periodoTrabajoRepo.findOne({
+          where: { id: idPeriodo, trabajo: { usuario: { id: userId } } },
+          relations: { trabajo: true },
+        });
+        if (!periodo) {
+          throw new Error(`Período de trabajo con id ${idPeriodo} no encontrado`);
+        }
       }
-      trabajo = await ds.getRepository(Trabajo).findOneBy({
-        id: idTrabajo,
-        usuario: { id: userId },
-      });
-      if (!trabajo) {
-        throw new Error(`Trabajo con id ${idTrabajo} no encontrado`);
+
+      const precioHora = trabajo?.precioHora ?? periodo?.trabajo?.precioHora;
+      if (!periodo || !precioHora) {
+        throw new Error("No se pudo determinar el trabajo del período");
       }
-      // String directo (patrón de fechaJornada): evita el desfase de zona
-      // horaria al guardar en columnas `date` (un Date a medianoche UTC en
-      // GMT-4 cae en el día anterior).
-      const d = data.fechaJornada as unknown as Date;
-      periodo = await ds.getRepository(PeriodoTrabajo).save(
-        ds.getRepository(PeriodoTrabajo).create({ fechaDesde: d, fechaHasta: d, trabajo })
+      const montoJornada = calcularMontoJornada(
+        data.horaDesde,
+        data.horaHasta,
+        precioHora
       );
-    } else {
-      if (!idPeriodo) {
-        throw new Error("Seleccioná el período de trabajo");
-      }
-      periodo = await ds.getRepository(PeriodoTrabajo).findOne({
-        where: { id: idPeriodo, trabajo: { usuario: { id: userId } } },
-        relations: { trabajo: true },
+
+      const created = await jornadaRepo.save(
+        jornadaRepo.create({
+          ...rest,
+          periodoTrabajo: periodo,
+          fechaCarga: new Date(),
+          montoJornada,
+        })
+      );
+      createdId = created.id;
+
+      // Recalcular el monto a cobrar del período (SIN propina).
+      const periodoActualizado = await periodoTrabajoRepo.findOne({
+        where: { id: periodo.id },
+        relations: { jornadas: true },
       });
-      if (!periodo) {
-        throw new Error(`Período de trabajo con id ${idPeriodo} no encontrado`);
+      if (periodoActualizado) {
+        periodoActualizado.montoACobrar = calcularMontoACobrar(
+          periodoActualizado.jornadas ?? []
+        );
+        await periodoTrabajoRepo.save(periodoActualizado);
       }
-    }
 
-    const precioHora = trabajo?.precioHora ?? periodo?.trabajo?.precioHora;
-    if (!periodo || !precioHora) {
-      throw new Error("No se pudo determinar el trabajo del período");
-    }
-    const montoJornada = calcularMontoJornada(
-      data.horaDesde,
-      data.horaHasta,
-      precioHora
-    );
+      // Depósito de la propina en la cuenta elegida (como el wizard).
+      if (propina > 0 && idCuenta) {
+        const cuenta = await cuentaRepo.findOneBy({
+          id: idCuenta,
+          usuario: { id: userId },
+        });
+        if (!cuenta) {
+          throw new Error(`Cuenta con id ${idCuenta} no encontrada`);
+        }
+        const concepto = await conceptoRepo.findOneBy({
+          nombre: "Cobro Propina",
+        });
+        if (!concepto) {
+          throw new Error("Concepto 'Cobro Propina' no encontrado");
+        }
 
-    const repo = ds.getRepository(JornadaTrabajo);
-    const created = await repo.save(
-      repo.create({
-        ...rest,
-        periodoTrabajo: periodo,
-        fechaCarga: new Date(),
-        montoJornada,
-      })
-    );
+        cuenta.saldo += propina;
+        await cuentaRepo.save(cuenta);
 
-    await actualizarMontoACobrarPeriodo(periodo.id);
+        const mov = await movRepo.save(
+          movRepo.create({
+            fecha: data.fechaJornada,
+            monto: propinaPredeterminada,
+            montoCuentaMonedaOrigen: propina,
+            cuenta,
+            concepto,
+            // Vínculo a la jornada: al borrar/editar la jornada se localiza
+            // este movimiento para revertir o recrear el depósito.
+            jornadaTrabajo: created,
+          })
+        );
+        await crearHistoricoCuenta(manager, cuenta, mov.id);
+      }
+    });
 
     refresh();
-    return getJornadaTrabajoById(created.id);
+    return getJornadaTrabajoById(createdId);
   } catch (error) {
     dbError(error, "Jornada de trabajo");
   }
@@ -295,27 +366,119 @@ export async function actualizarJornadaTrabajo(
   if (!idPeriodo) {
     throw new Error("idPeriodo es requerido");
   }
-  const periodo = await ds.getRepository(PeriodoTrabajo).findOne({
-    where: { id: idPeriodo, trabajo: { usuario: { id: userId } } },
-    relations: { trabajo: true },
-  });
-  if (!periodo) {
-    throw new Error(`Período de trabajo con id ${idPeriodo} no encontrado`);
-  }
 
-  const montoJornada = calcularMontoJornada(
-    data.horaDesde ?? existing.horaDesde,
-    data.horaHasta ?? existing.horaHasta,
-    periodo.trabajo.precioHora
-  );
+  // Propina nueva (el form siempre la envía; fallback al valor actual).
+  const propina = data.montoPropina ?? existing.montoPropina ?? 0;
+  const idCuenta = data.idCuenta;
+  if (propina > 0 && !idCuenta) {
+    throw new Error("Seleccioná la cuenta para depositar la propina");
+  }
+  const fechaStr =
+    data.fechaJornada ?? String(existing.fechaJornada).slice(0, 10);
+  const propinaPredeterminada =
+    propina > 0 && idCuenta
+      ? await montoEnMonedaPredeterminada(idCuenta, propina, new Date(fechaStr))
+      : propina;
 
   try {
-    // Excluimos idPeriodo (no es columna; se asigna vía periodoTrabajo)
-    const { idPeriodo: _ignored, ...restData } = data;
-    Object.assign(existing, restData, { montoJornada, periodoTrabajo: periodo });
-    await ds.getRepository(JornadaTrabajo).save(existing);
+    await ds.transaction(async (manager) => {
+      const periodoTrabajoRepo = manager.getRepository(PeriodoTrabajo);
+      const jornadaRepo = manager.getRepository(JornadaTrabajo);
+      const cuentaRepo = manager.getRepository(Cuenta);
+      const conceptoRepo = manager.getRepository(Concepto);
+      const movRepo = manager.getRepository(Movimiento);
 
-    await actualizarMontoACobrarPeriodo(idPeriodo);
+      const periodo = await periodoTrabajoRepo.findOne({
+        where: { id: idPeriodo, trabajo: { usuario: { id: userId } } },
+        relations: { trabajo: true },
+      });
+      if (!periodo) {
+        throw new Error(`Período de trabajo con id ${idPeriodo} no encontrado`);
+      }
+
+      const montoJornada = calcularMontoJornada(
+        data.horaDesde ?? existing.horaDesde,
+        data.horaHasta ?? existing.horaHasta,
+        periodo.trabajo.precioHora
+      );
+
+      // Revertir el/los depósitos de propina anteriores vinculados a la jornada
+      // (creados por el wizard o por el CRUD) y recrear con los valores nuevos.
+      const propinasViejas = await movRepo.find({
+        where: { jornadaTrabajo: { id }, eliminado: false },
+        relations: { cuenta: true },
+      });
+      for (const mov of propinasViejas) {
+        const cuenta = mov.cuenta;
+        if (cuenta) {
+          // Se revierte con el monto EN LA MONEDA DE LA CUENTA (el delta real
+          // aplicado al saldo), no con `monto` (moneda predeterminada).
+          cuenta.saldo -= mov.montoCuentaMonedaOrigen;
+          await cuentaRepo.save(cuenta);
+          await crearHistoricoCuenta(manager, cuenta);
+        }
+        mov.eliminado = true;
+        await movRepo.save(mov);
+      }
+
+      // Guardar la jornada actualizada. Excluimos idPeriodo (no es columna; se
+      // asigna vía periodoTrabajo) e idCuenta (no es columna de la jornada).
+      const {
+        idPeriodo: _ignored,
+        idCuenta: _cuentaIgnored,
+        ...restData
+      } = data;
+      Object.assign(existing, restData, {
+        montoPropina: propina,
+        montoJornada,
+        periodoTrabajo: periodo,
+      });
+      await jornadaRepo.save(existing);
+
+      // Recalcular el monto a cobrar del período (SIN propina).
+      const periodoActualizado = await periodoTrabajoRepo.findOne({
+        where: { id: idPeriodo },
+        relations: { jornadas: true },
+      });
+      if (periodoActualizado) {
+        periodoActualizado.montoACobrar = calcularMontoACobrar(
+          periodoActualizado.jornadas ?? []
+        );
+        await periodoTrabajoRepo.save(periodoActualizado);
+      }
+
+      // Depósito nuevo de la propina (si corresponde).
+      if (propina > 0 && idCuenta) {
+        const cuenta = await cuentaRepo.findOneBy({
+          id: idCuenta,
+          usuario: { id: userId },
+        });
+        if (!cuenta) {
+          throw new Error(`Cuenta con id ${idCuenta} no encontrada`);
+        }
+        const concepto = await conceptoRepo.findOneBy({
+          nombre: "Cobro Propina",
+        });
+        if (!concepto) {
+          throw new Error("Concepto 'Cobro Propina' no encontrado");
+        }
+
+        cuenta.saldo += propina;
+        await cuentaRepo.save(cuenta);
+
+        const mov = await movRepo.save(
+          movRepo.create({
+            fecha: fechaStr,
+            monto: propinaPredeterminada,
+            montoCuentaMonedaOrigen: propina,
+            cuenta,
+            concepto,
+            jornadaTrabajo: existing,
+          })
+        );
+        await crearHistoricoCuenta(manager, cuenta, mov.id);
+      }
+    });
 
     refresh();
     return getJornadaTrabajoById(id);
@@ -352,7 +515,9 @@ export async function eliminarJornadaTrabajo(id: string) {
       for (const mov of propinas) {
         const cuenta = mov.cuenta;
         if (cuenta) {
-          cuenta.saldo -= mov.monto;
+          // Se revierte con el monto EN LA MONEDA DE LA CUENTA (el delta real
+          // aplicado al saldo), no con `monto` (moneda predeterminada).
+          cuenta.saldo -= mov.montoCuentaMonedaOrigen;
           await cuentaRepo.save(cuenta);
           await crearHistoricoCuenta(manager, cuenta);
         }

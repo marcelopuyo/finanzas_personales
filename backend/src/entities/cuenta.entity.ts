@@ -24,6 +24,12 @@ export class Cuenta {
   })
   eliminado: boolean;
 
+  // Indica si la cuenta forma parte del cálculo del "Balance Actual" del
+  // dashboard. Lo configura el usuario desde el CRUD de cuentas; por defecto
+  // queda habilitada (true) al crear una cuenta.
+  @Column({ default: true })
+  incluirEnBalance: boolean;
+
   // FK a Tarjeta. La relación OneToOne se agrega al migrar el módulo de
   // tarjetas (Fase 4); por ahora se mapea como columna simple.
   @Column({ type: "int", nullable: true })

@@ -41,6 +41,8 @@ export interface CuentaOut {
   id: number;
   nombre: string;
   saldo: number;
+  /** Si la cuenta participa del "Balance Actual" del dashboard. */
+  incluirEnBalance: boolean;
   tipo: { nombre: string } | null;
   tarjeta: null;
   moneda: { nombre: string; codigoISO: string } | null;
@@ -186,6 +188,7 @@ export async function getAllCuentas(): Promise<CuentaOut[]> {
     id: r.id,
     nombre: r.nombre,
     saldo: r.saldo,
+    incluirEnBalance: r.incluirEnBalance,
     tipo: r.tipo ? { nombre: r.tipo.nombre } : null,
     tarjeta: null,
     moneda: r.moneda
@@ -206,6 +209,7 @@ export async function getCuentaById(id: number): Promise<CuentaOut | null> {
         id: r.id,
         nombre: r.nombre,
         saldo: r.saldo,
+        incluirEnBalance: r.incluirEnBalance,
         tipo: r.tipo ? { nombre: r.tipo.nombre } : null,
         tarjeta: null,
         moneda: r.moneda

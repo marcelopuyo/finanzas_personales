@@ -36,5 +36,7 @@ export const jornadaTrabajoCreateSchema = z.object({
   idPeriodo: z.number().optional(),
   crearPeriodoAutomatico: z.boolean().optional().default(false),
   idTrabajo: z.number().optional(),
+  // Cuenta donde se deposita la propina (requerida si montoPropina > 0).
+  idCuenta: z.number().optional(),
 });
 export const jornadaTrabajoUpdateSchema = jornadaTrabajoCreateSchema.partial();

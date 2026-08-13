@@ -29,6 +29,8 @@ export const cuentaCreateSchema = z.object({
   tipo: z.string().min(1),
   tarjeta: z.string().optional(),
   moneda: z.string().min(1),
+  // Indica si la cuenta participa del "Balance Actual" (default: sí).
+  incluirEnBalance: z.boolean().optional().default(true),
 });
 export const cuentaUpdateSchema = cuentaCreateSchema.partial();
 

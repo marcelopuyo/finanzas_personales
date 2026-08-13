@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { FormField } from "@/components/crud/CrudForm";
-import { fetchPeriodosTrabajo, fetchTrabajosId } from "../options";
+import { fetchCuentasId, fetchPeriodosTrabajo, fetchTrabajosId } from "../options";
 
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
@@ -14,6 +14,8 @@ export const jornadaTrabajoSchema = z
     // un número (string) = id del período existente seleccionado.
     idPeriodo: z.string().min(1, "Seleccione un período"),
     idTrabajo: z.string().optional(),
+    // Cuenta donde se deposita la propina (se pide solo si propina > 0).
+    idCuenta: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.idPeriodo === "auto" && !data.idTrabajo) {
@@ -21,6 +23,13 @@ export const jornadaTrabajoSchema = z
         code: z.ZodIssueCode.custom,
         path: ["idTrabajo"],
         message: "Seleccione el trabajo",
+      });
+    }
+    if ((data.montoPropina ?? 0) > 0 && !data.idCuenta) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["idCuenta"],
+        message: "Seleccione la cuenta para la propina",
       });
     }
   });
@@ -32,6 +41,16 @@ const camposBase: FormField[] = [
   { name: "horaHasta", label: "Hora Hasta", type: "time" },
   { name: "montoPropina", label: "Propina", type: "number", placeholder: "0.00" },
 ];
+
+// Cuenta donde se deposita la propina. Solo se muestra si la propina > 0
+// (mismo criterio que el wizard de movimientos).
+const campoCuentaPropina: FormField = {
+  name: "idCuenta",
+  label: "Cuenta (propina)",
+  type: "select",
+  optionsFrom: fetchCuentasId,
+  showIf: (v) => Number(v.montoPropina ?? 0) > 0,
+};
 
 // Para "Nueva Jornada": el select de período incluye la opción
 // "Cargar período automático" y, al elegirla, aparece el select de Trabajo.
@@ -51,6 +70,7 @@ export const jornadaTrabajoFields: FormField[] = [
     optionsFrom: fetchTrabajosId,
     showIf: (v) => v.idPeriodo === "auto",
   },
+  campoCuentaPropina,
 ];
 
 // Para "Editar Jornada": solo períodos existentes (sin "auto").
@@ -62,4 +82,5 @@ export const jornadaTrabajoFieldsEditar: FormField[] = [
     type: "select",
     optionsFrom: fetchPeriodosTrabajo,
   },
+  campoCuentaPropina,
 ];

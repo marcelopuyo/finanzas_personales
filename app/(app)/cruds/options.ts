@@ -27,6 +27,15 @@ export async function fetchCuentas() {
   return rows.map((r) => ({ value: r.nombre, label: r.nombre }));
 }
 
+// Variante con value = ID (para la cuenta de propina de las jornadas).
+export async function fetchCuentasId() {
+  const rows = await getAllCuentas();
+  return rows.map((r) => ({
+    value: String(r.id),
+    label: r.moneda ? `${r.nombre} (${r.moneda.codigoISO})` : r.nombre,
+  }));
+}
+
 export async function fetchTarjetas() {
   const rows = await getAllTarjetas();
   return rows.map((r) => ({ value: r.nombre, label: r.nombre }));

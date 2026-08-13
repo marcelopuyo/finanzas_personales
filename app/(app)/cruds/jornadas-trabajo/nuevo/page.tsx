@@ -6,11 +6,15 @@ import { timeToDecimal } from "@/lib/utils";
 export default function NuevaJornadaTrabajoPage() {
   return <CrudForm title="Nueva Jornada de Trabajo" fields={jornadaTrabajoFields} schema={jornadaTrabajoSchema} onSubmit={async (d) => {
     const idPeriodo = d.idPeriodo as string;
+    const propina = Number(d.montoPropina ?? 0);
     await crearJornadaTrabajo({
       fechaJornada: d.fechaJornada as string,
       horaDesde: timeToDecimal(d.horaDesde as string),
       horaHasta: timeToDecimal(d.horaHasta as string),
-      montoPropina: d.montoPropina ? Number(d.montoPropina) : 0,
+      montoPropina: propina,
+      ...(propina > 0
+        ? { idCuenta: d.idCuenta ? Number(d.idCuenta) : undefined }
+        : {}),
       ...(idPeriodo === "auto"
         ? { crearPeriodoAutomatico: true, idTrabajo: Number(d.idTrabajo) }
         : { idPeriodo: Number(idPeriodo), crearPeriodoAutomatico: false }),

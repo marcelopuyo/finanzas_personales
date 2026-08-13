@@ -311,7 +311,7 @@ export async function actualizarCuenta(
   const userId = await requireUserId();
   const data = cuentaUpdateSchema.parse(input);
   const ds = await getDb();
-  const { tipo, tarjeta, moneda, ...rest } = data;
+  const { tipo, tarjeta, moneda, incluirEnBalance, ...rest } = data;
 
   const existing = await ds
     .getRepository(Cuenta)
@@ -338,6 +338,12 @@ export async function actualizarCuenta(
       throw new Error(`Moneda con nombre "${moneda}" no encontrada`);
     }
     existing.moneda = monedaEntity;
+  }
+
+  // `incluirEnBalance` se aplica solo si viene definido (en edición el form
+  // siempre lo envía; si un caller lo omite se conserva el valor actual).
+  if (incluirEnBalance !== undefined) {
+    existing.incluirEnBalance = incluirEnBalance;
   }
 
   try {

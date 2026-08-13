@@ -1,6 +1,7 @@
 import { Between, In, IsNull, LessThanOrEqual, MoreThan, MoreThanOrEqual } from "typeorm";
 import { getDb } from "../db";
-import { requireUserId } from "../lib/auth";
+import { getSessionUser, requireUserId } from "../lib/auth";
+import { convertir } from "../lib/cotizaciones";
 import { Cuenta } from "../entities/cuenta.entity";
 import { Gasto } from "../entities/gasto.entity";
 import { HistoricoCuenta } from "../entities/historico-cuenta.entity";
@@ -53,20 +54,26 @@ export async function getBalanceActual(): Promise<number> {
   const userId = await requireUserId();
   const ds = await getDb();
 
-  // Cuentas en dólares de tipo bancaria o caja
+  // Cuentas que el usuario marcó como parte del balance actual
+  // (campo "Incluir en el balance actual" del CRUD de cuentas).
   const cuentas = await ds.getRepository(Cuenta).find({
     where: {
       usuario: { id: userId },
       eliminado: false,
-      tipo: [{ nombre: "Cuenta Bancaria" }, { nombre: "Caja Fisica" }],
-      moneda: { nombre: "Dolar Estadounidense" },
+      incluirEnBalance: true,
     },
-    relations: { tipo: true, moneda: true },
+    relations: { moneda: true },
   });
+
+  // Moneda predeterminada del usuario: si una cuenta está en OTRA moneda, su
+  // saldo se convierte a esta antes de sumarse al balance (via cotización).
+  const sesion = await getSessionUser();
+  const predeterminada = sesion?.monedaPredeterminada;
+  const hoy = new Date();
 
   let saldoCajas = 0;
   for (const c of cuentas) {
-    saldoCajas += c.saldo;
+    saldoCajas += await convertir(c.saldo, c.moneda, predeterminada, hoy);
   }
 
   // Gastos pendientes (saldo > 0)

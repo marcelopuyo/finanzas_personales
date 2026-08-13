@@ -1,6 +1,7 @@
 import { getDb } from "../db";
 import { requireUserId } from "../lib/auth";
 import { JornadaTrabajo } from "../entities/jornada-trabajo.entity";
+import { Movimiento } from "../entities/movimiento.entity";
 import { PeriodoTrabajo } from "../entities/periodo-trabajo.entity";
 import { Trabajo } from "../entities/trabajo.entity";
 
@@ -153,14 +154,26 @@ export async function getAllJornadasTrabajo(): Promise<
 
 export async function getJornadaTrabajoById(
   id: string
-): Promise<(JornadaTrabajoOut & { periodoTrabajoId?: number }) | null> {
+): Promise<
+  (JornadaTrabajoOut & { periodoTrabajoId?: number; cuentaPropinaId?: number }) | null
+> {
   const userId = await requireUserId();
   const ds = await getDb();
   const r = await ds.getRepository(JornadaTrabajo).findOne({
     where: { id, periodoTrabajo: { trabajo: { usuario: { id: userId } } }, eliminado: false },
     relations: { periodoTrabajo: true },
   });
-  return r
-    ? { ...mapJornada(r), periodoTrabajoId: r.periodoTrabajo?.id }
-    : null;
+  if (!r) return null;
+  // Cuenta donde se depositó la propina (movimiento "Cobro Propina" vinculado
+  // a la jornada). Se usa para preseleccionar el select al editar.
+  const mov = await ds.getRepository(Movimiento).findOne({
+    where: { jornadaTrabajo: { id }, eliminado: false },
+    relations: { cuenta: true },
+    order: { fecha: "DESC" },
+  });
+  return {
+    ...mapJornada(r),
+    periodoTrabajoId: r.periodoTrabajo?.id,
+    cuentaPropinaId: mov?.cuenta?.id ?? undefined,
+  };
 }
