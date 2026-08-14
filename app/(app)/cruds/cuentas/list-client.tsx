@@ -6,6 +6,7 @@ import { actualizarCuenta, eliminarCuenta } from "@/backend/src/actions/maestros
 import type { ColumnDef } from "@tanstack/react-table";
 import { numberToCurrency } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
+import { CurrencyFlag } from "@/components/ui/currency-flag";
 import { toast } from "sonner";
 
 interface Props { initialData: CuentaOut[] }
@@ -46,7 +47,20 @@ export function CuentasListClient({ initialData }: Props) {
       { accessorKey: "nombre", header: "Nombre" },
       { accessorKey: "saldo", header: "Saldo", meta: { align: "right" as const, isCurrency: true, exportValue: (row: CuentaOut) => numberToCurrency(row.saldo, row.moneda?.codigoISO ?? "ARS") }, cell: ({ getValue, row }) => numberToCurrency(getValue<number>() ?? 0, row.original.moneda?.codigoISO ?? "ARS") },
       { accessorFn: (r) => r.tipo?.nombre ?? "", id: "tipo", header: "Tipo" },
-      { accessorFn: (r) => r.moneda?.nombre ?? "", id: "moneda", header: "Moneda" },
+      {
+        accessorFn: (r) => r.moneda?.nombre ?? "",
+        id: "moneda",
+        header: "Moneda",
+        cell: ({ row }) => {
+          const m = row.original.moneda;
+          return (
+            <span className="inline-flex items-center gap-1.5">
+              <CurrencyFlag pais={m?.codigoPais} />
+              {m?.nombre ?? ""}
+            </span>
+          );
+        },
+      },
       {
         accessorKey: "incluirEnBalance",
         header: "Balance",

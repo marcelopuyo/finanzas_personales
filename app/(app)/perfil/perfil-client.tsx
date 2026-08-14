@@ -6,6 +6,7 @@ import { KeyRound, LogOut, Moon, ShieldCheck, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "@/components/layout/theme-provider";
 import { Modal } from "@/components/ui/modal";
+import { Combobox } from "@/components/ui/combobox";
 import { cambiarPassword, actualizarMonedaPredeterminada } from "@/backend/src/actions/cuenta";
 import { NO_REMEMBER, PENDING_CLEAR } from "@/lib/session-flags";
 import { cn } from "@/lib/utils";
@@ -29,7 +30,7 @@ export default function PerfilClient({
   email: string;
   esAdmin: boolean;
   initials: string;
-  monedas: { id: number; nombre: string; codigoISO: string }[];
+  monedas: { id: number; nombre: string; codigoISO: string; codigoPais: string | null }[];
   monedaPredeterminadaId: number;
 }) {
   const { theme, setTheme } = useTheme();
@@ -162,17 +163,17 @@ export default function PerfilClient({
             Se usa para mostrar el balance actual y las tarjetas sintéticas del dashboard.
           </p>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-            <select
-              value={monedaId}
-              onChange={(e) => setMonedaId(Number(e.target.value))}
-              className={inputCls}
-            >
-              {monedas.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.nombre} ({m.codigoISO})
-                </option>
-              ))}
-            </select>
+            <Combobox
+              value={monedaId ? String(monedaId) : ""}
+              onChange={(v) => setMonedaId(Number(v))}
+              options={monedas.map((m) => ({
+                value: String(m.id),
+                label: `${m.nombre} (${m.codigoISO})`,
+                flag: m.codigoPais,
+              }))}
+              placeholder="Seleccionar moneda..."
+              className="w-full"
+            />
             <button
               type="button"
               onClick={handleGuardarMoneda}

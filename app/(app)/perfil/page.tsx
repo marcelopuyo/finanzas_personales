@@ -30,6 +30,7 @@ export default async function PerfilPage() {
         id: m.id,
         nombre: m.nombre,
         codigoISO: m.codigoISO,
+        codigoPais: m.codigoPais,
       }))}
       monedaPredeterminadaId={monedaPredeterminadaId}
     />

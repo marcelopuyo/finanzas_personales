@@ -18,6 +18,6 @@ export const cuentaFields: FormField[] = [
   { name: "nombre", label: "Nombre", type: "text", placeholder: "Ej. Cuenta Galicia $" },
   { name: "saldo", label: "Saldo", type: "number", placeholder: "0.00" },
   { name: "tipo", label: "Tipo", type: "select", optionsFrom: fetchTiposCuenta },
-  { name: "moneda", label: "Moneda", type: "select", optionsFrom: fetchMonedas },
+  { name: "moneda", label: "Moneda", type: "combobox", optionsFrom: fetchMonedas },
   { name: "incluirEnBalance", label: "Incluir en el balance actual", type: "boolean" },
 ];

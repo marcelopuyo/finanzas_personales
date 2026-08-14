@@ -1,0 +1,182 @@
+import { MigrationInterface, QueryRunner } from "typeorm";
+
+// Agrega `moneda.codigoPais` (ISO 3166-1 alpha-2, minúscula; "eu" para el euro)
+// usado para mostrar la bandera de cada divisa (flag-icons) junto al nombre.
+// Aprovecha la misma migración para SEMBRAR el catálogo de monedas ISO 4217
+// (activas y de uso común): nombre + símbolo (o ISO si no hay símbolo estándar)
+// + codigoISO + codigoPais. Idempotente: hace UPSERT por nombre (el nombre es
+// UNIQUE), así actualiza ARS/USD existentes y agrega el resto.
+//
+// Los códigos sin bandera propia (multipaís/fondos, ej. XOF/XAF/XPF/XCD)
+// quedan con codigoPais NULL → la UI no pinta bandera para ellos.
+const MONEDAS: [nombre: string, simbolo: string, iso: string, pais: string | null][] = [
+  ["Peso Argentino", "$", "ARS", "ar"],
+  ["Dolar Estadounidense", "U$S", "USD", "us"],
+  ["Euro", "€", "EUR", "eu"],
+  ["Libra Esterlina", "£", "GBP", "gb"],
+  ["Yen Japones", "¥", "JPY", "jp"],
+  ["Yuan Chino", "¥", "CNY", "cn"],
+  ["Real Brasileño", "R$", "BRL", "br"],
+  ["Peso Mexicano", "$", "MXN", "mx"],
+  ["Peso Chileno", "$", "CLP", "cl"],
+  ["Peso Colombiano", "$", "COP", "co"],
+  ["Peso Uruguayo", "$U", "UYU", "uy"],
+  ["Sol Peruano", "S/", "PEN", "pe"],
+  ["Boliviano", "Bs", "BOB", "bo"],
+  ["Guaraní", "₲", "PYG", "py"],
+  ["Bolívar Soberano", "Bs", "VES", "ve"],
+  ["Dólar Canadiense", "CA$", "CAD", "ca"],
+  ["Dólar Australiano", "A$", "AUD", "au"],
+  ["Dólar Neozelandés", "NZ$", "NZD", "nz"],
+  ["Franco Suizo", "CHF", "CHF", "ch"],
+  ["Corona Sueca", "kr", "SEK", "se"],
+  ["Corona Noruega", "kr", "NOK", "no"],
+  ["Corona Danesa", "kr", "DKK", "dk"],
+  ["Corona Islandesa", "kr", "ISK", "is"],
+  ["Corona Checa", "Kč", "CZK", "cz"],
+  ["Florín Húngaro", "Ft", "HUF", "hu"],
+  ["Zloty Polaco", "zł", "PLN", "pl"],
+  ["Leu Rumano", "lei", "RON", "ro"],
+  ["Lev Búlgaro", "лв", "BGN", "bg"],
+  ["Kuna Croata", "kn", "HRK", "hr"],
+  ["Rublo Ruso", "₽", "RUB", "ru"],
+  ["Lira Turca", "₺", "TRY", "tr"],
+  ["Grivna Ucraniana", "₴", "UAH", "ua"],
+  ["Rupia India", "₹", "INR", "in"],
+  ["Rupia Pakistaní", "₨", "PKR", "pk"],
+  ["Taka Bangladesí", "৳", "BDT", "bd"],
+  ["Rupia de Sri Lanka", "Rs", "LKR", "lk"],
+  ["Rupia Nepalí", "Rs", "NPR", "np"],
+  ["Rupia Indonesa", "Rp", "IDR", "id"],
+  ["Baht Tailandés", "฿", "THB", "th"],
+  ["Dong Vietnamita", "₫", "VND", "vn"],
+  ["Peso Filipino", "₱", "PHP", "ph"],
+  ["Ringgit Malayo", "RM", "MYR", "my"],
+  ["Dólar de Singapur", "S$", "SGD", "sg"],
+  ["Dólar de Hong Kong", "HK$", "HKD", "hk"],
+  ["Nuevo Dólar Taiwanés", "NT$", "TWD", "tw"],
+  ["Won Surcoreano", "₩", "KRW", "kr"],
+  ["Tenge Kazajo", "₸", "KZT", "kz"],
+  ["Som Uzbeko", "so'm", "UZS", "uz"],
+  ["Manat Azerí", "₼", "AZN", "az"],
+  ["Lari Georgiano", "₾", "GEL", "ge"],
+  ["Dram Armenio", "֏", "AMD", "am"],
+  ["Rublo Bielorruso", "Br", "BYN", "by"],
+  ["Leu Moldavo", "L", "MDL", "md"],
+  ["Dinar Serbio", "дин", "RSD", "rs"],
+  ["Denar Macedonio", "ден", "MKD", "mk"],
+  ["Lek Albanés", "L", "ALL", "al"],
+  ["Marco Bosnio", "KM", "BAM", "ba"],
+  ["Dinar Kuwaití", "د.ك", "KWD", "kw"],
+  ["Rial Saudí", "﷼", "SAR", "sa"],
+  ["Dírham de EAU", "د.إ", "AED", "ae"],
+  ["Rial Catarí", "ر.ق", "QAR", "qa"],
+  ["Dinar Bareiní", ".د.ب", "BHD", "bh"],
+  ["Rial Omaní", "ر.ع.", "OMR", "om"],
+  ["Dinar Jordano", "د.ا", "JOD", "jo"],
+  ["Nuevo Séquel Israelí", "₪", "ILS", "il"],
+  ["Libra Libanesa", "ل.ل", "LBP", "lb"],
+  ["Dinar Iraquí", "ع.د", "IQD", "iq"],
+  ["Rial Iraní", "﷼", "IRR", "ir"],
+  ["Libra Egipcia", "ج.م", "EGP", "eg"],
+  ["Dírham Marroquí", "د.م.", "MAD", "ma"],
+  ["Dinar Argelino", "د.ج", "DZD", "dz"],
+  ["Dinar Tunecino", "د.ت", "TND", "tn"],
+  ["Dinar Libio", "ل.د", "LYD", "ly"],
+  ["Libra Sudanesa", "ج.س", "SDG", "sd"],
+  ["Naira Nigeriana", "₦", "NGN", "ng"],
+  ["Cedi Ghanés", "₵", "GHS", "gh"],
+  ["Chelín Keniano", "KSh", "KES", "ke"],
+  ["Chelín Tanzano", "TSh", "TZS", "tz"],
+  ["Chelín Ugandés", "USh", "UGX", "ug"],
+  ["Rand Sudafricano", "R", "ZAR", "za"],
+  ["Birr Etíope", "Br", "ETB", "et"],
+  ["Rupia Mauriciana", "₨", "MUR", "mu"],
+  ["Rupia Seychellense", "₨", "SCR", "sc"],
+  ["Dólar de Barbados", "Bds$", "BBD", "bb"],
+  ["Dólar de las Bahamas", "B$", "BSD", "bs"],
+  ["Dólar de Jamaica", "J$", "JMD", "jm"],
+  ["Dólar de Trinidad y Tobago", "TT$", "TTD", "tt"],
+  ["Dólar de Guyana", "G$", "GYD", "gy"],
+  ["Dólar de Belice", "BZ$", "BZD", "bz"],
+  ["Dólar de las Islas Caimán", "CI$", "KYD", "ky"],
+  ["Dólar de Bermudas", "BD$", "BMD", "bm"],
+  ["Dólar de Fiyi", "FJ$", "FJD", "fj"],
+  ["Tala de Samoa", "WS$", "WST", "ws"],
+  ["Pa'anga de Tonga", "T$", "TOP", "to"],
+  ["Vatu de Vanuatu", "VT", "VUV", "vu"],
+  ["Kina de Papúa Nueva Guinea", "K", "PGK", "pg"],
+  ["Dólar de las Islas Salomón", "SI$", "SBD", "sb"],
+  ["Dólar de Surinam", "SR$", "SRD", "sr"],
+  ["Florín Antillano", "ƒ", "ANG", "cw"],
+  ["Florín de Aruba", "ƒ", "AWG", "aw"],
+  ["Chelín Somalí", "Sh", "SOS", "so"],
+  ["Franco Yibutiano", "Fdj", "DJF", "dj"],
+  ["Nakfa Eritreo", "Nfk", "ERN", "er"],
+  ["Dólar de Liberia", "L$", "LRD", "lr"],
+  ["Leone de Sierra Leona", "Le", "SLL", "sl"],
+  ["Dalasi de Gambia", "D", "GMD", "gm"],
+  ["Franco de Guinea", "FG", "GNF", "gn"],
+  ["Dobra de Santo Tomé y Príncipe", "Db", "STN", "st"],
+  ["Kwanza Angoleño", "Kz", "AOA", "ao"],
+  ["Kwacha Zambiano", "ZK", "ZMW", "zm"],
+  ["Kwacha Malauí", "MK", "MWK", "mw"],
+  ["Metical Mozambiqueño", "MT", "MZN", "mz"],
+  ["Lilangeni de Eswatini", "L", "SZL", "sz"],
+  ["Loti de Lesoto", "L", "LSL", "ls"],
+  ["Pula de Botsuana", "P", "BWP", "bw"],
+  ["Dólar de Namibia", "N$", "NAD", "na"],
+  ["Dólar de Zimbabue", "Z$", "ZWL", "zw"],
+  ["Ariary Malgache", "Ar", "MGA", "mg"],
+  ["Franco Ruandés", "FRw", "RWF", "rw"],
+  ["Franco Burundés", "FBu", "BIF", "bi"],
+  ["Franco Congoleño", "FC", "CDF", "cd"],
+  ["Franco de África Central", "FCFA", "XAF", null],
+  ["Franco de África Occidental", "FCFA", "XOF", null],
+  ["Franco CFP", "₣", "XPF", null],
+  ["Dólar del Caribe Oriental", "EC$", "XCD", null],
+  ["Tugrik Mongol", "₮", "MNT", "mn"],
+  ["Kip Laosiano", "₭", "LAK", "la"],
+  ["Riel Camboyano", "៛", "KHR", "kh"],
+  ["Kyat Birmano", "K", "MMK", "mm"],
+  ["Som Kirguís", "с", "KGS", "kg"],
+  ["Somoni Tayiko", "SM", "TJS", "tj"],
+  ["Manat Turcomano", "m", "TMT", "tm"],
+  ["Afgani Afgano", "؋", "AFN", "af"],
+  ["Rufiyaa de Maldivas", "Rf", "MVR", "mv"],
+  ["Ngultrum Butanés", "Nu.", "BTN", "bt"],
+  ["Dólar de Brunéi", "B$", "BND", "bn"],
+  ["Córdoba Nicaragüense", "C$", "NIO", "ni"],
+  ["Lempira Hondureño", "L", "HNL", "hn"],
+  ["Quetzal Guatemalteco", "Q", "GTQ", "gt"],
+  ["Colón Costarricense", "₡", "CRC", "cr"],
+  ["Balboa Panameño", "B/.", "PAB", "pa"],
+  ["Gourde Haitiano", "G", "HTG", "ht"],
+  ["Peso Dominicano", "RD$", "DOP", "do"],
+  ["Peso Cubano", "$", "CUP", "cu"],
+  ["Peso Convertible Cubano", "CUC", "CUC", "cu"],
+];
+
+export class AddCodigoPaisMoneda1786900000000 implements MigrationInterface {
+  name = "AddCodigoPaisMoneda1786900000000";
+
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `ALTER TABLE "moneda" ADD "codigoPais" character varying(2)`
+    );
+    for (const [nombre, simbolo, iso, pais] of MONEDAS) {
+      await queryRunner.query(
+        `INSERT INTO "moneda" ("nombre", "simbolo", "codigoISO", "codigoPais", "eliminado")
+         VALUES ($1, $2, $3, $4, false)
+         ON CONFLICT ("nombre") DO UPDATE SET
+           "codigoISO" = EXCLUDED."codigoISO",
+           "codigoPais" = EXCLUDED."codigoPais"`,
+        [nombre, simbolo, iso, pais]
+      );
+    }
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`ALTER TABLE "moneda" DROP COLUMN "codigoPais"`);
+  }
+}

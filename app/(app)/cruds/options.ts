@@ -14,7 +14,11 @@ export async function fetchTiposCuenta() {
 
 export async function fetchMonedas() {
   const rows = await getAllMonedas();
-  return rows.map((r) => ({ value: r.nombre, label: `${r.simbolo} - ${r.nombre}` }));
+  return rows.map((r) => ({
+    value: r.nombre,
+    label: `${r.simbolo} - ${r.nombre}`,
+    flag: r.codigoPais,
+  }));
 }
 
 export async function fetchPersonas() {

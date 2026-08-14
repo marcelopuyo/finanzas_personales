@@ -18,6 +18,11 @@ export class Moneda {
   @Column()
   codigoISO: string;
 
+  /** Código ISO 3166-1 alpha-2 del país (minúscula; "eu" en el euro).
+   * Se usa para mostrar la bandera de la divisa (flag-icons). */
+  @Column({ type: "varchar", length: 2, nullable: true })
+  codigoPais?: string | null;
+
   @Column({
     default: false,
   })

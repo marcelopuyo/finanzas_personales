@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Unbounded } from "next/font/google";
 import { cookies } from "next/headers";
+import "flag-icons/css/flag-icons.min.css";
 import ThemeProvider from "@/components/layout/theme-provider";
 import { ToasterProvider } from "@/components/layout/toaster";
 import { SessionGuard } from "@/components/auth/session-guard";

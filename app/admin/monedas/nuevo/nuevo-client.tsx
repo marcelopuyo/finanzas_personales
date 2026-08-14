@@ -15,6 +15,7 @@ export function NuevaMonedaClient() {
           simbolo: d.simbolo as string,
           nombre: d.nombre as string,
           codigoISO: d.codigoISO as string,
+          codigoPais: (d.codigoPais as string | undefined) || null,
         });
       }}
       cancelHref="/admin/monedas"

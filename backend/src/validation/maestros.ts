@@ -47,6 +47,14 @@ export const monedaCreateSchema = z.object({
   simbolo: z.string().min(1),
   nombre: z.string().min(1),
   codigoISO: z.string().min(1).transform((v) => v.trim().toUpperCase()),
+  // Código ISO 3166-1 del país para la bandera (minúscula; "eu" en el euro).
+  codigoPais: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .max(2)
+    .nullable()
+    .optional(),
 });
 export const monedaUpdateSchema = monedaCreateSchema.partial();
 

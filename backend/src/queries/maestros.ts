@@ -28,6 +28,8 @@ export interface MonedaOut {
   simbolo: string;
   nombre: string;
   codigoISO: string;
+  /** ISO 3166-1 del país (bandera); null si la moneda no tiene bandera. */
+  codigoPais: string | null;
 }
 
 export interface PersonaOut {
@@ -45,7 +47,7 @@ export interface CuentaOut {
   incluirEnBalance: boolean;
   tipo: { nombre: string } | null;
   tarjeta: null;
-  moneda: { nombre: string; codigoISO: string } | null;
+  moneda: { nombre: string; codigoISO: string; codigoPais: string | null } | null;
 }
 
 export interface CotizacionOut {
@@ -130,7 +132,7 @@ export async function getAllMonedas(): Promise<MonedaOut[]> {
   const rows = await ds
     .getRepository(Moneda)
     .find({ where: { eliminado: false } });
-  return rows.map((r) => ({ id: r.id, simbolo: r.simbolo, nombre: r.nombre, codigoISO: r.codigoISO }));
+  return rows.map((r) => ({ id: r.id, simbolo: r.simbolo, nombre: r.nombre, codigoISO: r.codigoISO, codigoPais: r.codigoPais ?? null }));
 }
 
 export async function getMonedaById(id: number): Promise<MonedaOut | null> {
@@ -138,7 +140,7 @@ export async function getMonedaById(id: number): Promise<MonedaOut | null> {
   const r = await ds
     .getRepository(Moneda)
     .findOne({ where: { id, eliminado: false } });
-  return r ? { id: r.id, simbolo: r.simbolo, nombre: r.nombre, codigoISO: r.codigoISO } : null;
+  return r ? { id: r.id, simbolo: r.simbolo, nombre: r.nombre, codigoISO: r.codigoISO, codigoPais: r.codigoPais ?? null } : null;
 }
 
 // ============================================================
@@ -196,7 +198,7 @@ export async function getAllCuentas(): Promise<CuentaOut[]> {
     tipo: r.tipo ? { nombre: r.tipo.nombre } : null,
     tarjeta: null,
     moneda: r.moneda
-      ? { nombre: r.moneda.nombre, codigoISO: r.moneda.codigoISO }
+      ? { nombre: r.moneda.nombre, codigoISO: r.moneda.codigoISO, codigoPais: r.moneda.codigoPais ?? null }
       : null,
   }));
 }
@@ -217,7 +219,7 @@ export async function getCuentaById(id: number): Promise<CuentaOut | null> {
         tipo: r.tipo ? { nombre: r.tipo.nombre } : null,
         tarjeta: null,
         moneda: r.moneda
-          ? { nombre: r.moneda.nombre, codigoISO: r.moneda.codigoISO }
+          ? { nombre: r.moneda.nombre, codigoISO: r.moneda.codigoISO, codigoPais: r.moneda.codigoPais ?? null }
           : null,
       }
     : null;

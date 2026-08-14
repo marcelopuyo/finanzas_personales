@@ -8,6 +8,7 @@ import { ArrowLeft, Save } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import type { ZodSchema } from "zod";
 
 export interface FormField {
@@ -16,14 +17,15 @@ export interface FormField {
   type:
     | "text"
     | "select"
+    | "combobox"
     | "textarea"
     | "date"
     | "number"
     | "time"
     | "password"
     | "boolean";
-  options?: { value: string; label: string }[];
-  optionsFrom?: () => Promise<{ value: string; label: string }[]>;
+  options?: ComboboxOption[];
+  optionsFrom?: () => Promise<ComboboxOption[]>;
   placeholder?: string;
   /** Opciones extra que se agregan al final del select (además de options/optionsFrom). */
   extraOptions?: { value: string; label: string }[];
@@ -69,7 +71,7 @@ export function CrudForm({
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [asyncOptions, setAsyncOptions] = useState<
-    Record<string, { value: string; label: string }[]>
+    Record<string, ComboboxOption[]>
   >({});
 
   // Cargar opciones asíncronas de los selects (ej. categorías, períodos)
@@ -185,6 +187,22 @@ export function CrudForm({
                         </option>
                       ))}
                     </select>
+                  )}
+                />
+              ) : field.type === "combobox" ? (
+                <Controller
+                  name={field.name}
+                  control={control}
+                  render={({ field: controllerField }) => (
+                    <Combobox
+                      id={field.name}
+                      name={controllerField.name}
+                      value={controllerField.value ?? ""}
+                      onBlur={controllerField.onBlur}
+                      onChange={(v) => controllerField.onChange(v)}
+                      options={asyncOptions[field.name] || field.options || []}
+                      placeholder={field.placeholder}
+                    />
                   )}
                 />
               ) : field.type === "boolean" ? (
