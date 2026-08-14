@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <!-- Recorte para la mitad derecha de la P (borde recto en x=291) -->
+    <clipPath id="mitadDer">
+      <rect x="291" y="0" width="221" height="512"/>
+    </clipPath>
+  </defs>
+  <rect x="16" y="16" width="480" height="480" rx="108" fill="#151517"/>
+  <rect x="16" y="16" width="480" height="480" rx="108" fill="none" stroke="#3e3f42" stroke-width="6"/>
+  <!-- Panza completa en AZUL: la mitad izquierda de ambos brazos queda azul -->
+  <path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267"
+        fill="none" stroke="#4c6ef5" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Palote de la P (azul) -->
+  <rect x="168" y="128" width="62" height="256" rx="16" fill="#4c6ef5"/>
+  <!-- Mitad derecha de los brazos + arco en ROJO (recortada desde x=291) -->
+  <g clip-path="url(#mitadDer)">
+    <path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267"
+          fill="none" stroke="#e03131" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
