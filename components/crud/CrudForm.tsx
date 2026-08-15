@@ -109,8 +109,10 @@ export function CrudForm({
       await onSubmit(data);
       toast.success(successMessage);
       router.push(cancelHref);
-    } catch {
-      toast.error("Error al guardar los datos");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Error al guardar los datos"
+      );
     } finally {
       setSubmitting(false);
     }

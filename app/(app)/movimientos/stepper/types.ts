@@ -41,6 +41,14 @@ export interface MovimientoData {
   idTrabajo: number;
 }
 
+/** Jornada existente del usuario (para pre-validar solapamiento de día/horas). */
+export interface JornadaWizardOut {
+  fechaJornada: Date;
+  horaDesde: number;
+  horaHasta: number;
+  trabajo: string;
+}
+
 /** Opciones precargadas en el Server Component para los selects del wizard. */
 export interface MovimientoOptions {
   cuentas: CuentaOut[];
@@ -53,6 +61,8 @@ export interface MovimientoOptions {
   /** Gastos pendientes (saldo > 0). */
   gastos: GastoOut[];
   categoriasGasto: CategoriaGastoOut[];
+  /** Jornadas existentes (para validar solapamiento de día/horas). */
+  jornadas: JornadaWizardOut[];
 }
 
 /** Índice de paso del wizard al que lleva cada tipo de movimiento (0=Selector, 8=Confirmación). */

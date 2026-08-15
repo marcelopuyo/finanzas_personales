@@ -11,7 +11,11 @@ import {
   formatFecha,
 } from "./ui";
 import { STEP_CONFIRMACION } from "./types";
-import { numberToCurrency } from "@/lib/utils";
+import {
+  decimalToTime,
+  numberToCurrency,
+  timeToDecimal,
+} from "@/lib/utils";
 
 /**
  * Paso del wizard: cargar una nueva jornada de trabajo.
@@ -29,10 +33,43 @@ export function JornadaTrabajo() {
   const periodoValido = data.crearPeriodoAutomatico
     ? data.idTrabajo > 0
     : data.periodoTrabajo > 0;
+
+  // Trabajo efectivo de la jornada (período seleccionado o trabajo del período
+  // automático) para validar que no exista otra jornada con día/horas solapadas.
+  const trabajoNombre = data.crearPeriodoAutomatico
+    ? options.trabajos.find((t) => t.id === data.idTrabajo)?.nombre
+    : options.periodosTrabajo.find((p) => p.id === data.periodoTrabajo)?.trabajo
+        ?.nombre;
+  const desdeNum = timeToDecimal(data.horaDesde);
+  const hastaNum = timeToDecimal(data.horaHasta);
+  const jornadaSolapada =
+    !!data.fecha && !!trabajoNombre && horaValida
+      ? options.jornadas.find(
+          (j) =>
+            j.trabajo === trabajoNombre &&
+            String(j.fechaJornada).slice(0, 10) === data.fecha &&
+            j.horaDesde < hastaNum &&
+            j.horaHasta > desdeNum
+        )
+      : undefined;
+  const haySolapamiento = !!jornadaSolapada;
+
+  // La fecha de la jornada debe caer dentro del período seleccionado.
+  const periodoSeleccionado = data.crearPeriodoAutomatico
+    ? undefined
+    : options.periodosTrabajo.find((p) => p.id === data.periodoTrabajo);
+  const fechaFueraDePeriodo =
+    !!data.fecha &&
+    !!periodoSeleccionado &&
+    (data.fecha < String(periodoSeleccionado.fechaDesde).slice(0, 10) ||
+      data.fecha > String(periodoSeleccionado.fechaHasta).slice(0, 10));
+
   const isValid =
     !!data.fecha &&
     horaValida &&
     periodoValido &&
+    !haySolapamiento &&
+    !fechaFueraDePeriodo &&
     (!requiereCuenta || data.cuentaPropina > 0);
 
   return (
@@ -131,6 +168,29 @@ export function JornadaTrabajo() {
             label: c.moneda ? `${c.nombre} (${c.moneda.codigoISO})` : c.nombre,
           }))}
         />
+      )}
+
+      {/* Aviso de solapamiento: ya existe otra jornada del mismo trabajo en el
+          mismo día con horas superpuestas ("Siguiente" queda deshabilitado). */}
+      {haySolapamiento && jornadaSolapada && (
+        <div className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-[13px] text-danger">
+          Ya existe una jornada de "{trabajoNombre}" el {formatFecha(data.fecha)}{" "}
+          de {decimalToTime(jornadaSolapada.horaDesde)} a{" "}
+          {decimalToTime(jornadaSolapada.horaHasta)}. No se pueden superponer
+          horas del mismo trabajo.
+        </div>
+      )}
+
+      {/* Aviso: la fecha de la jornada no cae dentro del período seleccionado
+          ("Siguiente" queda deshabilitado). */}
+      {fechaFueraDePeriodo && periodoSeleccionado && (
+        <div className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-[13px] text-danger">
+          La fecha {formatFecha(data.fecha)} no corresponde al período{" "}
+          {formatFecha(periodoSeleccionado.fechaDesde)} al{" "}
+          {formatFecha(periodoSeleccionado.fechaHasta)} de{" "}
+          {periodoSeleccionado.trabajo?.nombre}. Elegí otra fecha o un período
+          que la contenga.
+        </div>
       )}
     </StepShell>
   );

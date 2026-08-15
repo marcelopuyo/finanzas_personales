@@ -16,7 +16,15 @@ import { PeriodoTrabajo } from "../entities/periodo-trabajo.entity";
 import { Prestamo } from "../entities/prestamo.entity";
 import { Trabajo } from "../entities/trabajo.entity";
 import { crearHistoricoCuenta, refresh } from "../lib/action-helpers";
-import { calcularMontoACobrar, calcularMontoJornada } from "../lib/jornadas";
+import {
+  calcularMontoACobrar,
+  calcularMontoJornada,
+  encontrarJornadaSuperpuesta,
+  encontrarPeriodoSuperpuesto,
+  fechaEnRango,
+  formatearFechaDMA,
+  formatearHora,
+} from "../lib/jornadas";
 import { montoEnMonedaPredeterminada } from "../lib/cotizaciones";
 import {
   jornadaStepperSchema,
@@ -518,6 +526,8 @@ export async function cargarJornadaTrabajo(
     // período de una sola jornada (fechaDesde = fechaHasta = fecha de la
     // jornada); si no, se usa el período existente seleccionado por el usuario.
     let periodo: PeriodoTrabajo | null = null;
+    let trabajoIdJornada: number;
+    let nombreTrabajoJornada = "";
     if (data.crearPeriodoAutomatico) {
       if (!data.idTrabajo) {
         throw new Error(
@@ -530,6 +540,21 @@ export async function cargarJornadaTrabajo(
       });
       if (!trabajo) {
         throw new Error(`Trabajo con id ${data.idTrabajo} no encontrado`);
+      }
+      trabajoIdJornada = trabajo.id;
+      nombreTrabajoJornada = trabajo.nombre;
+      // El período automático (de un día) no debe superponerse con otro del
+      // mismo trabajo.
+      const superpuestoAuto = await encontrarPeriodoSuperpuesto(
+        periodoTrabajoRepo,
+        trabajo.id,
+        data.fecha,
+        data.fecha
+      );
+      if (superpuestoAuto) {
+        throw new Error(
+          `El período automático se superpone con "${formatearFechaDMA(superpuestoAuto.fechaDesde)} al ${formatearFechaDMA(superpuestoAuto.fechaHasta)}" del trabajo "${trabajo.nombre}"`
+        );
       }
       const d = data.fecha as unknown as Date;
       periodo = await periodoTrabajoRepo.save(
@@ -548,6 +573,42 @@ export async function cargarJornadaTrabajo(
           `Período de trabajo con id ${data.idPeriodo} no encontrado`
         );
       }
+      trabajoIdJornada = periodo.trabajo.id;
+      nombreTrabajoJornada = periodo.trabajo.nombre;
+      // El período seleccionado no debe superponerse con otro del mismo trabajo.
+      const superpuestoExistente = await encontrarPeriodoSuperpuesto(
+        periodoTrabajoRepo,
+        periodo.trabajo.id,
+        String(periodo.fechaDesde).slice(0, 10),
+        String(periodo.fechaHasta).slice(0, 10),
+        periodo.id
+      );
+      if (superpuestoExistente) {
+        throw new Error(
+          `El período seleccionado se superpone con "${formatearFechaDMA(superpuestoExistente.fechaDesde)} al ${formatearFechaDMA(superpuestoExistente.fechaHasta)}" del trabajo "${periodo.trabajo.nombre}"`
+        );
+      }
+      // La fecha de la jornada debe caer dentro del período seleccionado.
+      if (!fechaEnRango(data.fecha, periodo.fechaDesde, periodo.fechaHasta)) {
+        throw new Error(
+          `La fecha de la jornada (${formatearFechaDMA(data.fecha)}) no corresponde al período "${formatearFechaDMA(periodo.fechaDesde)} al ${formatearFechaDMA(periodo.fechaHasta)}" del trabajo "${periodo.trabajo.nombre}"`
+        );
+      }
+    }
+
+    // No debe existir otra jornada del mismo trabajo que se superponga en el
+    // mismo día y con horas solapadas.
+    const jornadaSuperpuesta = await encontrarJornadaSuperpuesta(
+      jornadaRepo,
+      trabajoIdJornada,
+      data.fecha,
+      data.horaDesde,
+      data.horaHasta
+    );
+    if (jornadaSuperpuesta) {
+      throw new Error(
+        `Ya existe una jornada de "${nombreTrabajoJornada}" el ${formatearFechaDMA(data.fecha)} de ${formatearHora(jornadaSuperpuesta.horaDesde)} a ${formatearHora(jornadaSuperpuesta.horaHasta)} (horas superpuestas)`
+      );
     }
 
     // 1. Crear la jornada (misma lógica que crearJornadaTrabajo del CRUD).

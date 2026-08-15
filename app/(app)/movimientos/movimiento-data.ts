@@ -1,6 +1,7 @@
 // Capa de datos del wizard de Movimientos (se ejecuta en Server Component).
 import { getAllCuentas } from "@/backend/src/queries/maestros";
 import {
+  getAllJornadasTrabajo,
   getAllPeriodosTrabajo,
   getAllTrabajos,
 } from "@/backend/src/queries/trabajos";
@@ -29,6 +30,7 @@ export async function getMovimientoOptions(): Promise<MovimientoOptions> {
     prestamos,
     gastos,
     categoriasGasto,
+    jornadas,
   ] = await Promise.all([
     getAllCuentas(),
     getAllPeriodosTrabajo(),
@@ -36,6 +38,7 @@ export async function getMovimientoOptions(): Promise<MovimientoOptions> {
     getPrestamosPendientes(),
     getGastosPendientes(),
     getAllCategoriasGasto(),
+    getAllJornadasTrabajo(),
   ]);
 
   return {
@@ -46,6 +49,12 @@ export async function getMovimientoOptions(): Promise<MovimientoOptions> {
     prestamos,
     gastos,
     categoriasGasto,
+    jornadas: jornadas.map((j) => ({
+      fechaJornada: j.fechaJornada,
+      horaDesde: j.horaDesde,
+      horaHasta: j.horaHasta,
+      trabajo: j.trabajo,
+    })),
     // Solo períodos SIN fecha de cobro (null o fecha centinela < 1901-01-02),
     // misma lógica que el dashboard y fetchPeriodosTrabajo.
     periodosTrabajo: periodosTrabajo.filter((p) => {

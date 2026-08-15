@@ -20,3 +20,13 @@ export const periodoTrabajoFields: FormField[] = [
   { name: "fechaDeCobro", label: "Fecha de Cobro", type: "date" },
   { name: "nombreTrabajo", label: "Trabajo", type: "select", optionsFrom: fetchTrabajos },
 ];
+
+// Campos del ALTA de un período: "Monto a cobrar" y "Fecha de cobro" NO se
+// ingresan al crear (el monto se calcula de las jornadas y la fecha de cobro se
+// fija cuando se cobra). Se mantienen en la edición (periodoTrabajoFields).
+export const periodoTrabajoFieldsNuevo: FormField[] = [
+  { name: "fechaDesde", label: "Desde", type: "date" },
+  { name: "fechaHasta", label: "Hasta", type: "date" },
+  { name: "fechaEstimadaCobro", label: "Estimación de Cobro", type: "date" },
+  { name: "nombreTrabajo", label: "Trabajo", type: "select", optionsFrom: fetchTrabajos },
+];

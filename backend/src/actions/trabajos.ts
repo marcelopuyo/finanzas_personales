@@ -16,7 +16,15 @@ import {
   getPeriodoTrabajoById,
   getTrabajoById,
 } from "../queries/trabajos";
-import { calcularMontoACobrar, calcularMontoJornada } from "../lib/jornadas";
+import {
+  calcularMontoACobrar,
+  calcularMontoJornada,
+  encontrarJornadaSuperpuesta,
+  encontrarPeriodoSuperpuesto,
+  fechaEnRango,
+  formatearFechaDMA,
+  formatearHora,
+} from "../lib/jornadas";
 import {
   jornadaTrabajoCreateSchema,
   jornadaTrabajoUpdateSchema,
@@ -123,6 +131,19 @@ export async function crearPeriodoTrabajo(
     throw new Error(`Trabajo con nombre "${nombreTrabajo}" no encontrado`);
   }
 
+  // Validación: el nuevo período no debe superponerse con otro del mismo trabajo.
+  const superpuesto = await encontrarPeriodoSuperpuesto(
+    ds.getRepository(PeriodoTrabajo),
+    trabajo.id,
+    data.fechaDesde,
+    data.fechaHasta
+  );
+  if (superpuesto) {
+    throw new Error(
+      `El período se superpone con "${formatearFechaDMA(superpuesto.fechaDesde)} al ${formatearFechaDMA(superpuesto.fechaHasta)}" del trabajo "${trabajo.nombre}"`
+    );
+  }
+
   try {
     const repo = ds.getRepository(PeriodoTrabajo);
     const created = await repo.save(repo.create({ ...rest, trabajo }));
@@ -145,6 +166,7 @@ export async function actualizarPeriodoTrabajo(
   const repo = ds.getRepository(PeriodoTrabajo);
   const existing = await repo.findOne({
     where: { id, trabajo: { usuario: { id: userId } }, eliminado: false },
+    relations: { trabajo: true },
   });
   if (!existing) {
     throw new Error(`Período de trabajo con id ${id} no encontrado`);
@@ -159,6 +181,23 @@ export async function actualizarPeriodoTrabajo(
       throw new Error(`Trabajo con nombre "${nombreTrabajo}" no encontrado`);
     }
     existing.trabajo = trabajo;
+  }
+
+  // Validación: el período (con los valores nuevos) no debe superponerse con
+  // otro del mismo trabajo (se excluye a sí mismo).
+  if (existing.trabajo) {
+    const superpuesto = await encontrarPeriodoSuperpuesto(
+      repo,
+      existing.trabajo.id,
+      data.fechaDesde ?? existing.fechaDesde,
+      data.fechaHasta ?? existing.fechaHasta,
+      id
+    );
+    if (superpuesto) {
+      throw new Error(
+        `El período se superpone con "${formatearFechaDMA(superpuesto.fechaDesde)} al ${formatearFechaDMA(superpuesto.fechaHasta)}" del trabajo "${existing.trabajo.nombre}"`
+      );
+    }
   }
 
   try {
@@ -225,6 +264,84 @@ export async function crearJornadaTrabajo(
           new Date(data.fechaJornada)
         )
       : propina;
+
+  // Validación previa: el período (automático o existente) no debe superponerse
+  // con otro período del mismo trabajo.
+  const periodoRepoVal = ds.getRepository(PeriodoTrabajo);
+  const jornadaRepoVal = ds.getRepository(JornadaTrabajo);
+  let trabajoIdVal: number;
+  let nombreTrabajoVal = "";
+  if (crearPeriodoAutomatico) {
+    if (!idTrabajo) {
+      throw new Error("Seleccioná el trabajo para crear el período automático");
+    }
+    const trabajoVal = await ds.getRepository(Trabajo).findOneBy({
+      id: idTrabajo,
+      usuario: { id: userId },
+    });
+    if (!trabajoVal) {
+      throw new Error(`Trabajo con id ${idTrabajo} no encontrado`);
+    }
+    trabajoIdVal = trabajoVal.id;
+    nombreTrabajoVal = trabajoVal.nombre;
+    const superpuesto = await encontrarPeriodoSuperpuesto(
+      periodoRepoVal,
+      trabajoVal.id,
+      data.fechaJornada,
+      data.fechaJornada
+    );
+    if (superpuesto) {
+      throw new Error(
+        `El período automático se superpone con "${formatearFechaDMA(superpuesto.fechaDesde)} al ${formatearFechaDMA(superpuesto.fechaHasta)}" del trabajo "${trabajoVal.nombre}"`
+      );
+    }
+  } else {
+    if (!idPeriodo) {
+      throw new Error("Seleccioná el período de trabajo");
+    }
+    const periodoVal = await periodoRepoVal.findOne({
+      where: { id: idPeriodo, trabajo: { usuario: { id: userId } } },
+      relations: { trabajo: true },
+    });
+    if (!periodoVal) {
+      throw new Error(`Período de trabajo con id ${idPeriodo} no encontrado`);
+    }
+    trabajoIdVal = periodoVal.trabajo.id;
+    nombreTrabajoVal = periodoVal.trabajo.nombre;
+    const superpuesto = await encontrarPeriodoSuperpuesto(
+      periodoRepoVal,
+      periodoVal.trabajo.id,
+      String(periodoVal.fechaDesde).slice(0, 10),
+      String(periodoVal.fechaHasta).slice(0, 10),
+      periodoVal.id
+    );
+    if (superpuesto) {
+      throw new Error(
+        `El período seleccionado se superpone con "${formatearFechaDMA(superpuesto.fechaDesde)} al ${formatearFechaDMA(superpuesto.fechaHasta)}" del trabajo "${periodoVal.trabajo.nombre}"`
+      );
+    }
+    // La fecha de la jornada debe caer dentro del período seleccionado.
+    if (!fechaEnRango(data.fechaJornada, periodoVal.fechaDesde, periodoVal.fechaHasta)) {
+      throw new Error(
+        `La fecha de la jornada (${formatearFechaDMA(data.fechaJornada)}) no corresponde al período "${formatearFechaDMA(periodoVal.fechaDesde)} al ${formatearFechaDMA(periodoVal.fechaHasta)}" del trabajo "${periodoVal.trabajo.nombre}"`
+      );
+    }
+  }
+
+  // Validación previa: no debe existir otra jornada del mismo trabajo que se
+  // superponga en el mismo día y con horas solapadas.
+  const jornadaSuperpuesta = await encontrarJornadaSuperpuesta(
+    jornadaRepoVal,
+    trabajoIdVal,
+    data.fechaJornada,
+    data.horaDesde,
+    data.horaHasta
+  );
+  if (jornadaSuperpuesta) {
+    throw new Error(
+      `Ya existe una jornada de "${nombreTrabajoVal}" el ${formatearFechaDMA(data.fechaJornada)} de ${formatearHora(jornadaSuperpuesta.horaDesde)} a ${formatearHora(jornadaSuperpuesta.horaHasta)} (horas superpuestas)`
+    );
+  }
 
   let createdId = "";
   try {
@@ -379,6 +496,53 @@ export async function actualizarJornadaTrabajo(
     propina > 0 && idCuenta
       ? await montoEnMonedaPredeterminada(idCuenta, propina, new Date(fechaStr))
       : propina;
+
+  // Validación previa: el período al que se mueve la jornada no debe
+  // superponerse con otro del mismo trabajo.
+  const periodoVal = await ds.getRepository(PeriodoTrabajo).findOne({
+    where: { id: idPeriodo, trabajo: { usuario: { id: userId } } },
+    relations: { trabajo: true },
+  });
+  if (!periodoVal) {
+    throw new Error(`Período de trabajo con id ${idPeriodo} no encontrado`);
+  }
+  const superpuesto = await encontrarPeriodoSuperpuesto(
+    ds.getRepository(PeriodoTrabajo),
+    periodoVal.trabajo.id,
+    String(periodoVal.fechaDesde).slice(0, 10),
+    String(periodoVal.fechaHasta).slice(0, 10),
+    periodoVal.id
+  );
+  if (superpuesto) {
+    throw new Error(
+      `El período seleccionado se superpone con "${formatearFechaDMA(superpuesto.fechaDesde)} al ${formatearFechaDMA(superpuesto.fechaHasta)}" del trabajo "${periodoVal.trabajo.nombre}"`
+    );
+  }
+
+  // Validación previa: no debe existir otra jornada del mismo trabajo que se
+  // superponga en el mismo día y con horas solapadas (se excluye a sí misma).
+  const fechaJornadaStr =
+    data.fechaJornada ?? String(existing.fechaJornada).slice(0, 10);
+  const jornadaSuperpuesta = await encontrarJornadaSuperpuesta(
+    ds.getRepository(JornadaTrabajo),
+    periodoVal.trabajo.id,
+    fechaJornadaStr,
+    data.horaDesde ?? existing.horaDesde,
+    data.horaHasta ?? existing.horaHasta,
+    existing.id
+  );
+  if (jornadaSuperpuesta) {
+    throw new Error(
+      `Ya existe una jornada de "${periodoVal.trabajo.nombre}" el ${formatearFechaDMA(fechaJornadaStr)} de ${formatearHora(jornadaSuperpuesta.horaDesde)} a ${formatearHora(jornadaSuperpuesta.horaHasta)} (horas superpuestas)`
+    );
+  }
+
+  // La fecha de la jornada debe caer dentro del período seleccionado.
+  if (!fechaEnRango(fechaJornadaStr, periodoVal.fechaDesde, periodoVal.fechaHasta)) {
+    throw new Error(
+      `La fecha de la jornada (${formatearFechaDMA(fechaJornadaStr)}) no corresponde al período "${formatearFechaDMA(periodoVal.fechaDesde)} al ${formatearFechaDMA(periodoVal.fechaHasta)}" del trabajo "${periodoVal.trabajo.nombre}"`
+    );
+  }
 
   try {
     await ds.transaction(async (manager) => {
