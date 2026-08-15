@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <defs><clipPath id="mitadDer"><rect x="291" y="0" width="221" height="512"/></clipPath></defs>
+  <defs><clipPath id="mitadDer"><polygon points="364.9,0 178.5,512 512,512 512,0"/></clipPath></defs>
   <g transform="translate(-240, -205) scale(1.8)">
-    <path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267" fill="none" stroke="#4c6ef5" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/>
-    <rect x="168" y="128" width="62" height="256" rx="16" fill="#4c6ef5"/>
+    <path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267" fill="none" stroke="#16a34a" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="168" y="128" width="62" height="256" rx="16" fill="#16a34a"/>
     <g clip-path="url(#mitadDer)">
       <path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267" fill="none" stroke="#e03131" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
