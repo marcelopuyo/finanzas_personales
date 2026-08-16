@@ -405,6 +405,8 @@ export async function crearJornadaTrabajo(
           periodoTrabajo: periodo,
           fechaCarga: new Date(),
           montoJornada,
+          // Snapshot del precio por hora al momento de la carga (se usa al editar).
+          precioHora,
         })
       );
       createdId = created.id;
@@ -560,10 +562,14 @@ export async function actualizarJornadaTrabajo(
         throw new Error(`Período de trabajo con id ${idPeriodo} no encontrado`);
       }
 
+      // Usa el PRECIO SNAPSHOT guardado en la jornada al momento de la carga
+      // (no el precio actual del trabajo), para no perder el valor histórico
+      // al editar. Si la jornada no tiene snapshot, cae al precio actual.
+      const precioJornada = existing.precioHora || periodo.trabajo.precioHora;
       const montoJornada = calcularMontoJornada(
         data.horaDesde ?? existing.horaDesde,
         data.horaHasta ?? existing.horaHasta,
-        periodo.trabajo.precioHora
+        precioJornada
       );
 
       // Revertir el/los depósitos de propina anteriores vinculados a la jornada

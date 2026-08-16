@@ -24,6 +24,12 @@ export class JornadaTrabajo {
   @Column({ type: "numeric", precision: 10, scale: 2, default: 0 })
   montoPropina: number = 0;
 
+  // Precio por hora del trabajo AL MOMENTO DE LA CARGA (snapshot). Al editar la
+  // jornada se usa este precio para recalcular el monto (NO el precio actual del
+  // trabajo), preservando el valor histórico del período.
+  @Column({ type: "numeric", precision: 10, scale: 2, default: 0 })
+  precioHora: number;
+
   @Column({
     default: false,
   })

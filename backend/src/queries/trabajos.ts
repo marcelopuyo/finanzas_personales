@@ -24,6 +24,7 @@ export interface JornadaTrabajoOut {
   horaHasta: number;
   montoJornada: number;
   montoPropina: number;
+  precioHora: number;
 }
 
 export interface PeriodoTrabajoOut {
@@ -46,6 +47,7 @@ function mapJornada(r: JornadaTrabajo): JornadaTrabajoOut {
     horaHasta: r.horaHasta,
     montoJornada: r.montoJornada,
     montoPropina: r.montoPropina ?? 0,
+    precioHora: r.precioHora ?? 0,
   };
 }
 

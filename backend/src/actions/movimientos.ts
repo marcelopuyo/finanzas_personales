@@ -625,6 +625,8 @@ export async function cargarJornadaTrabajo(
         horaHasta: data.horaHasta,
         montoJornada,
         montoPropina: data.montoPropina ?? 0,
+        // Snapshot del precio por hora al momento de la carga (se usa al editar).
+        precioHora: periodo.trabajo.precioHora,
         periodoTrabajo: periodo,
       })
     );
