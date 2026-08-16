@@ -54,12 +54,10 @@ export function PeriodosModal({
       cell: ({ getValue }) => dateTimeToString(getValue<Date | string>()),
     },
     {
-      // En "Períodos Actuales" (abiertos) se muestra la FECHA ESTIMADA de cobro
-      // (fechaEstimadaCobro de la BD); en "Períodos a Cobrar" se mantiene la
-      // fecha de cobro real (fechaDeCobro).
-      accessorKey: tipo === "actuales" ? "fechaEstimadaCobro" : "fechaDeCobro",
-      header:
-        tipo === "actuales" ? "Fecha Est. Cobro" : "Fecha de Cobro",
+      // Muestra la FECHA ESTIMADA de cobro (fechaEstimadaCobro de la BD), en
+      // ambos paneles ("Períodos a Cobrar" y "Períodos Actuales").
+      accessorKey: "fechaEstimadaCobro",
+      header: "Fecha Est. Cobro",
       meta: { align: "center" } as const,
       cell: ({ getValue }) => {
         const v = getValue<Date | string | null>();
