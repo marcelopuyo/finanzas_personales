@@ -59,7 +59,7 @@ export function PeriodosModal({
       // fecha de cobro real (fechaDeCobro).
       accessorKey: tipo === "actuales" ? "fechaEstimadaCobro" : "fechaDeCobro",
       header:
-        tipo === "actuales" ? "Fecha Estimada de Cobro" : "Fecha de Cobro",
+        tipo === "actuales" ? "Fecha Est. Cobro" : "Fecha de Cobro",
       meta: { align: "center" } as const,
       cell: ({ getValue }) => {
         const v = getValue<Date | string | null>();
