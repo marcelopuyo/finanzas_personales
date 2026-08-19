@@ -10,8 +10,14 @@ export default async function ProtectedLayout({
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
-  // Primera letra del nombre/email para el avatar de "Perfil" en el sidebar.
-  const initial = (user.nombre ?? user.email ?? "U").charAt(0).toUpperCase();
+  // Etiqueta dinámica del item "Perfil" del sidebar: nombre del usuario
+  // logueado (o su email si no tiene nombre), y la primera letra para el avatar.
+  const userLabel = (user.nombre?.trim() || user.email || "Perfil").trim();
+  const initial = userLabel.charAt(0).toUpperCase();
 
-  return <AppLayout initial={initial}>{children}</AppLayout>;
+  return (
+    <AppLayout initial={initial} userLabel={userLabel}>
+      {children}
+    </AppLayout>
+  );
 }

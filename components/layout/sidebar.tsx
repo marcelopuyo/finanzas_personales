@@ -166,15 +166,22 @@ function NavItem({
   );
 }
 
-export default function Sidebar({ initial = "U" }: { initial?: string }) {
+export default function Sidebar({
+  initial = "U",
+  userLabel = "Perfil",
+}: {
+  initial?: string;
+  userLabel?: string;
+}) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   // "Perfil" es un avatar tipo DeepSeek: círculo algo más grande que los demás
   // íconos, tono distinto y la primera letra del nombre/email del usuario.
+  // La etiqueta es dinámica: muestra el nombre del usuario logueado.
   const nav: NavItem[] = [
     ...navigation,
     {
-      label: "Perfil",
+      label: userLabel,
       href: "/perfil",
       icon: () => (
         <span
