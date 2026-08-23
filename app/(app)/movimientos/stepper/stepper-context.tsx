@@ -3,9 +3,11 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useState,
   type ReactNode,
 } from "react";
+import { todayLocalISODate } from "@/lib/utils";
 import {
   CONCEPTO_STEP,
   type MovimientoConcepto,
@@ -82,6 +84,15 @@ export function MovimientoProvider({
       cuentaPropina: esJornada ? (initial.cuenta ?? 0) : 0,
     };
   });
+
+  // La fecha "hoy" provista por el servidor puede quedar corrida ±1 día si el
+  // servidor corre en otra zona horaria (ej. Vercel en UTC y el usuario en
+  // GMT-3 de noche: 23:00 local ya son las 02:00 del día siguiente en UTC).
+  // Al montar se corrige con la fecha LOCAL del navegador (siempre la del
+  // usuario). No rompe la hidratación: el SSR y el primer render usan fechaHoy.
+  useEffect(() => {
+    setData((prev) => ({ ...prev, fecha: todayLocalISODate() }));
+  }, []);
 
   const handleSetData = (partial: Partial<MovimientoData>) =>
     setData((prev) => ({ ...prev, ...partial }));

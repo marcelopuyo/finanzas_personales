@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
 import { StatBadge } from "@/components/ui/stat-badge";
@@ -112,6 +112,46 @@ export function DashboardClient({ data }: Props) {
         ),
     [todosLosIngresos, hoy]
   );
+
+  // Tarjetas sintéticas de períodos ("Períodos a Cobrar"/"Períodos Actuales"):
+  // se calculan en el cliente DESPUÉS del montaje para que el "hoy" sea el del
+  // navegador (el del servidor puede correrse ±1 día si corre en otra zona
+  // horaria, ej. Vercel en UTC con usuario en GMT-3 de noche). Durante el SSR y
+  // el primer render se muestran solo las cuentas reales; al montar se agregan
+  // las sintéticas (sin romper la hidratación).
+  const [sinteticas, setSinteticas] = useState<DashboardData["cuentas"]>([]);
+  useEffect(() => {
+    const pendiente = periodosCobrar.reduce(
+      (acc, p) => acc + (p.montoACobrar || 0),
+      0
+    );
+    const actual = periodosActuales.reduce(
+      (acc, p) => acc + (p.montoACobrar || 0),
+      0
+    );
+    const cards: DashboardData["cuentas"] = [];
+    if (pendiente > 0) {
+      cards.push({
+        title: "Períodos a Cobrar",
+        value: numberToCurrency(pendiente, data.monedaPredeterminadaISO),
+        labels: [],
+        values: [],
+        // Menú con "Cobro Sueldo" (cobrar los períodos pendientes).
+        menuAccion: "cobro",
+      });
+    }
+    if (periodosActuales.length > 0) {
+      cards.push({
+        title: "Períodos Actuales",
+        value: numberToCurrency(actual, data.monedaPredeterminadaISO),
+        labels: [],
+        values: [],
+        // Menú con "Jornada trabajo" (agregar jornadas a los períodos actuales).
+        menuAccion: "jornada",
+      });
+    }
+    setSinteticas(cards);
+  }, [data.monedaPredeterminadaISO, periodosCobrar, periodosActuales]);
 
   const filteredGastos = useMemo(() => {
     let r = todosLosGastos;
@@ -383,7 +423,7 @@ export function DashboardClient({ data }: Props) {
       <div>
         <h2 className="mb-3 text-[14px] font-medium text-header">Cuentas y Períodos</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {data.cuentas.map((cuenta, i) => (
+          {[...data.cuentas, ...sinteticas].map((cuenta, i) => (
             <AccountCard
               key={i}
               {...cuenta}

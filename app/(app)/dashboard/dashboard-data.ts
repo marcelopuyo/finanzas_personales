@@ -12,18 +12,7 @@ import { getAllPeriodosTrabajo, type PeriodoTrabajoOut } from "@/backend/src/que
 import type { GastoOut } from "@/backend/src/queries/gastos";
 import { getAllGastos } from "@/backend/src/queries/gastos";
 import { getSessionUser } from "@/backend/src/lib/auth";
-import { numberToCurrency, todayLocalISODate } from "@/lib/utils";
-
-/**
- * Convierte una fecha de columna `date` (Date en medianoche UTC o string
- * "YYYY-MM-DD") a su clave ISO "YYYY-MM-DD", segura para comparar días sin
- * corrimientos por zona horaria.
- */
-function toDateKey(v: string | Date | null | undefined): string {
-  if (!v) return "";
-  if (v instanceof Date) return v.toISOString().slice(0, 10);
-  return String(v).slice(0, 10);
-}
+import { numberToCurrency } from "@/lib/utils";
 
 export interface DashboardData {
   balance: number;
@@ -101,7 +90,8 @@ export async function fetchDashboardData(): Promise<DashboardData> {
 
   // --- Cuentas con evolución ---
   // `id` es opcional: las tarjetas sintéticas ("Períodos a Cobrar/Actuales")
-  // no tienen cuenta real detrás y no deben abrir el historial al hacer click.
+  // se agregan en el cliente (dashboard-client.tsx) y no tienen cuenta real
+  // detrás, así que no deben abrir el historial al hacer click.
   const cuentas: {
     id?: number;
     title: string;
@@ -121,52 +111,10 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     monedaISO: c.monedaCodigoISO ?? "ARS",
   }));
 
-  // Periodos pendientes de cobro (cerrados no cobrados)
-  let pendienteCobro = 0;
-  let periodosActuales = 0;
-  // Flag: hay al menos un período "actual" (ya comenzado y no terminado)
-  // aunque su monto sea $0 (ej. recién creado sin jornadas). La tarjeta
-  // "Períodos Actuales" se muestra igual para permitir cargar jornadas.
-  let hayPeriodosActuales = false;
-  // Comparación por clave ISO (YYYY-MM-DD) para evitar corrimientos por zona
-  // horaria entre las fechas `date` (medianoche UTC) y el "hoy" local.
-  const hoyKey = todayLocalISODate();
-
-  periodosTrabajo.forEach((p) => {
-    const noCobrado =
-      !p.fechaDeCobro || toDateKey(p.fechaDeCobro) < "1901-01-02";
-    const fechaDesde = toDateKey(p.fechaDesde);
-    const fechaHasta = toDateKey(p.fechaHasta);
-
-    if (noCobrado && fechaHasta < hoyKey) {
-      pendienteCobro += p.montoACobrar ?? 0;
-    } else if (noCobrado && fechaHasta >= hoyKey && fechaDesde <= hoyKey) {
-      periodosActuales += p.montoACobrar ?? 0;
-      hayPeriodosActuales = true;
-    }
-  });
-
-  if (pendienteCobro > 0) {
-    cuentas.push({
-      title: "Períodos a Cobrar",
-      value: numberToCurrency(pendienteCobro, monedaPredeterminadaISO),
-      labels: [],
-      values: [],
-      // Menú con "Cobro Sueldo" (cobrar los períodos pendientes).
-      menuAccion: "cobro",
-    });
-  }
-
-  if (hayPeriodosActuales) {
-    cuentas.push({
-      title: "Períodos Actuales",
-      value: numberToCurrency(periodosActuales, monedaPredeterminadaISO),
-      labels: [],
-      values: [],
-      // Menú con "Jornada trabajo" (agregar jornadas a los períodos actuales).
-      menuAccion: "jornada",
-    });
-  }
+  // Las tarjetas sintéticas "Períodos a Cobrar"/"Períodos Actuales" se calculan
+  // en el cliente (dashboard-client.tsx) tras el montaje: el "hoy" del navegador
+  // es el día real del usuario, mientras que el servidor podría correr en otra
+  // zona horaria (ej. Vercel en UTC) y desfasarse ±1 día de noche.
 
   // --- Gastos por categoría ---
   const gastosMap = new Map<
