@@ -130,7 +130,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   let hayPeriodosActuales = false;
   // Comparación por clave ISO (YYYY-MM-DD) para evitar corrimientos por zona
   // horaria entre las fechas `date` (medianoche UTC) y el "hoy" local.
-  const hoy = todayLocalISODate();
+  const hoyKey = todayLocalISODate();
 
   periodosTrabajo.forEach((p) => {
     const noCobrado =
@@ -138,9 +138,9 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     const fechaDesde = toDateKey(p.fechaDesde);
     const fechaHasta = toDateKey(p.fechaHasta);
 
-    if (noCobrado && fechaHasta < hoy) {
+    if (noCobrado && fechaHasta < hoyKey) {
       pendienteCobro += p.montoACobrar ?? 0;
-    } else if (noCobrado && fechaHasta >= hoy && fechaDesde <= hoy) {
+    } else if (noCobrado && fechaHasta >= hoyKey && fechaDesde <= hoyKey) {
       periodosActuales += p.montoACobrar ?? 0;
       hayPeriodosActuales = true;
     }
