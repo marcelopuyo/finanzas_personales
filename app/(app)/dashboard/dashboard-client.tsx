@@ -77,7 +77,8 @@ export function DashboardClient({ data }: Props) {
 
   // Listados de períodos para los popups de las tarjetas sintéticas:
   // - "Períodos a Cobrar": cerrados (fecha final < hoy) y no cobrados.
-  // - "Períodos Actuales": con fecha final >= hoy.
+  // - "Períodos Actuales": no cobrados, ya comenzados (desde <= hoy) y con
+  //   fecha final >= hoy (misma condición que la tarjeta del dashboard).
   const periodosCobrar = useMemo(
     () =>
       todosLosIngresos
@@ -95,7 +96,17 @@ export function DashboardClient({ data }: Props) {
   const periodosActuales = useMemo(
     () =>
       todosLosIngresos
-        .filter((p) => toDateKey(p.fechaHasta) >= hoy)
+        .filter((p) => {
+          const noCobrado =
+            !p.fechaDeCobro || toDateKey(p.fechaDeCobro) < "1901-01-02";
+          // Misma condición que la tarjeta "Períodos Actuales" del dashboard:
+          // no cobrado, ya comenzado (desde <= hoy) y no terminado (hasta >= hoy).
+          return (
+            noCobrado &&
+            toDateKey(p.fechaHasta) >= hoy &&
+            toDateKey(p.fechaDesde) <= hoy
+          );
+        })
         .sort((a, b) =>
           toDateKey(a.fechaHasta).localeCompare(toDateKey(b.fechaHasta))
         ),

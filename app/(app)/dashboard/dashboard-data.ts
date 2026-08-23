@@ -12,7 +12,18 @@ import { getAllPeriodosTrabajo, type PeriodoTrabajoOut } from "@/backend/src/que
 import type { GastoOut } from "@/backend/src/queries/gastos";
 import { getAllGastos } from "@/backend/src/queries/gastos";
 import { getSessionUser } from "@/backend/src/lib/auth";
-import { numberToCurrency } from "@/lib/utils";
+import { numberToCurrency, todayLocalISODate } from "@/lib/utils";
+
+/**
+ * Convierte una fecha de columna `date` (Date en medianoche UTC o string
+ * "YYYY-MM-DD") a su clave ISO "YYYY-MM-DD", segura para comparar días sin
+ * corrimientos por zona horaria.
+ */
+function toDateKey(v: string | Date | null | undefined): string {
+  if (!v) return "";
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  return String(v).slice(0, 10);
+}
 
 export interface DashboardData {
   balance: number;
@@ -113,25 +124,25 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   // Periodos pendientes de cobro (cerrados no cobrados)
   let pendienteCobro = 0;
   let periodosActuales = 0;
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
+  // Flag: hay al menos un período "actual" (ya comenzado y no terminado)
+  // aunque su monto sea $0 (ej. recién creado sin jornadas). La tarjeta
+  // "Períodos Actuales" se muestra igual para permitir cargar jornadas.
+  let hayPeriodosActuales = false;
+  // Comparación por clave ISO (YYYY-MM-DD) para evitar corrimientos por zona
+  // horaria entre las fechas `date` (medianoche UTC) y el "hoy" local.
+  const hoy = todayLocalISODate();
 
   periodosTrabajo.forEach((p) => {
-    const fechaCobro = p.fechaDeCobro
-      ? new Date(p.fechaDeCobro)
-      : null;
-    const fechaHasta = new Date(p.fechaHasta);
     const noCobrado =
-      !fechaCobro || fechaCobro < new Date("1901-01-02");
+      !p.fechaDeCobro || toDateKey(p.fechaDeCobro) < "1901-01-02";
+    const fechaDesde = toDateKey(p.fechaDesde);
+    const fechaHasta = toDateKey(p.fechaHasta);
 
-    if (noCobrado && fechaHasta < now) {
+    if (noCobrado && fechaHasta < hoy) {
       pendienteCobro += p.montoACobrar ?? 0;
-    } else if (
-      noCobrado &&
-      fechaHasta >= now &&
-      new Date(p.fechaDesde) <= now
-    ) {
+    } else if (noCobrado && fechaHasta >= hoy && fechaDesde <= hoy) {
       periodosActuales += p.montoACobrar ?? 0;
+      hayPeriodosActuales = true;
     }
   });
 
@@ -146,7 +157,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     });
   }
 
-  if (periodosActuales > 0) {
+  if (hayPeriodosActuales) {
     cuentas.push({
       title: "Períodos Actuales",
       value: numberToCurrency(periodosActuales, monedaPredeterminadaISO),
