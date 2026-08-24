@@ -3,10 +3,13 @@
 import type { z } from "zod";
 import { getDb } from "../db";
 import { requireUserId } from "../lib/auth";
+import { Concepto } from "../entities/concepto.entity";
 import { Cuenta } from "../entities/cuenta.entity";
 import { Persona } from "../entities/persona.entity";
+import { Movimiento } from "../entities/movimiento.entity";
 import { Prestamo } from "../entities/prestamo.entity";
 import { crearHistoricoCuenta, dbError, refresh } from "../lib/action-helpers";
+import { montoEnMonedaPredeterminada } from "../lib/cotizaciones";
 import { getPrestamoById } from "../queries/prestamos";
 import {
   prestamoCreateSchema,
@@ -71,11 +74,39 @@ export async function crearPrestamo(
         : cuentaEntity.saldo + data.monto;
     await ds.getRepository(Cuenta).save(cuentaEntity);
 
+    // El alta de préstamo cambia el saldo de la cuenta → se registra un
+    // Movimiento para que aparezca en el historial (popup) de la cuenta desde
+    // la cual sale el dinero (otorgado) o a la que entra (obtenido).
+    // Concepto según sentido: otorgado → "Prestamo Otorgado" (Egreso);
+    // obtenido → "Prestamo Obtenido" (Ingreso). `monto` queda en la moneda
+    // predeterminada del usuario; `montoCuentaMonedaOrigen` en la de la cuenta.
+    const montoPredeterminada = await montoEnMonedaPredeterminada(
+      cuentaEntity.id,
+      data.monto,
+      new Date(data.fecha)
+    );
+    const concepto = await ds.getRepository(Concepto).findOneBy({
+      nombre: data.sentido === "otorgado" ? "Prestamo Otorgado" : "Prestamo Obtenido",
+    });
+    if (!concepto) throw new Error("Concepto de préstamo no encontrado");
+
+    const movRepo = ds.getRepository(Movimiento);
+    const mov = await movRepo.save(
+      movRepo.create({
+        fecha: data.fecha,
+        monto: montoPredeterminada,
+        montoCuentaMonedaOrigen: data.monto,
+        cuenta: cuentaEntity,
+        prestamo: created,
+        concepto,
+      })
+    );
+
     // El alta de préstamo cambia el saldo de la cuenta → se actualiza el
     // histórico (cierra el vigente y crea uno nuevo con el saldo actual).
     // Sin esto, el sparkline/historial de la cuenta queda desactualizado
     // (el punto derecho muestra un saldo viejo, no el actual).
-    await crearHistoricoCuenta(ds.manager, cuentaEntity);
+    await crearHistoricoCuenta(ds.manager, cuentaEntity, mov.id);
 
     refresh();
     return getPrestamoById(created.id);

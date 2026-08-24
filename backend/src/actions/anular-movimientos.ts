@@ -24,6 +24,7 @@ import { crearHistoricoCuenta, refresh } from "../lib/action-helpers";
  * Reversión por tipo:
  *  - Cobro Sueldo  → revierte saldo + limpia `fechaDeCobro` del período (si hay vínculo)
  *  - Ajuste        → revierte saldo
+ *  - Alta Préstamo → revierte saldo de cuenta + soft-delete del préstamo si no tiene pagos
  *  - Pago Préstamo → revierte saldo de cuenta + saldo del préstamo
  *  - Pago Gasto    → revierte saldo de cuenta + saldo/`fechaPago` del gasto
  *  - Gasto Directo → igual + soft-delete del gasto (deshace toda la operación)
@@ -132,14 +133,40 @@ export async function anularMovimiento(movimientoId: string) {
       }
       await gastoRepo.save(gasto);
     } else if (mov.prestamo) {
-      // ---- Pago Préstamo ----
       const prestamo = mov.prestamo;
-      cuenta.saldo =
-        prestamo.sentido === "otorgado"
-          ? cuenta.saldo - mov.montoCuentaMonedaOrigen
-          : cuenta.saldo + mov.montoCuentaMonedaOrigen;
-      prestamo.saldo += mov.montoCuentaMonedaOrigen;
-      await prestamoRepo.save(prestamo);
+      const esAltaPrestamo =
+        conceptoNombre === "Prestamo Otorgado" ||
+        conceptoNombre === "Prestamo Obtenido";
+      if (esAltaPrestamo) {
+        // ---- Alta Préstamo ----
+        // Revierte el saldo de la cuenta (inverso al alta: otorgado restó,
+        // obtenido sumó). Si es el ÚNICO movimiento activo del préstamo (no
+        // hay pagos), el alta es el origen del préstamo → se soft-deletea el
+        // préstamo (deshace toda la operación, igual que el Gasto Directo).
+        cuenta.saldo =
+          prestamo.sentido === "otorgado"
+            ? cuenta.saldo + mov.montoCuentaMonedaOrigen
+            : cuenta.saldo - mov.montoCuentaMonedaOrigen;
+        const otrosActivos = await movRepo.count({
+          where: {
+            prestamo: { id: prestamo.id },
+            eliminado: false,
+            id: Not(mov.id),
+          },
+        });
+        if (otrosActivos === 0) {
+          prestamo.eliminado = true;
+        }
+        await prestamoRepo.save(prestamo);
+      } else {
+        // ---- Pago Préstamo ----
+        cuenta.saldo =
+          prestamo.sentido === "otorgado"
+            ? cuenta.saldo - mov.montoCuentaMonedaOrigen
+            : cuenta.saldo + mov.montoCuentaMonedaOrigen;
+        prestamo.saldo += mov.montoCuentaMonedaOrigen;
+        await prestamoRepo.save(prestamo);
+      }
     } else if (conceptoNombre === "Cobro Sueldo") {
       // ---- Cobro Sueldo ----
       cuenta.saldo -= mov.montoCuentaMonedaOrigen;
