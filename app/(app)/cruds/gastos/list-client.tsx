@@ -9,6 +9,17 @@ import { dateTimeToString, numberToCurrency } from "@/lib/utils";
 function gastosColumns(currency: string): ColumnDef<GastoOut>[] {
   return [
     {
+      accessorKey: "fechaPago",
+      header: "Fecha",
+      meta: {
+        align: "center" as const,
+        exportValue: (row: GastoOut) =>
+          dateTimeToString(row.fechaPago ?? undefined),
+      },
+      cell: ({ getValue }) =>
+        dateTimeToString(getValue<string | Date | null>() ?? undefined),
+    },
+    {
       accessorKey: "descripcion",
       header: "Descripción",
       cell: ({ getValue }) => (getValue<string | null>() ?? "-"),
@@ -34,28 +45,6 @@ function gastosColumns(currency: string): ColumnDef<GastoOut>[] {
       },
       cell: ({ getValue }) =>
         numberToCurrency(getValue<number>() ?? 0, currency),
-    },
-    {
-      accessorKey: "fechaVencimiento",
-      header: "Vencimiento",
-      meta: {
-        align: "center" as const,
-        exportValue: (row: GastoOut) =>
-          dateTimeToString(row.fechaVencimiento ?? undefined),
-      },
-      cell: ({ getValue }) =>
-        dateTimeToString(getValue<string | Date | null>() ?? undefined),
-    },
-    {
-      accessorKey: "fechaPago",
-      header: "Pago",
-      meta: {
-        align: "center" as const,
-        exportValue: (row: GastoOut) =>
-          dateTimeToString(row.fechaPago ?? undefined),
-      },
-      cell: ({ getValue }) =>
-        dateTimeToString(getValue<string | Date | null>() ?? undefined),
     },
     {
       accessorFn: (row) => row.categoria?.nombre ?? "",
