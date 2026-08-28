@@ -5,16 +5,19 @@
       <polygon points="364.9,0 178.5,512 512,512 512,0"/>
     </clipPath>
   </defs>
-  <rect x="16" y="16" width="480" height="480" rx="108" fill="#151517"/>
+  <rect x="16" y="16" width="480" height="480" rx="108" fill="#0B1A30"/>
   <rect x="16" y="16" width="480" height="480" rx="108" fill="none" stroke="#3e3f42" stroke-width="6"/>
-  <!-- Panza completa en VERDE: la mitad izquierda de ambos brazos queda verde -->
-  <path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267"
-        fill="none" stroke="#16a34a" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- Palote de la P (verde) -->
-  <rect x="168" y="128" width="62" height="256" rx="16" fill="#16a34a"/>
-  <!-- Mitad derecha de los brazos + arco en ROJO (recortada desde x=291) -->
-  <g clip-path="url(#mitadDer)">
+  <!-- Monograma centrado en el tile y reducido al 73% del tamaño original (3 x -10%) -->
+  <g transform="translate(-125.85, -79.92) scale(1.3122)">
+    <!-- Panza completa en CYAN: la mitad izquierda de ambos brazos queda cyan -->
     <path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267"
-          fill="none" stroke="#e03131" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/>
+          fill="none" stroke="#00E5FF" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Palote de la P (cyan) -->
+    <rect x="168" y="128" width="62" height="256" rx="16" fill="#00E5FF"/>
+    <!-- Mitad derecha de los brazos + arco en VERDE LIMA (recortada desde x=291) -->
+    <g clip-path="url(#mitadDer)">
+      <path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267"
+            fill="none" stroke="#39FF14" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
   </g>
 </svg>
