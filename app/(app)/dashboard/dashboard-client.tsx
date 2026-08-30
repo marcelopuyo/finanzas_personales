@@ -61,10 +61,9 @@ export function DashboardClient({ data }: Props) {
 
   // Filtros de Ingresos (trabajo + fechas)
   const [selTra, setSelTra] = useState<string[]>([]);
-  // Fechas vacías por defecto: los períodos de trabajo no alinean con el 1°
-  // del mes calendario, así se evita un resumen/detalle vacío por defecto.
-  const [selFdIng, setSelFdIng] = useState("");
-  const [selFhIng, setSelFhIng] = useState("");
+  // Fechas por defecto: primer día del mes actual → hoy.
+  const [selFdIng, setSelFdIng] = useState(fechaPrimerDia);
+  const [selFhIng, setSelFhIng] = useState(fechaHoy);
   const [openIng, setOpenIng] = useState(false);
   const [dTra, setDTra] = useState<string[]>([]);
   const [dFdIng, setDFdIng] = useState("");
@@ -631,7 +630,7 @@ export function DashboardClient({ data }: Props) {
           ))}
         </div>
         <div className="my-4 border-t border-border" />
-        <p className="mb-2 text-[13px] font-medium text-header">Fecha de inicio</p>
+        <p className="mb-2 text-[13px] font-medium text-header">Fecha</p>
         <div className="grid grid-cols-2 gap-3">
           <label className="flex flex-col gap-1">
             <span className="text-[12px] text-subtitle">Desde</span>
