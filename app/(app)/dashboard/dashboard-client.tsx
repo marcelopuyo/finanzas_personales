@@ -354,8 +354,8 @@ export function DashboardClient({ data }: Props) {
     setSelTra(dTra); setSelFdIng(dFdIng); setSelFhIng(dFhIng); setOpenIng(false);
   };
   const limpiarIng = () => {
-    setDTra([]); setDFdIng(""); setDFhIng("");
-    setSelTra([]); setSelFdIng(""); setSelFhIng("");
+    setDTra([]); setDFdIng(fechaPrimerDia()); setDFhIng(fechaHoy());
+    setSelTra([]); setSelFdIng(fechaPrimerDia()); setSelFhIng(fechaHoy());
     setOpenIng(false);
   };
 
