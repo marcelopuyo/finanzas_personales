@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
   Banknote,
   Briefcase,
+  ChevronDown,
   ChevronRight,
   Coins,
   HandCoins,
@@ -13,6 +15,7 @@ import {
   Send,
   Settings2,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Modal } from "@/components/ui/modal";
 
 export interface CuentaAcciones {
@@ -47,6 +50,8 @@ export function AccountActionsSheet({
   soloMovimiento?: AccionSintetica;
 }) {
   const router = useRouter();
+  // Colapsable "Préstamos": agrupa las acciones vinculadas a préstamos.
+  const [prestamosOpen, setPrestamosOpen] = useState(false);
   if (!cuenta) return null;
 
   const SOLO_ACCIONES: Record<
@@ -72,7 +77,9 @@ export function AccountActionsSheet({
     onClose();
   };
 
-  const rows: { icon: LucideIcon; label: string; onClick: () => void }[] =
+  // Acciones generales (siempre visibles). En modo soloMovimiento (tarjetas
+  // sintéticas) se muestra únicamente la acción de esa tarjeta.
+  const accionesTop: { icon: LucideIcon; label: string; onClick: () => void }[] =
     soloMovimiento
       ? [
           {
@@ -94,6 +101,15 @@ export function AccountActionsSheet({
             },
           },
           { icon: Banknote, label: "Cobro Sueldo", onClick: () => go("cobro", "cuenta") },
+        ];
+
+  // Acciones de préstamos, agrupadas en el colapsable "Préstamos". El pago y
+  // el cobro comparten el wizard "Pago Préstamo": el backend resuelve la
+  // dirección (ingreso/egreso) según el sentido del préstamo seleccionado.
+  const accionesPrestamo: { icon: LucideIcon; label: string; onClick: () => void }[] =
+    soloMovimiento
+      ? []
+      : [
           { icon: HandCoins, label: "Pago Préstamo", onClick: () => go("pago-prestamo", "cuenta") },
           {
             icon: Coins,
@@ -106,6 +122,13 @@ export function AccountActionsSheet({
               onClose();
             },
           },
+        ];
+
+  // Acciones finales (después del bloque de préstamos).
+  const accionesBottom: { icon: LucideIcon; label: string; onClick: () => void }[] =
+    soloMovimiento
+      ? []
+      : [
           { icon: Settings2, label: "Ajuste Cuenta", onClick: () => go("ajuste", "cuenta") },
           { icon: Receipt, label: "Gasto", onClick: () => go("gasto", "cuenta") },
           { icon: Send, label: "Transferir", onClick: () => go("transferencia", "origen") },
@@ -126,24 +149,88 @@ export function AccountActionsSheet({
           </p>
         </div>
         <div className="space-y-1">
-          {rows.map((row, i) => (
-            <div key={row.label}>
-              {i === 1 && <div className="my-1 h-px bg-border" />}
-              <button
-                type="button"
-                onClick={row.onClick}
-                className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-muted"
-              >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-primary">
-                  <row.icon className="h-4 w-4" />
-                </span>
-                <span className="flex-1 text-[14px] font-medium text-card-foreground">
-                  {row.label}
-                </span>
-                <ChevronRight className="h-4 w-4 text-subtitle" />
-              </button>
-            </div>
+          {accionesTop.map((row) => (
+            <button
+              key={row.label}
+              type="button"
+              onClick={row.onClick}
+              className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-muted"
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-primary">
+                <row.icon className="h-4 w-4" />
+              </span>
+              <span className="flex-1 text-[14px] font-medium text-card-foreground">
+                {row.label}
+              </span>
+              <ChevronRight className="h-4 w-4 text-subtitle" />
+            </button>
           ))}
+
+          {accionesPrestamo.length > 0 && (
+            <>
+              <div className="my-1 h-px bg-border" />
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setPrestamosOpen((v) => !v)}
+                  aria-expanded={prestamosOpen}
+                  className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-muted"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-primary">
+                    <HandCoins className="h-4 w-4" />
+                  </span>
+                  <span className="flex-1 text-[14px] font-medium text-card-foreground">
+                    Préstamos
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 text-subtitle transition-transform",
+                      prestamosOpen && "rotate-180"
+                    )}
+                  />
+                </button>
+                {prestamosOpen && (
+                  <div className="space-y-1 pt-0.5">
+                    {accionesPrestamo.map((row) => (
+                      <button
+                        key={row.label}
+                        type="button"
+                        onClick={row.onClick}
+                        className="flex w-full items-center gap-3 rounded-lg py-2.5 pl-12 pr-2 text-left transition-colors hover:bg-muted"
+                      >
+                        <span className="flex-1 text-[14px] font-medium text-card-foreground">
+                          {row.label}
+                        </span>
+                        <ChevronRight className="h-4 w-4 text-subtitle" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {accionesBottom.length > 0 && (
+            <>
+              <div className="my-1 h-px bg-border" />
+              {accionesBottom.map((row) => (
+                <button
+                  key={row.label}
+                  type="button"
+                  onClick={row.onClick}
+                  className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-muted"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-primary">
+                    <row.icon className="h-4 w-4" />
+                  </span>
+                  <span className="flex-1 text-[14px] font-medium text-card-foreground">
+                    {row.label}
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-subtitle" />
+                </button>
+              ))}
+            </>
+          )}
         </div>
       </div>
     </Modal>
