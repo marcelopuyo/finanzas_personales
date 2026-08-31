@@ -561,6 +561,7 @@ export function DashboardClient({ data }: Props) {
           badge={<><StatBadge label="Mes actual" value={data.ingresosMesActual} />{ingFilterBtn("sm:hidden")}</>}
           currency={data.monedaPredeterminadaISO}
           data={filteredIngresosResumen.map((i) => ({ name: i.name, value: i.value }))}
+          invertTrend
           compare={esMesActualIngresos ? {
             prevTotal: ingresosPrevTotal,
             prevByName: Object.fromEntries(ingresosMesAnterior),

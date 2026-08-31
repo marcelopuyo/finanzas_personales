@@ -102,3 +102,23 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Recharts: evitar el recuadro/highlight del navegador al tocar los segmentos
+   de las donas en móvil (tap-highlight de Android + anillo de foco). */
+.recharts-surface,
+.recharts-surface * {
+  -webkit-tap-highlight-color: transparent;
+}
+.recharts-surface:focus,
+.recharts-surface *:focus {
+  outline: none;
+}
+
+/* Recharts: el tooltip se portaliza dentro del wrapper del gráfico, y en la
+   dona comparte contenedor con el overlay del "Total" central (que es un
+   hermano posterior, también absolute). Para que el tooltip quede SIEMPRE por
+   encima del total central, se le da un z-index explícito. */
+.recharts-tooltip-wrapper {
+  z-index: 50;
+}
+

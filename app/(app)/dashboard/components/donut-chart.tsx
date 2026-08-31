@@ -10,7 +10,7 @@ import {
   Tooltip,
   type TooltipContentProps,
 } from "recharts";
-import { numberToCurrency } from "@/lib/utils";
+import { cn, numberToCurrency } from "@/lib/utils";
 
 export interface DonutDatum {
   name: string;
@@ -34,11 +34,12 @@ interface DonutChartProps {
   className?: string;
   action?: ReactNode;
   badge?: ReactNode;
-  /** Máximo de segmentos; los de menor monto se agrupan en "Otros". */
-  maxSlices?: number;
   /** Comparación vs el período anterior: muestra flechas de tendencia en el
    * total y en la leyenda (solo cuando se visualiza el mes actual). */
   compare?: DonutCompare | null;
+  /** Invierte el color de las flechas de tendencia (verde si sube, rojo si baja).
+   * Se usa en Ingresos, donde subir es bueno. Default: rojo sube / verde baja (Gastos). */
+  invertTrend?: boolean;
 }
 
 /** Paleta para los segmentos: tonos 500, legibles en tema claro y oscuro. */
@@ -54,49 +55,44 @@ const PALETTE = [
   "#f97316",
   "#14b8a6",
 ];
-const OTROS_COLOR = "#94a3b8";
 
 interface Slice extends DonutDatum {
   color: string;
   percent: number;
 }
 
-/** Prepara los datos: quita montos 0, agrupa los menores en "Otros" y asigna
- * colores y porcentajes en orden descendente de monto. */
-function buildSlices(data: DonutDatum[], maxSlices: number): Slice[] {
+/** Prepara los datos: quita montos 0 y asigna colores y porcentajes en orden
+ * descendente de monto. Muestra TODOS los ítems, sin agrupar en "Otros". */
+function buildSlices(data: DonutDatum[]): Slice[] {
   const pos = data.filter((d) => d.value > 0).sort((a, b) => b.value - a.value);
-  if (!pos.length) return [];
-
-  const top = maxSlices > 0 ? pos.slice(0, maxSlices - 1) : pos;
-  const rest = maxSlices > 0 ? pos.slice(maxSlices - 1) : [];
   const total = pos.reduce((acc, d) => acc + d.value, 0);
 
-  const slices: Slice[] = top.map((d, i) => ({
+  return pos.map((d, i) => ({
     ...d,
     color: PALETTE[i % PALETTE.length],
     percent: total > 0 ? (d.value / total) * 100 : 0,
   }));
-
-  if (rest.length > 0) {
-    const resto = rest.reduce((acc, d) => acc + d.value, 0);
-    slices.push({
-      name: "Otros",
-      value: resto,
-      meta: rest.map((d) => ({ label: d.name, value: d.value })),
-      color: OTROS_COLOR,
-      percent: total > 0 ? (resto / total) * 100 : 0,
-    });
-  }
-
-  return slices;
 }
 
-/** Flecha de tendencia: subió (rojo), bajó (verde) o se mantuvo igual (gris). */
-function TrendArrow({ current, previous }: { current: number; previous: number }) {
+/** Flecha de tendencia: subió (rojo por defecto), bajó (verde por defecto) o se
+ * mantuvo igual (gris). Con `invertTrend` (semántica de ingresos) se invierten
+ * los colores: subió verde / bajó rojo. */
+function TrendArrow({
+  current,
+  previous,
+  invertTrend = false,
+}: {
+  current: number;
+  previous: number;
+  invertTrend?: boolean;
+}) {
   if (current > previous) {
     return (
       <ArrowUp
-        className="h-3.5 w-3.5 shrink-0 text-danger"
+        className={cn(
+          "h-3.5 w-3.5 shrink-0",
+          invertTrend ? "text-success" : "text-danger"
+        )}
         aria-label="Subió respecto al período anterior"
       />
     );
@@ -104,7 +100,10 @@ function TrendArrow({ current, previous }: { current: number; previous: number }
   if (current < previous) {
     return (
       <ArrowDown
-        className="h-3.5 w-3.5 shrink-0 text-success"
+        className={cn(
+          "h-3.5 w-3.5 shrink-0",
+          invertTrend ? "text-danger" : "text-success"
+        )}
         aria-label="Bajó respecto al período anterior"
       />
     );
@@ -157,8 +156,8 @@ export function DonutChart({
   className = "",
   action,
   badge,
-  maxSlices = 8,
   compare,
+  invertTrend = false,
 }: DonutChartProps) {
   const header = (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
@@ -170,7 +169,7 @@ export function DonutChart({
     </div>
   );
 
-  const slices = buildSlices(data, maxSlices);
+  const slices = buildSlices(data);
   const total = slices.reduce((acc, s) => acc + s.value, 0);
 
   return (
@@ -215,7 +214,11 @@ export function DonutChart({
                   {numberToCurrency(total, currency)}
                 </span>
                 {compare && (
-                  <TrendArrow current={total} previous={compare.prevTotal} />
+                  <TrendArrow
+                    current={total}
+                    previous={compare.prevTotal}
+                    invertTrend={invertTrend}
+                  />
                 )}
               </span>
               {compare && (
@@ -249,15 +252,9 @@ export function DonutChart({
                   </span>
                   {compare && (
                     <TrendArrow
+                      invertTrend={invertTrend}
                       current={s.value}
-                      previous={
-                        s.name === "Otros" && s.meta
-                          ? s.meta.reduce(
-                              (acc, m) => acc + (compare.prevByName[m.label] ?? 0),
-                              0
-                            )
-                          : (compare.prevByName[s.name] ?? 0)
-                      }
+                      previous={compare.prevByName[s.name] ?? 0}
                     />
                   )}
                 </span>
