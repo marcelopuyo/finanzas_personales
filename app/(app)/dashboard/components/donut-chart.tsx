@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { ArrowDown, ArrowUp, Minus } from "lucide-react";
 import {
   Cell,
   Pie,
@@ -18,6 +19,13 @@ export interface DonutDatum {
   meta?: { label: string; value: number }[];
 }
 
+export interface DonutCompare {
+  /** Total del período anterior (flecha del centro). */
+  prevTotal: number;
+  /** Monto del período anterior por nombre de segmento. */
+  prevByName: Record<string, number>;
+}
+
 interface DonutChartProps {
   title: string;
   data: DonutDatum[];
@@ -28,6 +36,9 @@ interface DonutChartProps {
   badge?: ReactNode;
   /** Máximo de segmentos; los de menor monto se agrupan en "Otros". */
   maxSlices?: number;
+  /** Comparación vs el período anterior: muestra flechas de tendencia en el
+   * total y en la leyenda (solo cuando se visualiza el mes actual). */
+  compare?: DonutCompare | null;
 }
 
 /** Paleta para los segmentos: tonos 500, legibles en tema claro y oscuro. */
@@ -80,6 +91,32 @@ function buildSlices(data: DonutDatum[], maxSlices: number): Slice[] {
   return slices;
 }
 
+/** Flecha de tendencia: subió (rojo), bajó (verde) o se mantuvo igual (gris). */
+function TrendArrow({ current, previous }: { current: number; previous: number }) {
+  if (current > previous) {
+    return (
+      <ArrowUp
+        className="h-3.5 w-3.5 shrink-0 text-danger"
+        aria-label="Subió respecto al período anterior"
+      />
+    );
+  }
+  if (current < previous) {
+    return (
+      <ArrowDown
+        className="h-3.5 w-3.5 shrink-0 text-success"
+        aria-label="Bajó respecto al período anterior"
+      />
+    );
+  }
+  return (
+    <Minus
+      className="h-3.5 w-3.5 shrink-0 text-subtitle"
+      aria-label="Se mantuvo igual respecto al período anterior"
+    />
+  );
+}
+
 function DonutTooltip({
   active,
   payload,
@@ -89,7 +126,7 @@ function DonutTooltip({
   const d = payload[0]?.payload as Slice | undefined;
   if (!d) return null;
   return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-lg">
+    <div className="rounded-lg bg-background/80 px-3 py-2 shadow-lg backdrop-blur-sm">
       <p className="text-[12px] font-medium text-subtitle">{d.name}</p>
       <p className="mt-0.5 text-[16px] font-semibold text-card-foreground">
         {numberToCurrency(d.value, currency)}
@@ -121,6 +158,7 @@ export function DonutChart({
   action,
   badge,
   maxSlices = 8,
+  compare,
 }: DonutChartProps) {
   const header = (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
@@ -172,9 +210,17 @@ export function DonutChart({
               <span className="text-[11px] uppercase tracking-wide text-subtitle">
                 Total
               </span>
-              <span className="max-w-full truncate px-2 text-[17px] font-semibold text-header">
-                {numberToCurrency(total, currency)}
+              <span className="flex max-w-full items-center gap-1 px-2">
+                <span className="truncate text-[17px] font-semibold text-header">
+                  {numberToCurrency(total, currency)}
+                </span>
+                {compare && (
+                  <TrendArrow current={total} previous={compare.prevTotal} />
+                )}
               </span>
+              {compare && (
+                <span className="text-[10px] text-subtitle">vs mes anterior</span>
+              )}
             </div>
           </div>
 
@@ -192,13 +238,28 @@ export function DonutChart({
                   />
                   <span className="truncate text-card-foreground">{s.name}</span>
                 </span>
-                <span className="flex shrink-0 flex-col items-end leading-tight">
-                  <span className="font-medium text-header">
-                    {numberToCurrency(s.value, currency)}
+                <span className="flex shrink-0 items-center gap-1.5">
+                  <span className="flex flex-col items-end leading-tight">
+                    <span className="font-medium text-header">
+                      {numberToCurrency(s.value, currency)}
+                    </span>
+                    <span className="text-[11px] text-subtitle">
+                      {s.percent.toFixed(1).replace(/\.0$/, "")}%
+                    </span>
                   </span>
-                  <span className="text-[11px] text-subtitle">
-                    {s.percent.toFixed(1).replace(/\.0$/, "")}%
-                  </span>
+                  {compare && (
+                    <TrendArrow
+                      current={s.value}
+                      previous={
+                        s.name === "Otros" && s.meta
+                          ? s.meta.reduce(
+                              (acc, m) => acc + (compare.prevByName[m.label] ?? 0),
+                              0
+                            )
+                          : (compare.prevByName[s.name] ?? 0)
+                      }
+                    />
+                  )}
                 </span>
               </div>
             ))}

@@ -74,6 +74,22 @@ export function DashboardClient({ data }: Props) {
 
   const hoy = todayLocalISODate();
 
+  // ¿Se está visualizando el "mes actual" (sin filtros de fechas aplicados)?
+  // Solo en ese caso se muestran las flechas de tendencia "vs mes anterior".
+  const esMesActualGastos = selFd === fechaPrimerDia() && selFh === fechaHoy();
+  const esMesActualIngresos =
+    selFdIng === fechaPrimerDia() && selFhIng === fechaHoy();
+
+  // Rango (inclusive) del MES ANTERIOR para comparar montos.
+  const fechaAhora = new Date();
+  const prevYear =
+    fechaAhora.getMonth() === 0 ? fechaAhora.getFullYear() - 1 : fechaAhora.getFullYear();
+  const prevMonth = fechaAhora.getMonth() === 0 ? 12 : fechaAhora.getMonth(); // 1-based
+  const prevInicioKey = `${prevYear}-${String(prevMonth).padStart(2, "0")}-01`;
+  const prevFinKey = `${prevYear}-${String(prevMonth).padStart(2, "0")}-${String(
+    new Date(prevYear, prevMonth, 0).getDate()
+  ).padStart(2, "0")}`;
+
   // Listados de períodos para los popups de las tarjetas sintéticas:
   // - "Períodos a Cobrar": cerrados (fecha final < hoy) y no cobrados.
   // - "Períodos Actuales": no cobrados, ya comenzados (desde <= hoy) y con
@@ -200,6 +216,26 @@ export function DashboardClient({ data }: Props) {
     }));
   }, [filteredSinCat]);
 
+  // Totales del MES ANTERIOR por categoría (mismas cuentas filtradas, sin
+  // fechas) para las flechas de tendencia del resumen de gastos.
+  const gastosMesAnterior = useMemo(() => {
+    const map = new Map<string, number>();
+    todosLosGastos.forEach((g) => {
+      if (selCta.length > 0 && !selCta.includes(g.cuenta || SIN_CUENTA)) return;
+      const f = toDateKey(g.fechaPago);
+      if (f >= prevInicioKey && f <= prevFinKey) {
+        const name = g.categoria?.nombre || SIN_CATEGORIA;
+        map.set(name, (map.get(name) || 0) + g.monto);
+      }
+    });
+    return map;
+  }, [todosLosGastos, selCta, prevInicioKey, prevFinKey]);
+
+  const gastosPrevTotal = useMemo(
+    () => Array.from(gastosMesAnterior.values()).reduce((a, b) => a + b, 0),
+    [gastosMesAnterior]
+  );
+
   // Evolución filtrada (sin fechas, para el panel Histórico):
   // agrupa por período y suma montos, ordenado cronológicamente.
   const filteredEvolucion = useMemo(() => {
@@ -321,6 +357,29 @@ export function DashboardClient({ data }: Props) {
     });
     return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
   }, [todosLosIngresos, selFdIng, selFhIng]);
+
+  // Totales del MES ANTERIOR por trabajo para las flechas de tendencia de ingresos.
+  const ingresosMesAnterior = useMemo(() => {
+    const map = new Map<string, number>();
+    todosLosIngresos.forEach((p) => {
+      const nombre = p.trabajo?.nombre || SIN_TRABAJO;
+      (p.jornadas ?? []).forEach((j) => {
+        const f = toDateKey(j.fechaJornada);
+        if (f >= prevInicioKey && f <= prevFinKey) {
+          map.set(
+            nombre,
+            (map.get(nombre) || 0) + (j.montoJornada || 0) + (j.montoPropina || 0)
+          );
+        }
+      });
+    });
+    return map;
+  }, [todosLosIngresos, prevInicioKey, prevFinKey]);
+
+  const ingresosPrevTotal = useMemo(
+    () => Array.from(ingresosMesAnterior.values()).reduce((a, b) => a + b, 0),
+    [ingresosMesAnterior]
+  );
 
   // Histórico por mes (desde las jornadas de los períodos filtrados por trabajo)
   const filteredIngresosEvolucion = useMemo(() => {
@@ -461,6 +520,10 @@ export function DashboardClient({ data }: Props) {
               { label: "Pendiente", value: g.saldo },
             ],
           }))}
+          compare={esMesActualGastos ? {
+            prevTotal: gastosPrevTotal,
+            prevByName: Object.fromEntries(gastosMesAnterior),
+          } : null}
         />
       ) : tabGastos === "detalle" ? (
         <div className="rounded-lg border border-border bg-card p-5">
@@ -498,6 +561,10 @@ export function DashboardClient({ data }: Props) {
           badge={<><StatBadge label="Mes actual" value={data.ingresosMesActual} />{ingFilterBtn("sm:hidden")}</>}
           currency={data.monedaPredeterminadaISO}
           data={filteredIngresosResumen.map((i) => ({ name: i.name, value: i.value }))}
+          compare={esMesActualIngresos ? {
+            prevTotal: ingresosPrevTotal,
+            prevByName: Object.fromEntries(ingresosMesAnterior),
+          } : null}
         />
       ) : tabIngresos === "detalle" ? (
         <div className="rounded-lg border border-border bg-card p-5">
