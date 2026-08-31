@@ -1,20 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
-    <!-- Recorte para la mitad derecha de la P: linea vertical x=291 rotada 20° en sentido horario y desplazada al punto medio entre el centro del ojo y la posicion anterior -->
+    <!-- Mitad IZQUIERDA (celeste): linea de corte desplazada a la izquierda -->
+    <clipPath id="mitadIzq">
+      <polygon points="0,0 359.3,-2 172.9,510 0,512"/>
+    </clipPath>
+    <!-- Mitad DERECHA (verde): linea de corte desplazada a la derecha → deja un
+         hueco cobalto entre celeste y verde (separación marcada ~16px a escala 512) -->
     <clipPath id="mitadDer">
-      <polygon points="364.9,0 178.5,512 512,512 512,0"/>
+      <polygon points="370.5,2 184.1,514 512,512 512,0"/>
     </clipPath>
   </defs>
   <rect x="16" y="16" width="480" height="480" rx="108" fill="#0B1A30"/>
   <rect x="16" y="16" width="480" height="480" rx="108" fill="none" stroke="#3e3f42" stroke-width="6"/>
-  <!-- Monograma centrado en el tile y reducido al 73% del tamaño original (3 x -10%) -->
+  <!-- Monograma centrado en el tile -->
   <g transform="translate(-125.85, -79.92) scale(1.3122)">
-    <!-- Panza completa en CYAN: la mitad izquierda de ambos brazos queda cyan -->
-    <path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267"
-          fill="none" stroke="#00E5FF" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/>
-    <!-- Palote de la P (cyan) -->
-    <rect x="168" y="128" width="62" height="256" rx="16" fill="#00E5FF"/>
-    <!-- Mitad derecha de los brazos + arco en VERDE LIMA (recortada desde x=291) -->
+    <!-- Celeste (panza + palote) recortado a la IZQUIERDA del corte -->
+    <g clip-path="url(#mitadIzq)">
+      <path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267"
+            fill="none" stroke="#00E5FF" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="168" y="128" width="62" height="256" rx="16" fill="#00E5FF"/>
+    </g>
+    <!-- Verde lima (mitad derecha de brazos + arco) recortado a la DERECHA -->
     <g clip-path="url(#mitadDer)">
       <path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267"
             fill="none" stroke="#39FF14" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/>

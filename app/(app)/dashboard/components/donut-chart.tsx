@@ -15,8 +15,6 @@ import { cn, numberToCurrency } from "@/lib/utils";
 export interface DonutDatum {
   name: string;
   value: number;
-  /** Desglose opcional (ej. Pagado/Pendiente en gastos) para el tooltip. */
-  meta?: { label: string; value: number }[];
 }
 
 export interface DonutCompare {
@@ -130,21 +128,6 @@ function DonutTooltip({
       <p className="mt-0.5 text-[16px] font-semibold text-card-foreground">
         {numberToCurrency(d.value, currency)}
       </p>
-      {d.meta && d.meta.length > 0 && (
-        <div className="mt-1 space-y-0.5">
-          {d.meta.map((m) => (
-            <div
-              key={m.label}
-              className="flex items-center justify-between gap-4 text-[12px]"
-            >
-              <span className="text-subtitle">{m.label}</span>
-              <span className="font-medium text-card-foreground">
-                {numberToCurrency(m.value, currency)}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

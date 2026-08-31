@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Separación celeste/verde — Propuesta favicon</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 28px;
+    background: #151517; color: #e2e4f0;
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; color: #fff; }
+  p.sub { margin: 0 0 22px; font-size: 13px; color: #8b8d98; max-width: 760px; line-height: 1.5; }
+  .row {
+    display: flex; flex-wrap: wrap; gap: 18px;
+  }
+  .card {
+    background: #1b1b1c; border: 1px solid #3e3f42; border-radius: 14px;
+    padding: 22px; width: 300px;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+  }
+  .card .tile {
+    width: 160px; height: 160px; border-radius: 24px;
+    overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  }
+  .card .tile svg { display: block; width: 100%; height: 100%; }
+  .card .name { font-size: 14px; font-weight: 700; color: #fff; }
+  .card .desc { font-size: 12px; color: #8b8d98; text-align: center; line-height: 1.45; }
+  .badge {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+    background: #4c6ef5; color: #fff; border-radius: 999px; padding: 3px 9px;
+  }
+  .badge.activo { background: #16a34a; }
+  .sizes { display: flex; align-items: flex-end; gap: 10px; margin-top: 2px; }
+  .sizes svg { border-radius: 5px; }
+  .note {
+    margin-top: 22px; max-width: 760px;
+    font-size: 12px; color: #8b8d98; line-height: 1.6;
+    border: 1px dashed #3e3f42; border-radius: 10px; padding: 12px 14px;
+  }
+  .note b { color: #e2e4f0; }
+</style>
+</head>
+<body>
+  <h1>Separación celeste / verde — Propuesta de favicon</h1>
+  <p class="sub">
+    Muestra previa (NO aplicada al ícono real). La idea: dejar un pequeño hueco entre la
+    mitad <b style="color:#00E5FF">celeste</b> y la mitad <b style="color:#39FF14">verde</b>
+    a lo largo del corte diagonal (se ve el fondo cobalto <code>#0B1A30</code> entre ambos).
+    Dos niveles de separación para elegir.
+  </p>
+
+  <div class="row">
+
+    <!-- ACTUAL -->
+    <div class="card">
+      <div class="tile">
+        <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="mitadDerA"><polygon points="364.9,0 178.5,512 512,512 512,0"/></clipPath></defs><rect x="16" y="16" width="480" height="480" rx="108" fill="#0B1A30"/><rect x="16" y="16" width="480" height="480" rx="108" fill="none" stroke="#3e3f42" stroke-width="6"/><g transform="translate(-125.85, -79.92) scale(1.3122)"><path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267" fill="none" stroke="#00E5FF" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/><rect x="168" y="128" width="62" height="256" rx="16" fill="#00E5FF"/><g clip-path="url(#mitadDerA)"><path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267" fill="none" stroke="#39FF14" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/></g></g></svg>
+      </div>
+      <span class="badge activo">Actual</span>
+      <div class="name">Sin separación</div>
+      <div class="desc">Celeste y verde pegados en el corte diagonal.</div>
+      <div class="sizes">
+        <svg viewBox="0 0 512 512" width="48" height="48" xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="mitadDerA2"><polygon points="364.9,0 178.5,512 512,512 512,0"/></clipPath></defs><rect x="16" y="16" width="480" height="480" rx="108" fill="#0B1A30"/><rect x="16" y="16" width="480" height="480" rx="108" fill="none" stroke="#3e3f42" stroke-width="6"/><g transform="translate(-125.85, -79.92) scale(1.3122)"><path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267" fill="none" stroke="#00E5FF" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/><rect x="168" y="128" width="62" height="256" rx="16" fill="#00E5FF"/><g clip-path="url(#mitadDerA2)"><path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267" fill="none" stroke="#39FF14" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/></g></g></svg>
+        <svg viewBox="0 0 512 512" width="32" height="32" xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="mitadDerA3"><polygon points="364.9,0 178.5,512 512,512 512,0"/></clipPath></defs><rect x="16" y="16" width="480" height="480" rx="108" fill="#0B1A30"/><rect x="16" y="16" width="480" height="480" rx="108" fill="none" stroke="#3e3f42" stroke-width="6"/><g transform="translate(-125.85, -79.92) scale(1.3122)"><path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267" fill="none" stroke="#00E5FF" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/><rect x="168" y="128" width="62" height="256" rx="16" fill="#00E5FF"/><g clip-path="url(#mitadDerA3)"><path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267" fill="none" stroke="#39FF14" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/></g></g></svg>
+      </div>
+    </div>
+
+    <!-- PROP SUTIL -->
+    <div class="card">
+      <div class="tile">
+        <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="mitadIzqS"><polygon points="0,0 362.1,-1 175.7,511 0,512"/></clipPath><clipPath id="mitadDerS"><polygon points="367.7,1 181.3,513 512,512 512,0"/></clipPath></defs><rect x="16" y="16" width="480" height="480" rx="108" fill="#0B1A30"/><rect x="16" y="16" width="480" height="480" rx="108" fill="none" stroke="#3e3f42" stroke-width="6"/><g transform="translate(-125.85, -79.92) scale(1.3122)"><g clip-path="url(#mitadIzqS)"><path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267" fill="none" stroke="#00E5FF" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/><rect x="168" y="128" width="62" height="256" rx="16" fill="#00E5FF"/></g><g clip-path="url(#mitadDerS)"><path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267" fill="none" stroke="#39FF14" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/></g></g></svg>
+      </div>
+      <span class="badge">Propuesta 1</span>
+      <div class="name">Separación sutil</div>
+      <div class="desc">Hueco fino (~6u) entre el celeste y el verde en el corte.</div>
+      <div class="sizes">
+        <svg viewBox="0 0 512 512" width="48" height="48" xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="mitadIzqS2"><polygon points="0,0 362.1,-1 175.7,511 0,512"/></clipPath><clipPath id="mitadDerS2"><polygon points="367.7,1 181.3,513 512,512 512,0"/></clipPath></defs><rect x="16" y="16" width="480" height="480" rx="108" fill="#0B1A30"/><rect x="16" y="16" width="480" height="480" rx="108" fill="none" stroke="#3e3f42" stroke-width="6"/><g transform="translate(-125.85, -79.92) scale(1.3122)"><g clip-path="url(#mitadIzqS2)"><path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267" fill="none" stroke="#00E5FF" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/><rect x="168" y="128" width="62" height="256" rx="16" fill="#00E5FF"/></g><g clip-path="url(#mitadDerS2)"><path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267" fill="none" stroke="#39FF14" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/></g></g></svg>
+        <svg viewBox="0 0 512 512" width="32" height="32" xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="mitadIzqS3"><polygon points="0,0 362.1,-1 175.7,511 0,512"/></clipPath><clipPath id="mitadDerS3"><polygon points="367.7,1 181.3,513 512,512 512,0"/></clipPath></defs><rect x="16" y="16" width="480" height="480" rx="108" fill="#0B1A30"/><rect x="16" y="16" width="480" height="480" rx="108" fill="none" stroke="#3e3f42" stroke-width="6"/><g transform="translate(-125.85, -79.92) scale(1.3122)"><g clip-path="url(#mitadIzqS3)"><path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267" fill="none" stroke="#00E5FF" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/><rect x="168" y="128" width="62" height="256" rx="16" fill="#00E5FF"/></g><g clip-path="url(#mitadDerS3)"><path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267" fill="none" stroke="#39FF14" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/></g></g></svg>
+      </div>
+    </div>
+
+    <!-- PROP MARCADA -->
+    <div class="card">
+      <div class="tile">
+        <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="mitadIzqM"><polygon points="0,0 359.3,-2 172.9,510 0,512"/></clipPath><clipPath id="mitadDerM"><polygon points="370.5,2 184.1,514 512,512 512,0"/></clipPath></defs><rect x="16" y="16" width="480" height="480" rx="108" fill="#0B1A30"/><rect x="16" y="16" width="480" height="480" rx="108" fill="none" stroke="#3e3f42" stroke-width="6"/><g transform="translate(-125.85, -79.92) scale(1.3122)"><g clip-path="url(#mitadIzqM)"><path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267" fill="none" stroke="#00E5FF" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/><rect x="168" y="128" width="62" height="256" rx="16" fill="#00E5FF"/></g><g clip-path="url(#mitadDerM)"><path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267" fill="none" stroke="#39FF14" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/></g></g></svg>
+      </div>
+      <span class="badge" style="background:#16a34a">✓ Elegida</span>
+      <div class="name">Separación marcada</div>
+      <div class="desc">Hueco más visible (~12u) entre el celeste y el verde. — APLICADA a icon.* y variantes</div>
+      <div class="sizes">
+        <svg viewBox="0 0 512 512" width="48" height="48" xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="mitadIzqM2"><polygon points="0,0 359.3,-2 172.9,510 0,512"/></clipPath><clipPath id="mitadDerM2"><polygon points="370.5,2 184.1,514 512,512 512,0"/></clipPath></defs><rect x="16" y="16" width="480" height="480" rx="108" fill="#0B1A30"/><rect x="16" y="16" width="480" height="480" rx="108" fill="none" stroke="#3e3f42" stroke-width="6"/><g transform="translate(-125.85, -79.92) scale(1.3122)"><g clip-path="url(#mitadIzqM2)"><path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267" fill="none" stroke="#00E5FF" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/><rect x="168" y="128" width="62" height="256" rx="16" fill="#00E5FF"/></g><g clip-path="url(#mitadDerM2)"><path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267" fill="none" stroke="#39FF14" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/></g></g></svg>
+        <svg viewBox="0 0 512 512" width="32" height="32" xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="mitadIzqM3"><polygon points="0,0 359.3,-2 172.9,510 0,512"/></clipPath><clipPath id="mitadDerM3"><polygon points="370.5,2 184.1,514 512,512 512,0"/></clipPath></defs><rect x="16" y="16" width="480" height="480" rx="108" fill="#0B1A30"/><rect x="16" y="16" width="480" height="480" rx="108" fill="none" stroke="#3e3f42" stroke-width="6"/><g transform="translate(-125.85, -79.92) scale(1.3122)"><g clip-path="url(#mitadIzqM3)"><path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267" fill="none" stroke="#00E5FF" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/><rect x="168" y="128" width="62" height="256" rx="16" fill="#00E5FF"/></g><g clip-path="url(#mitadDerM3)"><path d="M 230 159 L 352 159 A 62 62 0 0 1 352 267 L 230 267" fill="none" stroke="#39FF14" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/></g></g></svg>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="note">
+    <b>Cómo se hace:</b> en vez de un único recorte diagonal, la propuesta usa <b>dos recortes paralelos</b> —
+    el <span style="color:#00E5FF">celeste</span> se corta en la mitad izquierda de la diagonal y el
+    <span style="color:#39FF14">verde</span> en la mitad derecha, dejando una franja del fondo cobalto
+    <code>#0B1A30</code> entre ambos. Si elegís una propuesta, la aplico a <code>app/icon.*</code>
+    (svg + png 32 + apple-icon 180 + ico 16) y a las variantes de <code>favicons/</code>.
+  </div>
+</body>
+</html>

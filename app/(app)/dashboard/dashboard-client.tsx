@@ -515,10 +515,6 @@ export function DashboardClient({ data }: Props) {
           data={filteredResumen.map((g) => ({
             name: g.name,
             value: g.pagado + g.saldo,
-            meta: [
-              { label: "Pagado", value: g.pagado },
-              { label: "Pendiente", value: g.saldo },
-            ],
           }))}
           compare={esMesActualGastos ? {
             prevTotal: gastosPrevTotal,
