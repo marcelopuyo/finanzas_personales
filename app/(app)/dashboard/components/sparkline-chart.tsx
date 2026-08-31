@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { MouseEvent, TouchEvent } from "react";
 import { numberToCurrency } from "@/lib/utils";
 
@@ -26,6 +26,7 @@ export function SparkLineChart({
   currency = "ARS",
 }: SparkLineChartProps) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const gradientId = useId().replace(/:/g, "");
 
   if (!data || data.length === 0) return null;
 
@@ -155,6 +156,18 @@ export function SparkLineChart({
 
   const points = linePoints.map((p) => `${p.x},${p.y}`).join(" ");
 
+  // Relleno (área/sombra) bajo la línea, estilo los gráficos históricos: cierra
+  // el contorno desde la línea hasta la base del gráfico con un gradiente
+  // vertical (más opaco arriba → transparente abajo).
+  const areaPath =
+    `M ${linePoints[0].x},${linePoints[0].y}` +
+    linePoints
+      .slice(1)
+      .map((p) => ` L ${p.x},${p.y}`)
+      .join("") +
+    ` L ${linePoints[linePoints.length - 1].x},${height}` +
+    ` L ${linePoints[0].x},${height} Z`;
+
   // Soporta mouse (onMouseMove) y dedo en móvil (onTouchStart/onTouchMove): el
   // tooltip se actualiza según la posición horizontal sobre el gráfico.
   const handleMove = (
@@ -195,6 +208,20 @@ export function SparkLineChart({
         onTouchMove={handleMove}
         onTouchEnd={() => setTooltip(null)}
       >
+        <defs>
+          <linearGradient
+            id={gradientId}
+            x1="0"
+            y1="0"
+            x2="0"
+            y2={height}
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop offset="0%" stopColor="var(--success)" stopOpacity={0.35} />
+            <stop offset="100%" stopColor="var(--success)" stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <path d={areaPath} fill={`url(#${gradientId})`} />
         <polyline
           points={points}
           fill="none"
