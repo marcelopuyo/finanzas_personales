@@ -8,7 +8,7 @@ import { Tabs } from "@/components/ui/tabs";
 import { Modal } from "@/components/ui/modal";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AccountCard } from "./components/account-card";
-import { StackedBarChart } from "./components/bar-chart";
+import { DonutChart } from "./components/donut-chart";
 import { EvolutionChart } from "./components/line-chart";
 import { PrestamosChart } from "./components/prestamos-chart";
 import { GastosDetalle } from "./components/gastos-detalle";
@@ -448,16 +448,19 @@ export function DashboardClient({ data }: Props) {
 
       {/* Gastos Section — filtro compartido */}
       {tabGastos === "resumen" ? (
-        <StackedBarChart
+        <DonutChart
           title="Gastos"
           action={<div className="flex items-center gap-2">{filterBtn("hidden sm:inline-flex")}{gastosTabs}</div>}
           badge={<><StatBadge label="Mes actual" value={data.gastosTotal} />{filterBtn("sm:hidden")}</>}
           currency={data.monedaPredeterminadaISO}
-          data={filteredResumen.map((g) => ({ name: g.name, value: g.pagado, value2: g.saldo }))}
-          bars={[
-            { key: "value", name: "Pagado", color: "var(--success)", darkColor: "var(--success)" },
-            { key: "value2", name: "Pendiente", color: "var(--warning)", darkColor: "var(--warning)" },
-          ]}
+          data={filteredResumen.map((g) => ({
+            name: g.name,
+            value: g.pagado + g.saldo,
+            meta: [
+              { label: "Pagado", value: g.pagado },
+              { label: "Pendiente", value: g.saldo },
+            ],
+          }))}
         />
       ) : tabGastos === "detalle" ? (
         <div className="rounded-lg border border-border bg-card p-5">
@@ -489,13 +492,12 @@ export function DashboardClient({ data }: Props) {
 
       {/* Ingresos Section — filtro compartido */}
       {tabIngresos === "resumen" ? (
-        <StackedBarChart
+        <DonutChart
           title="Ingresos"
           action={<div className="flex items-center gap-2">{ingFilterBtn("hidden sm:inline-flex")}{ingresosTabs}</div>}
           badge={<><StatBadge label="Mes actual" value={data.ingresosMesActual} />{ingFilterBtn("sm:hidden")}</>}
-          data={filteredIngresosResumen.map((i) => ({ name: i.name, value: i.value }))}
-          bars={[{ key: "value", name: "Ingresos", color: "var(--success)", darkColor: "var(--success)" }]}
           currency={data.monedaPredeterminadaISO}
+          data={filteredIngresosResumen.map((i) => ({ name: i.name, value: i.value }))}
         />
       ) : tabIngresos === "detalle" ? (
         <div className="rounded-lg border border-border bg-card p-5">
