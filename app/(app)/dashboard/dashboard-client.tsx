@@ -135,6 +135,15 @@ export function DashboardClient({ data }: Props) {
   // el primer render se muestran solo las cuentas reales; al montar se agregan
   // las sintéticas (sin romper la hidratación).
   const [sinteticas, setSinteticas] = useState<DashboardData["cuentas"]>([]);
+  // Badges "Mes actual" de Gastos e Ingresos. El servidor (Vercel, UTC) los
+  // calcula con `new Date()` y en el límite de mes puede quedar ±1 día/mes
+  // adelantado respecto al usuario (ej. GMT-3 de noche el 31 → el server ya
+  // está en el 1° → marca 0). Se inicializan con el valor del servidor (SSR,
+  // sin romper la hidratación) y se recalculan tras el montaje con la fecha
+  // LOCAL del navegador (primer día del mes → hoy), en el mismo efecto que
+  // las tarjetas sintéticas (mismo desfase de zona horaria del servidor).
+  const [mesActualGastos, setMesActualGastos] = useState(data.gastosTotal);
+  const [mesActualIngresos, setMesActualIngresos] = useState(data.ingresosMesActual);
   useEffect(() => {
     const pendiente = periodosCobrar.reduce(
       (acc, p) => acc + (p.montoACobrar || 0),
@@ -166,7 +175,36 @@ export function DashboardClient({ data }: Props) {
       });
     }
     setSinteticas(cards);
-  }, [data.monedaPredeterminadaISO, periodosCobrar, periodosActuales]);
+
+    // Badge "Mes actual" de Gastos: fechaPago en [primer día del mes, hoy].
+    const d = new Date();
+    const desde = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+    const hasta = todayLocalISODate();
+    let totalG = 0;
+    todosLosGastos.forEach((g) => {
+      const f = toDateKey(g.fechaPago);
+      if (f >= desde && f <= hasta) totalG += g.monto;
+    });
+    setMesActualGastos(numberToCurrency(totalG, data.monedaPredeterminadaISO));
+
+    // Badge "Mes actual" de Ingresos: jornadas con fechaJornada en el mes.
+    let totalI = 0;
+    todosLosIngresos.forEach((p) => {
+      (p.jornadas ?? []).forEach((j) => {
+        const f = toDateKey(j.fechaJornada);
+        if (f >= desde && f <= hasta) {
+          totalI += (j.montoJornada || 0) + (j.montoPropina || 0);
+        }
+      });
+    });
+    setMesActualIngresos(numberToCurrency(totalI, data.monedaPredeterminadaISO));
+  }, [
+    data.monedaPredeterminadaISO,
+    periodosCobrar,
+    periodosActuales,
+    todosLosGastos,
+    todosLosIngresos,
+  ]);
 
   const filteredGastos = useMemo(() => {
     let r = todosLosGastos;
@@ -510,7 +548,7 @@ export function DashboardClient({ data }: Props) {
         <DonutChart
           title="Gastos"
           action={<div className="flex items-center gap-2">{filterBtn("hidden sm:inline-flex")}{gastosTabs}</div>}
-          badge={<><StatBadge label="Mes actual" value={data.gastosTotal} />{filterBtn("sm:hidden")}</>}
+          badge={<><StatBadge label="Mes actual" value={mesActualGastos} />{filterBtn("sm:hidden")}</>}
           currency={data.monedaPredeterminadaISO}
           data={filteredResumen.map((g) => ({
             name: g.name,
@@ -526,7 +564,7 @@ export function DashboardClient({ data }: Props) {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-[16px] font-semibold text-header">Gastos</h3>
-              <StatBadge label="Mes actual" value={data.gastosTotal} />
+              <StatBadge label="Mes actual" value={mesActualGastos} />
               {filterBtn("sm:hidden")}
             </div>
             <div className="flex items-center gap-2">{filterBtn("hidden sm:inline-flex")}{gastosTabs}</div>
@@ -541,7 +579,7 @@ export function DashboardClient({ data }: Props) {
         <EvolutionChart
           title="Gastos"
           action={<div className="flex items-center gap-2">{filterBtn("hidden sm:inline-flex")}{gastosTabs}</div>}
-          badge={<><StatBadge label="Mes actual" value={data.gastosTotal} />{filterBtn("sm:hidden")}</>}
+          badge={<><StatBadge label="Mes actual" value={mesActualGastos} />{filterBtn("sm:hidden")}</>}
           currency={data.monedaPredeterminadaISO}
           data={filteredEvolucion}
           color="var(--primary)"
@@ -554,7 +592,7 @@ export function DashboardClient({ data }: Props) {
         <DonutChart
           title="Ingresos"
           action={<div className="flex items-center gap-2">{ingFilterBtn("hidden sm:inline-flex")}{ingresosTabs}</div>}
-          badge={<><StatBadge label="Mes actual" value={data.ingresosMesActual} />{ingFilterBtn("sm:hidden")}</>}
+          badge={<><StatBadge label="Mes actual" value={mesActualIngresos} />{ingFilterBtn("sm:hidden")}</>}
           currency={data.monedaPredeterminadaISO}
           data={filteredIngresosResumen.map((i) => ({ name: i.name, value: i.value }))}
           invertTrend
@@ -568,7 +606,7 @@ export function DashboardClient({ data }: Props) {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-[16px] font-semibold text-header">Ingresos</h3>
-              <StatBadge label="Mes actual" value={data.ingresosMesActual} />
+              <StatBadge label="Mes actual" value={mesActualIngresos} />
               {ingFilterBtn("sm:hidden")}
             </div>
             <div className="flex items-center gap-2">{ingFilterBtn("hidden sm:inline-flex")}{ingresosTabs}</div>
@@ -582,7 +620,7 @@ export function DashboardClient({ data }: Props) {
         <EvolutionChart
           title="Ingresos"
           action={<div className="flex items-center gap-2">{ingFilterBtn("hidden sm:inline-flex")}{ingresosTabs}</div>}
-          badge={<><StatBadge label="Mes actual" value={data.ingresosMesActual} />{ingFilterBtn("sm:hidden")}</>}
+          badge={<><StatBadge label="Mes actual" value={mesActualIngresos} />{ingFilterBtn("sm:hidden")}</>}
           data={filteredIngresosEvolucion}
           color="var(--primary)"
           area

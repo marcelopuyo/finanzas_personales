@@ -115,13 +115,23 @@ export async function getGastosPeriodo(
 
   let id = idPeriodo;
   if (!id) {
-    const now = new Date();
+    // Se resuelve el período vigente con el "hoy" del servidor. Las columnas
+    // son `date` (medianoche UTC), así que se compara con FECHAS INCLUSIVAS
+    // usando el inicio/fin del día en UTC: antes, `fechaCierre >= now` (un
+    // timestamp con hora) fallaba el MISMO día de cierre del período (p. ej.
+    // el 31 si cierra el 31), dejando el badge "Mes actual" en 0. Además, el
+    // servidor corre en UTC (Vercel) y en el límite de mes puede quedar ±1 día
+    // adelantado al usuario (GMT-3 de noche el 31 → server ya en el 1°); el
+    // cliente recalcula el badge con su fecha local tras el montaje.
+    const hoyKey = new Date().toISOString().slice(0, 10);
+    const inicioDia = new Date(`${hoyKey}T00:00:00.000Z`);
+    const finDia = new Date(`${hoyKey}T23:59:59.999Z`);
     const actual = await ds.getRepository(PeriodoGasto).findOne({
       where: {
         usuario: { id: userId },
         eliminado: false,
-        fechaApertura: LessThanOrEqual(now),
-        fechaCierre: MoreThanOrEqual(now),
+        fechaApertura: LessThanOrEqual(finDia),
+        fechaCierre: MoreThanOrEqual(inicioDia),
       },
     });
     if (!actual) return [];

@@ -164,7 +164,12 @@ export async function fetchDashboardData(): Promise<DashboardData> {
 
   // --- Ingresos del mes actual (jornadas cuya fechaJornada cae en el mes en curso) ---
   // Suma montojornada + montopropina de todos los registros de jornadatrabajo
-  // filtrados por el mes actual.
+  // filtrados por el mes actual. ⚠️ Este valor es solo el FALLBACK SSR: se
+  // calcula con `new Date()` del servidor (Vercel en UTC) y, en el límite de
+  // mes, puede quedar ±1 día/mes adelantado respecto al usuario (ej. GMT-3 de
+  // noche el 31 → el server ya está en el 1° → 0). El badge "Mes actual" del
+  // dashboard lo recalcula el cliente tras el montaje con la fecha local del
+  // navegador (dashboard-client.tsx), mismo patrón que las tarjetas sintéticas.
   const hoy = new Date();
   const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
   const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1);
