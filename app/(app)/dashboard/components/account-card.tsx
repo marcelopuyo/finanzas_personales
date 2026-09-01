@@ -1,10 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { MoreVertical } from "lucide-react";
+import {
+  CalendarCheck,
+  CalendarClock,
+  Landmark,
+  MoreVertical,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
 import { SparkLineChart } from "./sparkline-chart";
 import { AccountActionsSheet } from "./account-actions-sheet";
 import { cn } from "@/lib/utils";
+
+// Icono por tipo de cuenta para la esquina superior izquierda de la tarjeta.
+// Se pinta en el mismo gris que el nombre de la cuenta (text-label).
+const ICONOS_POR_TIPO: Record<string, LucideIcon> = {
+  "Cuenta Bancaria": Landmark,
+  "Caja Fisica": Wallet,
+  "Períodos a Cobrar": CalendarClock,
+  "Períodos Actuales": CalendarCheck,
+};
 
 interface AccountCardProps {
   id?: number;
@@ -14,6 +30,8 @@ interface AccountCardProps {
   values: number[];
   /** Código ISO de la moneda de la cuenta (formatea el tooltip del sparkline). */
   monedaISO?: string;
+  /** Nombre del tipo de cuenta (para el icono de la esquina superior izquierda). */
+  tipo?: string;
   className?: string;
   /** Se invoca al hacer click en una tarjeta de cuenta real (abre el historial). */
   onOpen?: () => void;
@@ -28,19 +46,25 @@ export function AccountCard({
   labels,
   values,
   monedaISO,
+  tipo,
   className,
   onOpen,
   menuAccion,
 }: AccountCardProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const esCuentaReal = id != null && onOpen != null;
+  // Icono del tipo de cuenta (Landmark como fallback para tipos desconocidos).
+  const Icon = ICONOS_POR_TIPO[tipo ?? ""] ?? Landmark;
 
   const content = (
     <>
-      <div className="flex items-start justify-between">
-        <div>
+      <div className="flex items-start gap-2.5">
+        {/* Icono del tipo de cuenta (arriba a la izquierda, a la altura del
+            nombre de la cuenta), SIN fondo, en el mismo gris (text-label). */}
+        <Icon className="h-4.5 w-4.5 flex-none text-label" />
+        <div className="min-w-0">
           <p className="text-[12px] leading-4 text-label">{title}</p>
-          <p className="mt-0.5 text-[18px] font-semibold leading-7 tracking-tight text-value">
+          <p className="mt-0.5 truncate text-[18px] font-semibold leading-7 tracking-tight text-value">
             {value}
           </p>
         </div>
@@ -157,8 +181,13 @@ export function AccountCard({
 export function AccountCardSkeleton() {
   return (
     <div className="animate-pulse rounded-lg border border-border bg-card p-4">
-      <div className="mb-1.5 h-3 w-20 rounded bg-border" />
-      <div className="mb-3 h-6 w-28 rounded bg-border" />
+      <div className="flex items-start gap-2.5">
+        <div className="h-4.5 w-4.5 flex-none rounded bg-border" />
+        <div>
+          <div className="mb-1.5 h-3 w-20 rounded bg-border" />
+          <div className="mb-3 h-6 w-28 rounded bg-border" />
+        </div>
+      </div>
       <div className="h-10 w-full rounded bg-border" />
     </div>
   );

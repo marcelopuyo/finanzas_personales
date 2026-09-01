@@ -31,6 +31,8 @@ export interface CuentaConEvolucion {
   valoresEjeX: number[];
   /** Código ISO 4217 de la moneda de la cuenta (para formatear el saldo). */
   monedaCodigoISO: string | null;
+  /** Nombre del tipo de cuenta (para el icono de la tarjeta del dashboard). */
+  tipoNombre: string | null;
 }
 
 export interface GastoPeriodo {
@@ -423,6 +425,7 @@ export async function getCuentasConEvolucion(): Promise<CuentaConEvolucion[]> {
       serieEjeX: vKeys,
       valoresEjeX: vValues,
       monedaCodigoISO: cuenta.moneda?.codigoISO ?? null,
+      tipoNombre: cuenta.tipo?.nombre ?? null,
     });
   }
 

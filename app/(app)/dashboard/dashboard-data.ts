@@ -26,6 +26,8 @@ export interface DashboardData {
     values: number[];
     /** Código ISO de la moneda de la cuenta (para el historial). */
     monedaISO?: string;
+    /** Nombre del tipo de cuenta (para el icono de la tarjeta). */
+    tipo?: string;
     /** Tarjeta sintética con menú de una sola acción (ej. Períodos Actuales → jornada). */
     menuAccion?: "jornada" | "cobro";
   }[];
@@ -100,6 +102,8 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     values: number[];
     /** Código ISO de la moneda de la cuenta (para el historial). */
     monedaISO?: string;
+    /** Nombre del tipo de cuenta (para el icono de la tarjeta). */
+    tipo?: string;
     /** Tarjeta sintética con menú de una sola acción (ej. Períodos Actuales → jornada). */
     menuAccion?: "jornada" | "cobro";
   }[] = cuentasEvol.map((c) => ({
@@ -109,6 +113,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     labels: c.serieEjeX || [],
     values: c.valoresEjeX || [],
     monedaISO: c.monedaCodigoISO ?? "ARS",
+    tipo: c.tipoNombre ?? undefined,
   }));
 
   // Las tarjetas sintéticas "Períodos a Cobrar"/"Períodos Actuales" se calculan

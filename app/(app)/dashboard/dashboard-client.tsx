@@ -162,6 +162,7 @@ export function DashboardClient({ data }: Props) {
         values: [],
         // Menú con "Cobro Sueldo" (cobrar los períodos pendientes).
         menuAccion: "cobro",
+        tipo: "Períodos a Cobrar",
       });
     }
     if (periodosActuales.length > 0) {
@@ -172,6 +173,7 @@ export function DashboardClient({ data }: Props) {
         values: [],
         // Menú con "Jornada trabajo" (agregar jornadas a los períodos actuales).
         menuAccion: "jornada",
+        tipo: "Períodos Actuales",
       });
     }
     setSinteticas(cards);
