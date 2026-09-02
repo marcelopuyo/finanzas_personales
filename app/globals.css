@@ -27,8 +27,11 @@
   --color-header: var(--header);
   --color-tabs: var(--tabs-bg);
   --color-tabs-hover: var(--tabs-hover);
-  --font-sans: var(--font-inter), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  /* UI — SF Pro Display (elección 2026-09-02). En Apple resuelve a SF vía
+     -apple-system; si está instalada (p. ej. SF Pro de Apple Developer en
+     Windows) se usa directo. Inter sigue cargada (app/layout.tsx) como
+     fallback; para VOLVER a Inter basta mover var(--font-inter) al inicio. */
+  --font-sans: "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, var(--font-inter), "Inter", "Segoe UI", Roboto, sans-serif;
 }
 
 /* ============================================================
@@ -95,10 +98,12 @@
   --tabs-hover: #d0d1d4;
 }
 
+/* La familia de la UI (SF Pro Display con fallback a Inter) se aplica desde
+   el token --font-sans (definido arriba) mediante la clase `font-sans` que el
+   RootLayout pone en <body> (app/layout.tsx) — no duplicar aquí la cadena. */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-inter), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
