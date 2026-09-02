@@ -523,7 +523,7 @@ export function DashboardClient({ data }: Props) {
         title="Balance Actual"
         value={numberToCurrency(data.balance, data.monedaPredeterminadaISO)}
         centered
-        className="border-primary/40 bg-linear-to-br from-primary/10 via-card to-card shadow-sm"
+        className="bg-success/10 shadow-sm"
       />
 
       <div>
