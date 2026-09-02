@@ -364,13 +364,21 @@ export function DashboardClient({ data }: Props) {
     [todosLosIngresos]
   );
 
-  // Detalle: trabajo + fechas (la fecha usa la columna "desde")
+  // Detalle: trabajo + fechas. Los períodos abarcan un rango [fechaDesde,
+  // fechaHasta], así que se filtra por SOLAPAMIENTO con el rango elegido (no
+  // solo por la columna "desde"): un período que comenzó el mes pasado pero
+  // sigue vigente este mes (fechaHasta >= inicio) debe verse en el detalle.
   const filteredIngresos = useMemo(() => {
     let r = todosLosIngresos;
     if (selTra.length > 0)
       r = r.filter((p) => selTra.includes(p.trabajo?.nombre || SIN_TRABAJO));
-    if (selFdIng) r = r.filter((p) => toDateKey(p.fechaDesde) >= selFdIng);
-    if (selFhIng) r = r.filter((p) => toDateKey(p.fechaDesde) <= selFhIng);
+    if (selFdIng || selFhIng) {
+      r = r.filter(
+        (p) =>
+          (!selFdIng || toDateKey(p.fechaHasta) >= selFdIng) &&
+          (!selFhIng || toDateKey(p.fechaDesde) <= selFhIng)
+      );
+    }
     return r;
   }, [todosLosIngresos, selTra, selFdIng, selFhIng]);
 
