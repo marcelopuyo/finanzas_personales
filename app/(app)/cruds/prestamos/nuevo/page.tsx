@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { CrudForm } from "@/components/crud/CrudForm";
 import { crearPrestamo } from "@/backend/src/actions/prestamos";
 import { prestamoSchema, prestamoFields } from "../prestamo-form-config";
+import { todayLocalISODate } from "@/lib/utils";
 
 function NuevoPrestamoForm() {
   const searchParams = useSearchParams();
@@ -18,7 +19,9 @@ function NuevoPrestamoForm() {
       title="Nuevo Préstamo"
       fields={prestamoFields}
       schema={prestamoSchema}
-      defaultValues={{ cuenta }}
+      // Fecha precargada con HOY (la calcula el navegador al montar el
+      // formulario, por lo que es la fecha local del usuario y puede editarse).
+      defaultValues={{ cuenta, fecha: todayLocalISODate() }}
       onSubmit={async (d) => {
         await crearPrestamo({ detalle: (d.detalle as string) || undefined, fecha: d.fecha as string, monto: Number(d.monto), cuotas: Number(d.cuotas), sentido: d.sentido as "otorgado" | "obtenido", personaOrigen: d.personaOrigen as string, personaDestino: d.personaDestino as string, cuenta: d.cuenta as string });
       }}

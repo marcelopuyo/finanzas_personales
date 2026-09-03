@@ -19,8 +19,8 @@ export const prestamoFields: FormField[] = [
   { name: "fecha", label: "Fecha", type: "date" },
   { name: "monto", label: "Monto", type: "number", placeholder: "0.00" },
   { name: "cuotas", label: "Cuotas", type: "number", placeholder: "1" },
-  { name: "sentido", label: "Sentido", type: "select", options: [{ value: "otorgado", label: "Otorgado" }, { value: "obtenido", label: "Obtenido" }] },
-  { name: "personaOrigen", label: "Persona Origen", type: "select", optionsFrom: fetchPersonas },
-  { name: "personaDestino", label: "Persona Destino", type: "select", optionsFrom: fetchPersonas },
+  { name: "sentido", label: "Sentido", type: "select", options: [{ value: "otorgado", label: "Otorgado" }, { value: "obtenido", label: "Recibido" }] },
+  { name: "personaOrigen", label: "Prestador", type: "select", optionsFrom: fetchPersonas },
+  { name: "personaDestino", label: "Destinatario", type: "select", optionsFrom: fetchPersonas },
   { name: "cuenta", label: "Cuenta", type: "select", optionsFrom: fetchCuentas },
 ];
