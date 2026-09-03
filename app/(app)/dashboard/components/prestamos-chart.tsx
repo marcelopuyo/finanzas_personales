@@ -93,12 +93,16 @@ export function PrestamosChart({
   action,
 }: PrestamosChartProps) {
   const header = (
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+    <div className="relative mb-4 pr-8">
+      {/* El título + badges pueden ocupar varias líneas en mobile; el menú (⋮)
+          se ancla SIEMPRE al ángulo superior derecho del panel. */}
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-[16px] font-semibold text-header">{title}</h3>
         {badge}
       </div>
-      {action && <div className="flex items-center gap-2">{action}</div>}
+      {action && (
+        <div className="absolute right-0 top-0 flex items-center">{action}</div>
+      )}
     </div>
   );
 
