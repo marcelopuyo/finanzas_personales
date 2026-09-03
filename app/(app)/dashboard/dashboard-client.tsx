@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
-import { StatCard } from "@/components/ui/stat-card";
 import { StatBadge } from "@/components/ui/stat-badge";
 import { Tabs } from "@/components/ui/tabs";
 import { Modal } from "@/components/ui/modal";
@@ -522,23 +521,28 @@ export function DashboardClient({ data }: Props) {
   );
 
   return (
-    <div className="space-y-6 pb-8">
-      <div>
-        <h1 className="text-[18px] font-semibold tracking-tight text-header">Resumen</h1>
-        <p className="mt-0.5 text-[13px] text-subtitle">Resumen de tus finanzas personales</p>
+    <div className="space-y-6 pb-8 pt-4 lg:pt-0">
+      {/* Balance Actual — tarjeta full-width con el MISMO alto que las tarjetas
+          de cuentas y su texto centrado en vertical: flex + min-height igual al
+          alto fijo de AccountCard (título + importe + área del gráfico h-10).
+          El `pt-4 lg:pt-0` separa la tarjeta de la barra superior de menú en
+          mobile (en desktop el main ya aporta margen superior, lg:pt-6). */}
+      <div className="relative flex min-h-31.75 items-center justify-center rounded-lg border border-border bg-card p-4 shadow-sm">
+        {/* Rótulo en el ángulo superior izquierdo, como el título de las
+            tarjetas de cuentas (dentro del mismo padding p-4). */}
+        <p className="absolute left-4 top-4 text-[16px] font-semibold text-header">Balance Actual</p>
+        <p className="text-3xl font-semibold tracking-tight text-success">
+          {numberToCurrency(data.balance, data.monedaPredeterminadaISO)}
+        </p>
       </div>
 
-      <StatCard
-        title="Balance Actual"
-        value={numberToCurrency(data.balance, data.monedaPredeterminadaISO)}
-        centered
-        className="bg-success/10 shadow-sm"
-      />
-
-      <div>
-        <h2 className="mb-3 text-[14px] font-medium text-header">Cuentas y Períodos</h2>
+      {/* Cuentas — solo cuentas reales (clic abre el historial). */}
+      {/* Panel Cuentas — solo cuentas reales (clic abre el historial). El panel
+          usa bg-card como el resto; las tarjetas internas van en bg-muted. */}
+      <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
+        <h2 className="mb-3 text-[16px] font-semibold text-header">Cuentas</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[...data.cuentas, ...sinteticas].map((cuenta, i) => (
+          {data.cuentas.map((cuenta, i) => (
             <AccountCard
               key={i}
               {...cuenta}
@@ -551,16 +555,36 @@ export function DashboardClient({ data }: Props) {
                     monedaISO: cuenta.monedaISO ?? "ARS",
                     monedaPredeterminadaISO: data.monedaPredeterminadaISO,
                   });
-                } else if (cuenta.menuAccion === "cobro") {
-                  setPeriodosModal("cobrar");
-                } else if (cuenta.menuAccion === "jornada") {
-                  setPeriodosModal("actuales");
                 }
               }}
             />
           ))}
         </div>
       </div>
+
+      {/* Panel Trabajo — tarjetas sintéticas de períodos de trabajo (Períodos a
+          Cobrar / Actuales). Solo se muestra si existen (se agregan tras el
+          montaje, como las sintéticas). */}
+      {sinteticas.length > 0 && (
+        <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
+          <h2 className="mb-3 text-[16px] font-semibold text-header">Trabajo</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {sinteticas.map((cuenta, i) => (
+              <AccountCard
+                key={i}
+                {...cuenta}
+                onOpen={() => {
+                  if (cuenta.menuAccion === "cobro") {
+                    setPeriodosModal("cobrar");
+                  } else if (cuenta.menuAccion === "jornada") {
+                    setPeriodosModal("actuales");
+                  }
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Gastos Section — filtro compartido */}
       {tabGastos === "resumen" ? (
