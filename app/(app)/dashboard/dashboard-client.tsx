@@ -135,15 +135,17 @@ export function DashboardClient({ data }: Props) {
   // el primer render se muestran solo las cuentas reales; al montar se agregan
   // las sintéticas (sin romper la hidratación).
   const [sinteticas, setSinteticas] = useState<DashboardData["cuentas"]>([]);
-  // Badges "Mes actual" de Gastos e Ingresos. El servidor (Vercel, UTC) los
-  // calcula con `new Date()` y en el límite de mes puede quedar ±1 día/mes
-  // adelantado respecto al usuario (ej. GMT-3 de noche el 31 → el server ya
-  // está en el 1° → marca 0). Se inicializan con el valor del servidor (SSR,
-  // sin romper la hidratación) y se recalculan tras el montaje con la fecha
-  // LOCAL del navegador (primer día del mes → hoy), en el mismo efecto que
-  // las tarjetas sintéticas (mismo desfase de zona horaria del servidor).
+  // Badges "Mes actual" de Gastos, Ingresos y Resultados. El servidor (Vercel,
+  // UTC) los calcula con `new Date()` y en el límite de mes puede quedar ±1
+  // día/mes adelantado respecto al usuario (ej. GMT-3 de noche el 31 → el
+  // server ya está en el 1° → marca 0). Se inicializan con el valor del
+  // servidor (SSR, sin romper la hidratación) y se recalculan tras el montaje
+  // con la fecha LOCAL del navegador (primer día del mes → hoy), en el mismo
+  // efecto que las tarjetas sintéticas (mismo desfase de zona horaria del
+  // servidor).
   const [mesActualGastos, setMesActualGastos] = useState(data.gastosTotal);
   const [mesActualIngresos, setMesActualIngresos] = useState(data.ingresosMesActual);
+  const [mesActualResultados, setMesActualResultados] = useState(data.resultadosMesActual);
   useEffect(() => {
     const pendiente = periodosCobrar.reduce(
       (acc, p) => acc + (p.montoACobrar || 0),
@@ -200,6 +202,13 @@ export function DashboardClient({ data }: Props) {
       });
     });
     setMesActualIngresos(numberToCurrency(totalI, data.monedaPredeterminadaISO));
+
+    // Badge "Mes actual" de Resultados: ingresos del mes − gastos del mes
+    // (misma ventana [desde, hoy] que los badges anteriores, para que la resta
+    // sea coherente con los montos que muestran Ingresos y Gastos).
+    setMesActualResultados(
+      numberToCurrency(totalI - totalG, data.monedaPredeterminadaISO)
+    );
   }, [
     data.monedaPredeterminadaISO,
     periodosCobrar,
@@ -640,7 +649,8 @@ export function DashboardClient({ data }: Props) {
 
       {data.evolucionResultados.length > 0 && (
         <EvolutionChart
-          title="Evolución de Resultados"
+          title="Resultados"
+          badge={<StatBadge label="Mes actual" value={mesActualResultados} />}
           data={data.evolucionResultados}
           color="var(--primary)"
           area
