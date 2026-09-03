@@ -31,6 +31,27 @@ export function PagoPrestamo() {
         />
       }
     >
+      {/* Préstamo a pagar en primer lugar: al seleccionarlo se autocompleta el
+          monto con el saldo pendiente del préstamo elegido. */}
+      <SelectField
+        label="Préstamo a pagar"
+        value={data.idPrestamo}
+        onChange={(id) => {
+          const prestamo = options.prestamos.find((p) => p.id === id);
+          handleSetData({
+            idPrestamo: id,
+            // Autocompleta el monto a pagar con el saldo del préstamo. Si se
+            // deselecciona, se conserva el monto ya cargado.
+            montoOrigen: prestamo ? prestamo.saldo : data.montoOrigen,
+          });
+        }}
+        placeholder="Seleccionar préstamo..."
+        options={options.prestamos.map((p) => ({
+          value: p.id,
+          label: `${p.detalle ?? "Préstamo"} — Monto ${numberToCurrency(p.monto)} · Saldo ${numberToCurrency(p.saldo)} · ${formatFecha(p.fecha)} (${p.personaOrigen?.nombre ?? "—"} → ${p.personaDestino?.nombre ?? "—"})`,
+        }))}
+      />
+
       <DateField
         label="Fecha"
         value={data.fecha}
@@ -51,17 +72,6 @@ export function PagoPrestamo() {
         label="Monto a pagar"
         value={data.montoOrigen}
         onChange={(v) => handleSetData({ montoOrigen: v })}
-      />
-
-      <SelectField
-        label="Préstamo a pagar"
-        value={data.idPrestamo}
-        onChange={(v) => handleSetData({ idPrestamo: v })}
-        placeholder="Seleccionar préstamo..."
-        options={options.prestamos.map((p) => ({
-          value: p.id,
-          label: `${p.detalle ?? "Préstamo"} — Monto ${numberToCurrency(p.monto)} · Saldo ${numberToCurrency(p.saldo)} · ${formatFecha(p.fecha)} (${p.personaOrigen?.nombre ?? "—"} → ${p.personaDestino?.nombre ?? "—"})`,
-        }))}
       />
     </StepShell>
   );

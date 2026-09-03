@@ -70,7 +70,7 @@ export function PrestamosActionsMenu() {
           <button
             type="button"
             role="menuitem"
-            onClick={() => go("/cruds/prestamos/nuevo")}
+            onClick={() => go("/cruds/prestamos/nuevo?origen=dashboard")}
             className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] font-medium text-card-foreground transition-colors hover:bg-muted"
           >
             <Coins className="h-4 w-4 text-subtitle" />

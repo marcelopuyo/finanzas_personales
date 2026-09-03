@@ -39,7 +39,10 @@ interface CrudFormProps {
   schema: ZodSchema;
   defaultValues?: Record<string, unknown>;
   onSubmit: (data: Record<string, unknown>) => Promise<void>;
+  /** Destino de Cancelar / volver (flecha). */
   cancelHref: string;
+  /** Destino opcional tras guardar con éxito (si no se pasa, usa `cancelHref`). */
+  successHref?: string;
   successMessage: string;
 }
 
@@ -66,6 +69,7 @@ export function CrudForm({
   defaultValues,
   onSubmit,
   cancelHref,
+  successHref,
   successMessage,
 }: CrudFormProps) {
   const router = useRouter();
@@ -108,7 +112,7 @@ export function CrudForm({
     try {
       await onSubmit(data);
       toast.success(successMessage);
-      router.push(cancelHref);
+      router.push(successHref ?? cancelHref);
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Error al guardar los datos"

@@ -683,21 +683,21 @@ export function DashboardClient({ data }: Props) {
         />
       )}
 
-      {data.prestamosChart.data.length > 0 && (
-        <PrestamosChart
-          title="Préstamos Pendientes"
-          badge={
-            <div className="flex flex-wrap items-center gap-2">
-              {data.prestamosTotales.map((t) => (
-                <StatBadge key={t.currency} label={t.currency} value={t.value} />
-              ))}
-            </div>
-          }
-          data={data.prestamosChart.data}
-          series={data.prestamosChart.series}
-          action={<PrestamosActionsMenu />}
-        />
-      )}
+      {/* Panel de préstamos: se muestra SIEMPRE (también sin préstamos
+          cargados; en ese caso PrestamosChart muestra su estado vacío). */}
+      <PrestamosChart
+        title="Préstamos Pendientes"
+        badge={
+          <div className="flex flex-wrap items-center gap-2">
+            {data.prestamosTotales.map((t) => (
+              <StatBadge key={t.currency} label={t.currency} value={t.value} />
+            ))}
+          </div>
+        }
+        data={data.prestamosChart.data}
+        series={data.prestamosChart.series}
+        action={<PrestamosActionsMenu />}
+      />
 
       {/* Modal de filtros */}
       <Modal open={open} onClose={() => setOpen(false)} title="Filtros"
