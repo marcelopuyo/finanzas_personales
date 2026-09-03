@@ -113,6 +113,13 @@ export function HistorialModal({
       cell: ({ getValue }) => dateTimeToString(getValue<Date | string>()),
     },
     {
+      accessorKey: "motivo",
+      header: "Motivo",
+      cell: ({ getValue }) => (
+        <span className="text-card-foreground">{String(getValue())}</span>
+      ),
+    },
+    {
       accessorKey: "monto",
       header: "Monto",
       meta: { align: "right" } as const,
@@ -134,13 +141,6 @@ export function HistorialModal({
       },
     },
     ...(mostrarMonedaPredeterminada ? columnaMonedaPredeterminada : []),
-    {
-      accessorKey: "motivo",
-      header: "Motivo",
-      cell: ({ getValue }) => (
-        <span className="text-card-foreground">{String(getValue())}</span>
-      ),
-    },
     {
       accessorKey: "saldoPosterior",
       header: "Saldo",
@@ -179,7 +179,7 @@ export function HistorialModal({
         onClose={() => {
           if (!pendingAnular) onClose();
         }}
-        title="Historial de Cuenta"
+        title="Movimientos"
         className="sm:max-w-xl"
       >
         <div className="space-y-3">

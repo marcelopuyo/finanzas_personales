@@ -29,6 +29,8 @@ interface PrestamosChartProps {
   height?: number;
   className?: string;
   badge?: ReactNode;
+  /** Acción (menú) alineada a la derecha del encabezado del panel. */
+  action?: ReactNode;
 }
 
 /**
@@ -88,6 +90,7 @@ export function PrestamosChart({
   height = 300,
   className = "",
   badge,
+  action,
 }: PrestamosChartProps) {
   const header = (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
@@ -95,6 +98,7 @@ export function PrestamosChart({
         <h3 className="text-[16px] font-semibold text-header">{title}</h3>
         {badge}
       </div>
+      {action && <div className="flex items-center gap-2">{action}</div>}
     </div>
   );
 

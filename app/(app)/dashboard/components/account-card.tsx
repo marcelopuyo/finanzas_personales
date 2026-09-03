@@ -129,7 +129,6 @@ export function AccountCard({
           cuenta={{ id: id!, nombre: title, saldo: value }}
           open={sheetOpen}
           onClose={() => setSheetOpen(false)}
-          onVerHistorial={onOpen}
         />
       </>
     );

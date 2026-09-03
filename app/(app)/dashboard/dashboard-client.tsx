@@ -10,6 +10,7 @@ import { AccountCard } from "./components/account-card";
 import { DonutChart } from "./components/donut-chart";
 import { EvolutionChart } from "./components/line-chart";
 import { PrestamosChart } from "./components/prestamos-chart";
+import { PrestamosActionsMenu } from "./components/prestamos-actions-menu";
 import { GastosDetalle } from "./components/gastos-detalle";
 import { IngresosDetalle } from "./components/ingresos-detalle";
 import { HistorialModal, type CuentaHistorial } from "./components/historial-modal";
@@ -694,6 +695,7 @@ export function DashboardClient({ data }: Props) {
           }
           data={data.prestamosChart.data}
           series={data.prestamosChart.series}
+          action={<PrestamosActionsMenu />}
         />
       )}
 
