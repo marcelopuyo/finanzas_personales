@@ -2,6 +2,7 @@ import { getDb } from "../db";
 import { requireUserId } from "../lib/auth";
 import { Cuenta } from "../entities/cuenta.entity";
 import { Movimiento } from "../entities/movimiento.entity";
+import { HistoricoCuenta } from "../entities/historico-cuenta.entity";
 
 export interface MovimientoOut {
   id: string;
@@ -87,19 +88,47 @@ export async function getHistorialMovimientosCuenta(
   });
   if (!cuenta) return [];
 
-  // Movimientos de la cuenta (no eliminados) en orden cronológico ASC,
-  // con las relaciones que usa la query original (concepto + gasto).
+  // Movimientos de la cuenta (no eliminados) con las relaciones que usa la
+  // query original (concepto + gasto).
   const movs = await ds.getRepository(Movimiento).find({
     where: { cuenta: { id: cuentaId }, eliminado: false },
     relations: { concepto: true, gasto: true },
-    order: { fecha: "ASC", id: "ASC" },
   });
   if (movs.length === 0) return [];
+
+  // `movimiento.fecha` es solo fecha (type date, sin hora). Para ordenar
+  // dentro del mismo día se usa la hora REAL de registro: cada movimiento crea,
+  // en la misma transacción, un snapshot en historico_cuenta con su movimientoId
+  // y fechaDesde = momento en que se aplicó a la cuenta (crearHistoricoCuenta).
+  const historicos = await ds.getRepository(HistoricoCuenta).find({
+    where: { eliminado: false, cuenta: { id: cuentaId } },
+    relations: { movimiento: true },
+  });
+  const fechaDesdePorMovimiento = new Map<string, Date>();
+  for (const h of historicos) {
+    if (h.movimiento) fechaDesdePorMovimiento.set(h.movimiento.id, h.fechaDesde);
+  }
+
+  // Orden cronológico ASC por (fecha del movimiento, hora real de registro)
+  // para calcular el saldo corrido; la salida final se invierte a DESC.
+  // Los movimientos legacy sin snapshot se ordenan como si se registraran a
+  // las 00:00 de su propia fecha (quedan al inicio del día).
+  const fechaRegistro = (m: Movimiento): number => {
+    const ts = fechaDesdePorMovimiento.get(m.id);
+    return ts ? ts.getTime() : new Date(m.fecha).getTime();
+  };
+  const movsOrdenados = [...movs].sort((a, b) => {
+    const porFecha = new Date(a.fecha).getTime() - new Date(b.fecha).getTime();
+    if (porFecha !== 0) return porFecha;
+    const porHora = fechaRegistro(a) - fechaRegistro(b);
+    if (porHora !== 0) return porHora;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
 
   // Variación de la cuenta según la categoría del concepto (egreso → resta).
   // Se usa el monto en la moneda de la cuenta (el saldo y el historial se
   // guardan en la moneda de la cuenta; `monto` quedó en la predeterminada).
-  const variaciones = movs.map((m) => {
+  const variaciones = movsOrdenados.map((m) => {
     const esEgreso = m.concepto?.categoria?.toLowerCase() === "egreso";
     return esEgreso
       ? -Math.abs(m.montoCuentaMonedaOrigen)
@@ -111,8 +140,8 @@ export async function getHistorialMovimientosCuenta(
 
   // Running-sum en memoria: saldoPosterior[i] = saldoBase + Σ variaciones[0..i]
   const result: HistorialMovimientoOut[] = [];
-  for (let i = 0; i < movs.length; i++) {
-    const m = movs[i];
+  for (let i = 0; i < movsOrdenados.length; i++) {
+    const m = movsOrdenados[i];
     saldo += variaciones[i];
     const desc = m.gasto?.descripcion;
     result.push({
@@ -127,6 +156,6 @@ export async function getHistorialMovimientosCuenta(
     });
   }
 
-  // Salida en orden cronológico DESC (como el ORDER BY final del SQL)
+  // Salida en orden cronológico DESC por fecha-hora (más reciente primero)
   return result.reverse();
 }
