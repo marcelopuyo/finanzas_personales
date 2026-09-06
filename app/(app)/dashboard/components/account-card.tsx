@@ -10,7 +10,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { SparkLineChart } from "./sparkline-chart";
-import { AccountActionsSheet } from "./account-actions-sheet";
+import {
+  AccountActionsSheet,
+  type AccionSintetica,
+} from "./account-actions-sheet";
 import { cn } from "@/lib/utils";
 
 // Icono por tipo de cuenta para la esquina superior izquierda de la tarjeta.
@@ -18,8 +21,8 @@ import { cn } from "@/lib/utils";
 const ICONOS_POR_TIPO: Record<string, LucideIcon> = {
   "Cuenta Bancaria": Landmark,
   "Caja Fisica": Wallet,
-  "Períodos a Cobrar": CalendarClock,
-  "Períodos Actuales": CalendarCheck,
+  "Por cobrar": CalendarClock,
+  "Actuales": CalendarCheck,
 };
 
 interface AccountCardProps {
@@ -35,8 +38,8 @@ interface AccountCardProps {
   className?: string;
   /** Se invoca al hacer click en una tarjeta de cuenta real (abre el historial). */
   onOpen?: () => void;
-  /** Tarjeta sintética con menú de una sola acción (ej. Períodos Actuales → "jornada"). */
-  menuAccion?: "jornada" | "cobro";
+  /** Tarjeta sintética con menú de acción(es) (ej. Actuales → jornada/tarea). */
+  menuAccion?: AccionSintetica[];
 }
 
 export function AccountCard({
@@ -134,11 +137,14 @@ export function AccountCard({
     );
   }
 
-  // Tarjeta sintética con menú de una sola acción (Períodos a Cobrar → cobro,
-  // Períodos Actuales → jornada): clicable (abre el popup de períodos, si se
-  // provee onOpen) + botón ⋮ con el sheet de esa única acción.
-  if (menuAccion) {
-    const clicable = onOpen != null;
+  // Tarjeta sintética: puede ser clicable (abre el popup de períodos si se
+  // provee onOpen) y/o traer menú de acción(es) con su botón ⋮ (Actuales →
+  // jornada/tarea/nuevo período). "Por cobrar" ya NO trae
+  // menú: el cobro se lanza desde el icono por fila de su popup, así que la
+  // tarjeta queda clicable sin botón ⋮ (solo abre el listado).
+  const conMenu = menuAccion != null && menuAccion.length > 0;
+  const clicable = onOpen != null;
+  if (conMenu || clicable) {
     return (
       <>
         <div
@@ -162,14 +168,16 @@ export function AccountCard({
           )}
         >
           {content}
-          {menuButton}
+          {conMenu && menuButton}
         </div>
-        <AccountActionsSheet
-          cuenta={{ nombre: title, saldo: value }}
-          open={sheetOpen}
-          onClose={() => setSheetOpen(false)}
-          soloMovimiento={menuAccion}
-        />
+        {conMenu && (
+          <AccountActionsSheet
+            cuenta={{ nombre: title, saldo: value }}
+            open={sheetOpen}
+            onClose={() => setSheetOpen(false)}
+            soloMovimiento={menuAccion}
+          />
+        )}
       </>
     );
   }

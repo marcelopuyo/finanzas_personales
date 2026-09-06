@@ -2,12 +2,13 @@ import { Between, In, IsNull, LessThanOrEqual, MoreThan, MoreThanOrEqual } from 
 import { getDb } from "../db";
 import { getSessionUser, requireUserId } from "../lib/auth";
 import { convertir } from "../lib/cotizaciones";
+import { aporteProrrateado, modalidadProrratea } from "../lib/jornadas";
 import { Cuenta } from "../entities/cuenta.entity";
 import { Gasto } from "../entities/gasto.entity";
 import { HistoricoCuenta } from "../entities/historico-cuenta.entity";
-import { JornadaTrabajo } from "../entities/jornada-trabajo.entity";
 import { Movimiento } from "../entities/movimiento.entity";
 import { PeriodoGasto } from "../entities/periodo-gasto.entity";
+import { PeriodoTrabajo } from "../entities/periodo-trabajo.entity";
 import { Prestamo } from "../entities/prestamo.entity";
 
 // ============================================================
@@ -243,28 +244,129 @@ export async function getEvolucionGastosMovimientos(): Promise<EvolucionItem[]> 
 }
 
 // ============================================================
-// 5) Evolución de ingresos (por mes, desde jornadas)
+// 5) Evolución de ingresos (por mes): jornadas + tareas + prorrateo (§8)
 // ============================================================
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/**
+ * "YYYY-MM" de una fecha (componentes UTC). Acepta Date o string (las columnas
+ * `date` pueden llegar como Date o "YYYY-MM-DD"; se normaliza para que los
+ * períodos prorrateados no exploten — fix 2026-09-05).
+ */
+function ymDeFecha(v: Date | string): string {
+  const d = v instanceof Date ? v : new Date(v);
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}`;
+}
+
+/** "YYYY-MM-DD" del último día del mes representado por "YYYY-MM". */
+function finMesISO(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  const ultimo = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return `${ym}-${pad2(ultimo)}`;
+}
+
+/** Siguiente mes "YYYY-MM". */
+function mesSiguiente(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1, 1));
+  d.setUTCMonth(d.getUTCMonth() + 1);
+  return ymDeFecha(d);
+}
+
 export async function getEvolucionIngresos(): Promise<EvolucionItem[]> {
   const userId = await requireUserId();
   const ds = await getDb();
-  const jornadas = await ds.getRepository(JornadaTrabajo).find({
-    where: { periodoTrabajo: { trabajo: { usuario: { id: userId } } }, eliminado: false },
-    order: { fechaJornada: "ASC" },
+  const periodos = await ds.getRepository(PeriodoTrabajo).find({
+    where: { trabajo: { usuario: { id: userId } }, eliminado: false },
+    order: { fechaDesde: "ASC" },
+    relations: { trabajo: true, jornadas: true, tareas: true },
   });
 
+  // Agrupa por "YYYY-MM" (ordenable) y convierte a etiqueta al final.
   const agrupado: Record<string, number> = {};
-  for (const j of jornadas) {
-    // Mediodía UTC: evita que fechas a medianoche (UTC) se corran al día/mes
-    // anterior en zonas horarias con offset negativo (p. ej. GMT-3).
-    const d = new Date(j.fechaJornada);
-    d.setUTCHours(12, 0, 0, 0);
-    const mes = d.toLocaleDateString("es-ES", { month: "short" });
-    const key = `${mes}-${d.getFullYear()}`;
-    agrupado[key] = (agrupado[key] || 0) + j.montoJornada + j.montoPropina;
+  const sumarKey = (ym: string, monto: number) => {
+    if (monto > 0) agrupado[ym] = (agrupado[ym] || 0) + monto;
+  };
+
+  for (const p of periodos) {
+    const modalidad = p.trabajo?.modalidadCobro ?? "horas_variables";
+    const jornadas = (p.jornadas ?? []).filter((j) => !j.eliminado);
+    const tareas = (p.tareas ?? []).filter((t) => !t.eliminado);
+
+    // Período CON JORNADAS → cuenta lo real por fecha de jornada (como hoy).
+    // (Un período pasado con jornadas no cambia su aporte aunque el trabajo se
+    // convierta después; discriminador robusto del §8.)
+    if (jornadas.length > 0) {
+      for (const j of jornadas) {
+        // Mediodía UTC: evita que fechas a medianoche (UTC) se corran al mes
+        // anterior en zonas horarias con offset negativo.
+        const d = new Date(j.fechaJornada);
+        d.setUTCHours(12, 0, 0, 0);
+        sumarKey(ymDeFecha(d), j.montoJornada + j.montoPropina);
+      }
+      continue;
+    }
+
+    // Período CON TAREAS (modalidad por_tarea) → cuenta lo real por mes de la
+    // FECHA LOCAL de la tarea (`fechaTarea`, decisión 2026-09-05): es la fecha
+    // que eligió el usuario (se guarda como `date`), sin corrimiento de zona.
+    if (tareas.length > 0) {
+      for (const t of tareas) {
+        // Mediodía UTC: evita que fechas a medianoche (UTC) se corran al mes
+        // anterior (misma técnica que las jornadas).
+        const d = new Date(t.fechaTarea);
+        d.setUTCHours(12, 0, 0, 0);
+        sumarKey(ymDeFecha(d), t.montoTarea);
+      }
+      continue;
+    }
+
+    // Período SIN hijos de fijo/horas_fijas → aporte PRORRATEADO por mes (§8).
+    // El mes EN CURSO se corta a HOY (a la fecha, decisión usuario 2026-09-05);
+    // los meses cerrados van completos.
+    if (modalidadProrratea(modalidad)) {
+      const monto = p.montoACobrar ?? 0;
+      if (monto <= 0) continue;
+      const hoyKey = new Date().toISOString().slice(0, 10);
+      const hoyYM = hoyKey.slice(0, 7);
+      const desde = `${ymDeFecha(p.fechaDesde)}-${pad2(
+        new Date(p.fechaDesde).getUTCDate()
+      )}`;
+      const hasta = `${ymDeFecha(p.fechaHasta)}-${pad2(
+        new Date(p.fechaHasta).getUTCDate()
+      )}`;
+      let cursor = ymDeFecha(p.fechaDesde);
+      while (cursor <= ymDeFecha(p.fechaHasta)) {
+        const finMes = finMesISO(cursor);
+        const hastaMes =
+          cursor === hoyYM && hoyKey < finMes ? hoyKey : finMes;
+        const aporte = aporteProrrateado(
+          desde,
+          hasta,
+          monto,
+          `${cursor}-01`,
+          hastaMes
+        );
+        if (aporte > 0) sumarKey(cursor, aporte);
+        cursor = mesSiguiente(cursor);
+      }
+    }
+    // horas_variables / por_tarea sin hijos → aporte 0 (no prorratea).
   }
 
-  return Object.entries(agrupado).map(([periodo, monto]) => ({ periodo, monto }));
+  return Object.keys(agrupado)
+    .sort()
+    .map((ym) => {
+      const [y, m] = ym.split("-").map(Number);
+      // Etiqueta con el MISMO formato que usaban las jornadas (es-ES corto).
+      const mes = new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString("es-ES", {
+        month: "short",
+        timeZone: "UTC",
+      });
+      return { periodo: `${mes}-${y}`, monto: agrupado[ym] };
+    });
 }
 
 // ============================================================
@@ -288,14 +390,12 @@ export async function getEvolucionResultados(): Promise<EvolucionResultado[]> {
     resultado[item.periodo] = (resultado[item.periodo] || 0) - item.monto;
   }
 
-  // Solo se muestran los períodos que tienen gastos (se descartan los meses
-  // sin gastos, que solo reflejarían ingresos sin contrapartida de gastos).
-  const conGastos = new Set(
-    gastos.filter((g) => g.monto > 0).map((g) => g.periodo)
-  );
-
+  // Se muestran TODOS los meses con movimiento (ingresos y/o gastos): un mes
+  // puede tener solo ingresos (sin gastos cargados todavía) y su resultado
+  // (ingresos − gastos) igual debe verse. Antes solo se mostraban los meses con
+  // gastos y se descartaban los que solo reflejaban ingresos (fix 2026-09-06:
+  // se mostró el mes en curso sin gastos y el usuario pidió aplicar a todos).
   return Object.keys(resultado)
-    .filter((key) => conGastos.has(key))
     .map((key) => ({
       id: key,
       valor: resultado[key],

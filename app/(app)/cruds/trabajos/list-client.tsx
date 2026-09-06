@@ -4,9 +4,18 @@ import type { TrabajoOut } from "@/backend/src/queries/trabajos";
 import { eliminarTrabajo } from "@/backend/src/actions/trabajos";
 import type { ColumnDef } from "@tanstack/react-table";
 import { dateTimeToString, numberToCurrency } from "@/lib/utils";
+import { MODALIDAD_LABEL } from "./trabajo-form-config";
 const columns: ColumnDef<TrabajoOut>[] = [
   { accessorKey: "nombre", header: "Nombre" },
   { accessorKey: "fechaInicio", header: "Inicio", cell: ({ getValue }) => dateTimeToString(getValue<Date>()), meta: { align: "center" as const } },
+  {
+    accessorKey: "modalidadCobro",
+    header: "Modalidad",
+    cell: ({ getValue }) =>
+      MODALIDAD_LABEL[getValue<string>() ?? "horas_variables"] ??
+      getValue<string>() ??
+      "",
+  },
   { accessorKey: "precioHora", header: "Precio Hora", meta: { align: "right" as const, isCurrency: true }, cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0) },
 ];
 interface Props { initialData: TrabajoOut[] }

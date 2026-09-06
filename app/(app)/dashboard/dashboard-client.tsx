@@ -16,6 +16,11 @@ import { IngresosDetalle } from "./components/ingresos-detalle";
 import { HistorialModal, type CuentaHistorial } from "./components/historial-modal";
 import { PeriodosModal, type TipoPeriodos } from "./components/periodos-modal";
 import type { DashboardData } from "./dashboard-data";
+import {
+  evolucionIngresosPorMes,
+  ingresosDelMesActual,
+  ingresosEnRango,
+} from "./ingresos-helpers";
 import type { GastoOut } from "@/backend/src/queries/gastos";
 import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
 import { cn, numberToCurrency, todayLocalISODate } from "@/lib/utils";
@@ -91,8 +96,8 @@ export function DashboardClient({ data }: Props) {
   ).padStart(2, "0")}`;
 
   // Listados de períodos para los popups de las tarjetas sintéticas:
-  // - "Períodos a Cobrar": cerrados (fecha final < hoy) y no cobrados.
-  // - "Períodos Actuales": no cobrados, ya comenzados (desde <= hoy) y con
+  // - "Por cobrar": cerrados (fecha final < hoy) y no cobrados.
+  // - "Actuales": no cobrados, ya comenzados (desde <= hoy) y con
   //   fecha final >= hoy (misma condición que la tarjeta del dashboard).
   const periodosCobrar = useMemo(
     () =>
@@ -114,7 +119,7 @@ export function DashboardClient({ data }: Props) {
         .filter((p) => {
           const noCobrado =
             !p.fechaDeCobro || toDateKey(p.fechaDeCobro) < "1901-01-02";
-          // Misma condición que la tarjeta "Períodos Actuales" del dashboard:
+          // Misma condición que la tarjeta "Actuales" del dashboard:
           // no cobrado, ya comenzado (desde <= hoy) y no terminado (hasta >= hoy).
           return (
             noCobrado &&
@@ -128,7 +133,7 @@ export function DashboardClient({ data }: Props) {
     [todosLosIngresos, hoy]
   );
 
-  // Tarjetas sintéticas de períodos ("Períodos a Cobrar"/"Períodos Actuales"):
+  // Tarjetas sintéticas de períodos ("Por cobrar"/"Actuales"):
   // se calculan en el cliente DESPUÉS del montaje para que el "hoy" sea el del
   // navegador (el del servidor puede correrse ±1 día si corre en otra zona
   // horaria, ej. Vercel en UTC con usuario en GMT-3 de noche). Durante el SSR y
@@ -158,24 +163,36 @@ export function DashboardClient({ data }: Props) {
     const cards: DashboardData["cuentas"] = [];
     if (pendiente > 0) {
       cards.push({
-        title: "Períodos a Cobrar",
+        title: "Por cobrar",
         value: numberToCurrency(pendiente, data.monedaPredeterminadaISO),
         labels: [],
         values: [],
-        // Menú con "Cobro Sueldo" (cobrar los períodos pendientes).
-        menuAccion: "cobro",
-        tipo: "Períodos a Cobrar",
+        // Sin menú ⋮: el cobro se lanza desde el icono por fila del popup que
+        // abre la tarjeta al hacer clic (listado "Por cobrar").
+        tipo: "Por cobrar",
       });
     }
     if (periodosActuales.length > 0) {
+      // Acciones rápidas según las modalidades presentes entre los períodos
+      // actuales: jornada si hay trabajos por hora (horas variables) y/o cargar
+      // tarea si hay trabajos por tarea.
+      const mods = new Set(
+        periodosActuales.map(
+          (p) => p.trabajo?.modalidadCobro ?? "horas_variables"
+        )
+      );
+      const acciones: ("jornada" | "cobro" | "tarea" | "periodo")[] = [];
+      if (mods.has("horas_variables")) acciones.push("jornada");
+      if (mods.has("por_tarea")) acciones.push("tarea");
+      // Nuevo período: siempre disponible (crear un período de trabajo).
+      acciones.push("periodo");
       cards.push({
-        title: "Períodos Actuales",
+        title: "Actuales",
         value: numberToCurrency(actual, data.monedaPredeterminadaISO),
         labels: [],
         values: [],
-        // Menú con "Jornada trabajo" (agregar jornadas a los períodos actuales).
-        menuAccion: "jornada",
-        tipo: "Períodos Actuales",
+        menuAccion: acciones,
+        tipo: "Actuales",
       });
     }
     setSinteticas(cards);
@@ -191,16 +208,10 @@ export function DashboardClient({ data }: Props) {
     });
     setMesActualGastos(numberToCurrency(totalG, data.monedaPredeterminadaISO));
 
-    // Badge "Mes actual" de Ingresos: jornadas con fechaJornada en el mes.
-    let totalI = 0;
-    todosLosIngresos.forEach((p) => {
-      (p.jornadas ?? []).forEach((j) => {
-        const f = toDateKey(j.fechaJornada);
-        if (f >= desde && f <= hasta) {
-          totalI += (j.montoJornada || 0) + (j.montoPropina || 0);
-        }
-      });
-    });
+    // Badge "Mes actual" de Ingresos: jornadas/tareas del mes + prorrateo de
+    // fijo/horas_fijas contra el mes calendario completo (§8).
+    const hoyI = todayLocalISODate();
+    const totalI = ingresosDelMesActual(todosLosIngresos, hoyI);
     setMesActualIngresos(numberToCurrency(totalI, data.monedaPredeterminadaISO));
 
     // Badge "Mes actual" de Resultados: ingresos del mes − gastos del mes
@@ -399,38 +410,25 @@ export function DashboardClient({ data }: Props) {
     return r;
   }, [todosLosIngresos, selTra]);
 
-  // Resumen por trabajo: filtra las JORNADAS por su fechaJornada (la fecha
-  // afecta al resumen, pero el trabajo no). Con fechas vacías muestra todo.
+  // Resumen por trabajo: suma JORNADAS, TAREAS y prorrateo de fijo/horas_fijas
+  // cuya fecha cae en el rango elegido (la fecha afecta al resumen, el trabajo
+  // no). Con fechas vacías muestra todo.
   const filteredIngresosResumen = useMemo(() => {
-    const map = new Map<string, number>();
-    todosLosIngresos.forEach((p) => {
-      const nombre = p.trabajo?.nombre || SIN_TRABAJO;
-      (p.jornadas ?? []).forEach((j) => {
-        const f = toDateKey(j.fechaJornada);
-        if (selFdIng && f < selFdIng) return;
-        if (selFhIng && f > selFhIng) return;
-        map.set(nombre, (map.get(nombre) || 0) + (j.montoJornada || 0) + (j.montoPropina || 0));
-      });
-    });
-    return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
+    const rango = ingresosEnRango(
+      todosLosIngresos,
+      selFdIng || undefined,
+      selFhIng || undefined
+    );
+    return Array.from(rango.porTrabajo.entries()).map(([name, value]) => ({
+      name,
+      value,
+    }));
   }, [todosLosIngresos, selFdIng, selFhIng]);
 
-  // Totales del MES ANTERIOR por trabajo para las flechas de tendencia de ingresos.
+  // Totales del MES ANTERIOR por trabajo (jornadas + tareas + prorrateo) para
+  // las flechas de tendencia de ingresos.
   const ingresosMesAnterior = useMemo(() => {
-    const map = new Map<string, number>();
-    todosLosIngresos.forEach((p) => {
-      const nombre = p.trabajo?.nombre || SIN_TRABAJO;
-      (p.jornadas ?? []).forEach((j) => {
-        const f = toDateKey(j.fechaJornada);
-        if (f >= prevInicioKey && f <= prevFinKey) {
-          map.set(
-            nombre,
-            (map.get(nombre) || 0) + (j.montoJornada || 0) + (j.montoPropina || 0)
-          );
-        }
-      });
-    });
-    return map;
+    return ingresosEnRango(todosLosIngresos, prevInicioKey, prevFinKey).porTrabajo;
   }, [todosLosIngresos, prevInicioKey, prevFinKey]);
 
   const ingresosPrevTotal = useMemo(
@@ -438,30 +436,13 @@ export function DashboardClient({ data }: Props) {
     [ingresosMesAnterior]
   );
 
-  // Histórico por mes (desde las jornadas de los períodos filtrados por trabajo)
-  const filteredIngresosEvolucion = useMemo(() => {
-    const map = new Map<string, number>();
-    filteredIngresosSinFechaIng.forEach((p) => {
-      (p.jornadas ?? []).forEach((j) => {
-        const d = new Date(j.fechaJornada);
-        d.setUTCHours(12, 0, 0, 0); // mismo criterio que el backend (evita corrimiento por timezone)
-        const mes = d.toLocaleDateString("es-ES", { month: "short" });
-        const key = `${mes}-${d.getFullYear()}`;
-        map.set(key, (map.get(key) || 0) + (j.montoJornada || 0) + (j.montoPropina || 0));
-      });
-    });
-    const MESES_ORD: Record<string, number> = {
-      ene:1,feb:2,mar:3,abr:4,may:5,jun:6,
-      jul:7,ago:8,sept:9,oct:10,nov:11,dic:12,
-    };
-    return Array.from(map.entries())
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => {
-        const [ma, ya] = a.name.split("-");
-        const [mb, yb] = b.name.split("-");
-        return (Number(ya) * 12 + (MESES_ORD[ma] ?? 0)) - (Number(yb) * 12 + (MESES_ORD[mb] ?? 0));
-      });
-  }, [filteredIngresosSinFechaIng]);
+  // Histórico por mes (jornadas + tareas + prorrateo de fijo/horas_fijas) de
+  // los períodos filtrados por trabajo. `hoy` se pasa para que en horas_fijas el
+  // mes en curso se corte a la fecha (devengado hasta hoy).
+  const filteredIngresosEvolucion = useMemo(
+    () => evolucionIngresosPorMes(filteredIngresosSinFechaIng, hoy),
+    [filteredIngresosSinFechaIng, hoy]
+  );
 
   const openIngFilters = () => {
     setDTra(selTra); setDFdIng(selFdIng); setDFhIng(selFhIng); setOpenIng(true);
@@ -575,9 +556,9 @@ export function DashboardClient({ data }: Props) {
                 key={i}
                 {...cuenta}
                 onOpen={() => {
-                  if (cuenta.menuAccion === "cobro") {
+                  if (cuenta.title === "Por cobrar") {
                     setPeriodosModal("cobrar");
-                  } else if (cuenta.menuAccion === "jornada") {
+                  } else {
                     setPeriodosModal("actuales");
                   }
                 }}

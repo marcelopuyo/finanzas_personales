@@ -19,6 +19,12 @@ export class Trabajo {
   @Column({ type: "numeric", precision: 10, scale: 2, default: 0 })
   precioHora: number;
 
+  // Modalidad de cobro del trabajo (2026-09-04/05):
+  // 'fijo' | 'horas_fijas' | 'horas_variables' (actual) | 'por_tarea'.
+  // Default 'horas_variables' = comportamiento actual (sin backfill).
+  @Column({ default: "horas_variables" })
+  modalidadCobro: string;
+
   @Column({ default: null })
   memos?: string;
 

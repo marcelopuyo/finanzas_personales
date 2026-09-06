@@ -20,6 +20,7 @@ export interface FormField {
     | "combobox"
     | "textarea"
     | "date"
+    | "datetime"
     | "number"
     | "time"
     | "password"
@@ -224,6 +225,13 @@ export function CrudForm({
                       }
                     />
                   )}
+                />
+              ) : field.type === "datetime" ? (
+                <input
+                  id={field.name}
+                  type="datetime-local"
+                  {...register(field.name)}
+                  className={inputClasses}
                 />
               ) : field.type === "textarea" ? (
                 <textarea

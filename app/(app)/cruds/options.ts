@@ -61,6 +61,35 @@ export async function fetchTrabajosId() {
   return rows.map((r) => ({ value: String(r.id), label: r.nombre }));
 }
 
+// ---- Filtros por modalidad de cobro (2026-09-05) ----
+
+/** Devuelve nombre + modalidadCobro de cada trabajo (para condicionales de UI). */
+export async function fetchTrabajosModalidad(): Promise<
+  { nombre: string; modalidadCobro: string }[]
+> {
+  const rows = await getAllTrabajos();
+  return rows.map((r) => ({
+    nombre: r.nombre,
+    modalidadCobro: r.modalidadCobro ?? "horas_variables",
+  }));
+}
+
+/** Trabajos que admiten JORNADAS (modalidad horas_variables) — value = ID. */
+export async function fetchTrabajosHorasVariablesId() {
+  const rows = await getAllTrabajos();
+  return rows
+    .filter((r) => (r.modalidadCobro ?? "horas_variables") === "horas_variables")
+    .map((r) => ({ value: String(r.id), label: r.nombre }));
+}
+
+/** Trabajos que admiten TAREAS (modalidad por_tarea) — value = ID. */
+export async function fetchTrabajosPorTareaId() {
+  const rows = await getAllTrabajos();
+  return rows
+    .filter((r) => (r.modalidadCobro ?? "horas_variables") === "por_tarea")
+    .map((r) => ({ value: String(r.id), label: r.nombre }));
+}
+
 /** Formatea "YYYY-MM-DD" (o Date) a "D/M/YYYY" sin problemas de zona horaria. */
 function formatFecha(value: string | Date): string {
   let iso: string;
@@ -89,6 +118,33 @@ export async function fetchPeriodosTrabajo() {
       value: String(r.id),
       label: `${r.trabajo?.nombre ?? "Trabajo"}: ${formatFecha(r.fechaDesde)} al ${formatFecha(r.fechaHasta)}`,
     }));
+}
+
+/** Períodos (sin cobrar) cuyo trabajo es de la modalidad indicada. */
+async function fetchPeriodosTrabajoPorModalidad(modalidad: string) {
+  const rows = await getAllPeriodosTrabajo();
+  return rows
+    .filter(
+      (r) => (r.trabajo?.modalidadCobro ?? "horas_variables") === modalidad
+    )
+    .filter((r) => {
+      if (!r.fechaDeCobro) return true;
+      return new Date(r.fechaDeCobro) < new Date("1901-01-02");
+    })
+    .map((r) => ({
+      value: String(r.id),
+      label: `${r.trabajo?.nombre ?? "Trabajo"}: ${formatFecha(r.fechaDesde)} al ${formatFecha(r.fechaHasta)}`,
+    }));
+}
+
+/** Períodos de trabajos horas_variables (para cargar jornadas). */
+export async function fetchPeriodosTrabajoHorasVariables() {
+  return fetchPeriodosTrabajoPorModalidad("horas_variables");
+}
+
+/** Períodos de trabajos por_tarea (para cargar tareas). */
+export async function fetchPeriodosTrabajoPorTarea() {
+  return fetchPeriodosTrabajoPorModalidad("por_tarea");
 }
 
 // Para Movimientos Tarjeta (opciones de movimiento, solo lectura de ejemplo)

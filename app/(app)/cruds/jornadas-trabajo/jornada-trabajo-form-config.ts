@@ -1,6 +1,10 @@
 import { z } from "zod";
 import type { FormField } from "@/components/crud/CrudForm";
-import { fetchCuentasId, fetchPeriodosTrabajo, fetchTrabajosId } from "../options";
+import {
+  fetchCuentasId,
+  fetchPeriodosTrabajoHorasVariables,
+  fetchTrabajosHorasVariablesId,
+} from "../options";
 
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
@@ -60,14 +64,14 @@ export const jornadaTrabajoFields: FormField[] = [
     name: "idPeriodo",
     label: "Período",
     type: "select",
-    optionsFrom: fetchPeriodosTrabajo,
+    optionsFrom: fetchPeriodosTrabajoHorasVariables,
     extraOptions: [{ value: "auto", label: "Cargar período automático" }],
   },
   {
     name: "idTrabajo",
     label: "Trabajo",
     type: "select",
-    optionsFrom: fetchTrabajosId,
+    optionsFrom: fetchTrabajosHorasVariablesId,
     showIf: (v) => v.idPeriodo === "auto",
   },
   campoCuentaPropina,
@@ -80,7 +84,7 @@ export const jornadaTrabajoFieldsEditar: FormField[] = [
     name: "idPeriodo",
     label: "Período",
     type: "select",
-    optionsFrom: fetchPeriodosTrabajo,
+    optionsFrom: fetchPeriodosTrabajoHorasVariables,
   },
   campoCuentaPropina,
 ];

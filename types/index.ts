@@ -138,6 +138,8 @@ export interface ResponseTrabajoDto {
   nombre: string;
   fechaInicio: Date;
   precioHora: number;
+  /** 'fijo' | 'horas_fijas' | 'horas_variables' | 'por_tarea' (2026-09-05). */
+  modalidadCobro: string;
   memos?: string;
 }
 
@@ -146,10 +148,13 @@ export interface ResponsePeriodoTrabajoDto {
   fechaDesde: Date;
   fechaHasta: Date;
   montoACobrar: number;
+  horasPeriodo?: number;
+  precioHoraPeriodo?: number;
   fechaEstimadaCobro: Date;
   fechaDeCobro: Date;
-  trabajo?: { nombre: string };
+  trabajo?: { nombre: string; modalidadCobro: string };
   jornadas?: ResponseJornadaTrabajoDto[];
+  tareas?: ResponseTareaTrabajoDto[];
 }
 
 export interface ResponseJornadaTrabajoDto {
@@ -158,6 +163,17 @@ export interface ResponseJornadaTrabajoDto {
   horaHasta: number;
   montoJornada: number;
   montoPropina: number;
+}
+
+export interface ResponseTareaTrabajoDto {
+  id: string;
+  fechaCarga: Date;
+  fechaHoraTarea: Date;
+  /** Fecha calendario LOCAL de la tarea (la que eligió el usuario). */
+  fechaTarea: Date;
+  descripcion?: string | null;
+  horasTarea?: number | null;
+  montoTarea: number;
 }
 
 // ============================================================

@@ -21,9 +21,11 @@ import {
   calcularMontoJornada,
   encontrarJornadaSuperpuesta,
   encontrarPeriodoSuperpuesto,
+  etiquetaModalidad,
   fechaEnRango,
   formatearFechaDMA,
   formatearHora,
+  modalidadAdmiteJornadas,
 } from "../lib/jornadas";
 import { montoEnMonedaPredeterminada } from "../lib/cotizaciones";
 import {
@@ -32,6 +34,8 @@ import {
   movimiento2Schema,
   movimiento3Schema,
 } from "../validation/movimientos";
+import { tareaTrabajoCreateSchema } from "../validation/trabajos";
+import { crearTareaTrabajo } from "./trabajos";
 
 // ---------------------------------------------------------------------------
 
@@ -541,6 +545,13 @@ export async function cargarJornadaTrabajo(
       if (!trabajo) {
         throw new Error(`Trabajo con id ${data.idTrabajo} no encontrado`);
       }
+      if (!modalidadAdmiteJornadas(trabajo.modalidadCobro ?? "horas_variables")) {
+        throw new Error(
+          `El trabajo "${trabajo.nombre}" no admite jornadas (modalidad ${etiquetaModalidad(
+            trabajo.modalidadCobro ?? "horas_variables"
+          )})`
+        );
+      }
       trabajoIdJornada = trabajo.id;
       nombreTrabajoJornada = trabajo.nombre;
       // El período automático (de un día) no debe superponerse con otro del
@@ -571,6 +582,17 @@ export async function cargarJornadaTrabajo(
       if (!periodo) {
         throw new Error(
           `Período de trabajo con id ${data.idPeriodo} no encontrado`
+        );
+      }
+      if (
+        !modalidadAdmiteJornadas(
+          periodo.trabajo?.modalidadCobro ?? "horas_variables"
+        )
+      ) {
+        throw new Error(
+          `El trabajo "${periodo.trabajo?.nombre ?? "?"}" no admite jornadas (modalidad ${etiquetaModalidad(
+            periodo.trabajo?.modalidadCobro ?? "horas_variables"
+          )})`
         );
       }
       trabajoIdJornada = periodo.trabajo.id;
@@ -679,5 +701,19 @@ export async function cargarJornadaTrabajo(
   });
 
   refresh();
+  return true;
+}
+
+// ============================================================
+// 6) CARGAR TAREA (wizard — modalidad 'por_tarea', SIN depósito)
+// ============================================================
+export async function cargarTareaTrabajo(
+  input: z.infer<typeof tareaTrabajoCreateSchema>
+) {
+  // Espejo del CRUD: crea la tarea dentro del período elegido (existente o
+  // automático). A diferencia de la jornada NO hay propina ni depósito a
+  // cuenta: la tarea solo registra el monto ganado; el ingreso se cobra con
+  // el período (cobrarSueldo).
+  await crearTareaTrabajo(input);
   return true;
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { Banknote } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Modal } from "@/components/ui/modal";
 import { DataTable } from "@/components/ui/data-table";
@@ -9,8 +11,8 @@ import { dateTimeToString, numberToCurrency } from "@/lib/utils";
 export type TipoPeriodos = "cobrar" | "actuales";
 
 const TITULOS: Record<TipoPeriodos, string> = {
-  cobrar: "Períodos a Cobrar",
-  actuales: "Períodos Actuales",
+  cobrar: "Por cobrar",
+  actuales: "Actuales",
 };
 
 /**
@@ -31,7 +33,15 @@ export function PeriodosModal({
   currency: string;
   onClose: () => void;
 }) {
-  const columns: ColumnDef<PeriodoTrabajoOut>[] = [
+  const router = useRouter();
+  // Lanza el wizard de cobro de sueldo con el período de la fila preseleccionado
+  // (y su monto a cobrar precargado), reutilizando el query param `periodo`.
+  const cobrar = (id: number) => {
+    router.push(`/movimientos/nuevo/cobro?periodo=${id}`);
+    onClose();
+  };
+
+  const columnasBase: ColumnDef<PeriodoTrabajoOut>[] = [
     {
       accessorKey: "trabajo",
       header: "Trabajo",
@@ -55,7 +65,7 @@ export function PeriodosModal({
     },
     {
       // Muestra la FECHA ESTIMADA de cobro (fechaEstimadaCobro de la BD), en
-      // ambos paneles ("Períodos a Cobrar" y "Períodos Actuales").
+      // ambos paneles ("Por cobrar" y "Actuales").
       accessorKey: "fechaEstimadaCobro",
       header: "Fecha Est. Cobro",
       meta: { align: "center" } as const,
@@ -76,6 +86,34 @@ export function PeriodosModal({
       ),
     },
   ];
+
+  // Icono "Cobrar" por fila: lanza el wizard de cobro de sueldo directamente
+  // con ese período preseleccionado. Solo en el listado "Por cobrar"
+  // (los "Actuales" aún no están cerrados, no corresponden cobrarlos).
+  const columnasCobro: ColumnDef<PeriodoTrabajoOut>[] = [
+    {
+      id: "cobrar",
+      header: "Cobrar",
+      meta: { align: "center" } as const,
+      cell: ({ row }) => {
+        const p = row.original;
+        return (
+          <button
+            type="button"
+            onClick={() => cobrar(p.id)}
+            title="Cobrar"
+            aria-label={`Cobrar período de ${p.trabajo?.nombre ?? "trabajo"} (${dateTimeToString(p.fechaDesde)} al ${dateTimeToString(p.fechaHasta)})`}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted text-primary transition-colors hover:bg-primary/15"
+          >
+            <Banknote className="h-4 w-4" />
+          </button>
+        );
+      },
+    },
+  ];
+
+  const columns: ColumnDef<PeriodoTrabajoOut>[] =
+    tipo === "cobrar" ? [...columnasBase, ...columnasCobro] : columnasBase;
 
   const total = data.reduce((acc, p) => acc + (p.montoACobrar || 0), 0);
 

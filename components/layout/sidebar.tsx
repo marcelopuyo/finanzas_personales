@@ -70,6 +70,7 @@ const navigation: NavItem[] = [
       { label: "Trabajos", href: "/cruds/trabajos" },
       { label: "Períodos", href: "/cruds/periodos-trabajo" },
       { label: "Jornadas", href: "/cruds/jornadas-trabajo" },
+      { label: "Tareas", href: "/cruds/tareas-trabajo" },
     ],
   },
 ];

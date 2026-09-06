@@ -13,7 +13,8 @@ export type MovimientoConcepto =
   | "PagoGasto"
   | "GastoDirecto"
   | "Transferencia"
-  | "JornadaTrabajo";
+  | "JornadaTrabajo"
+  | "CargarTarea";
 
 /** Datos acumulados del wizard (patrón StepperData del frontend original). */
 export interface MovimientoData {
@@ -39,6 +40,13 @@ export interface MovimientoData {
   crearPeriodoAutomatico: boolean;
   /** Jornada: trabajo del período automático (requerido si crearPeriodoAutomatico). */
   idTrabajo: number;
+  // Tarea de trabajo (wizard "Cargar tarea", modalidad por_tarea)
+  /** Fecha de la tarea (reutiliza `fecha`); la hora se toma de `horaDesde`. */
+  descripcionTarea: string;
+  /** Monto ganado en la tarea. */
+  montoTarea: number;
+  /** Horas informativas (no afectan el monto). */
+  horasTarea: number;
 }
 
 /** Jornada existente del usuario (para pre-validar solapamiento de día/horas). */
@@ -65,7 +73,7 @@ export interface MovimientoOptions {
   jornadas: JornadaWizardOut[];
 }
 
-/** Índice de paso del wizard al que lleva cada tipo de movimiento (0=Selector, 8=Confirmación). */
+/** Índice de paso del wizard al que lleva cada tipo de movimiento (0=Selector, Confirmación=STEP_CONFIRMACION). */
 export const CONCEPTO_STEP: Record<MovimientoConcepto, number> = {
   CobroSueldo: 1,
   PagoPrestamo: 2,
@@ -74,10 +82,11 @@ export const CONCEPTO_STEP: Record<MovimientoConcepto, number> = {
   GastoDirecto: 5,
   Transferencia: 6,
   JornadaTrabajo: 7,
+  CargarTarea: 8,
 };
 
 /** Índice del paso de Confirmación (el último del wizard). */
-export const STEP_CONFIRMACION = 8;
+export const STEP_CONFIRMACION = 9;
 
 /** Pre-carga del wizard desde las tarjetas del dashboard (query params). */
 export interface MovimientoInitial {
@@ -88,6 +97,8 @@ export interface MovimientoInitial {
   origen?: number;
   /** Transferencia: cuenta destino. */
   destino?: number;
+  /** Cobro de sueldo: período de trabajo a cobrar preseleccionado (icono por fila del listado de períodos a cobrar). */
+  periodo?: number;
 }
 
 /** Valor de `?tipo=` en la URL para cada concepto (lo usan las tarjetas y el page). */
@@ -99,6 +110,7 @@ export const MOVIMIENTO_TIPO_PARAM: Record<MovimientoConcepto, string> = {
   GastoDirecto: "gasto",
   Transferencia: "transferencia",
   JornadaTrabajo: "jornada",
+  CargarTarea: "tarea",
 };
 
 /** Motivos posibles de transferencia (igual que el enum backend). */

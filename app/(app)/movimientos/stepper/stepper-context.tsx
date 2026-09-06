@@ -72,16 +72,27 @@ export function MovimientoProvider({
       cuentaPropina: 0,
       crearPeriodoAutomatico: false,
       idTrabajo: 0,
+      descripcionTarea: "",
+      montoTarea: 0,
+      horasTarea: 0,
     };
     if (!initial) return base;
     // En Jornada trabajo la cuenta precargada va al depósito de propina.
     const esJornada = initial.concepto === "JornadaTrabajo";
+    // Cobro de sueldo: si viene un período preseleccionado (icono por fila del
+    // listado "Por cobrar"), se precarga el período y su monto a cobrar.
+    const periodoPre =
+      initial.concepto === "CobroSueldo" && initial.periodo != null
+        ? options.periodosTrabajo.find((p) => p.id === initial.periodo)
+        : undefined;
     return {
       ...base,
       concepto: initial.concepto,
       cuentaOrigen: esJornada ? 0 : (initial.cuenta ?? initial.origen ?? 0),
       cuentaDestino: initial.destino ?? 0,
       cuentaPropina: esJornada ? (initial.cuenta ?? 0) : 0,
+      periodoTrabajo: periodoPre?.id ?? 0,
+      montoOrigen: periodoPre?.montoACobrar ?? 0,
     };
   });
 
@@ -117,6 +128,9 @@ export function MovimientoProvider({
       cuentaPropina: 0,
       crearPeriodoAutomatico: false,
       idTrabajo: 0,
+      descripcionTarea: "",
+      montoTarea: 0,
+      horasTarea: 0,
     }));
 
   const navigateTo = (step: number) => setActiveStep(step);
@@ -141,6 +155,9 @@ export function MovimientoProvider({
       cuentaPropina: 0,
       crearPeriodoAutomatico: false,
       idTrabajo: 0,
+      descripcionTarea: "",
+      montoTarea: 0,
+      horasTarea: 0,
     }));
 
   return (

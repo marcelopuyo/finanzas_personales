@@ -13,6 +13,17 @@ function formatCobroDate(value?: string | Date): string {
   return dateTimeToString(d);
 }
 
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** Formatea un instante (fecha/hora efectiva de una tarea) a "dd/mm hh:mm" LOCAL. */
+function fechaHoraLabel(value: string | Date): string {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(
+    d.getHours()
+  )}:${pad(d.getMinutes())}`;
+}
+
 function ImporteCell({
   montoACobrar,
   fechaDeCobro,
@@ -36,25 +47,47 @@ function ImporteCell({
   );
 }
 
-function JornadasCell({
+function ActividadCell({
   jornadas,
+  tareas,
   currency,
 }: {
   jornadas?: PeriodoTrabajoOut["jornadas"];
+  tareas?: PeriodoTrabajoOut["tareas"];
   currency: string;
 }) {
-  const sorted = (jornadas || [])
+  // Discriminador §8: si el período tiene JORNADAS se grafican las jornadas
+  // (incl. históricos tras una conversión); si no, las TAREAS (por_tarea).
+  const jornadasSorted = (jornadas || [])
     .slice()
     .sort(
       (a, b) =>
         new Date(a.fechaJornada).getTime() - new Date(b.fechaJornada).getTime()
     );
-  if (sorted.length === 0) return <span className="text-subtitle">—</span>;
+  if (jornadasSorted.length === 0) {
+    const tareasSorted = (tareas || [])
+      .slice()
+      .sort(
+        (a, b) =>
+          new Date(a.fechaHoraTarea).getTime() -
+          new Date(b.fechaHoraTarea).getTime()
+      );
+    if (tareasSorted.length === 0)
+      return <span className="text-subtitle">—</span>;
+    return (
+      <SparkLineChart
+        variant="bar"
+        data={tareasSorted.map((t) => t.montoTarea || 0)}
+        labels={tareasSorted.map((t) => fechaHoraLabel(t.fechaHoraTarea))}
+        currency={currency}
+      />
+    );
+  }
   return (
     <SparkLineChart
       variant="bar"
-      data={sorted.map((j) => (j.montoJornada || 0) + (j.montoPropina || 0))}
-      labels={sorted.map((j) => dateTimeToString(j.fechaJornada))}
+      data={jornadasSorted.map((j) => (j.montoJornada || 0) + (j.montoPropina || 0))}
+      labels={jornadasSorted.map((j) => dateTimeToString(j.fechaJornada))}
       currency={currency}
     />
   );
@@ -116,12 +149,13 @@ export function ingresosDetalleColumns(
     cell: ({ getValue }) => formatCobroDate(getValue<string | Date>()),
   },
   {
-    id: "jornadas",
-    header: "Jornadas",
+    id: "actividad",
+    header: "Jornadas/Tareas",
     meta: { align: "center" },
     cell: ({ row }) => (
-      <JornadasCell
+      <ActividadCell
         jornadas={row.original.jornadas}
+        tareas={row.original.tareas}
         currency={currency}
       />
     ),

@@ -9,6 +9,7 @@ import { PagoGasto } from "./stepper/pago-gasto";
 import { GastoDirecto } from "./stepper/gasto-directo";
 import { Transferencia } from "./stepper/transferencia";
 import { JornadaTrabajo } from "./stepper/jornada-trabajo";
+import { CargarTarea } from "./stepper/cargar-tarea";
 import { Confirmacion } from "./stepper/confirmacion";
 import type { MovimientoInitial, MovimientoOptions } from "./stepper/types";
 
@@ -21,6 +22,7 @@ const STEPS = [
   GastoDirecto,
   Transferencia,
   JornadaTrabajo,
+  CargarTarea,
   Confirmacion,
 ];
 

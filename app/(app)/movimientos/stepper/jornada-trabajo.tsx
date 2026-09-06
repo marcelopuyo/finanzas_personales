@@ -21,10 +21,19 @@ import {
  * Paso del wizard: cargar una nueva jornada de trabajo.
  * Mismos campos que el CRUD de jornadas (sin "monto jornada", se calcula en el
  * servidor) + un select de cuenta. Si el usuario carga propina > 0, se deposita
- * en la cuenta seleccionada (la propina nunca suma a "Períodos a Cobrar/Actuales").
+ * en la cuenta seleccionada (la propina nunca suma a "Por cobrar/Actuales").
  */
 export function JornadaTrabajo() {
   const { data, handleSetData, navigateTo, options } = useMovimientoStepper();
+
+  // Solo trabajos/períodos de modalidad horas_variables admiten jornadas
+  // (2026-09-05). El resto (fijo/horas_fijas/por_tarea) no usa jornadas.
+  const periodosHoras = options.periodosTrabajo.filter(
+    (p) => (p.trabajo?.modalidadCobro ?? "horas_variables") === "horas_variables"
+  );
+  const trabajosHoras = options.trabajos.filter(
+    (t) => (t.modalidadCobro ?? "horas_variables") === "horas_variables"
+  );
 
   const horaValida =
     !!data.horaDesde && !!data.horaHasta && data.horaDesde < data.horaHasta;
@@ -37,9 +46,8 @@ export function JornadaTrabajo() {
   // Trabajo efectivo de la jornada (período seleccionado o trabajo del período
   // automático) para validar que no exista otra jornada con día/horas solapadas.
   const trabajoNombre = data.crearPeriodoAutomatico
-    ? options.trabajos.find((t) => t.id === data.idTrabajo)?.nombre
-    : options.periodosTrabajo.find((p) => p.id === data.periodoTrabajo)?.trabajo
-        ?.nombre;
+    ? trabajosHoras.find((t) => t.id === data.idTrabajo)?.nombre
+    : periodosHoras.find((p) => p.id === data.periodoTrabajo)?.trabajo?.nombre;
   const desdeNum = timeToDecimal(data.horaDesde);
   const hastaNum = timeToDecimal(data.horaHasta);
   const jornadaSolapada =
@@ -57,7 +65,7 @@ export function JornadaTrabajo() {
   // La fecha de la jornada debe caer dentro del período seleccionado.
   const periodoSeleccionado = data.crearPeriodoAutomatico
     ? undefined
-    : options.periodosTrabajo.find((p) => p.id === data.periodoTrabajo);
+    : periodosHoras.find((p) => p.id === data.periodoTrabajo);
   const fechaFueraDePeriodo =
     !!data.fecha &&
     !!periodoSeleccionado &&
@@ -85,6 +93,13 @@ export function JornadaTrabajo() {
         />
       }
     >
+      {!trabajosHoras.length && (
+        <div className="rounded-md border border-border bg-muted px-3 py-2 text-[13px] text-subtitle">
+          No tenés trabajos con modalidad por hora (horas variables). Las
+          jornadas solo se cargan en ese tipo de trabajo.
+        </div>
+      )}
+
       <DateField
         label="Fecha"
         value={data.fecha}
@@ -132,7 +147,7 @@ export function JornadaTrabajo() {
           }
         }}
         options={[
-          ...options.periodosTrabajo.map((p) => ({
+          ...periodosHoras.map((p) => ({
             value: String(p.id),
             label: `${p.trabajo?.nombre ?? "Trabajo"}: ${formatFecha(
               p.fechaDesde
@@ -149,7 +164,7 @@ export function JornadaTrabajo() {
           label="Trabajo"
           value={data.idTrabajo ? String(data.idTrabajo) : ""}
           onChange={(v) => handleSetData({ idTrabajo: Number(v) })}
-          options={options.trabajos.map((t) => ({
+          options={trabajosHoras.map((t) => ({
             value: String(t.id),
             label: t.nombre,
           }))}
@@ -174,7 +189,7 @@ export function JornadaTrabajo() {
           mismo día con horas superpuestas ("Siguiente" queda deshabilitado). */}
       {haySolapamiento && jornadaSolapada && (
         <div className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-[13px] text-danger">
-          Ya existe una jornada de "{trabajoNombre}" el {formatFecha(data.fecha)}{" "}
+          Ya existe una jornada de &quot;{trabajoNombre}&quot; el {formatFecha(data.fecha)}{" "}
           de {decimalToTime(jornadaSolapada.horaDesde)} a{" "}
           {decimalToTime(jornadaSolapada.horaHasta)}. No se pueden superponer
           horas del mismo trabajo.

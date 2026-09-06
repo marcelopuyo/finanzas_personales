@@ -23,7 +23,7 @@ export function calcularMontoJornada(
 /**
  * Suma el monto a cobrar de un período a partir de sus jornadas NO eliminadas.
  * IMPORTANTE (decisión 2026-08-06): la propina NO se incluye. Las tarjetas
- * "Períodos a Cobrar" / "Períodos Actuales" del dashboard no contabilizan la
+ * "Por cobrar" / "Actuales" del dashboard no contabilizan la
  * propina; la propina se deposita aparte en una cuenta (wizard "Jornada trabajo").
  */
 export function calcularMontoACobrar(
@@ -130,4 +130,143 @@ export async function encontrarJornadaSuperpuesta(
     qb.andWhere("jt.id <> :excluirId", { excluirId });
   }
   return qb.getOne();
+}
+
+// ===========================================================================
+// Modalidades de cobro y tareas (2026-09-05)
+// ===========================================================================
+
+export type ModalidadCobro =
+  | "fijo"
+  | "horas_fijas"
+  | "horas_variables"
+  | "por_tarea";
+
+export function modalidadAdmiteJornadas(m: string): boolean {
+  return m === "horas_variables";
+}
+
+export function modalidadAdmiteTareas(m: string): boolean {
+  return m === "por_tarea";
+}
+
+/** Solo 'fijo' / 'horas_fijas' se prorratean por mes (períodos SIN hijos). */
+export function modalidadProrratea(m: string): boolean {
+  return m === "fijo" || m === "horas_fijas";
+}
+
+/** Etiqueta legible de una modalidad para mensajes al usuario. */
+export function etiquetaModalidad(m: string): string {
+  switch (m) {
+    case "fijo":
+      return "Monto fijo";
+    case "horas_fijas":
+      return "Horas fijas";
+    case "por_tarea":
+      return "Por tarea";
+    case "horas_variables":
+    default:
+      return "Horas variables";
+  }
+}
+
+/** Suma el monto a cobrar de un período a partir de sus tareas NO eliminadas. */
+export function calcularMontoTareas(
+  tareas: { eliminado: boolean; montoTarea: number }[]
+): number {
+  let total = 0;
+  for (const tarea of tareas) {
+    if (!tarea.eliminado) {
+      total += tarea.montoTarea;
+    }
+  }
+  return total;
+}
+
+/**
+ * Calcula el `montoACobrar` de un período según la modalidad de su trabajo:
+ *  - fijo           → `montoCargado` (lo que se cargó junto con el período).
+ *  - horas_fijas    → `horasPeriodo × precioHoraPeriodo` (snapshot).
+ *  - horas_variables→ suma de jornadas (`calcularMontoACobrar`).
+ *  - por_tarea      → suma de tareas (`calcularMontoTareas`).
+ */
+export function calcularMontoACobrarPorModalidad(params: {
+  modalidad: string;
+  montoCargado?: number;
+  horasPeriodo?: number;
+  precioHoraPeriodo?: number;
+  jornadas?: { eliminado: boolean; montoJornada: number }[];
+  tareas?: { eliminado: boolean; montoTarea: number }[];
+}): number {
+  switch (params.modalidad) {
+    case "fijo":
+      return params.montoCargado ?? 0;
+    case "horas_fijas":
+      return (params.horasPeriodo ?? 0) * (params.precioHoraPeriodo ?? 0);
+    case "por_tarea":
+      return params.tareas ? calcularMontoTareas(params.tareas) : 0;
+    case "horas_variables":
+    default:
+      return params.jornadas ? calcularMontoACobrar(params.jornadas) : 0;
+  }
+}
+
+/**
+ * Normaliza una fecha/hora (Date o string ISO con o sin zona) a su parte de
+ * FECHA "YYYY-MM-DD" (componentes UTC). NOTA (2026-09-05): para las TAREAS ya
+ * no se usa esta función — la agrupación/validación usa la `fechaTarea` (fecha
+ * LOCAL persistida como `date`). Se mantiene por compatibilidad.
+ */
+export function isoFechaHora(v: Date | string): string {
+  const d = v instanceof Date ? v : new Date(v);
+  if (Number.isNaN(d.getTime())) {
+    return String(v).slice(0, 10);
+  }
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * ¿Cae la fecha/hora efectiva dentro del rango [desde, hasta]? Compara la
+ * FECHA (UTC) contra el rango. NOTA (2026-09-05): para TAREAS se prefiere
+ * `fechaEnRango(fechaTarea, ...)` (fecha local persistida), sin corrimiento
+ * de zona. Se mantiene por compatibilidad.
+ */
+export function fechaHoraEnRango(
+  fechaHora: Date | string,
+  desde: Date | string,
+  hasta: Date | string
+): boolean {
+  const f = isoFechaHora(fechaHora);
+  return f >= isoDate(desde) && f <= isoDate(hasta);
+}
+
+/**
+ * Prorrateo de un período contra un mes calendario (§8 del plan).
+ * devuelve el APORTE del período al mes [inicioMes, finMes]:
+ *   aporte = monto × (días de P dentro del mes / días totales de P)
+ * Las fechas se pasan como "YYYY-MM-DD" (comparables como string).
+ */
+export function aporteProrrateado(
+  desde: Date | string,
+  hasta: Date | string,
+  monto: number,
+  inicioMes: string,
+  finMes: string
+): number {
+  const desdeStr = isoDate(desde);
+  const hastaStr = isoDate(hasta);
+  const totalDias = diffDias(desdeStr, hastaStr) + 1;
+  if (totalDias <= 0 || monto <= 0) return 0;
+  const ini = desdeStr > inicioMes ? desdeStr : inicioMes;
+  const fin = hastaStr < finMes ? hastaStr : finMes;
+  const dentro = diffDias(ini, fin) + 1;
+  if (dentro <= 0) return 0;
+  return (monto * dentro) / totalDias;
+}
+
+/** Días de diferencia entre dos "YYYY-MM-DD" (desde restado a hasta). */
+function diffDias(desde: string, hasta: string): number {
+  const d1 = Date.parse(`${desde}T00:00:00Z`);
+  const d2 = Date.parse(`${hasta}T00:00:00Z`);
+  return Math.round((d2 - d1) / 86400000);
 }

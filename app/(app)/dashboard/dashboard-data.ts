@@ -7,8 +7,11 @@ import {
   getEvolucionIngresos,
   getEvolucionResultados,
 } from "@/backend/src/queries/reportes";
-import { getAllJornadasTrabajo } from "@/backend/src/queries/trabajos";
-import { getAllPeriodosTrabajo, type PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
+import {
+  getAllPeriodosTrabajo,
+  type PeriodoTrabajoOut,
+} from "@/backend/src/queries/trabajos";
+import { ingresosDelMesActual, ingresosEnRango } from "./ingresos-helpers";
 import type { GastoOut } from "@/backend/src/queries/gastos";
 import { getAllGastos } from "@/backend/src/queries/gastos";
 import { getSessionUser } from "@/backend/src/lib/auth";
@@ -28,8 +31,8 @@ export interface DashboardData {
     monedaISO?: string;
     /** Nombre del tipo de cuenta (para el icono de la tarjeta). */
     tipo?: string;
-    /** Tarjeta sintética con menú de una sola acción (ej. Períodos Actuales → jornada). */
-    menuAccion?: "jornada" | "cobro";
+    /** Tarjeta sintética con menú de acción(es) (Actuales → jornada/tarea/período). */
+    menuAccion?: ("jornada" | "cobro" | "tarea" | "periodo")[];
   }[];
   gastosResumen: {
     name: string;
@@ -71,7 +74,6 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     evolGastos,
     evolIngresos,
     evolResultados,
-    jornadas,
     periodosTrabajo,
   ] = await Promise.all([
     getBalanceActual().catch(() => 0),
@@ -82,18 +84,17 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     getEvolucionGastos().catch(() => []),
     getEvolucionIngresos().catch(() => []),
     getEvolucionResultados().catch(() => []),
-    getAllJornadasTrabajo().catch(() => []),
     getAllPeriodosTrabajo().catch(() => []),
   ]);
 
   // Moneda predeterminada del usuario: se usa para formatear el balance actual
-  // y las tarjetas sintéticas (Períodos a Cobrar/Actuales).
+  // y las tarjetas sintéticas (Por cobrar/Actuales).
   const sessionUser = await getSessionUser();
   const monedaPredeterminadaISO =
     sessionUser?.monedaPredeterminada?.codigoISO ?? "USD";
 
   // --- Cuentas con evolución ---
-  // `id` es opcional: las tarjetas sintéticas ("Períodos a Cobrar/Actuales")
+  // `id` es opcional: las tarjetas sintéticas ("Por cobrar"/"Actuales")
   // se agregan en el cliente (dashboard-client.tsx) y no tienen cuenta real
   // detrás, así que no deben abrir el historial al hacer click.
   const cuentas: {
@@ -106,8 +107,8 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     monedaISO?: string;
     /** Nombre del tipo de cuenta (para el icono de la tarjeta). */
     tipo?: string;
-    /** Tarjeta sintética con menú de una sola acción (ej. Períodos Actuales → jornada). */
-    menuAccion?: "jornada" | "cobro";
+    /** Tarjeta sintética con menú de acción(es) (Actuales → jornada/tarea/período). */
+    menuAccion?: ("jornada" | "cobro" | "tarea" | "periodo")[];
   }[] = cuentasEvol.map((c) => ({
     id: c.id,
     title: c.nombreCuenta,
@@ -118,8 +119,8 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     tipo: c.tipoNombre ?? undefined,
   }));
 
-  // Las tarjetas sintéticas "Períodos a Cobrar"/"Períodos Actuales" se calculan
-  // en el cliente (dashboard-client.tsx) tras el montaje: el "hoy" del navegador
+  // Las tarjetas sintéticas "Por cobrar"/"Actuales" se calculan en el cliente
+  // (dashboard-client.tsx) tras el montaje: el "hoy" del navegador
   // es el día real del usuario, mientras que el servidor podría correr en otra
   // zona horaria (ej. Vercel en UTC) y desfasarse ±1 día de noche.
 
@@ -154,20 +155,14 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     })
   );
 
-  // --- Ingresos por trabajo ---
-  const ingresosMap = new Map<string, number>();
-  let totalIngresos = 0;
-
-  jornadas.forEach((j) => {
-    const nombre = j.trabajo || "Sin trabajo";
-    const monto = j.montoJornada + j.montoPropina;
-    ingresosMap.set(nombre, (ingresosMap.get(nombre) || 0) + monto);
-    totalIngresos += monto;
-  });
-
-  const ingresosResumen = Array.from(ingresosMap.entries()).map(
+  // --- Ingresos por trabajo (jornadas + tareas + prorrateo de fijo/horas_fijas) ---
+  // ⚠️ Estos totales son solo el FALLBACK SSR; el dashboard los recalcula en el
+  // cliente (dashboard-client.tsx) con la fecha local del navegador.
+  const ingresosTotales = ingresosEnRango(periodosTrabajo);
+  const ingresosResumen = Array.from(ingresosTotales.porTrabajo.entries()).map(
     ([name, value]) => ({ name, value })
   );
+  const totalIngresos = ingresosTotales.total;
 
   // --- Ingresos del mes actual (jornadas cuya fechaJornada cae en el mes en curso) ---
   // Suma montojornada + montopropina de todos los registros de jornadatrabajo
@@ -177,19 +172,19 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   // noche el 31 → el server ya está en el 1° → 0). El badge "Mes actual" del
   // dashboard lo recalcula el cliente tras el montaje con la fecha local del
   // navegador (dashboard-client.tsx), mismo patrón que las tarjetas sintéticas.
+  // --- Ingresos del mes actual (FALLBACK SSR; el cliente lo recalcula) ---
+  // ⚠️ Solo fallback de SSR: se calcula con el "hoy" del servidor (Vercel en
+  // UTC) y en el límite de mes puede quedar ±1 día/mes adelantado al usuario
+  // (ej. GMT-3 de noche el 31 → el server ya está en el 1° → 0). El badge "Mes
+  // actual" del dashboard lo recalcula el cliente tras el montaje con la fecha
+  // local del navegador (dashboard-client.tsx), mismo patrón que las tarjetas
+  // sintéticas.
   const hoy = new Date();
-  const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-  const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1);
-  let totalMesActual = 0;
-  jornadas.forEach((j) => {
-    // Mediodía UTC: evita que fechas a medianoche (UTC) se corran al día/mes
-    // anterior en zonas horarias con offset negativo (p. ej. GMT-3).
-    const f = new Date(j.fechaJornada);
-    f.setUTCHours(12, 0, 0, 0);
-    if (f >= inicioMes && f < finMes) {
-      totalMesActual += j.montoJornada + j.montoPropina;
-    }
-  });
+  const hoyKeyMes = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(
+    2,
+    "0"
+  )}-${String(hoy.getDate()).padStart(2, "0")}`;
+  const totalMesActual = ingresosDelMesActual(periodosTrabajo, hoyKeyMes);
 
   // --- Resultado del mes actual (ingresos − gastos; FALLBACK SSR) ---
   // ⚠️ Igual que `ingresosMesActual`, es solo el fallback de SSR: se calcula

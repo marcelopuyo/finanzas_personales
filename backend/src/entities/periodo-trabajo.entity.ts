@@ -8,6 +8,8 @@ import {
 import { Trabajo } from "./trabajo.entity";
 // import type rompe el ciclo en runtime con jornada-trabajo (string target)
 import type { JornadaTrabajo } from "./jornada-trabajo.entity";
+// import type rompe el ciclo en runtime con tarea-trabajo (string target)
+import type { TareaTrabajo } from "./tarea-trabajo.entity";
 
 @Entity({ name: "periodo_trabajo" })
 export class PeriodoTrabajo {
@@ -28,6 +30,26 @@ export class PeriodoTrabajo {
     nullable: true,
   })
   montoACobrar?: number;
+
+  // Modalidad 'horas_fijas': horas totales del período, cargadas junto con el período.
+  @Column({
+    type: "numeric",
+    precision: 10,
+    scale: 2,
+    default: null,
+    nullable: true,
+  })
+  horasPeriodo?: number;
+
+  // Modalidad 'horas_fijas': snapshot del trabajo.precioHora al crear el período.
+  @Column({
+    type: "numeric",
+    precision: 10,
+    scale: 2,
+    default: null,
+    nullable: true,
+  })
+  precioHoraPeriodo?: number;
 
   @Column({ type: "date", nullable: true })
   fechaEstimadaCobro?: Date;
@@ -54,4 +76,12 @@ export class PeriodoTrabajo {
     eager: false,
   })
   jornadas?: JornadaTrabajo[];
+
+  // Relación inversa con STRING TARGET = NOMBRE DE TABLA (igual que jornadas):
+  // evita import circular en runtime y sobrevive la minificación de Turbopack.
+  @OneToMany("tarea_trabajo", (tarea: TareaTrabajo) => tarea.periodoTrabajo, {
+    cascade: true,
+    eager: false,
+  })
+  tareas?: TareaTrabajo[];
 }

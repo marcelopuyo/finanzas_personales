@@ -16,6 +16,7 @@ import {
   gastoDirecto,
   transferir,
   cargarJornadaTrabajo,
+  cargarTareaTrabajo,
 } from "@/backend/src/actions/movimientos";
 
 const TITULOS: Record<MovimientoConcepto, string> = {
@@ -26,6 +27,7 @@ const TITULOS: Record<MovimientoConcepto, string> = {
   GastoDirecto: "Revisar la información y confirmar el gasto directo.",
   Transferencia: "Revisar la información y confirmar la transferencia.",
   JornadaTrabajo: "Revisar la información y confirmar la carga de la jornada.",
+  CargarTarea: "Revisar la información y confirmar la carga de la tarea.",
 };
 
 export function Confirmacion() {
@@ -174,6 +176,36 @@ export function Confirmacion() {
         { label: "Cuenta (propina)", value: cuentaNombre(data.cuentaPropina) }
       );
     }
+  } else if (concepto === "CargarTarea") {
+    const periodoT = options.periodosTrabajo.find(
+      (p) => p.id === data.periodoTrabajo
+    );
+    const trabajoT = options.trabajos.find((t) => t.id === data.idTrabajo);
+    filas.push(
+      {
+        label: "Fecha/hora",
+        value: `${formatFecha(data.fecha)} ${data.horaDesde || "—"}`,
+      },
+      {
+        label: data.crearPeriodoAutomatico
+          ? "Trabajo (período automático)"
+          : "Período de trabajo",
+        value: data.crearPeriodoAutomatico
+          ? `${trabajoT?.nombre ?? "Trabajo"} — período del ${formatFecha(
+              data.fecha
+            )}`
+          : periodoT
+          ? `${periodoT.trabajo?.nombre ?? "Trabajo"}: ${formatFecha(
+              periodoT.fechaDesde
+            )} al ${formatFecha(periodoT.fechaHasta)}`
+          : "—",
+      },
+      { label: "Descripción", value: data.descripcionTarea || "—" }
+    );
+    if (data.horasTarea > 0) {
+      filas.push({ label: "Horas", value: String(data.horasTarea) });
+    }
+    filas.push({ label: "Monto ganado", value: numberToCurrency(data.montoTarea) });
   }
 
   const guardar = async () => {
@@ -247,6 +279,27 @@ export function Confirmacion() {
               : undefined,
           });
           break;
+        case "CargarTarea": {
+          const fechaHoraTarea = new Date(
+            `${data.fecha}T${data.horaDesde || "00:00"}`
+          ).toISOString();
+          await cargarTareaTrabajo({
+            fechaHoraTarea,
+            // Fecha CALENDARIO LOCAL (la que eligió el usuario en el wizard).
+            fechaTarea: data.fecha,
+            descripcion: (data.descripcionTarea ?? "").trim() || undefined,
+            horasTarea: data.horasTarea > 0 ? data.horasTarea : undefined,
+            montoTarea: data.montoTarea,
+            idPeriodo: data.crearPeriodoAutomatico
+              ? undefined
+              : data.periodoTrabajo,
+            crearPeriodoAutomatico: data.crearPeriodoAutomatico,
+            idTrabajo: data.crearPeriodoAutomatico
+              ? data.idTrabajo
+              : undefined,
+          });
+          break;
+        }
       }
       toast.success("Movimiento guardado correctamente");
       // En modo directo (sin stepper) se vuelve al dashboard tras guardar.

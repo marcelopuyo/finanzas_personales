@@ -23,6 +23,7 @@ export default async function MovimientoNuevoPage({
     cuenta?: string;
     origen?: string;
     destino?: string;
+    periodo?: string;
   }>;
 }) {
   const [{ tipo }, qs] = await Promise.all([params, searchParams]);
@@ -38,6 +39,9 @@ export default async function MovimientoNuevoPage({
     cuenta: num(qs.cuenta),
     origen: num(qs.origen),
     destino: num(qs.destino),
+    // Período de trabajo preseleccionado (icono de cobro por fila en el
+    // listado "Por cobrar" del dashboard).
+    periodo: num(qs.periodo),
   };
 
   const options = await getMovimientoOptions();

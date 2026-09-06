@@ -6,6 +6,7 @@ import { requireUserId } from "../lib/auth";
 import { Concepto } from "../entities/concepto.entity";
 import { JornadaTrabajo } from "../entities/jornada-trabajo.entity";
 import { PeriodoTrabajo } from "../entities/periodo-trabajo.entity";
+import { TareaTrabajo } from "../entities/tarea-trabajo.entity";
 import { Trabajo } from "../entities/trabajo.entity";
 import { Cuenta } from "../entities/cuenta.entity";
 import { Movimiento } from "../entities/movimiento.entity";
@@ -14,44 +15,81 @@ import { montoEnMonedaPredeterminada } from "../lib/cotizaciones";
 import {
   getJornadaTrabajoById,
   getPeriodoTrabajoById,
+  getTareaTrabajoById,
   getTrabajoById,
 } from "../queries/trabajos";
 import {
   calcularMontoACobrar,
+  calcularMontoACobrarPorModalidad,
   calcularMontoJornada,
+  calcularMontoTareas,
   encontrarJornadaSuperpuesta,
   encontrarPeriodoSuperpuesto,
+  etiquetaModalidad,
   fechaEnRango,
   formatearFechaDMA,
   formatearHora,
+  modalidadAdmiteJornadas,
+  modalidadAdmiteTareas,
 } from "../lib/jornadas";
 import {
   jornadaTrabajoCreateSchema,
   jornadaTrabajoUpdateSchema,
   periodoTrabajoCreateSchema,
   periodoTrabajoUpdateSchema,
+  tareaTrabajoCreateSchema,
+  tareaTrabajoUpdateSchema,
   trabajoCreateSchema,
   trabajoUpdateSchema,
 } from "../validation/trabajos";
 
 // ---------------------------------------------------------------------------
-// Helpers de lógica de jornadas (port del servicio JornadaTrabajoService)
+// Helpers de lógica de jornadas/tareas (port del servicio JornadaTrabajoService)
 // ---------------------------------------------------------------------------
 async function actualizarMontoACobrarPeriodo(idPeriodo: number) {
   const ds = await getDb();
   const repo = ds.getRepository(PeriodoTrabajo);
   const periodo = await repo.findOne({
     where: { id: idPeriodo },
-    relations: { jornadas: true },
+    relations: { trabajo: true, jornadas: true, tareas: true },
   });
   if (!periodo) {
     throw new Error(`PeriodoTrabajo con id ${idPeriodo} no encontrado`);
   }
 
-  // La propina NO forma parte del monto a cobrar (tarjetas "Períodos a
-  // Cobrar/Actuales" del dashboard; decisión 2026-08-06). Ver lib/jornadas.
-  periodo.montoACobrar = calcularMontoACobrar(periodo.jornadas ?? []);
+  // El origen del monto depende de la modalidad del trabajo (§5 del plan):
+  //  - fijo: es lo cargado (se conserva).
+  //  - horas_fijas: horasPeriodo × precioHoraPeriodo (snapshot).
+  //  - horas_variables: suma de jornadas (SIN propina, decisión 2026-08-06).
+  //  - por_tarea: suma de tareas.
+  periodo.montoACobrar = calcularMontoACobrarPorModalidad({
+    modalidad: periodo.trabajo?.modalidadCobro ?? "horas_variables",
+    montoCargado: periodo.montoACobrar ?? 0,
+    horasPeriodo: periodo.horasPeriodo,
+    precioHoraPeriodo: periodo.precioHoraPeriodo,
+    jornadas: periodo.jornadas ?? [],
+    tareas: periodo.tareas ?? [],
+  });
   await repo.save(periodo);
+}
+
+/** ¿Tiene el trabajo un período EN CURSO (no cobrado y vigente hoy)? (§3.2) */
+async function periodoEnCursoDe(
+  ds: Awaited<ReturnType<typeof getDb>>,
+  trabajoId: number
+): Promise<PeriodoTrabajo | null> {
+  const hoyKey = new Date().toISOString().slice(0, 10);
+  const repo = ds.getRepository(PeriodoTrabajo);
+  return repo
+    .createQueryBuilder("pt")
+    .where("pt.trabajoId = :trabajoId", { trabajoId })
+    .andWhere("pt.eliminado = :eliminado", { eliminado: false })
+    // No cobrado: fechaDeCobro null o centinela (1901-01-01).
+    .andWhere("(pt.fechaDeCobro IS NULL OR pt.fechaDeCobro < '1901-01-02')")
+    .andWhere("pt.fechaDesde <= :hoy", { hoy: hoyKey })
+    .andWhere("pt.fechaHasta >= :hoy", { hoy: hoyKey })
+    .limit(1)
+    .getOne();
 }
 
 // ============================================================
@@ -64,7 +102,12 @@ export async function crearTrabajo(input: z.infer<typeof trabajoCreateSchema>) {
   const repo = ds.getRepository(Trabajo);
   try {
     const created = await repo.save(
-      repo.create({ ...data, usuario: { id: userId } })
+      repo.create({
+        ...data,
+        // Default conservador: la modalidad que hoy tienen todos los trabajos.
+        modalidadCobro: data.modalidadCobro ?? "horas_variables",
+        usuario: { id: userId },
+      })
     );
     refresh();
     return getTrabajoById(created.id);
@@ -85,6 +128,19 @@ export async function actualizarTrabajo(
   if (!existing) {
     throw new Error(`Trabajo con id ${id} no encontrado`);
   }
+
+  // Conversión de modalidad (§3.2): bloqueada si el trabajo tiene un período en
+  // curso (no cobrado y vigente hoy). La conversión solo afecta períodos futuros.
+  const modalidadActual = existing.modalidadCobro ?? "horas_variables";
+  if (data.modalidadCobro && data.modalidadCobro !== modalidadActual) {
+    const enCurso = await periodoEnCursoDe(ds, existing.id);
+    if (enCurso) {
+      throw new Error(
+        `No podés cambiar la modalidad de "${existing.nombre}" porque tiene un período en curso (${formatearFechaDMA(enCurso.fechaDesde)} al ${formatearFechaDMA(enCurso.fechaHasta)}). Cerrá o cobrá ese período primero.`
+      );
+    }
+  }
+
   try {
     Object.assign(existing, data);
     await repo.save(existing);
@@ -121,7 +177,7 @@ export async function crearPeriodoTrabajo(
   const userId = await requireUserId();
   const data = periodoTrabajoCreateSchema.parse(input);
   const ds = await getDb();
-  const { nombreTrabajo, ...rest } = data;
+  const { nombreTrabajo } = data;
 
   const trabajo = await ds.getRepository(Trabajo).findOneBy({
     nombre: nombreTrabajo,
@@ -144,9 +200,47 @@ export async function crearPeriodoTrabajo(
     );
   }
 
+  // Origen del monto según la modalidad del trabajo (§5 del plan):
+  //  - fijo        → se guarda el monto cargado junto con el período.
+  //  - horas_fijas → se guardan las horas + snapshot del precio; monto = horas × precio.
+  //  - horas_variables / por_tarea → montoACobrar queda 0 (llega de jornadas/tareas).
+  const modalidad = trabajo.modalidadCobro ?? "horas_variables";
+  let montoACobrar: number | undefined;
+  let horasPeriodo: number | undefined;
+  let precioHoraPeriodo: number | undefined;
+  if (modalidad === "fijo") {
+    if (!data.montoACobrar || data.montoACobrar <= 0) {
+      throw new Error(
+        `Indicá el monto del período (el trabajo "${trabajo.nombre}" es de monto fijo)`
+      );
+    }
+    montoACobrar = data.montoACobrar;
+  } else if (modalidad === "horas_fijas") {
+    if (!data.horasPeriodo || data.horasPeriodo <= 0) {
+      throw new Error(
+        `Indicá las horas del período (el trabajo "${trabajo.nombre}" es de horas fijas)`
+      );
+    }
+    horasPeriodo = data.horasPeriodo;
+    precioHoraPeriodo = trabajo.precioHora ?? 0;
+    montoACobrar = horasPeriodo * precioHoraPeriodo;
+  }
+
   try {
     const repo = ds.getRepository(PeriodoTrabajo);
-    const created = await repo.save(repo.create({ ...rest, trabajo }));
+    const created = await repo.save(
+      repo.create({
+        fechaDesde: data.fechaDesde as unknown as Date,
+        fechaHasta: data.fechaHasta as unknown as Date,
+        fechaEstimadaCobro: data.fechaEstimadaCobro
+          ? (data.fechaEstimadaCobro as unknown as Date)
+          : undefined,
+        montoACobrar,
+        horasPeriodo,
+        precioHoraPeriodo,
+        trabajo,
+      })
+    );
     refresh();
     return getPeriodoTrabajoById(created.id);
   } catch (error) {
@@ -200,8 +294,38 @@ export async function actualizarPeriodoTrabajo(
     }
   }
 
+  // Ajustes de la edición según la modalidad del trabajo (§5 del plan).
+  const modalidad = existing.trabajo?.modalidadCobro ?? "horas_variables";
+  const restData = { ...rest };
+  if (modalidad === "horas_fijas") {
+    if (restData.horasPeriodo !== undefined) {
+      if (restData.horasPeriodo <= 0) {
+        throw new Error(
+          "Las horas del período deben ser mayores a 0 (modalidad horas fijas)"
+        );
+      }
+      // Recalcula con el SNAPSHOT original (no refresca el precio al editar:
+      // para reflejar un cambio de precio se usa el Trabajo, afecta a períodos
+      // nuevos).
+      const precio =
+        existing.precioHoraPeriodo ?? existing.trabajo?.precioHora ?? 0;
+      restData.montoACobrar = restData.horasPeriodo * precio;
+      if (existing.precioHoraPeriodo == null && existing.trabajo) {
+        existing.precioHoraPeriodo = existing.trabajo.precioHora ?? 0;
+      }
+    }
+  } else if (modalidad === "fijo") {
+    if (restData.montoACobrar !== undefined && restData.montoACobrar <= 0) {
+      throw new Error(
+        "El monto del período debe ser mayor a 0 (modalidad monto fijo)"
+      );
+    }
+  }
+  // horas_variables / por_tarea: comportamiento actual (el monto puede editarse
+  // a mano como override, o recalcularse desde jornadas/tareas).
+
   try {
-    Object.assign(existing, rest);
+    Object.assign(existing, restData);
     await repo.save(existing);
     refresh();
     return getPeriodoTrabajoById(id);
@@ -282,6 +406,13 @@ export async function crearJornadaTrabajo(
     if (!trabajoVal) {
       throw new Error(`Trabajo con id ${idTrabajo} no encontrado`);
     }
+    if (!modalidadAdmiteJornadas(trabajoVal.modalidadCobro ?? "horas_variables")) {
+      throw new Error(
+        `El trabajo "${trabajoVal.nombre}" no admite jornadas (modalidad ${etiquetaModalidad(
+          trabajoVal.modalidadCobro ?? "horas_variables"
+        )})`
+      );
+    }
     trabajoIdVal = trabajoVal.id;
     nombreTrabajoVal = trabajoVal.nombre;
     const superpuesto = await encontrarPeriodoSuperpuesto(
@@ -305,6 +436,17 @@ export async function crearJornadaTrabajo(
     });
     if (!periodoVal) {
       throw new Error(`Período de trabajo con id ${idPeriodo} no encontrado`);
+    }
+    if (
+      !modalidadAdmiteJornadas(
+        periodoVal.trabajo?.modalidadCobro ?? "horas_variables"
+      )
+    ) {
+      throw new Error(
+        `El trabajo "${periodoVal.trabajo?.nombre ?? "?"}" no admite jornadas (modalidad ${etiquetaModalidad(
+          periodoVal.trabajo?.modalidadCobro ?? "horas_variables"
+        )})`
+      );
     }
     trabajoIdVal = periodoVal.trabajo.id;
     nombreTrabajoVal = periodoVal.trabajo.nombre;
@@ -508,6 +650,15 @@ export async function actualizarJornadaTrabajo(
   if (!periodoVal) {
     throw new Error(`Período de trabajo con id ${idPeriodo} no encontrado`);
   }
+  if (
+    !modalidadAdmiteJornadas(periodoVal.trabajo?.modalidadCobro ?? "horas_variables")
+  ) {
+    throw new Error(
+      `El trabajo "${periodoVal.trabajo?.nombre ?? "?"}" no admite jornadas (modalidad ${etiquetaModalidad(
+        periodoVal.trabajo?.modalidadCobro ?? "horas_variables"
+      )})`
+    );
+  }
   const superpuesto = await encontrarPeriodoSuperpuesto(
     ds.getRepository(PeriodoTrabajo),
     periodoVal.trabajo.id,
@@ -661,10 +812,21 @@ export async function eliminarJornadaTrabajo(id: string) {
   const repo = ds.getRepository(JornadaTrabajo);
   const row = await repo.findOne({
     where: { id, periodoTrabajo: { trabajo: { usuario: { id: userId } } }, eliminado: false },
-    relations: { periodoTrabajo: true },
+    relations: { periodoTrabajo: { trabajo: true } },
   });
   if (!row) {
     throw new Error(`Jornada de trabajo con id ${id} no encontrada`);
+  }
+  if (
+    !modalidadAdmiteJornadas(
+      row.periodoTrabajo?.trabajo?.modalidadCobro ?? "horas_variables"
+    )
+  ) {
+    throw new Error(
+      `El trabajo "${row.periodoTrabajo?.trabajo?.nombre ?? "?"}" ya no admite jornadas (modalidad ${etiquetaModalidad(
+        row.periodoTrabajo?.trabajo?.modalidadCobro ?? "horas_variables"
+      )})`
+    );
   }
   const idPeriodo = row.periodoTrabajo?.id;
   try {
@@ -704,4 +866,287 @@ export async function eliminarJornadaTrabajo(id: string) {
   } catch (error) {
     dbError(error, "Jornada de trabajo");
   }
+}
+
+// ============================================================
+// TAREA DE TRABAJO (modalidad 'por_tarea' — monto cargado a mano)
+// ============================================================
+export async function crearTareaTrabajo(
+  input: z.infer<typeof tareaTrabajoCreateSchema>
+) {
+  const userId = await requireUserId();
+  const parsed = tareaTrabajoCreateSchema.safeParse(input);
+  if (!parsed.success) {
+    const msg = parsed.error.issues
+      .map((i) => `${i.path.join(".") || "?"}: ${i.message}`)
+      .join("; ");
+    console.error("⚠️ crearTareaTrabajo PARSE ERROR:", msg, JSON.stringify(input));
+    throw new Error(`Datos inválidos: ${msg}`);
+  }
+  const data = parsed.data;
+  const ds = await getDb();
+  const { idPeriodo, crearPeriodoAutomatico, idTrabajo, ...rest } = data;
+  const descripcion = (rest.descripcion ?? "").trim();
+
+  let createdId = "";
+  try {
+    await ds.transaction(async (manager) => {
+      const tareaRepo = manager.getRepository(TareaTrabajo);
+      const periodoTrabajoRepo = manager.getRepository(PeriodoTrabajo);
+      const trabajoRepo = manager.getRepository(Trabajo);
+
+      let periodo: PeriodoTrabajo | null = null;
+      if (crearPeriodoAutomatico) {
+        if (!idTrabajo) {
+          throw new Error("Seleccioná el trabajo para crear el período automático");
+        }
+        const trabajo = await trabajoRepo.findOneBy({
+          id: idTrabajo,
+          usuario: { id: userId },
+        });
+        if (!trabajo) {
+          throw new Error(`Trabajo con id ${idTrabajo} no encontrado`);
+        }
+        if (!modalidadAdmiteTareas(trabajo.modalidadCobro ?? "horas_variables")) {
+          throw new Error(
+            `El trabajo "${trabajo.nombre}" no admite tareas (modalidad ${etiquetaModalidad(
+              trabajo.modalidadCobro ?? "horas_variables"
+            )})`
+          );
+        }
+        // Período de una sola tarea: fechaDesde = fechaHasta = FECHA LOCAL de la
+        // tarea (fechaTarea, decisión 2026-09-05). No se usa la fecha UTC del
+        // instante: una tarea de madrugada (GMT-3) se correría al día siguiente.
+        const dia = data.fechaTarea;
+        const superpuestoAuto = await encontrarPeriodoSuperpuesto(
+          periodoTrabajoRepo,
+          trabajo.id,
+          dia,
+          dia
+        );
+        if (superpuestoAuto) {
+          throw new Error(
+            `El período automático se superpone con "${formatearFechaDMA(
+              superpuestoAuto.fechaDesde
+            )} al ${formatearFechaDMA(superpuestoAuto.fechaHasta)}" del trabajo "${trabajo.nombre}"`
+          );
+        }
+        periodo = await periodoTrabajoRepo.save(
+          periodoTrabajoRepo.create({
+            fechaDesde: dia as unknown as Date,
+            fechaHasta: dia as unknown as Date,
+            trabajo,
+          })
+        );
+      } else {
+        if (!idPeriodo) {
+          throw new Error("Seleccioná el período de trabajo");
+        }
+        periodo = await periodoTrabajoRepo.findOne({
+          where: { id: idPeriodo, trabajo: { usuario: { id: userId } } },
+          relations: { trabajo: true },
+        });
+        if (!periodo) {
+          throw new Error(`Período de trabajo con id ${idPeriodo} no encontrado`);
+        }
+        if (
+          !modalidadAdmiteTareas(periodo.trabajo?.modalidadCobro ?? "horas_variables")
+        ) {
+          throw new Error(
+            `El trabajo "${periodo.trabajo?.nombre ?? "?"}" no admite tareas (modalidad ${etiquetaModalidad(
+              periodo.trabajo?.modalidadCobro ?? "horas_variables"
+            )})`
+          );
+        }
+        if (!fechaEnRango(data.fechaTarea, periodo.fechaDesde, periodo.fechaHasta)) {
+          throw new Error(
+            `La fecha de la tarea (${data.fechaTarea}) no corresponde al período "${formatearFechaDMA(
+              periodo.fechaDesde
+            )} al ${formatearFechaDMA(periodo.fechaHasta)}" del trabajo "${
+              periodo.trabajo?.nombre ?? "?"
+            }"`
+          );
+        }
+      }
+      if (!periodo) {
+        throw new Error("No se pudo determinar el período de la tarea");
+      }
+
+      const creada = await tareaRepo.save(
+        tareaRepo.create({
+          fechaCarga: new Date(),
+          fechaHoraTarea: data.fechaHoraTarea as unknown as Date,
+          fechaTarea: data.fechaTarea as unknown as Date,
+          descripcion: descripcion || undefined,
+          horasTarea: data.horasTarea ?? undefined,
+          montoTarea: data.montoTarea,
+          periodoTrabajo: periodo,
+        })
+      );
+      createdId = creada.id;
+
+      // Recalcular el monto a cobrar del período (Σ montoTarea).
+      const periodoActualizado = await periodoTrabajoRepo.findOne({
+        where: { id: periodo.id },
+        relations: { tareas: true },
+      });
+      if (periodoActualizado) {
+        periodoActualizado.montoACobrar = calcularMontoTareas(
+          periodoActualizado.tareas ?? []
+        );
+        await periodoTrabajoRepo.save(periodoActualizado);
+      }
+    });
+
+    refresh();
+    return getTareaTrabajoById(createdId);
+  } catch (error) {
+    dbError(error, "Tarea de trabajo");
+  }
+}
+
+export async function actualizarTareaTrabajo(
+  id: string,
+  input: z.infer<typeof tareaTrabajoUpdateSchema>
+) {
+  const userId = await requireUserId();
+  const data = tareaTrabajoUpdateSchema.parse(input);
+  const ds = await getDb();
+  const repo = ds.getRepository(TareaTrabajo);
+
+  const existing = await repo.findOne({
+    where: { id, periodoTrabajo: { trabajo: { usuario: { id: userId } } }, eliminado: false },
+    relations: { periodoTrabajo: { trabajo: true } },
+  });
+  if (!existing) {
+    throw new Error(`Tarea de trabajo con id ${id} no encontrada`);
+  }
+  const modalidadActual =
+    existing.periodoTrabajo?.trabajo?.modalidadCobro ?? "horas_variables";
+  if (!modalidadAdmiteTareas(modalidadActual)) {
+    throw new Error(
+      `El trabajo "${existing.periodoTrabajo?.trabajo?.nombre ?? "?"}" ya no admite tareas (modalidad ${etiquetaModalidad(
+        modalidadActual
+      )})`
+    );
+  }
+
+  const idPeriodo = data.idPeriodo ?? existing.periodoTrabajo?.id;
+  if (!idPeriodo) {
+    throw new Error("idPeriodo es requerido");
+  }
+
+  // Fecha local de la tarea (decisión 2026-09-05): si no viene nueva, se usa la
+  // `fechaTarea` ya persistida (fecha local original). `fechaHoraTarea` (instante)
+  // se conserva solo para mostrar la hora; el día/agrupación usa `fechaTarea`.
+  const fechaTarea =
+    data.fechaTarea ??
+    (existing.fechaTarea instanceof Date
+      ? existing.fechaTarea.toISOString().slice(0, 10)
+      : String(existing.fechaTarea).slice(0, 10));
+  const descripcion =
+    data.descripcion !== undefined ? (data.descripcion ?? "").trim() : undefined;
+
+  const periodoViejoId = existing.periodoTrabajo?.id;
+
+  try {
+    await ds.transaction(async (manager) => {
+      const tareaRepo = manager.getRepository(TareaTrabajo);
+      const periodoTrabajoRepo = manager.getRepository(PeriodoTrabajo);
+
+      const periodo = await periodoTrabajoRepo.findOne({
+        where: { id: idPeriodo, trabajo: { usuario: { id: userId } } },
+        relations: { trabajo: true },
+      });
+      if (!periodo) {
+        throw new Error(`Período de trabajo con id ${idPeriodo} no encontrado`);
+      }
+      if (
+        !modalidadAdmiteTareas(periodo.trabajo?.modalidadCobro ?? "horas_variables")
+      ) {
+        throw new Error(
+          `El trabajo "${periodo.trabajo?.nombre ?? "?"}" no admite tareas (modalidad ${etiquetaModalidad(
+            periodo.trabajo?.modalidadCobro ?? "horas_variables"
+          )})`
+        );
+      }
+      if (!fechaEnRango(fechaTarea, periodo.fechaDesde, periodo.fechaHasta)) {
+        throw new Error(
+          `La fecha de la tarea (${fechaTarea}) no corresponde al período "${formatearFechaDMA(
+            periodo.fechaDesde
+          )} al ${formatearFechaDMA(periodo.fechaHasta)}"`
+        );
+      }
+
+      const restData = { ...data };
+      delete restData.idPeriodo;
+      delete restData.crearPeriodoAutomatico;
+      delete restData.idTrabajo;
+      if (descripcion !== undefined) {
+        restData.descripcion = descripcion || undefined;
+      }
+      Object.assign(existing, restData, {
+        periodoTrabajo: periodo,
+        // `fechaTarea` siempre queda en la fecha local (persistida como `date`).
+        fechaTarea: fechaTarea as unknown as Date,
+      });
+      await tareaRepo.save(existing);
+
+      // Recalcular el período destino (y el origen si se movió la tarea).
+      const recalcular = async (pid: number) => {
+        const p = await periodoTrabajoRepo.findOne({
+          where: { id: pid },
+          relations: { tareas: true },
+        });
+        if (p) {
+          p.montoACobrar = calcularMontoTareas(p.tareas ?? []);
+          await periodoTrabajoRepo.save(p);
+        }
+      };
+      await recalcular(periodo.id);
+      if (periodoViejoId && periodoViejoId !== periodo.id) {
+        await recalcular(periodoViejoId);
+      }
+    });
+
+    refresh();
+    return getTareaTrabajoById(id);
+  } catch (error) {
+    dbError(error, "Tarea de trabajo");
+  }
+}
+
+export async function eliminarTareaTrabajo(id: string) {
+  const userId = await requireUserId();
+  const ds = await getDb();
+  const repo = ds.getRepository(TareaTrabajo);
+  const row = await repo.findOne({
+    where: { id, periodoTrabajo: { trabajo: { usuario: { id: userId } } }, eliminado: false },
+    relations: { periodoTrabajo: { trabajo: true } },
+  });
+  if (!row) {
+    throw new Error(`Tarea de trabajo con id ${id} no encontrada`);
+  }
+  if (
+    !modalidadAdmiteTareas(
+      row.periodoTrabajo?.trabajo?.modalidadCobro ?? "horas_variables"
+    )
+  ) {
+    throw new Error(
+      `El trabajo "${row.periodoTrabajo?.trabajo?.nombre ?? "?"}" ya no admite tareas (modalidad ${etiquetaModalidad(
+        row.periodoTrabajo?.trabajo?.modalidadCobro ?? "horas_variables"
+      )})`
+    );
+  }
+  const idPeriodo = row.periodoTrabajo?.id;
+  try {
+    row.eliminado = true;
+    await repo.save(row);
+  } catch (error) {
+    dbError(error, "Tarea de trabajo");
+  }
+  if (idPeriodo) {
+    await actualizarMontoACobrarPeriodo(idPeriodo);
+  }
+  refresh();
 }

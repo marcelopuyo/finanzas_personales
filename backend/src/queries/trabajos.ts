@@ -3,6 +3,7 @@ import { requireUserId } from "../lib/auth";
 import { JornadaTrabajo } from "../entities/jornada-trabajo.entity";
 import { Movimiento } from "../entities/movimiento.entity";
 import { PeriodoTrabajo } from "../entities/periodo-trabajo.entity";
+import { TareaTrabajo } from "../entities/tarea-trabajo.entity";
 import { Trabajo } from "../entities/trabajo.entity";
 
 // ============================================================
@@ -13,6 +14,7 @@ export interface TrabajoOut {
   nombre: string;
   fechaInicio: Date;
   precioHora: number;
+  modalidadCobro: string;
   memos: string | null;
 }
 
@@ -27,15 +29,41 @@ export interface JornadaTrabajoOut {
   precioHora: number;
 }
 
+export interface TareaTrabajoOut {
+  id: string;
+  fechaCarga: Date;
+  fechaHoraTarea: Date;
+  /** Fecha calendario LOCAL de la tarea (la que eligió el usuario). */
+  fechaTarea: Date;
+  descripcion: string | null;
+  horasTarea: number | null;
+  montoTarea: number;
+}
+
 export interface PeriodoTrabajoOut {
   id: number;
   fechaDesde: Date;
   fechaHasta: Date;
   montoACobrar: number | null;
+  horasPeriodo: number | null;
+  precioHoraPeriodo: number | null;
   fechaEstimadaCobro: Date | null;
   fechaDeCobro: Date | null;
-  trabajo: { nombre: string } | null;
+  trabajo: { nombre: string; modalidadCobro: string } | null;
   jornadas: JornadaTrabajoOut[];
+  tareas: TareaTrabajoOut[];
+}
+
+function mapTarea(r: TareaTrabajo): TareaTrabajoOut {
+  return {
+    id: r.id,
+    fechaCarga: r.fechaCarga,
+    fechaHoraTarea: r.fechaHoraTarea,
+    fechaTarea: r.fechaTarea,
+    descripcion: r.descripcion ?? null,
+    horasTarea: r.horasTarea ?? null,
+    montoTarea: r.montoTarea ?? 0,
+  };
 }
 
 function mapJornada(r: JornadaTrabajo): JornadaTrabajoOut {
@@ -57,12 +85,19 @@ function mapPeriodo(r: PeriodoTrabajo): PeriodoTrabajoOut {
     fechaDesde: r.fechaDesde,
     fechaHasta: r.fechaHasta,
     montoACobrar: r.montoACobrar ?? null,
+    horasPeriodo: r.horasPeriodo ?? null,
+    precioHoraPeriodo: r.precioHoraPeriodo ?? null,
     fechaEstimadaCobro: r.fechaEstimadaCobro ?? null,
     fechaDeCobro: r.fechaDeCobro ?? null,
-    trabajo: r.trabajo ? { nombre: r.trabajo.nombre } : null,
+    trabajo: r.trabajo
+      ? { nombre: r.trabajo.nombre, modalidadCobro: r.trabajo.modalidadCobro }
+      : null,
     jornadas: (r.jornadas ?? [])
       .filter((j) => !j.eliminado)
       .map(mapJornada),
+    tareas: (r.tareas ?? [])
+      .filter((t) => !t.eliminado)
+      .map(mapTarea),
   };
 }
 
@@ -80,6 +115,7 @@ export async function getAllTrabajos(): Promise<TrabajoOut[]> {
     nombre: r.nombre,
     fechaInicio: r.fechaInicio,
     precioHora: r.precioHora,
+    modalidadCobro: r.modalidadCobro ?? "horas_variables",
     memos: r.memos ?? null,
   }));
 }
@@ -96,6 +132,7 @@ export async function getTrabajoById(id: number): Promise<TrabajoOut | null> {
         nombre: r.nombre,
         fechaInicio: r.fechaInicio,
         precioHora: r.precioHora,
+        modalidadCobro: r.modalidadCobro ?? "horas_variables",
         memos: r.memos ?? null,
       }
     : null;
@@ -111,7 +148,7 @@ export async function getAllPeriodosTrabajo(): Promise<PeriodoTrabajoOut[]> {
     where: { trabajo: { usuario: { id: userId } }, eliminado: false },
     // Más recientes primero (por la columna Desde).
     order: { fechaDesde: "DESC" },
-    relations: { trabajo: true, jornadas: true },
+    relations: { trabajo: true, jornadas: true, tareas: true },
   });
   return rows.map(mapPeriodo);
 }
@@ -123,7 +160,7 @@ export async function getPeriodoTrabajoById(
   const ds = await getDb();
   const r = await ds.getRepository(PeriodoTrabajo).findOne({
     where: { id, trabajo: { usuario: { id: userId } }, eliminado: false },
-    relations: { trabajo: true, jornadas: true },
+    relations: { trabajo: true, jornadas: true, tareas: true },
   });
   return r ? mapPeriodo(r) : null;
 }
@@ -180,5 +217,73 @@ export async function getJornadaTrabajoById(
     ...mapJornada(r),
     periodoTrabajoId: r.periodoTrabajo?.id,
     cuentaPropinaId: mov?.cuenta?.id ?? undefined,
+  };
+}
+
+// ============================================================
+// Tareas de trabajo (modalidad 'por_tarea')
+// ============================================================
+export async function getAllTareasTrabajo(): Promise<
+  (TareaTrabajoOut & {
+    periodoTrabajo: {
+      id: number;
+      trabajo: string;
+      modalidadCobro: string;
+      fechaDesde: Date;
+      fechaHasta: Date;
+    } | null;
+    trabajo: string;
+    montoACobrarPeriodo: number | null;
+  })[]
+> {
+  const userId = await requireUserId();
+  const ds = await getDb();
+  const rows = await ds.getRepository(TareaTrabajo).find({
+    where: { periodoTrabajo: { trabajo: { usuario: { id: userId } } }, eliminado: false },
+    relations: { periodoTrabajo: { trabajo: true } },
+    order: { fechaHoraTarea: "DESC" },
+  });
+  return rows.map((r) => ({
+    ...mapTarea(r),
+    periodoTrabajo: r.periodoTrabajo
+      ? {
+          id: r.periodoTrabajo.id,
+          trabajo: r.periodoTrabajo.trabajo?.nombre ?? "Sin trabajo",
+          modalidadCobro:
+            r.periodoTrabajo.trabajo?.modalidadCobro ?? "horas_variables",
+          fechaDesde: r.periodoTrabajo.fechaDesde,
+          fechaHasta: r.periodoTrabajo.fechaHasta,
+        }
+      : null,
+    trabajo: r.periodoTrabajo?.trabajo?.nombre ?? "Sin trabajo",
+    montoACobrarPeriodo: r.periodoTrabajo?.montoACobrar ?? null,
+  }));
+}
+
+export async function getTareaTrabajoById(
+  id: string
+): Promise<
+  (TareaTrabajoOut & {
+    periodoTrabajoId?: number;
+    trabajoId?: number;
+    modalidadCobro?: string;
+    fechaDesde?: Date;
+    fechaHasta?: Date;
+  }) | null
+> {
+  const userId = await requireUserId();
+  const ds = await getDb();
+  const r = await ds.getRepository(TareaTrabajo).findOne({
+    where: { id, periodoTrabajo: { trabajo: { usuario: { id: userId } } }, eliminado: false },
+    relations: { periodoTrabajo: { trabajo: true } },
+  });
+  if (!r) return null;
+  return {
+    ...mapTarea(r),
+    periodoTrabajoId: r.periodoTrabajo?.id,
+    trabajoId: r.periodoTrabajo?.trabajo?.id,
+    modalidadCobro: r.periodoTrabajo?.trabajo?.modalidadCobro,
+    fechaDesde: r.periodoTrabajo?.fechaDesde,
+    fechaHasta: r.periodoTrabajo?.fechaHasta,
   };
 }

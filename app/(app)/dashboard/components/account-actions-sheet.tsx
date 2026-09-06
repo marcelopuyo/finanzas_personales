@@ -5,7 +5,9 @@ import type { LucideIcon } from "lucide-react";
 import {
   Banknote,
   Briefcase,
+  CalendarPlus,
   ChevronRight,
+  ClipboardList,
   Receipt,
   Send,
   Settings2,
@@ -20,14 +22,14 @@ export interface CuentaAcciones {
   saldo: string;
 }
 
-/** Acción única para tarjetas sintéticas (sin cuenta real detrás). */
-export type AccionSintetica = "jornada" | "cobro";
+/** Acción(es) únicas para tarjetas sintéticas (sin cuenta real detrás). */
+export type AccionSintetica = "jornada" | "cobro" | "tarea" | "periodo";
 
 /**
  * Bottom sheet (mobile) / diálogo centrado (desktop) con las acciones de una
  * cuenta: registrar gasto, transferir y ajustar cuenta (las cuentas reales
  * abren su historial al hacer clic en la tarjeta). Con `soloMovimiento`
- * (tarjetas sintéticas como "Períodos Actuales"/"Períodos a Cobrar") muestra
+ * (tarjetas sintéticas como "Actuales"/"Por cobrar") muestra
  * únicamente esa opción. Reutiliza `Modal`.
  */
 export function AccountActionsSheet({
@@ -39,8 +41,8 @@ export function AccountActionsSheet({
   cuenta: CuentaAcciones | null;
   open: boolean;
   onClose: () => void;
-  /** Modo con una sola acción (tarjetas sintéticas, sin cuenta real). */
-  soloMovimiento?: AccionSintetica;
+  /** Acciones para tarjetas sintéticas (sin cuenta real). */
+  soloMovimiento?: AccionSintetica[];
 }) {
   const router = useRouter();
   if (!cuenta) return null;
@@ -51,13 +53,23 @@ export function AccountActionsSheet({
   > = {
     jornada: {
       icon: Briefcase,
-      label: "Jornada trabajo",
+      label: "Cargar jornada",
       href: "/movimientos/nuevo/jornada",
     },
     cobro: {
       icon: Banknote,
       label: "Cobro Sueldo",
       href: "/movimientos/nuevo/cobro",
+    },
+    tarea: {
+      icon: ClipboardList,
+      label: "Cargar tarea",
+      href: "/movimientos/nuevo/tarea",
+    },
+    periodo: {
+      icon: CalendarPlus,
+      label: "Nuevo período",
+      href: "/cruds/periodos-trabajo/nuevo?origen=dashboard",
     },
   };
 
@@ -70,19 +82,17 @@ export function AccountActionsSheet({
 
   // Acciones de la cuenta real, en el orden del menú (Registrar gasto,
   // Transferir, Ajustar cuenta). En modo soloMovimiento (tarjetas sintéticas)
-  // se muestra únicamente la acción de esa tarjeta.
+  // se muestran únicamente esas acciones.
   const accionesTop: { icon: LucideIcon; label: string; onClick: () => void }[] =
-    soloMovimiento
-      ? [
-          {
-            icon: SOLO_ACCIONES[soloMovimiento].icon,
-            label: SOLO_ACCIONES[soloMovimiento].label,
-            onClick: () => {
-              router.push(SOLO_ACCIONES[soloMovimiento].href);
-              onClose();
-            },
+    soloMovimiento && soloMovimiento.length > 0
+      ? soloMovimiento.map((k) => ({
+          icon: SOLO_ACCIONES[k].icon,
+          label: SOLO_ACCIONES[k].label,
+          onClick: () => {
+            router.push(SOLO_ACCIONES[k].href);
+            onClose();
           },
-        ]
+        }))
       : [
           { icon: Receipt, label: "Registrar gasto", onClick: () => go("gasto", "cuenta") },
           { icon: Send, label: "Transferir", onClick: () => go("transferencia", "origen") },
