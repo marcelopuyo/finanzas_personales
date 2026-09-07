@@ -97,7 +97,7 @@ export function BottomActionBar({
               onClick={fabAction.onClick}
               aria-label={fabAction.label ?? "Agregar"}
               title={fabAction.label ?? "Nuevo"}
-              className="absolute left-1/2 top-0 z-10 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-4 border-background bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95"
+              className="absolute left-1/2 top-0 z-10 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-4 border-background bg-header text-background shadow-lg transition-transform active:scale-95"
             >
               <Plus className="h-6 w-6" />
             </button>
