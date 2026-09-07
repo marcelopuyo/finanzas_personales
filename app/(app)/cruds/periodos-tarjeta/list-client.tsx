@@ -13,5 +13,5 @@ const columns: ColumnDef<PeriodoTarjetaOut>[] = [
 ];
 interface Props { initialData: PeriodoTarjetaOut[] }
 export function PeriodosTarjetaListClient({ initialData }: Props) {
-  return <CrudTable<PeriodoTarjetaOut> title="Períodos de Tarjeta" columns={columns} initialData={initialData} deleteItem={eliminarPeriodoTarjeta} searchPlaceholder="Buscar período..." createHref="/cruds/periodos-tarjeta/nuevo" editHref={(id) => `/cruds/periodos-tarjeta/${id}/editar`} getId={(i) => i.id} searchPredicate={(i, q) => i.nombre.toLowerCase().includes(q)} />;
+  return <CrudTable<PeriodoTarjetaOut> title="Períodos de Tarjeta" columns={columns} initialData={initialData} deleteItem={eliminarPeriodoTarjeta} searchPlaceholder="Buscar período..." createHref="/cruds/periodos-tarjeta/nuevo" editHref={(id) => `/cruds/periodos-tarjeta/${id}/editar`} getId={(i) => i.id} searchPredicate={(i, q) => i.nombre.toLowerCase().includes(q)} mobileBottomNav />;
 }

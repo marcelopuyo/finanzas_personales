@@ -15,5 +15,5 @@ const columns: ColumnDef<PrestamoOut>[] = [
 ];
 interface Props { initialData: PrestamoOut[] }
 export function PrestamosListClient({ initialData }: Props) {
-  return <CrudTable<PrestamoOut, string> title="Préstamos" columns={columns} initialData={initialData} deleteItem={eliminarPrestamo} searchPlaceholder="Buscar préstamo..." createHref="/cruds/prestamos/nuevo" editHref={(id) => `/cruds/prestamos/${id}/editar`} getId={(i) => i.id} searchPredicate={(i, q) => (i.detalle ?? "").toLowerCase().includes(q)} />;
+  return <CrudTable<PrestamoOut, string> title="Préstamos" columns={columns} initialData={initialData} deleteItem={eliminarPrestamo} searchPlaceholder="Buscar préstamo..." createHref="/cruds/prestamos/nuevo" editHref={(id) => `/cruds/prestamos/${id}/editar`} getId={(i) => i.id} searchPredicate={(i, q) => (i.detalle ?? "").toLowerCase().includes(q)} mobileBottomNav />;
 }

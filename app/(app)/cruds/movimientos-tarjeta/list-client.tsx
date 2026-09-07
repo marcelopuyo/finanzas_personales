@@ -15,5 +15,5 @@ const columns: ColumnDef<MovimientoTarjetaOut>[] = [
 ];
 interface Props { initialData: MovimientoTarjetaOut[] }
 export function MovimientosTarjetaListClient({ initialData }: Props) {
-  return <CrudTable<MovimientoTarjetaOut, string> title="Movimientos de Tarjeta" columns={columns} initialData={initialData} deleteItem={eliminarMovimientoTarjeta} searchPlaceholder="Buscar movimiento..." createHref="/cruds/movimientos-tarjeta/nuevo" editHref={(id) => `/cruds/movimientos-tarjeta/${id}/editar`} getId={(i) => i.id} searchPredicate={(i, q) => (i.detalle ?? "").toLowerCase().includes(q)} />;
+  return <CrudTable<MovimientoTarjetaOut, string> title="Movimientos de Tarjeta" columns={columns} initialData={initialData} deleteItem={eliminarMovimientoTarjeta} searchPlaceholder="Buscar movimiento..." createHref="/cruds/movimientos-tarjeta/nuevo" editHref={(id) => `/cruds/movimientos-tarjeta/${id}/editar`} getId={(i) => i.id} searchPredicate={(i, q) => (i.detalle ?? "").toLowerCase().includes(q)} mobileBottomNav />;
 }

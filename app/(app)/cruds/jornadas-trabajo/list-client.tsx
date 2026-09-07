@@ -13,5 +13,5 @@ const columns: ColumnDef<JornadaTrabajoOut>[] = [
 ];
 interface Props { initialData: JornadaTrabajoOut[] }
 export function JornadasTrabajoListClient({ initialData }: Props) {
-  return <CrudTable<JornadaTrabajoOut, string> title="Jornadas de Trabajo" columns={columns} initialData={initialData} deleteItem={eliminarJornadaTrabajo} createHref="/cruds/jornadas-trabajo/nuevo" editHref={(id) => `/cruds/jornadas-trabajo/${id}/editar`} getId={(i) => i.id} searchPredicate={() => true} />;
+  return <CrudTable<JornadaTrabajoOut, string> title="Jornadas de Trabajo" columns={columns} initialData={initialData} deleteItem={eliminarJornadaTrabajo} createHref="/cruds/jornadas-trabajo/nuevo" editHref={(id) => `/cruds/jornadas-trabajo/${id}/editar`} getId={(i) => i.id} searchPredicate={() => true} mobileBottomNav />;
 }

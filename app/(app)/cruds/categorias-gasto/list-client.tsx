@@ -27,6 +27,7 @@ export function CategoriasGastoListClient({ initialData }: Props) {
       searchPredicate={(item, query) =>
         item.nombre.toLowerCase().includes(query)
       }
+      mobileBottomNav
     />
   );
 }

@@ -82,6 +82,7 @@ export function GastosListClient({ initialData, currency = "USD" }: Props) {
         (item.categoria?.nombre ?? "").toLowerCase().includes(query) ||
         (item.periodo?.nombre ?? "").toLowerCase().includes(query)
       }
+      mobileBottomNav
     />
   );
 }

@@ -71,6 +71,7 @@ export function TareasTrabajoListClient({ initialData }: Props) {
         (i.descripcion ?? "").toLowerCase().includes(q) ||
         i.trabajo.toLowerCase().includes(q)
       }
+      mobileBottomNav
     />
   );
 }

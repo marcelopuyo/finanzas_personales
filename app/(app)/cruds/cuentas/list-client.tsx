@@ -89,5 +89,5 @@ export function CuentasListClient({ initialData, origen }: Props) {
   const desdeDashboard = origen === "dashboard";
   const origenQ = desdeDashboard ? "?origen=dashboard" : "";
 
-  return <CrudTable<CuentaOut> title="Cuentas" columns={columns} initialData={cuentas} deleteItem={eliminarCuenta} searchPlaceholder="Buscar cuenta..." createHref={`/cruds/cuentas/nuevo${origenQ}`} editHref={(id) => `/cruds/cuentas/${id}/editar${origenQ}`} getId={(i) => i.id} searchPredicate={(i, q) => i.nombre.toLowerCase().includes(q)} backHref={desdeDashboard ? "/dashboard" : undefined} />;
+  return <CrudTable<CuentaOut> title="Cuentas" columns={columns} initialData={cuentas} deleteItem={eliminarCuenta} searchPlaceholder="Buscar cuenta..." createHref={`/cruds/cuentas/nuevo${origenQ}`} editHref={(id) => `/cruds/cuentas/${id}/editar${origenQ}`} getId={(i) => i.id} searchPredicate={(i, q) => i.nombre.toLowerCase().includes(q)} backHref={desdeDashboard ? "/dashboard" : undefined} mobileBottomNav />;
 }
