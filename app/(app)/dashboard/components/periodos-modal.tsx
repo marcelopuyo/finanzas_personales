@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Banknote } from "lucide-react";
+import { Banknote, Briefcase, ClipboardList } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Modal } from "@/components/ui/modal";
 import { DataTable } from "@/components/ui/data-table";
@@ -38,6 +38,17 @@ export function PeriodosModal({
   // (y su monto a cobrar precargado), reutilizando el query param `periodo`.
   const cobrar = (id: number) => {
     router.push(`/movimientos/nuevo/cobro?periodo=${id}`);
+    onClose();
+  };
+
+  // Lanza el wizard de jornada/tarea con el período de la fila preseleccionado
+  // (columna por fila del popup "Actuales").
+  const cargarJornada = (id: number) => {
+    router.push(`/movimientos/nuevo/jornada?periodo=${id}`);
+    onClose();
+  };
+  const cargarTarea = (id: number) => {
+    router.push(`/movimientos/nuevo/tarea?periodo=${id}`);
     onClose();
   };
 
@@ -112,8 +123,58 @@ export function PeriodosModal({
     },
   ];
 
+  // Columna "Cargar" (solo "Actuales"): por fila permite cargar la jornada
+  // (modalidad horas_variables) o la tarea (modalidad por_tarea) DENTRO de ese
+  // período. Los períodos fijo/horas_fijas no admiten cargas manuales.
+  const columnasCargar: ColumnDef<PeriodoTrabajoOut>[] = [
+    {
+      id: "cargar",
+      header: "Cargar",
+      meta: { align: "center" } as const,
+      cell: ({ row }) => {
+        const p = row.original;
+        const modalidad = p.trabajo?.modalidadCobro ?? "horas_variables";
+        const aria = `${p.trabajo?.nombre ?? "trabajo"} (${dateTimeToString(
+          p.fechaDesde
+        )} al ${dateTimeToString(p.fechaHasta)})`;
+        if (modalidad === "por_tarea") {
+          return (
+            <button
+              type="button"
+              onClick={() => cargarTarea(p.id)}
+              title="Cargar tarea"
+              aria-label={`Cargar tarea de ${aria}`}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted text-primary transition-colors hover:bg-primary/15"
+            >
+              <ClipboardList className="h-4 w-4" />
+            </button>
+          );
+        }
+        if (modalidad === "horas_variables") {
+          return (
+            <button
+              type="button"
+              onClick={() => cargarJornada(p.id)}
+              title="Cargar jornada"
+              aria-label={`Cargar jornada de ${aria}`}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted text-primary transition-colors hover:bg-primary/15"
+            >
+              <Briefcase className="h-4 w-4" />
+            </button>
+          );
+        }
+        // fijo / horas_fijas: no hay cargas manuales por período.
+        return <span className="text-subtitle">—</span>;
+      },
+    },
+  ];
+
   const columns: ColumnDef<PeriodoTrabajoOut>[] =
-    tipo === "cobrar" ? [...columnasBase, ...columnasCobro] : columnasBase;
+    tipo === "cobrar"
+      ? [...columnasBase, ...columnasCobro]
+      : tipo === "actuales"
+        ? [...columnasBase, ...columnasCargar]
+        : columnasBase;
 
   const total = data.reduce((acc, p) => acc + (p.montoACobrar || 0), 0);
 

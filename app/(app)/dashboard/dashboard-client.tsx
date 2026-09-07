@@ -8,6 +8,7 @@ import { Modal } from "@/components/ui/modal";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AccountCard } from "./components/account-card";
 import { CuentasActionsMenu } from "./components/cuentas-actions-menu";
+import { TrabajosActionsMenu } from "./components/trabajos-actions-menu";
 import { DonutChart } from "./components/donut-chart";
 import { EvolutionChart } from "./components/line-chart";
 import { PrestamosChart } from "./components/prestamos-chart";
@@ -174,25 +175,14 @@ export function DashboardClient({ data }: Props) {
       });
     }
     if (periodosActuales.length > 0) {
-      // Acciones rápidas según las modalidades presentes entre los períodos
-      // actuales: jornada si hay trabajos por hora (horas variables) y/o cargar
-      // tarea si hay trabajos por tarea.
-      const mods = new Set(
-        periodosActuales.map(
-          (p) => p.trabajo?.modalidadCobro ?? "horas_variables"
-        )
-      );
-      const acciones: ("jornada" | "cobro" | "tarea" | "periodo")[] = [];
-      if (mods.has("horas_variables")) acciones.push("jornada");
-      if (mods.has("por_tarea")) acciones.push("tarea");
-      // Nuevo período: siempre disponible (crear un período de trabajo).
-      acciones.push("periodo");
+      // "Cargar jornada"/"Cargar tarea" viven en la columna por fila del popup
+      // "Actuales" (ver PeriodosModal); "Nuevo período" pasó al menú ⋯ del
+      // panel "Trabajo" (ver TrabajosActionsMenu). La tarjeta queda SIN ⋮.
       cards.push({
         title: "Actuales",
         value: numberToCurrency(actual, data.monedaPredeterminadaISO),
         labels: [],
         values: [],
-        menuAccion: acciones,
         tipo: "Actuales",
       });
     }
@@ -556,7 +546,14 @@ export function DashboardClient({ data }: Props) {
           montaje, como las sintéticas). */}
       {sinteticas.length > 0 && (
         <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
-          <h2 className="mb-3 text-[16px] font-semibold text-header">Trabajo</h2>
+          {/* Encabezado: título a la izquierda y menú (⋯) anclado al ángulo
+              superior derecho del panel (crear un nuevo período). */}
+          <div className="relative mb-3 pr-8">
+            <h2 className="text-[16px] font-semibold text-header">Trabajo</h2>
+            <div className="absolute right-0 top-0 flex items-center">
+              <TrabajosActionsMenu />
+            </div>
+          </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {sinteticas.map((cuenta, i) => (
               <AccountCard

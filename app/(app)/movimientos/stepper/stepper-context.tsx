@@ -79,12 +79,18 @@ export function MovimientoProvider({
     if (!initial) return base;
     // En Jornada trabajo la cuenta precargada va al depósito de propina.
     const esJornada = initial.concepto === "JornadaTrabajo";
-    // Cobro de sueldo: si viene un período preseleccionado (icono por fila del
-    // listado "Por cobrar"), se precarga el período y su monto a cobrar.
-    const periodoPre =
-      initial.concepto === "CobroSueldo" && initial.periodo != null
-        ? options.periodosTrabajo.find((p) => p.id === initial.periodo)
-        : undefined;
+    // Período preseleccionado por fila: en Cobro (listado "Por cobrar") y en
+    // jornada/tarea (columna por fila del popup "Actuales") se precarga el
+    // período. El monto solo se precarga en Cobro (en jornada/tarea el monto se
+    // ingresa o calcula por horas/tarea).
+    const preseleccionaPeriodo =
+      initial.periodo != null &&
+      (initial.concepto === "CobroSueldo" ||
+        initial.concepto === "JornadaTrabajo" ||
+        initial.concepto === "CargarTarea");
+    const periodoPre = preseleccionaPeriodo
+      ? options.periodosTrabajo.find((p) => p.id === initial.periodo)
+      : undefined;
     return {
       ...base,
       concepto: initial.concepto,
@@ -92,7 +98,10 @@ export function MovimientoProvider({
       cuentaDestino: initial.destino ?? 0,
       cuentaPropina: esJornada ? (initial.cuenta ?? 0) : 0,
       periodoTrabajo: periodoPre?.id ?? 0,
-      montoOrigen: periodoPre?.montoACobrar ?? 0,
+      montoOrigen:
+        initial.concepto === "CobroSueldo"
+          ? (periodoPre?.montoACobrar ?? 0)
+          : 0,
     };
   });
 
