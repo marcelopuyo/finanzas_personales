@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Diseño — CRUD Personas · bottom nav + FAB</title>
+<style>
+  :root{
+    /* Variables del tema del DOCUMENTO (canvas neutro) */
+    --doc-bg:#0e0f11; --doc-panel:#16181b; --doc-border:#2a2d31; --doc-text:#e8e8ea; --doc-muted:#9a9aa0;
+  }
+  /* ===== Tokens de la app (mismos valores de globals.css) ===== */
+  .t-dark{
+    --bg:#151517; --card:#353638; --card-fg:#e2e4f0;
+    --primary:#4c6ef5; --primary-fg:#ffffff; --success:#51cf66; --danger:#ff6b6b; --warning:#ffd43b;
+    --muted:#1e1e20; --muted-fg:#9a9b9e; --border:#3e3f42;
+    --sidebar:#1b1b1c; --sidebar-fg:#f0f1f2; --sidebar-muted:#8f9094; --sidebar-hover:#2a2b2d;
+    --label:#9a9b9e; --value:#ffffff; --subtitle:#808185; --header:#ffffff;
+    --avatar-bg:#414346; --avatar-fg:#f0f1f2; --shadow:0 10px 24px rgba(0,0,0,.45);
+  }
+  .t-light{
+    --bg:#f6f7f9; --card:#ffffff; --card-fg:#1e293b;
+    --primary:#2563eb; --primary-fg:#ffffff; --success:#16a34a; --danger:#dc2626; --warning:#d97706;
+    --muted:#eef1f5; --muted-fg:#64748b; --border:#e2e8f0;
+    --sidebar:#ffffff; --sidebar-fg:#1f2937; --sidebar-muted:#64748b; --sidebar-hover:#f1f4f8;
+    --label:#64748b; --value:#0f172a; --subtitle:#7c8798; --header:#0f172a;
+    --avatar-bg:#e9edf3; --avatar-fg:#334155; --shadow:0 12px 28px rgba(15,23,42,.16);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--doc-bg);color:var(--doc-text);font-family:"SF Pro Display","SF Pro Text",-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,sans-serif;padding:28px 18px 60px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto}
+  h1{font-size:20px;font-weight:600;margin:0 0 4px;letter-spacing:-.01em}
+  .sub{color:var(--doc-muted);font-size:13px;margin:0 0 6px;line-height:1.6;max-width:820px}
+  .row{display:flex;flex-wrap:wrap;gap:34px;align-items:flex-start;justify-content:center;margin-top:26px}
+  .stage{display:flex;flex-direction:column;align-items:center;gap:14px}
+  .toolbar{display:flex;gap:8px}
+  .chipbtn{border:1px solid var(--doc-border);background:var(--doc-panel);color:var(--doc-text);border-radius:999px;padding:6px 14px;font-size:12px;cursor:pointer;font-family:inherit}
+  .chipbtn.on{background:#2563eb;border-color:#2563eb;color:#fff}
+  .chipbtn.lite{opacity:.85}
+  code{background:#1d2024;border:1px solid var(--doc-border);border-radius:4px;padding:1px 5px;font-size:11px;color:#c9c9cd}
+
+  /* ========== Teléfono ========== */
+  .phone{width:392px;height:812px;border-radius:44px;padding:12px;background:#000;box-shadow:0 30px 70px rgba(0,0,0,.55);position:relative}
+  .phone .island{width:120px;height:26px;border-radius:999px;background:#000;position:absolute;top:24px;left:50%;transform:translateX(-50%);z-index:60}
+  .screen{width:100%;height:100%;border-radius:34px;overflow:hidden;background:var(--bg);color:var(--card-fg);display:flex;flex-direction:column;position:relative;transition:background .25s,color .25s}
+  .screen ::selection{background:var(--primary)}
+
+  /* Top bar móvil (igual a la actual: hamburguesa + logo) */
+  .appbar{height:56px;flex:none;display:flex;align-items:center;gap:8px;padding:0 16px;background:var(--sidebar);border-bottom:1px solid var(--border)}
+  .iconbtn{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--sidebar-muted);background:transparent;border:none;cursor:pointer}
+  .iconbtn:hover{background:var(--sidebar-hover)}
+  .iconbtn svg{width:20px;height:20px}
+  .logo{display:flex;align-items:center;gap:8px}
+  .logomark{width:24px;height:24px;border-radius:7px;background:linear-gradient(135deg,#4c6ef5,#22b8cf);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700}
+  .logotext{font-size:15px;font-weight:600;letter-spacing:-.01em;color:var(--sidebar-fg)}
+
+  /* Contenido scrolleable */
+  .scroll{flex:1;min-height:0;overflow-y:auto;padding:18px 16px 150px}
+  .scroll::-webkit-scrollbar{width:0}
+  .pagehead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:4px}
+  .pagehead h1{font-size:24px;font-weight:700;color:var(--header);letter-spacing:-.02em;margin:0}
+  .pagehead .count{flex:none;display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;border-radius:999px;background:var(--muted);color:var(--subtitle);font-size:12px;font-weight:600;border:1px solid var(--border);margin-top:4px}
+  .pagesub{color:var(--subtitle);font-size:13px;margin:2px 0 14px}
+
+  /* Barra de búsqueda expandible */
+  .searchwrap{height:0;overflow:hidden;transition:height .18s ease;margin-bottom:0}
+  .searchwrap.open{height:44px;margin-bottom:12px}
+  .search{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:999px;height:40px;padding:0 14px;margin-top:2px}
+  .search svg{width:16px;height:16px;color:var(--subtitle);flex:none}
+  .search input{border:none;background:none;outline:none;color:var(--card-fg);font-size:13px;flex:1;font-family:inherit}
+  .search input::placeholder{color:var(--subtitle)}
+  .search .clear{border:none;background:none;color:var(--subtitle);cursor:pointer;padding:2px;display:flex}
+  .search .clear svg{width:14px;height:14px}
+
+  /* Lista de personas (tarjetas) */
+  .plist{display:flex;flex-direction:column;gap:10px}
+  .pcard{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px;transition:transform .1s}
+  .pcard:active{transform:scale(.985)}
+  .pcard .grow{flex:1;min-width:0}
+  .avatar{flex:none;width:42px;height:42px;border-radius:50%;background:var(--avatar-bg);color:var(--avatar-fg);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;letter-spacing:.01em}
+  .pname{font-size:15px;font-weight:600;color:var(--header);margin:0 0 2px;letter-spacing:-.01em}
+  .pline{display:flex;align-items:center;gap:6px;color:var(--subtitle);font-size:12.5px;margin:0;line-height:1.45}
+  .pline svg{width:13px;height:13px;flex:none;color:var(--label)}
+  .pline .dash{color:var(--label)}
+  .dots{flex:none;width:30px;height:30px;border-radius:50%;background:var(--muted);display:flex;align-items:center;justify-content:center;color:var(--subtitle);border:none;cursor:pointer;position:relative}
+  .dots svg{width:16px;height:16px}
+  .dots:hover{background:var(--border);color:var(--card-fg)}
+
+  /* menú contextual de fila */
+  .rowmenu{position:absolute;right:0;top:34px;z-index:40;width:158px;background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;display:none}
+  .rowmenu.open{display:block}
+  .rowmenu button{display:flex;width:100%;align-items:center;gap:9px;padding:10px 12px;background:none;border:none;color:var(--card-fg);font-size:13px;cursor:pointer;font-family:inherit;text-align:left}
+  .rowmenu button svg{width:15px;height:15px;color:var(--subtitle)}
+  .rowmenu button:hover{background:var(--muted)}
+  .rowmenu button.danger{color:var(--danger)}
+  .rowmenu button.danger svg{color:var(--danger)}
+
+  /* ========== Barra inferior + FAB ========== */
+  .bottomnav{position:absolute;left:0;right:0;bottom:0;height:88px;z-index:30;display:flex;align-items:flex-end;pointer-events:none}
+  .dock{margin:0 12px 12px;flex:1;height:62px;background:var(--sidebar);border:1px solid var(--border);border-radius:20px;display:flex;align-items:stretch;pointer-events:auto;box-shadow:var(--shadow);overflow:hidden}
+  .dock .slot{flex:1;display:flex;align-items:center;justify-content:center}
+  .dock .slot button{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;color:var(--sidebar-muted);font-size:10.5px;font-family:inherit;cursor:pointer;padding:6px 0 4px;width:100%;border-radius:14px}
+  .dock .slot button svg{width:20px;height:20px}
+  .dock .slot button span{font-weight:500;letter-spacing:.01em}
+  .dock .slot button:hover{color:var(--sidebar-fg)}
+  .dock .slot button.active{color:var(--primary)}
+  .dock .slot+.slot{border-left:1px solid var(--border)}
+  .dock .mid{border-left:none!important}
+  .fab{position:absolute;left:50%;bottom:74px;transform:translateX(-50%);width:58px;height:58px;border-radius:50%;background:var(--primary);color:var(--primary-fg);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;pointer-events:auto;box-shadow:0 8px 20px rgba(76,110,245,.45),0 2px 6px rgba(76,110,245,.35);transition:transform .12s}
+  .fab svg{width:26px;height:26px}
+  .fab:active{transform:translateX(-50%) scale(.92)}
+  .fab-label{position:absolute;left:50%;bottom:138px;transform:translateX(-50%);background:var(--card);border:1px solid var(--border);color:var(--card-fg);font-size:11.5px;padding:6px 10px;border-radius:999px;white-space:nowrap;box-shadow:var(--shadow);opacity:0;transition:opacity .15s;pointer-events:none}
+  .fab-label.show{opacity:1}
+
+  /* toast */
+  .toast{position:absolute;left:50%;bottom:150px;transform:translateX(-50%) translateY(8px);background:var(--card);color:var(--card-fg);border:1px solid var(--border);font-size:12px;padding:9px 14px;border-radius:12px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:all .18s;z-index:70;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* ===== Leyenda ===== */
+  .legend{flex:1;min-width:300px;max-width:520px}
+  .legend h2{font-size:15px;font-weight:600;margin:0 0 12px}
+  .items{display:flex;flex-direction:column;gap:10px}
+  .it{display:flex;gap:12px;background:var(--doc-panel);border:1px solid var(--doc-border);border-radius:12px;padding:12px 14px}
+  .it .n{flex:none;width:24px;height:24px;border-radius:50%;background:#2563eb;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .it b{font-size:13px}
+  .it p{font-size:12.5px;color:var(--doc-muted);margin:3px 0 0;line-height:1.55}
+  .it code{color:#8ab4ff}
+  .nota{margin-top:30px;border-top:1px solid var(--doc-border);padding-top:14px;font-size:12px;color:var(--doc-muted);line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Diseño · CRUD de Personas (bottom nav + FAB)</h1>
+  <p class="sub">Propuesta mobile-first manteniendo la estética actual (tokens reales de <code>globals.css</code>, top bar móvil, botones pill, ⋯ con fondo circular). La barra inferior concentra las acciones del CRUD que hoy viven en el toolbar (Buscar / Exportar) y el botón flotante central reemplaza al "Nuevo". Probá: buscá, tocá el ⋯ de una fila y el FAB.</p>
+
+  <div class="row">
+    <div class="stage">
+      <div class="toolbar">
+        <button class="chipbtn lite" id="btnlight">Light</button>
+        <button class="chipbtn on" id="btndark">Dark</button>
+      </div>
+
+      <div class="phone">
+        <div class="island"></div>
+        <div class="screen t-dark" id="screen">
+          <!-- Top bar móvil real de la app -->
+          <div class="appbar">
+            <button class="iconbtn" aria-label="Menu"><svg><use href="#i-menu"/></svg></button>
+            <div class="logo">
+              <span class="logomark">₣</span>
+              <span class="logotext">Finanzas</span>
+            </div>
+          </div>
+
+          <!-- Contenido scrolleable -->
+          <div class="scroll" id="scroll">
+            <div class="pagehead">
+              <h1>Personas</h1>
+              <span class="count" id="count">6</span>
+            </div>
+            <p class="pagesub">Contactos para préstamos y pagos</p>
+
+            <!-- Búsqueda expandible (se abre desde la barra inferior) -->
+            <div class="searchwrap" id="searchwrap">
+              <div class="search">
+                <svg><use href="#i-search"/></svg>
+                <input id="q" placeholder="Buscar persona..." autocomplete="off"/>
+                <button class="clear" id="qclear"><svg><use href="#i-x"/></svg></button>
+              </div>
+            </div>
+
+            <div class="plist" id="plist">
+              <div class="pcard" data-n="María López"><span class="avatar">ML</span>
+                <div class="grow">
+                  <p class="pname">María López</p>
+                  <p class="pline"><svg><use href="#i-phone"/></svg>+54 9 11 5555-0101</p>
+                  <p class="pline"><svg><use href="#i-mail"/></svg>maria.lopez@correo.com</p>
+                </div>
+                <button class="dots" data-m="0" aria-label="Opciones"><svg><use href="#i-ellipsis"/></svg>
+                  <div class="rowmenu" id="rm0">
+                    <button data-act="edit"><svg><use href="#i-pencil"/></svg>Editar</button>
+                    <button class="danger" data-act="del"><svg><use href="#i-trash"/></svg>Eliminar</button>
+                  </div>
+                </button>
+              </div>
+
+              <div class="pcard" data-n="Juan Pérez"><span class="avatar">JP</span>
+                <div class="grow">
+                  <p class="pname">Juan Pérez</p>
+                  <p class="pline"><svg><use href="#i-phone"/></svg>+54 9 11 5555-0188</p>
+                  <p class="pline"><svg><use href="#i-mail"/></svg><span class="dash">—</span></p>
+                </div>
+                <button class="dots" data-m="1" aria-label="Opciones"><svg><use href="#i-ellipsis"/></svg>
+                  <div class="rowmenu" id="rm1">
+                    <button data-act="edit"><svg><use href="#i-pencil"/></svg>Editar</button>
+                    <button class="danger" data-act="del"><svg><use href="#i-trash"/></svg>Eliminar</button>
+                  </div>
+                </button>
+              </div>
+
+              <div class="pcard" data-n="Ana García"><span class="avatar">AG</span>
+                <div class="grow">
+                  <p class="pname">Ana García</p>
+                  <p class="pline"><svg><use href="#i-phone"/></svg>+54 9 341 555-0909</p>
+                  <p class="pline"><svg><use href="#i-mail"/></svg>ana.garcia@correo.com</p>
+                </div>
+                <button class="dots" data-m="2" aria-label="Opciones"><svg><use href="#i-ellipsis"/></svg>
+                  <div class="rowmenu" id="rm2">
+                    <button data-act="edit"><svg><use href="#i-pencil"/></svg>Editar</button>
+                    <button class="danger" data-act="del"><svg><use href="#i-trash"/></svg>Eliminar</button>
+                  </div>
+                </button>
+              </div>
+
+              <div class="pcard" data-n="Carlos Ruiz"><span class="avatar">CR</span>
+                <div class="grow">
+                  <p class="pname">Carlos Ruiz</p>
+                  <p class="pline"><svg><use href="#i-phone"/></svg>+54 9 351 555-3471</p>
+                  <p class="pline"><svg><use href="#i-mail"/></svg>c.ruiz@correo.com</p>
+                </div>
+                <button class="dots" data-m="3" aria-label="Opciones"><svg><use href="#i-ellipsis"/></svg>
+                  <div class="rowmenu" id="rm3">
+                    <button data-act="edit"><svg><use href="#i-pencil"/></svg>Editar</button>
+                    <button class="danger" data-act="del"><svg><use href="#i-trash"/></svg>Eliminar</button>
+                  </div>
+                </button>
+              </div>
+
+              <div class="pcard" data-n="Sofía Torres"><span class="avatar">ST</span>
+                <div class="grow">
+                  <p class="pname">Sofía Torres</p>
+                  <p class="pline"><svg><use href="#i-phone"/></svg>+54 9 11 5555-0233</p>
+                  <p class="pline"><svg><use href="#i-mail"/></svg>sofi.torres@correo.com</p>
+                </div>
+                <button class="dots" data-m="4" aria-label="Opciones"><svg><use href="#i-ellipsis"/></svg>
+                  <div class="rowmenu" id="rm4">
+                    <button data-act="edit"><svg><use href="#i-pencil"/></svg>Editar</button>
+                    <button class="danger" data-act="del"><svg><use href="#i-trash"/></svg>Eliminar</button>
+                  </div>
+                </button>
+              </div>
+
+              <div class="pcard" data-n="Pedro Díaz"><span class="avatar">PD</span>
+                <div class="grow">
+                  <p class="pname">Pedro Díaz</p>
+                  <p class="pline"><svg><use href="#i-phone"/></svg>+54 9 261 555-7788</p>
+                  <p class="pline"><svg><use href="#i-mail"/></svg>pedro.diaz@correo.com</p>
+                </div>
+                <button class="dots" data-m="5" aria-label="Opciones"><svg><use href="#i-ellipsis"/></svg>
+                  <div class="rowmenu" id="rm5">
+                    <button data-act="edit"><svg><use href="#i-pencil"/></svg>Editar</button>
+                    <button class="danger" data-act="del"><svg><use href="#i-trash"/></svg>Eliminar</button>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Botón flotante central -->
+          <button class="fab" id="fab" aria-label="Nueva persona"><svg><use href="#i-plus"/></svg></button>
+          <div class="fab-label" id="fablabel">Nueva persona → /cruds/personas/nuevo</div>
+
+          <!-- Barra inferior: opciones del CRUD -->
+          <div class="bottomnav">
+            <div class="dock">
+              <div class="slot"><button id="actSearch"><svg><use href="#i-search"/></svg><span>Buscar</span></button></div>
+              <div class="slot mid"></div>
+              <div class="slot"><button id="actExport"><svg><use href="#i-file"/></svg><span>Exportar</span></button></div>
+            </div>
+          </div>
+
+          <div class="toast" id="toast"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Leyenda del diseño -->
+    <div class="legend">
+      <h2>Cómo se traduce el CRUD actual → nueva estructura</h2>
+      <div class="items">
+        <div class="it"><span class="n">1</span><div><b>Barra inferior (dock)</b><p>Concentra las acciones globales del CRUD que hoy viven en el toolbar: <b>Buscar</b> (abre el campo de búsqueda debajo del título) y <b>Exportar</b> (PDF). Mantiene el estilo actual: fondo <code>sidebar</code>, borde, bordes redondeados y shadow.</p></div></div>
+        <div class="it"><span class="n">2</span><div><b>FAB central (+) → Nuevo</b><p>Reemplaza el botón "Nuevo" del toolbar. Flota sobre la barra (círculo <code>56px</code>, color <code>primary</code>). Mantiene la ruta actual: <code>/cruds/personas/nuevo</code>.</p></div></div>
+        <div class="it"><span class="n">3</span><div><b>Filas → tarjetas</b><p>En móvil cada persona pasa a tarjeta (avatar con iniciales + nombre + teléfono/mail) en lugar de la tabla con scroll horizontal.</p></div></div>
+        <div class="it"><span class="n">4</span><div><b>⋯ por fila → Editar / Eliminar</b><p>Las acciones por registro quedan en el menú contextual, con la misma estética recién aplicada (⋯ + fondo circular <code>muted/60</code>).</p></div></div>
+        <div class="it"><span class="n">5</span><div><b>Desktop sin cambios</b><p>La barra + FAB serían <code>lg:hidden</code>: en desktop el CRUD sigue usando la tabla/toolbar actuales (se conserva el <code>backHref</code> y el flujo completo).</p></div></div>
+      </div>
+      <p class="nota"><b>Nota:</b> Mock visual 100% offline para validar la dirección del diseño. Nada de esto está implementado todavía. Si te gusta, el siguiente paso sería implementarlo en <code>PersonasListClient</code>/<code>CrudTable</code> reutilizando los componentes actuales.</p>
+    </div>
+  </div>
+</div>
+
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></symbol>
+  <symbol id="i-ellipsis" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.14a1 1 0 0 1-1.06 0L2 7"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+</svg>
+
+<script>
+  var screen=document.getElementById('screen');
+  var btnD=document.getElementById('btndark'), btnL=document.getElementById('btnlight');
+  btnD.onclick=function(){screen.classList.remove('t-light');screen.classList.add('t-dark');btnD.classList.add('on');btnL.classList.remove('on');};
+  btnL.onclick=function(){screen.classList.remove('t-dark');screen.classList.add('t-light');btnL.classList.add('on');btnD.classList.remove('on');};
+
+  var sw=document.getElementById('searchwrap'), q=document.getElementById('q');
+  var toast=document.getElementById('toast'), toastT=null;
+  function showToast(t){toast.textContent=t;toast.classList.add('show');clearTimeout(toastT);toastT=setTimeout(function(){toast.classList.remove('show')},1800);}
+
+  document.getElementById('actSearch').onclick=function(){sw.classList.toggle('open'); if(sw.classList.contains('open')) q.focus();};
+  document.getElementById('actExport').onclick=function(){showToast('Exportar PDF (mock)');};
+
+  var fab=document.getElementById('fab'), fl=document.getElementById('fablabel');
+  fab.onclick=function(){fl.classList.add('show');setTimeout(function(){fl.classList.remove('show')},1600);showToast('Nueva persona → /cruds/personas/nuevo');};
+
+  q.addEventListener('input',function(){var v=q.value.trim().toLowerCase();var shown=0;
+    document.querySelectorAll('.pcard').forEach(function(c){var hit=c.getAttribute('data-n').toLowerCase().indexOf(v)>-1;c.style.display=hit?'':'none';if(hit)shown++;});
+    document.getElementById('count').textContent=v?shown:6;});
+  document.getElementById('qclear').onclick=function(){q.value='';q.dispatchEvent(new Event('input'));};
+
+  // menús de fila
+  var openMenu=null;
+  document.querySelectorAll('.dots').forEach(function(d){
+    d.addEventListener('click',function(e){
+      e.stopPropagation();
+      var m=document.getElementById('rm'+d.getAttribute('data-m'));
+      if(openMenu===m){m.classList.remove('open');openMenu=null;return;}
+      if(openMenu)openMenu.classList.remove('open');
+      m.classList.add('open');openMenu=m;
+    });
+    d.querySelectorAll('.rowmenu button').forEach(function(b){
+      b.addEventListener('click',function(e){e.stopPropagation();
+        if(b.getAttribute('data-act')==='edit')showToast('Editar (mock) → /cruds/personas/{id}/editar');
+        else showToast('Eliminar (mock) — confirmación');});
+    });
+  });
+  document.addEventListener('click',function(){if(openMenu){openMenu.classList.remove('open');openMenu=null;}});
+</script>
+</body>
+</html>

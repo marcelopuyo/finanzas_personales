@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Iconos para reemplazar ⋮ (menú panel Cuentas)</title>
+<style>
+  :root{
+    --bg:#151517; --panel:#1b1b1c; --card:#232326; --chip:#353638;
+    --border:#3e3f42; --accent:#4c6ef5; --text:#e8e8ea; --muted:#9a9aa0; --value:#f1f1f3;
+    --icon-grey:#9b9c9f; --danger:#f87171; --ok:#4ade80;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;padding:32px 20px 64px}
+  .wrap{max-width:1080px;margin:0 auto}
+  h1{font-size:20px;font-weight:600;margin:0 0 4px;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 8px;line-height:1.6}
+  h2{font-size:14px;font-weight:600;color:var(--text);margin:36px 0 12px;display:flex;align-items:center;gap:8px}
+  .tag{display:inline-flex;align-items:center;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);color:var(--muted);font-weight:400}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+  .opt{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;gap:10px;position:relative}
+  .opt.rec{border-color:rgba(76,110,245,.55);box-shadow:0 0 0 1px rgba(76,110,245,.25)}
+  .opt.now{border-color:rgba(248,113,113,.4)}
+  .opt.ko{opacity:.72}
+  .rec-badge{position:absolute;top:8px;right:8px;font-size:10px;color:var(--accent);border:1px solid rgba(76,110,245,.5);background:rgba(76,110,245,.12);padding:1px 6px;border-radius:999px}
+  .badge{position:absolute;top:8px;right:8px;font-size:10px;padding:1px 6px;border-radius:999px}
+  .badge.now{color:var(--danger);border:1px solid rgba(248,113,113,.5);background:rgba(248,113,113,.12)}
+  .badge.ko{color:var(--muted);border:1px solid var(--border);background:rgba(154,154,160,.08)}
+  .chip{width:36px;height:36px;border-radius:9px;background:var(--chip);display:flex;align-items:center;justify-content:center;color:var(--icon-grey)}
+  .chip svg{width:20px;height:20px}
+  .big svg{width:44px;height:44px;color:var(--icon-grey)}
+  .name{font-size:12px;font-weight:600}
+  .hint{font-size:11px;color:var(--muted);text-align:center;line-height:1.4}
+  /* mock: encabezado del panel Cuentas con el botón en la esquina */
+  .mockrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:6px}
+  .mockpanel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;position:relative;min-height:64px}
+  .mockpanel .ptitle{font-size:14px;font-weight:600;color:var(--text)}
+  .mockpanel .pbtn{position:absolute;right:10px;top:9px;display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:7px;color:var(--muted)}
+  .mockpanel .pbtn:hover{background:var(--chip);color:var(--text)}
+  .mockpanel .pbtn svg{width:16px;height:16px}
+  .legend{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.6}
+  .note{margin-top:32px;border-top:1px solid var(--border);padding-top:14px;font-size:12px;color:var(--muted);line-height:1.7}
+  code{background:#232326;border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:11px;color:#c9c9cd}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Iconos para el menú ⋮ del panel Cuentas</h1>
+  <p class="sub">Reemplazo del botón de <code>MoreVertical</code> (<b>⋮</b>) en la esquina superior derecha. Iconos oficiales de <code>lucide-react</code> v1.28.0 (SVG extraídos de <code>node_modules</code>, 100% offline).</p>
+
+  <h2>🖱 Mock: cómo se vería en la esquina del panel</h2>
+  <div class="mockrow">
+    <div class="mockpanel"><div class="ptitle">Cuentas</div><span class="pbtn"><svg><use href="#i-morevertical"/></svg></span></div>
+    <div class="mockpanel"><div class="ptitle">Cuentas</div><span class="pbtn"><svg><use href="#i-ellipsis"/></svg></span></div>
+    <div class="mockpanel"><div class="ptitle">Cuentas</div><span class="pbtn"><svg><use href="#i-settings2"/></svg></span></div>
+    <div class="mockpanel"><div class="ptitle">Cuentas</div><span class="pbtn"><svg><use href="#i-wrench"/></svg></span></div>
+    <div class="mockpanel"><div class="ptitle">Cuentas</div><span class="pbtn"><svg><use href="#i-listchecks"/></svg></span></div>
+    <div class="mockpanel"><div class="ptitle">Cuentas</div><span class="pbtn"><svg><use href="#i-clipboardlist"/></svg></span></div>
+    <div class="mockpanel"><div class="ptitle">Cuentas</div><span class="pbtn"><svg><use href="#i-tableproperties"/></svg></span></div>
+  </div>
+  <p class="legend">El botón real usa el mismo tamaño/hover del resto de la app: <code>rounded p-1 text-subtitle hover:bg-muted hover:text-header</code>, 16px.</p>
+
+  <h2>Actual <span class="tag">en uso hoy</span></h2>
+  <div class="grid">
+    <div class="opt now">
+      <span class="badge now">Actual</span>
+      <div class="chip"><svg><use href="#i-morevertical"/></svg></div>
+      <div class="big"><svg><use href="#i-morevertical"/></svg></div>
+      <div class="name">MoreVertical</div>
+      <div class="hint">Tres puntos verticales (⋮) — el que estás usando</div>
+    </div>
+  </div>
+
+  <h2>🍔 Menú de acciones <span class="tag">misma semántica que ⋮</span></h2>
+  <div class="grid">
+    <div class="opt rec">
+      <span class="rec-badge">Recomendado</span>
+      <div class="chip"><svg><use href="#i-ellipsis"/></svg></div>
+      <div class="big"><svg><use href="#i-ellipsis"/></svg></div>
+      <div class="name">Ellipsis</div>
+      <div class="hint">Tres puntos horizontales (⋯): “más opciones”, clásico de apps</div>
+    </div>
+  </div>
+
+  <h2>⚙️ Gestión / configuración <span class="tag">“gestionar cuentas”</span></h2>
+  <div class="grid">
+    <div class="opt">
+      <div class="chip"><svg><use href="#i-settings2"/></svg></div>
+      <div class="big"><svg><use href="#i-settings2"/></svg></div>
+      <div class="name">Settings2</div>
+      <div class="hint">Sliders redondos (config). ⚠️ Ya lo usás en “Ajustar cuenta”</div>
+    </div>
+    <div class="opt">
+      <div class="chip"><svg><use href="#i-settings"/></svg></div>
+      <div class="big"><svg><use href="#i-settings"/></svg></div>
+      <div class="name">Settings</div>
+      <div class="hint">Engranaje clásico (configuración)</div>
+    </div>
+    <div class="opt rec">
+      <span class="rec-badge">Recomendado</span>
+      <div class="chip"><svg><use href="#i-wrench"/></svg></div>
+      <div class="big"><svg><use href="#i-wrench"/></svg></div>
+      <div class="name">Wrench</div>
+      <div class="hint">Llave inglesa: “arreglar/gestionar” sin chocar con nada</div>
+    </div>
+    <div class="opt">
+      <div class="chip"><svg><use href="#i-foldercog"/></svg></div>
+      <div class="big"><svg><use href="#i-foldercog"/></svg></div>
+      <div class="name">FolderCog</div>
+      <div class="hint">Carpeta con engranaje: gestionar un recurso del panel</div>
+    </div>
+  </div>
+
+  <h2>📋 Listado / CRUD <span class="tag">abre una grilla</span></h2>
+  <div class="grid">
+    <div class="opt rec">
+      <span class="rec-badge">Recomendado</span>
+      <div class="chip"><svg><use href="#i-listchecks"/></svg></div>
+      <div class="big"><svg><use href="#i-listchecks"/></svg></div>
+      <div class="name">ListChecks</div>
+      <div class="hint">Lista con checks: “ver y administrar el listado”</div>
+    </div>
+    <div class="opt">
+      <div class="chip"><svg><use href="#i-clipboardlist"/></svg></div>
+      <div class="big"><svg><use href="#i-clipboardlist"/></svg></div>
+      <div class="name">ClipboardList</div>
+      <div class="hint">Clipboard con líneas: registro/grilla</div>
+    </div>
+    <div class="opt">
+      <div class="chip"><svg><use href="#i-list"/></svg></div>
+      <div class="big"><svg><use href="#i-list"/></svg></div>
+      <div class="name">List</div>
+      <div class="hint">Viñetas de lista — muy genérico</div>
+    </div>
+    <div class="opt">
+      <div class="chip"><svg><use href="#i-tableproperties"/></svg></div>
+      <div class="big"><svg><use href="#i-tableproperties"/></svg></div>
+      <div class="name">TableProperties</div>
+      <div class="hint">Tabla: literal “CRUD” pero visual frío</div>
+    </div>
+    <div class="opt">
+      <div class="chip"><svg><use href="#i-rows3"/></svg></div>
+      <div class="big"><svg><use href="#i-rows3"/></svg></div>
+      <div class="name">Rows3</div>
+      <div class="hint">Filas apiladas: “ver filas/registros”</div>
+    </div>
+  </div>
+
+  <h2>🚫 Descartables <span class="tag">por colisión semántica</span></h2>
+  <div class="grid">
+    <div class="opt ko">
+      <span class="badge ko">Filtros</span>
+      <div class="chip"><svg><use href="#i-slidershorizontal"/></svg></div>
+      <div class="big"><svg><use href="#i-slidershorizontal"/></svg></div>
+      <div class="name">SlidersHorizontal</div>
+      <div class="hint">Ya lo usás en el botón “Filtros” → confundiría</div>
+    </div>
+    <div class="opt ko">
+      <span class="badge ko">Crear</span>
+      <div class="chip"><svg><use href="#i-plus"/></svg></div>
+      <div class="big"><svg><use href="#i-plus"/></svg></div>
+      <div class="name">Plus</div>
+      <div class="hint">Es acción “Nuevo”, no un menú</div>
+    </div>
+    <div class="opt ko">
+      <span class="badge ko">Editar</span>
+      <div class="chip"><svg><use href="#i-squarepen"/></svg></div>
+      <div class="big"><svg><use href="#i-squarepen"/></svg></div>
+      <div class="name">SquarePen</div>
+      <div class="hint">Parece “editar esta cuenta”, no abrir el CRUD</div>
+    </div>
+    <div class="opt ko">
+      <span class="badge ko">Drag</span>
+      <div class="chip"><svg><use href="#i-grip"/></svg></div>
+      <div class="big"><svg><use href="#i-grip"/></svg></div>
+      <div class="name">Grip</div>
+      <div class="hint">9 puntos: sugiere “arrastrar/reordenar”</div>
+    </div>
+  </div>
+
+  <p class="note">
+    <b>Nota:</b> Todos existen en la versión instalada. Mi recomendación según lo que quieras comunicar: <b>⋮ → ⋯</b> (<code>Ellipsis</code>) si querés mantener “menú de acciones”, o <b><code>Wrench</code></b> / <b><code>ListChecks</code></b> si querés que se entienda “esto abre la gestión del CRUD” sin chocar con iconos existentes.
+  </p>
+
+</div>
+
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-morevertical" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>
+  </symbol>
+  <symbol id="i-ellipsis" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
+  </symbol>
+  <symbol id="i-settings2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 17H5"/><path d="M19 7h-9"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/>
+  </symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/>
+  </symbol>
+  <symbol id="i-wrench" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z"/>
+  </symbol>
+  <symbol id="i-foldercog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10.3 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.98a2 2 0 0 1 1.69.9l.66 1.2A2 2 0 0 0 12 6h8a2 2 0 0 1 2 2v3.3"/><path d="m14.305 19.53.923-.382"/><path d="m15.228 16.852-.923-.383"/><path d="m16.852 15.228-.383-.923"/><path d="m16.852 20.772-.383.924"/><path d="m19.148 15.228.383-.923"/><path d="m19.53 21.696-.382-.924"/><path d="m20.772 16.852.924-.383"/><path d="m20.772 19.148.924.383"/><circle cx="18" cy="18" r="3"/>
+  </symbol>
+  <symbol id="i-listchecks" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M13 5h8"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/>
+  </symbol>
+  <symbol id="i-clipboardlist" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>
+  </symbol>
+  <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 5h.01"/><path d="M3 12h.01"/><path d="M3 19h.01"/><path d="M8 5h13"/><path d="M8 12h13"/><path d="M8 19h13"/>
+  </symbol>
+  <symbol id="i-tableproperties" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M15 3v18"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M21 9H3"/><path d="M21 15H3"/>
+  </symbol>
+  <symbol id="i-rows3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M21 9H3"/><path d="M21 15H3"/>
+  </symbol>
+  <symbol id="i-slidershorizontal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/>
+  </symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 12h14"/><path d="M12 5v14"/>
+  </symbol>
+  <symbol id="i-squarepen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/>
+  </symbol>
+  <symbol id="i-grip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="5" r="1"/><circle cx="19" cy="5" r="1"/><circle cx="5" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="12" cy="19" r="1"/><circle cx="19" cy="19" r="1"/><circle cx="5" cy="19" r="1"/>
+  </symbol>
+</svg>
+
+</body>
+</html>

@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Diseño v2 · CRUD Personas — barra inferior de acciones + FAB (grilla intacta)</title>
+<style>
+  :root{--doc-bg:#0e0f11;--doc-panel:#16181b;--doc-border:#2a2d31;--doc-text:#e8e8ea;--doc-muted:#9a9aa0}
+  .t-dark{
+    --bg:#151517;--card:#353638;--card-fg:#e2e4f0;--primary:#4c6ef5;--primary-fg:#fff;
+    --success:#51cf66;--danger:#ff6b6b;--warning:#ffd43b;--muted:#1e1e20;--muted-fg:#9a9b9e;
+    --border:#3e3f42;--sidebar:#1b1b1c;--sidebar-fg:#f0f1f2;--sidebar-muted:#8f9094;--sidebar-hover:#2a2b2d;
+    --label:#9a9b9e;--value:#fff;--subtitle:#808185;--header:#fff;--shadow:0 14px 30px rgba(0,0,0,.5);--rowsel:rgba(76,110,245,.14)
+  }
+  .t-light{
+    --bg:#f6f7f9;--card:#fff;--card-fg:#1e293b;--primary:#2563eb;--primary-fg:#fff;
+    --success:#16a34a;--danger:#dc2626;--warning:#d97706;--muted:#eef1f5;--muted-fg:#64748b;
+    --border:#e2e8f0;--sidebar:#fff;--sidebar-fg:#1f2937;--sidebar-muted:#64748b;--sidebar-hover:#f1f4f8;
+    --label:#64748b;--value:#0f172a;--subtitle:#7c8798;--header:#0f172a;--shadow:0 16px 34px rgba(15,23,42,.18);--rowsel:rgba(37,99,235,.10)
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--doc-bg);color:var(--doc-text);font-family:"SF Pro Display","SF Pro Text",-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,sans-serif;padding:28px 18px 60px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto}
+  h1{font-size:20px;font-weight:600;margin:0 0 4px;letter-spacing:-.01em}
+  .sub{color:var(--doc-muted);font-size:13px;margin:0 0 6px;line-height:1.6;max-width:860px}
+  .row{display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start;justify-content:center;margin-top:26px}
+  .stage{display:flex;flex-direction:column;align-items:center;gap:14px}
+  .toolbar{display:flex;gap:8px}
+  .chipbtn{border:1px solid var(--doc-border);background:var(--doc-panel);color:var(--doc-text);border-radius:999px;padding:6px 14px;font-size:12px;cursor:pointer;font-family:inherit}
+  .chipbtn.on{background:#2563eb;border-color:#2563eb;color:#fff}
+  code{background:#1d2024;border:1px solid var(--doc-border);border-radius:4px;padding:1px 5px;font-size:11px;color:#c9c9cd}
+
+  .phone{width:392px;height:812px;border-radius:44px;padding:12px;background:#000;box-shadow:0 30px 70px rgba(0,0,0,.55);position:relative;flex:none}
+  .phone .island{width:120px;height:26px;border-radius:999px;background:#000;position:absolute;top:24px;left:50%;transform:translateX(-50%);z-index:60}
+  .screen{width:100%;height:100%;border-radius:34px;overflow:hidden;background:var(--bg);color:var(--card-fg);display:flex;flex-direction:column;position:relative;transition:background .25s,color .25s}
+
+  .appbar{height:56px;flex:none;display:flex;align-items:center;gap:8px;padding:0 16px;background:var(--sidebar);border-bottom:1px solid var(--border)}
+  .iconbtn{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--sidebar-muted);background:none;border:none;cursor:pointer}
+  .iconbtn:hover{background:var(--sidebar-hover)}
+  .iconbtn svg{width:20px;height:20px}
+  .logomark{width:24px;height:24px;border-radius:7px;background:linear-gradient(135deg,#4c6ef5,#22b8cf);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700}
+  .logotext{font-size:15px;font-weight:600;color:var(--sidebar-fg);display:flex;align-items:center;gap:8px}
+
+  .scroll{flex:1;min-height:0;overflow-y:auto;padding:16px 16px 130px}
+  .scroll::-webkit-scrollbar{width:0}
+  .pagehead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:2px}
+  .pagehead h1{font-size:24px;font-weight:700;color:var(--header);letter-spacing:-.02em;margin:0}
+  .pagehead .right{display:flex;align-items:center;gap:8px;margin-top:2px}
+  .pillcount{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;border-radius:999px;background:var(--muted);color:var(--subtitle);font-size:12px;font-weight:600;border:1px solid var(--border)}
+  .pillcount.sel{background:var(--primary);color:var(--primary-fg);border-color:transparent}
+  .pagesub{color:var(--subtitle);font-size:13px;margin:2px 0 12px}
+
+  .searchwrap{height:0;overflow:hidden;transition:height .18s ease}
+  .searchwrap.open{height:44px;margin-bottom:12px}
+  .search{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:999px;height:40px;padding:0 14px;margin-top:2px}
+  .search svg{width:16px;height:16px;color:var(--subtitle);flex:none}
+  .search input{border:none;background:none;outline:none;color:var(--card-fg);font-size:13px;flex:1;font-family:inherit}
+  .search input::placeholder{color:var(--subtitle)}
+  .search .clear{border:none;background:none;color:var(--subtitle);cursor:pointer;padding:2px;display:flex}
+  .search .clear svg{width:14px;height:14px}
+
+  /* ===== Grilla = MISMA tabla actual ===== */
+  .tablewrap{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--label);background:var(--muted);padding:8px 14px;border-bottom:1px solid var(--border)}
+  tbody td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--card-fg)}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr{cursor:pointer;transition:background .1s}
+  tbody tr:active{background:var(--muted)}
+  /* la selección resalta la fila completa (fondo + acento lateral) */
+  td.cell-n{font-weight:600;color:var(--header)}
+  td.cell-muted{color:var(--subtitle)}
+  tr.sel{background:var(--rowsel);box-shadow:inset 2px 0 0 var(--primary)}
+
+  /* ===== Barra inferior con FAB central + notch ===== */
+  .bottomnav{position:absolute;left:0;right:0;bottom:0;height:104px;pointer-events:none}
+  .dock{position:absolute;left:12px;right:12px;bottom:14px;height:60px;background:var(--sidebar);border:1px solid var(--border);border-radius:24px;box-shadow:var(--shadow);display:flex;align-items:stretch;pointer-events:auto}
+  .dock .side{flex:1;display:flex;align-items:center;justify-content:space-around;padding:0 4px}
+  .dock .btn{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;color:var(--sidebar-muted);font-size:10.5px;font-family:inherit;cursor:pointer;padding:6px 8px 4px;border-radius:14px;min-width:56px}
+  .dock .btn svg{width:20px;height:20px}
+  .dock .btn span{font-weight:500;letter-spacing:.01em}
+  .dock .btn:hover{color:var(--sidebar-fg)}
+  .dock .btn.on{color:var(--primary)}
+  .dock .btn.danger.on{color:var(--danger)}
+  .dock .btn.disabled{opacity:.32;pointer-events:none}
+  /* notch: semicírculo recortado en el centro superior de la barra */
+  .dock .notch{position:absolute;left:50%;top:-1px;transform:translateX(-50%);width:66px;height:33px;background:var(--bg);border:1px solid var(--border);border-top:none;border-radius:0 0 34px 34px;pointer-events:none}
+  .fab{position:absolute;left:50%;bottom:40px;transform:translateX(-50%);width:58px;height:58px;border-radius:50%;background:var(--primary);color:var(--primary-fg);border:4px solid var(--bg);display:flex;align-items:center;justify-content:center;cursor:pointer;pointer-events:auto;box-shadow:0 8px 20px rgba(76,110,245,.5);z-index:5;transition:transform .12s}
+  .fab svg{width:26px;height:26px}
+  .fab:active{transform:translateX(-50%) scale(.92)}
+
+  .toast{position:absolute;left:50%;bottom:132px;transform:translateX(-50%) translateY(8px);background:var(--card);color:var(--card-fg);border:1px solid var(--border);font-size:12px;padding:9px 14px;border-radius:12px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:all .18s;z-index:70;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  .legend{flex:1;min-width:300px;max-width:560px}
+  .legend h2{font-size:15px;font-weight:600;margin:0 0 12px}
+  .items{display:flex;flex-direction:column;gap:10px}
+  .it{display:flex;gap:12px;background:var(--doc-panel);border:1px solid var(--doc-border);border-radius:12px;padding:12px 14px}
+  .it .n{flex:none;width:24px;height:24px;border-radius:50%;background:#2563eb;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .it b{font-size:13px}
+  .it p{font-size:12.5px;color:var(--doc-muted);margin:3px 0 0;line-height:1.55}
+  .nota{margin-top:30px;border-top:1px solid var(--doc-border);padding-top:14px;font-size:12px;color:var(--doc-muted);line-height:1.7}
+  .legend .keys{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+  .keyrow{flex:1;min-width:220px;background:var(--doc-panel);border:1px solid var(--doc-border);border-radius:10px;padding:10px 12px;font-size:12px}
+  .keyrow b{font-size:12px}
+  .keyrow p{color:var(--doc-muted);margin:3px 0 0;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Diseño v2 · CRUD Personas — barra de acciones inferior + FAB</h1>
+  <p class="sub">La <b>grilla/tabla actual NO cambia</b> (mismas columnas y orden). Solo se accede a las acciones típicas del CRUD (Buscar, Exportar, Editar, Eliminar, + Nuevo) desde una <b>barra inferior</b> con <b>FAB central</b> que recorta la barra, estilo la referencia. En móvil: tocás una fila para seleccionarla → se habilitan <b>Editar</b>/<b>Eliminar</b>.</p>
+
+  <div class="row">
+    <div class="stage">
+      <div class="toolbar">
+        <button class="chipbtn" id="btnlight">Light</button>
+        <button class="chipbtn on" id="btndark">Dark</button>
+      </div>
+
+      <div class="phone">
+        <div class="island"></div>
+        <div class="screen t-dark" id="screen">
+          <div class="appbar">
+            <button class="iconbtn"><svg><use href="#i-menu"/></svg></button>
+            <div class="logotext"><span class="logomark">₣</span>Finanzas</div>
+          </div>
+
+          <div class="scroll" id="scroll">
+            <div class="pagehead">
+              <h1>Personas</h1>
+              <div class="right"><span class="pillcount" id="count">6</span></div>
+            </div>
+            <p class="pagesub">Tocá una fila para seleccionarla</p>
+
+            <div class="searchwrap" id="searchwrap">
+              <div class="search">
+                <svg><use href="#i-search"/></svg>
+                <input id="q" placeholder="Buscar persona..." autocomplete="off"/>
+                <button class="clear" id="qclear"><svg><use href="#i-x"/></svg></button>
+              </div>
+            </div>
+
+            <!-- GRIILLA: misma tabla actual -->
+            <div class="tablewrap">
+              <table>
+                <thead><tr><th>Nombre</th><th>Teléfono</th><th>Email</th></tr></thead>
+                <tbody id="tbody">
+                  <tr data-id="1" data-n="María López"><td class="cell-n">María López</td><td class="cell-muted">+54 9 11 5555-0101</td><td class="cell-muted">maria.lopez@correo.com</td></tr>
+                  <tr data-id="2" data-n="Juan Pérez"><td class="cell-n">Juan Pérez</td><td class="cell-muted">+54 9 11 5555-0188</td><td class="cell-muted">—</td></tr>
+                  <tr data-id="3" data-n="Ana García"><td class="cell-n">Ana García</td><td class="cell-muted">+54 9 341 555-0909</td><td class="cell-muted">ana.garcia@correo.com</td></tr>
+                  <tr data-id="4" data-n="Carlos Ruiz"><td class="cell-n">Carlos Ruiz</td><td class="cell-muted">+54 9 351 555-3471</td><td class="cell-muted">c.ruiz@correo.com</td></tr>
+                  <tr data-id="5" data-n="Sofía Torres"><td class="cell-n">Sofía Torres</td><td class="cell-muted">+54 9 11 5555-0233</td><td class="cell-muted">sofi.torres@correo.com</td></tr>
+                  <tr data-id="6" data-n="Pedro Díaz"><td class="cell-n">Pedro Díaz</td><td class="cell-muted">+54 9 261 555-7788</td><td class="cell-muted">pedro.diaz@correo.com</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Barra inferior de acciones del CRUD -->
+          <div class="bottomnav">
+            <div class="dock">
+              <div class="side">
+                <button class="btn" id="actSearch"><svg><use href="#i-search"/></svg><span>Buscar</span></button>
+                <button class="btn" id="actExport"><svg><use href="#i-file"/></svg><span>Exportar</span></button>
+              </div>
+              <div class="notch"></div>
+              <div class="side">
+                <button class="btn disabled" id="actEdit"><svg><use href="#i-pencil"/></svg><span>Editar</span></button>
+                <button class="btn danger disabled" id="actDel"><svg><use href="#i-trash"/></svg><span>Eliminar</span></button>
+              </div>
+            </div>
+          </div>
+
+          <button class="fab" id="fab" aria-label="Nueva persona"><svg><use href="#i-plus"/></svg></button>
+          <div class="toast" id="toast"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <h2>Qué se mantiene y qué cambia</h2>
+      <div class="items">
+        <div class="it"><span class="n">1</span><div><b>Grilla intacta</b><p>Misma tabla (Nombre · Teléfono · Email), sin columnas nuevas ni radios. La fila se selecciona <b>tocándola</b> y queda <b>resaltada</b> (fondo + acento lateral).</p></div></div>
+        <div class="it"><span class="n">2</span><div><b>Barra inferior = acciones del CRUD</b><p><b>Buscar</b> (abre el campo) · <b>Exportar</b> (PDF) a la izquierda · <b>Editar</b> y <b>Eliminar</b> a la derecha, que se <b>habilitan al seleccionar una fila</b>.</p></div></div>
+        <div class="it"><span class="n">3</span><div><b>FAB central "+" = Nuevo</b><p>Botón flotante que recorta la barra (notch) y abre <code>/cruds/personas/nuevo</code>. Misma estética que la referencia.</p></div></div>
+        <div class="it"><span class="n">4</span><div><b>Modo selección por fila</b><p>Al tocar una fila queda resaltada (sin radio); el contador cambia a primario y Editar/Eliminar se activan (Editar en primario, Eliminar en danger). Volver a tocarla la deselecciona.</p></div></div>
+        <div class="it"><span class="n">5</span><div><b>Desktop sin cambios</b><p>Todo esto sería <code>lg:hidden</code>; en pantallas grandes el CRUD conserva el toolbar y la tabla actuales.</p></div></div>
+      </div>
+      <div class="keys">
+        <div class="keyrow"><b>Idle</b><p>Ninguna fila seleccionada: Editar/Eliminar atenuados.</p></div>
+        <div class="keyrow"><b>1 seleccionada</b><p>Fila resaltada (fondo + acento lateral); Editar/Eliminar activos; count → primario.</p></div>
+      </div>
+      <p class="nota"><b>Nota:</b> Mock v2, todavía sin implementar. Alcance acordado: Personas primero. Al seleccionar una fila, Editar abre <code>/cruds/personas/{id}/editar</code> y Eliminar dispara la confirmación actual.</p>
+    </div>
+  </div>
+</div>
+
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+</svg>
+
+<script>
+  var screen=document.getElementById('screen');
+  function setTheme(t){screen.classList.remove('t-light','t-dark');screen.classList.add(t==='light'?'t-light':'t-dark');document.getElementById('btnlight').classList.toggle('on',t==='light');document.getElementById('btndark').classList.toggle('on',t==='dark');}
+  document.getElementById('btnlight').onclick=function(){setTheme('light')};
+  document.getElementById('btndark').onclick=function(){setTheme('dark')};
+
+  var toast=document.getElementById('toast'),toastT=null;
+  function showToast(t){toast.textContent=t;toast.classList.add('show');clearTimeout(toastT);toastT=setTimeout(function(){toast.classList.remove('show')},1900);}
+
+  var sw=document.getElementById('searchwrap'),q=document.getElementById('q');
+  document.getElementById('actSearch').onclick=function(){sw.classList.toggle('open');if(sw.classList.contains('open'))q.focus()};
+  document.getElementById('actExport').onclick=function(){showToast('Exportar PDF (mock)')};
+  document.getElementById('qclear').onclick=function(){q.value='';q.dispatchEvent(new Event('input'))};
+  q.addEventListener('input',function(){var v=q.value.trim().toLowerCase(),shown=0;
+    document.querySelectorAll('#tbody tr').forEach(function(r){var hit=r.getAttribute('data-n').toLowerCase().indexOf(v)>-1;r.style.display=hit?'':'none';if(hit)shown++});
+    updateCount(shown);});
+  function updateCount(n){var c=document.getElementById('count');c.textContent=n;c.classList.toggle('sel',sel.size>0)}
+
+  // selección por fila
+  var sel=new Set(),actEdit=document.getElementById('actEdit'),actDel=document.getElementById('actDel');
+  document.querySelectorAll('#tbody tr').forEach(function(r){
+    r.addEventListener('click',function(){var id=r.getAttribute('data-id');
+      if(sel.has(id))sel.delete(id);else sel.add(id);
+      r.classList.toggle('sel',sel.has(id));
+      sync();});
+  });
+  function sync(){
+    var any=sel.size>0;
+    actEdit.classList.toggle('disabled',!any);actEdit.classList.toggle('on',any);
+    actDel.classList.toggle('disabled',!any);actDel.classList.toggle('on',any);
+    updateCount(document.querySelectorAll('#tbody tr:not([style*="none"])').length);
+  }
+  actEdit.onclick=function(){if(!sel.size)return;var id=sel.values().next().value;showToast('Editar → /cruds/personas/'+id+'/editar')};
+  actDel.onclick=function(){if(!sel.size)return;showToast('Eliminar (confirmación mock)')};
+
+  document.getElementById('fab').onclick=function(){showToast('Nueva persona → /cruds/personas/nuevo')};
+</script>
+</body>
+</html>
