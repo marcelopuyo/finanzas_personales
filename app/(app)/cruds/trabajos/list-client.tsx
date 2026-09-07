@@ -18,7 +18,18 @@ const columns: ColumnDef<TrabajoOut>[] = [
   },
   { accessorKey: "precioHora", header: "Precio Hora", meta: { align: "right" as const, isCurrency: true }, cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0) },
 ];
-interface Props { initialData: TrabajoOut[] }
-export function TrabajosListClient({ initialData }: Props) {
-  return <CrudTable<TrabajoOut> title="Trabajos" columns={columns} initialData={initialData} deleteItem={eliminarTrabajo} searchPlaceholder="Buscar trabajo..." createHref="/cruds/trabajos/nuevo" editHref={(id) => `/cruds/trabajos/${id}/editar`} getId={(i) => i.id} searchPredicate={(i, q) => i.nombre.toLowerCase().includes(q)} />;
+interface Props {
+  initialData: TrabajoOut[];
+  /** Origen de navegación (?origen=...). Si es "dashboard" se propaga al
+      Nuevo/Editar (mantiene el contexto al volver). La flecha volver al
+      dashboard es SIEMPRE visible, igual que en Personas. */
+  origen?: string;
+}
+export function TrabajosListClient({ initialData, origen }: Props) {
+  // Flecha "volver al dashboard" SIEMPRE visible junto al título (patrón mobile
+  // app, igual que Personas). Cuando se viene del panel Trabajo
+  // (?origen=dashboard) se propaga el origen al "+" (wizard) y al editar.
+  const desdeDashboard = origen === "dashboard";
+  const origenQ = desdeDashboard ? "?origen=dashboard" : "";
+  return <CrudTable<TrabajoOut> title="Trabajos" columns={columns} initialData={initialData} deleteItem={eliminarTrabajo} searchPlaceholder="Buscar trabajo..." createHref={`/cruds/trabajos/nuevo${origenQ}`} editHref={(id) => `/cruds/trabajos/${id}/editar${origenQ}`} getId={(i) => i.id} searchPredicate={(i, q) => i.nombre.toLowerCase().includes(q)} mobileBottomNav backHref="/dashboard" />;
 }

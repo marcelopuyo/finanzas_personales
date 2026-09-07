@@ -9,9 +9,16 @@ import {
   type TrabajoFormData,
 } from "../../trabajo-form-config";
 const dt = (v: Date) => String(v).slice(0, 10);
-interface Props { data: TrabajoOut }
-export function EditarTrabajoClient({ data }: Props) {
+interface Props {
+  data: TrabajoOut;
+  /** Origen de navegación (?origen=...). Si es "dashboard", Cancelar / volver
+      regresan al listado conservando el origen (mantiene la flecha volver). */
+  origen?: string;
+}
+export function EditarTrabajoClient({ data, origen }: Props) {
   const p = useParams();
+  const destino =
+    origen === "dashboard" ? "/cruds/trabajos?origen=dashboard" : "/cruds/trabajos";
   return <CrudForm title="Editar Trabajo" fields={trabajoFields} schema={trabajoSchema} defaultValues={{ nombre: data.nombre, fechaInicio: dt(data.fechaInicio), modalidadCobro: (data.modalidadCobro as TrabajoFormData["modalidadCobro"]) ?? "horas_variables", precioHora: data.precioHora ?? 0, memos: data.memos ?? "" }} onSubmit={async (f) => {
     const modalidad = f.modalidadCobro as string;
     await actualizarTrabajo(Number(p.id), {
@@ -28,5 +35,5 @@ export function EditarTrabajoClient({ data }: Props) {
         : {}),
       memos: (f.memos as string) || undefined,
     });
-  }} cancelHref="/cruds/trabajos" successMessage="Trabajo actualizado correctamente" />;
+  }} cancelHref={destino} successHref={destino} successMessage="Trabajo actualizado correctamente" />;
 }

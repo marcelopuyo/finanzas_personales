@@ -71,8 +71,14 @@ function Tarjeta({
   );
 }
 
-export function TrabajoWizard() {
+export function TrabajoWizard({ origen }: { origen?: string }) {
   const router = useRouter();
+  // Abierto desde el panel Trabajo del dashboard (?origen=dashboard): al
+  // volver (paso 0) o tras guardar se regresa al listado conservando el origen
+  // (mantiene la flecha volver al dashboard). Desde el CRUD normal vuelve al
+  // listado tal como antes.
+  const destino =
+    origen === "dashboard" ? "/cruds/trabajos?origen=dashboard" : "/cruds/trabajos";
   const [estado, setEstado] = useState<Estado>({
     nombre: "",
     fechaInicio: "",
@@ -91,7 +97,7 @@ export function TrabajoWizard() {
 
   const volver = () => {
     if (paso === 0) {
-      router.push("/cruds/trabajos");
+      router.push(destino);
       return;
     }
     setPaso((p) => p - 1);
@@ -149,7 +155,7 @@ export function TrabajoWizard() {
         memos: estado.memos.trim() || undefined,
       });
       toast.success("Trabajo creado correctamente");
-      router.push("/cruds/trabajos");
+      router.push(destino);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al guardar el trabajo");
     } finally {
