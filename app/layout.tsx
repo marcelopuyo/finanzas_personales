@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Unbounded } from "next/font/google";
 import { cookies } from "next/headers";
 import "flag-icons/css/flag-icons.min.css";
@@ -27,6 +27,26 @@ const unbounded = Unbounded({
 export const metadata: Metadata = {
   title: "Finanzas Personales",
   description: "Gestión de finanzas personales",
+  applicationName: "Finanzas",
+  // PWA: permite abrir la app en modo standalone (oculta las barras del
+  // navegador en iOS y Android). El manifest vive en /app/manifest.ts y Next
+  // lo enlaza automáticamente como <link rel="manifest">.
+  manifest: "/manifest.webmanifest",
+  other: {
+    // Legacy de iOS: habilita el modo "app" al abrir desde el Home Screen.
+    "apple-mobile-web-app-capable": "yes",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  // Tema para la barra del navegador (Android) y el área de la barra de estado
+  // en modo standalone (iOS), según el scheme del dispositivo.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f6f7f9" },
+    { media: "(prefers-color-scheme: dark)", color: "#151517" },
+  ],
 };
 
 export default async function RootLayout({
