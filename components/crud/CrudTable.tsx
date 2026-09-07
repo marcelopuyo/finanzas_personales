@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, FileDown, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { BottomActionBar } from "@/components/ui/bottom-action-bar";
 import { DataTable } from "@/components/ui/data-table";
 import { Modal } from "@/components/ui/modal";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -273,86 +274,45 @@ export function CrudTable<T, TId = number>({
     </div>
   );
 
-  // Barra inferior fija (<lg): barra ÚNICA y continua (como la referencia) con
+  // Barra inferior fija (<lg): componente reutilizable BottomActionBar con
   // Buscar/Exportar a la izquierda, Editar/Eliminar a la derecha (se habilitan
-  // al seleccionar una fila) y el FAB "+" flotando sobre el centro de la barra.
+  // al seleccionar una fila) y FAB central "+". El estado (selección, búsqueda)
+  // se mantiene acá y se pasa como props/callbacks.
   const bottomBarEl = mobileBottomNav ? (
-    <div
-      className="fixed inset-x-0 bottom-0 z-30 lg:hidden"
-      style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-    >
-      <div className="mx-auto max-w-md px-4">
-        <div className="relative">
-          {/* Barra única y continua */}
-          <div className="flex h-14 items-stretch justify-between rounded-[26px] border border-border bg-sidebar shadow-lg">
-            {/* Acciones izquierda: Buscar + Exportar */}
-            <div className="flex flex-1 items-center justify-around">
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileSearchOpen((o) => !o);
-                  setTimeout(() => mobileSearchRef.current?.focus(), 0);
-                }}
-                className={cn(
-                  "flex flex-col items-center gap-0.5 py-1 text-[10.5px] font-medium",
-                  mobileSearchOpen ? "text-primary" : "text-sidebar-muted"
-                )}
-              >
-                <Search className="h-5 w-5" />
-                <span>Buscar</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleExportPdf}
-                className="flex flex-col items-center gap-0.5 py-1 text-[10.5px] font-medium text-sidebar-muted"
-              >
-                <FileDown className="h-5 w-5" />
-                <span>Exportar</span>
-              </button>
-            </div>
-            {/* Zona central libre: el FAB flota arriba (no se recorta la barra) */}
-            <div className="w-16 shrink-0" aria-hidden="true" />
-            {/* Acciones derecha: Editar + Eliminar */}
-            <div className="flex flex-1 items-center justify-around">
-              <button
-                type="button"
-                aria-disabled={selectedId === null}
-                onClick={() => selectedId !== null && router.push(editHref(selectedId))}
-                className={cn(
-                  "flex flex-col items-center gap-0.5 py-1 text-[10.5px] font-medium",
-                  selectedId === null ? "pointer-events-none opacity-35" : "text-primary"
-                )}
-              >
-                <Pencil className="h-5 w-5" />
-                <span>Editar</span>
-              </button>
-              <button
-                type="button"
-                aria-disabled={selectedId === null}
-                onClick={() => selectedId !== null && setDeleteId(selectedId)}
-                className={cn(
-                  "flex flex-col items-center gap-0.5 py-1 text-[10.5px] font-medium",
-                  selectedId === null ? "pointer-events-none opacity-35" : "text-danger"
-                )}
-              >
-                <Trash2 className="h-5 w-5" />
-                <span>Eliminar</span>
-              </button>
-            </div>
-          </div>
-          {/* FAB centrado flotando sobre la barra (patrón de la referencia) */}
-          <button
-            type="button"
-            onClick={() => router.push(createHref)}
-            aria-label="Agregar"
-            title="Nuevo"
-            className="absolute left-1/2 top-0 z-10 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-4 border-background bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95"
-          >
-            <Plus className="h-6 w-6" />
-          </button>
-        </div>
-      </div>
-    </div>
+    <BottomActionBar
+      left={[
+        {
+          key: "search",
+          label: "Buscar",
+          icon: Search,
+          active: mobileSearchOpen,
+          onClick: () => {
+            setMobileSearchOpen((o) => !o);
+            setTimeout(() => mobileSearchRef.current?.focus(), 0);
+          },
+        },
+        { key: "export", label: "Exportar", icon: FileDown, onClick: handleExportPdf },
+      ]}
+      right={[
+        {
+          key: "edit",
+          label: "Editar",
+          icon: Pencil,
+          disabled: selectedId === null,
+          active: true,
+          onClick: () => selectedId !== null && router.push(editHref(selectedId)),
+        },
+        {
+          key: "delete",
+          label: "Eliminar",
+          icon: Trash2,
+          disabled: selectedId === null,
+          danger: true,
+          onClick: () => selectedId !== null && setDeleteId(selectedId),
+        },
+      ]}
+      fabAction={{ label: "Nuevo", onClick: () => router.push(createHref) }}
+    />
   ) : null;
 
   return (
