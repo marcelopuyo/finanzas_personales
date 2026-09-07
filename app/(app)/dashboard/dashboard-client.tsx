@@ -7,6 +7,7 @@ import { Tabs } from "@/components/ui/tabs";
 import { Modal } from "@/components/ui/modal";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AccountCard } from "./components/account-card";
+import { CuentasActionsMenu } from "./components/cuentas-actions-menu";
 import { DonutChart } from "./components/donut-chart";
 import { EvolutionChart } from "./components/line-chart";
 import { PrestamosChart } from "./components/prestamos-chart";
@@ -518,11 +519,17 @@ export function DashboardClient({ data }: Props) {
         </p>
       </div>
 
-      {/* Cuentas — solo cuentas reales (clic abre el historial). */}
       {/* Panel Cuentas — solo cuentas reales (clic abre el historial). El panel
           usa bg-card como el resto; las tarjetas internas van en bg-muted. */}
       <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
-        <h2 className="mb-3 text-[16px] font-semibold text-header">Cuentas</h2>
+        {/* Encabezado: título a la izquierda y menú (⋮) anclado al ángulo
+            superior derecho del panel (accede al CRUD de cuentas). */}
+        <div className="relative mb-3 pr-8">
+          <h2 className="text-[16px] font-semibold text-header">Cuentas</h2>
+          <div className="absolute right-0 top-0 flex items-center">
+            <CuentasActionsMenu />
+          </div>
+        </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {data.cuentas.map((cuenta, i) => (
             <AccountCard

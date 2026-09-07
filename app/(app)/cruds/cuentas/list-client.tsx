@@ -9,8 +9,13 @@ import { Switch } from "@/components/ui/switch";
 import { CurrencyFlag } from "@/components/ui/currency-flag";
 import { toast } from "sonner";
 
-interface Props { initialData: CuentaOut[] }
-export function CuentasListClient({ initialData }: Props) {
+interface Props {
+  initialData: CuentaOut[];
+  /** Origen de navegación (?origen=...). Si es "dashboard" se muestra el botón
+      volver para regresar al dashboard al estilo mobile app. */
+  origen?: string;
+}
+export function CuentasListClient({ initialData, origen }: Props) {
   // Estado local de las cuentas: CrudTable re-sincroniza `items` desde
   // `initialData` cuando cambia, así el toggle de Balance se refleja al instante.
   const [cuentas, setCuentas] = useState(initialData);
@@ -78,5 +83,11 @@ export function CuentasListClient({ initialData }: Props) {
     [pendingId, toggleBalance]
   );
 
-  return <CrudTable<CuentaOut> title="Cuentas" columns={columns} initialData={cuentas} deleteItem={eliminarCuenta} searchPlaceholder="Buscar cuenta..." createHref="/cruds/cuentas/nuevo" editHref={(id) => `/cruds/cuentas/${id}/editar`} getId={(i) => i.id} searchPredicate={(i, q) => i.nombre.toLowerCase().includes(q)} />;
+  // Al venir del dashboard (?origen=dashboard) se propaga el parámetro a
+  // Nuevo/Editar para que, al cancelar/volver, la grilla conserve el botón
+  // "volver" al dashboard (patrón mobile app).
+  const desdeDashboard = origen === "dashboard";
+  const origenQ = desdeDashboard ? "?origen=dashboard" : "";
+
+  return <CrudTable<CuentaOut> title="Cuentas" columns={columns} initialData={cuentas} deleteItem={eliminarCuenta} searchPlaceholder="Buscar cuenta..." createHref={`/cruds/cuentas/nuevo${origenQ}`} editHref={(id) => `/cruds/cuentas/${id}/editar${origenQ}`} getId={(i) => i.id} searchPredicate={(i, q) => i.nombre.toLowerCase().includes(q)} backHref={desdeDashboard ? "/dashboard" : undefined} />;
 }

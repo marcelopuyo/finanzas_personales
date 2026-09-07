@@ -36,6 +36,11 @@ interface DataTableProps<TData, TValue> {
   /** Devuelve un id estable por fila (default: índice). Evita que React reutilice
    * filas equivocadas cuando el orden de los datos cambia (p. ej. switches). */
   getRowId?: (originalRow: TData, index: number) => string;
+  /** Clases extra por fila (recibe el registro original), p. ej. resaltar la fila
+   * seleccionada en modo mobile (barra inferior de acciones). */
+  rowClassName?: (originalRow: TData) => string;
+  /** Click en una fila (recibe el registro original). Activa cursor pointer. */
+  onRowClick?: (originalRow: TData) => void;
 }
 
 /**
@@ -48,6 +53,8 @@ export function DataTable<TData, TValue>({
   emptyMessage = "Sin datos disponibles",
   pageSize = 10,
   getRowId,
+  rowClassName,
+  onRowClick,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize });
@@ -133,7 +140,12 @@ export function DataTable<TData, TValue>({
             {table.getRowModel().rows.map((row) => (
               <tr
                 key={row.id}
-                className="border-b border-border last:border-0 transition-colors hover:bg-muted/40"
+                onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                className={cn(
+                  "border-b border-border last:border-0 transition-colors hover:bg-muted/40",
+                  rowClassName?.(row.original),
+                  onRowClick && "cursor-pointer select-none"
+                )}
               >
                 {row.getVisibleCells().map((cell) => {
                   const meta = cell.column.columnDef.meta as

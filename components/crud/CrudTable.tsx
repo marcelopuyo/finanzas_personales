@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Search, Pencil, Trash2, FileDown } from "lucide-react";
+import { ArrowLeft, FileDown, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { Modal } from "@/components/ui/modal";
 import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import { numberToCurrency } from "@/lib/utils";
+import { cn, numberToCurrency } from "@/lib/utils";
 
 interface CrudTableProps<T, TId = number> {
   title: string;
@@ -24,8 +24,19 @@ interface CrudTableProps<T, TId = number> {
   editHref: (id: TId) => string;
   getId: (item: T) => TId;
   searchPredicate: (item: T, query: string) => boolean;
+  /** Si se pasa, muestra un botón "volver" (←) a la izquierda del título
+      (patrón mobile app), ej. al entrar al CRUD desde el dashboard. */
+  backHref?: string;
   /** ISO 4217 para formatear columnas currency en la exportación PDF (default ARS). */
   currency?: string;
+  /** Modo mobile con barra inferior de acciones + FAB central (lg:hidden). En
+      <lg la grilla muestra solo las columnas de datos; la fila se selecciona
+      tocándola (queda resaltada) y Buscar/Exportar/Editar/Eliminar/Nuevo viven
+      en la barra inferior. En desktop el CRUD no cambia. */
+  mobileBottomNav?: boolean;
+  /** Texto opcional bajo el título en mobile (p. ej. "Tocá una fila para
+      seleccionarla"). Solo aplica con mobileBottomNav. */
+  mobileHint?: string;
 }
 
 /**
@@ -44,7 +55,10 @@ export function CrudTable<T, TId = number>({
   editHref,
   getId,
   searchPredicate,
+  backHref,
   currency = "ARS",
+  mobileBottomNav = false,
+  mobileHint,
 }: CrudTableProps<T, TId>) {
   const router = useRouter();
   const [items, setItems] = useState<T[]>(initialData ?? []);
@@ -53,6 +67,11 @@ export function CrudTable<T, TId = number>({
   const [search, setSearch] = useState("");
   const [deleteId, setDeleteId] = useState<TId | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Selección por fila (solo mobile con barra inferior): una a la vez.
+  const [selectedId, setSelectedId] = useState<TId | null>(null);
+  // Búsqueda expandible del modo mobile (la abre el botón "Buscar" de la barra).
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const mobileSearchRef = useRef<HTMLInputElement>(null);
 
   const load = () => {
     if (!fetchData) return;
@@ -87,6 +106,7 @@ export function CrudTable<T, TId = number>({
       await deleteItem(deleteId);
       toast.success("Item eliminado correctamente");
       setDeleteId(null);
+      setSelectedId(null);
       load();
     } catch {
       toast.error("Error al eliminar el item");
@@ -219,9 +239,183 @@ export function CrudTable<T, TId = number>({
     doc.save(`${title.toLowerCase().replace(/\s+/g, "-")}.pdf`);
   };
 
+  // ── Modo mobileBottomNav: piezas de la barra inferior + selección por fila ──
+  // Clases de la fila seleccionada (la resaltan en la grilla mobile).
+  const selectedCls = (item: T) =>
+    mobileBottomNav && selectedId !== null && getId(item) === selectedId
+      ? "bg-primary/10 shadow-[inset_2px_0_0_0_var(--primary)]"
+      : "";
+  // Toca una fila → selecciona/deselecciona (una sola a la vez).
+  const toggleRow = (item: T) => {
+    const id = getId(item);
+    setSelectedId((prev) => (prev === id ? null : id));
+  };
+
+  // Encabezado mobile: título (+ contador de filas visibles).
+  const titleMobileEl = (
+    <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="flex items-center gap-3">
+        {backHref && (
+          <button
+            type="button"
+            onClick={() => router.push(backHref)}
+            className="rounded-lg p-1.5 text-subtitle transition-colors hover:bg-muted hover:text-header"
+            aria-label="Volver"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+        )}
+        <h1 className="text-[20px] font-semibold text-header">{title}</h1>
+      </div>
+      <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-muted px-2 text-[12px] font-semibold text-subtitle">
+        {filtered.length}
+      </span>
+    </div>
+  );
+
+  // Barra inferior fija (<lg): barra ÚNICA y continua (como la referencia) con
+  // Buscar/Exportar a la izquierda, Editar/Eliminar a la derecha (se habilitan
+  // al seleccionar una fila) y el FAB "+" flotando sobre el centro de la barra.
+  const bottomBarEl = mobileBottomNav ? (
+    <div
+      className="fixed inset-x-0 bottom-0 z-30 lg:hidden"
+      style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+    >
+      <div className="mx-auto max-w-md px-4">
+        <div className="relative">
+          {/* Barra única y continua */}
+          <div className="flex h-14 items-stretch justify-between rounded-[26px] border border-border bg-sidebar shadow-lg">
+            {/* Acciones izquierda: Buscar + Exportar */}
+            <div className="flex flex-1 items-center justify-around">
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileSearchOpen((o) => !o);
+                  setTimeout(() => mobileSearchRef.current?.focus(), 0);
+                }}
+                className={cn(
+                  "flex flex-col items-center gap-0.5 py-1 text-[10.5px] font-medium",
+                  mobileSearchOpen ? "text-primary" : "text-sidebar-muted"
+                )}
+              >
+                <Search className="h-5 w-5" />
+                <span>Buscar</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleExportPdf}
+                className="flex flex-col items-center gap-0.5 py-1 text-[10.5px] font-medium text-sidebar-muted"
+              >
+                <FileDown className="h-5 w-5" />
+                <span>Exportar</span>
+              </button>
+            </div>
+            {/* Zona central libre: el FAB flota arriba (no se recorta la barra) */}
+            <div className="w-16 shrink-0" aria-hidden="true" />
+            {/* Acciones derecha: Editar + Eliminar */}
+            <div className="flex flex-1 items-center justify-around">
+              <button
+                type="button"
+                aria-disabled={selectedId === null}
+                onClick={() => selectedId !== null && router.push(editHref(selectedId))}
+                className={cn(
+                  "flex flex-col items-center gap-0.5 py-1 text-[10.5px] font-medium",
+                  selectedId === null ? "pointer-events-none opacity-35" : "text-primary"
+                )}
+              >
+                <Pencil className="h-5 w-5" />
+                <span>Editar</span>
+              </button>
+              <button
+                type="button"
+                aria-disabled={selectedId === null}
+                onClick={() => selectedId !== null && setDeleteId(selectedId)}
+                className={cn(
+                  "flex flex-col items-center gap-0.5 py-1 text-[10.5px] font-medium",
+                  selectedId === null ? "pointer-events-none opacity-35" : "text-danger"
+                )}
+              >
+                <Trash2 className="h-5 w-5" />
+                <span>Eliminar</span>
+              </button>
+            </div>
+          </div>
+          {/* FAB centrado flotando sobre la barra (patrón de la referencia) */}
+          <button
+            type="button"
+            onClick={() => router.push(createHref)}
+            aria-label="Agregar"
+            title="Nuevo"
+            className="absolute left-1/2 top-0 z-10 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-4 border-background bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95"
+          >
+            <Plus className="h-6 w-6" />
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="mb-4 text-[18px] font-semibold text-header">{title}</h1>
+    <div
+      className={cn(
+        "mx-auto max-w-5xl px-4",
+        mobileBottomNav ? "py-6 pb-44 lg:py-8 lg:pb-8" : "py-8"
+      )}
+    >
+      {/* ===== Variante mobile (bottomNav): barra inferior + selección por fila ===== */}
+      {mobileBottomNav && (
+        <div className="lg:hidden">
+          {titleMobileEl}
+          {mobileHint && (
+            <p className="-mt-2 mb-3 text-[12px] text-subtitle">{mobileHint}</p>
+          )}
+          {/* Búsqueda expandible: la abre el botón "Buscar" de la barra */}
+          {mobileSearchOpen && (
+            <div className="relative mb-3">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtitle" />
+              <input
+                ref={mobileSearchRef}
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="w-full rounded-full border border-border bg-card py-2 pl-9 pr-3 text-[13px] text-card-foreground placeholder:text-subtitle focus:outline-none focus:ring-2 focus:ring-primary/40"
+              />
+            </div>
+          )}
+          <div className="rounded-lg border border-border bg-card p-4">
+            <DataTable
+              columns={columns}
+              data={filtered}
+              pageSize={10}
+              getRowId={(row) => String(getId(row))}
+              rowClassName={selectedCls}
+              onRowClick={toggleRow}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ===== Vista clásica (CRUD normal, o desktop dentro de bottomNav) ===== */}
+      <div className={mobileBottomNav ? "hidden lg:block" : ""}>
+      {/* Encabezado: si viene con backHref (p. ej. abierto desde el dashboard
+          con ?origen=dashboard) muestra el botón "volver" a la izquierda del
+          título, al estilo mobile app. */}
+      {backHref ? (
+        <div className="mb-4 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => router.push(backHref)}
+            className="rounded-lg p-1.5 text-subtitle transition-colors hover:bg-muted hover:text-header"
+            aria-label="Volver"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <h1 className="text-[18px] font-semibold text-header">{title}</h1>
+        </div>
+      ) : (
+        <h1 className="mb-4 text-[18px] font-semibold text-header">{title}</h1>
+      )}
 
       {/* Toolbar: búsqueda + botón Nuevo */}
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -283,6 +477,11 @@ export function CrudTable<T, TId = number>({
           />
         )}
       </div>
+
+      </div>
+
+      {/* Barra inferior fija (solo mobileBottomNav) */}
+      {bottomBarEl}
 
       {/* Modal de confirmación de eliminado */}
       <Modal

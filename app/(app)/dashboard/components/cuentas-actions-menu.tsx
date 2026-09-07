@@ -2,15 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Coins, Ellipsis, HandCoins } from "lucide-react";
+import { Ellipsis, Settings2 } from "lucide-react";
 
 /**
- * Menú desplegable (⋮) de acciones de préstamos, ubicado en la esquina superior
- * derecha del panel "Préstamos Pendientes". Como el panel no pertenece a una
- * cuenta puntual, las acciones navegan sin precargar cuenta: el wizard o el
- * formulario piden elegir el préstamo/cuenta según corresponda.
+ * Menú desplegable (⋮) del panel "Cuentas" del dashboard, ubicado en la esquina
+ * superior derecha del panel. Permite acceder al CRUD de cuentas ("Gestionar
+ * cuentas") navegando con ?origen=dashboard para que, desde el CRUD, el botón
+ * "volver" regrese al dashboard (patrón mobile app).
  */
-export function PrestamosActionsMenu() {
+export function CuentasActionsMenu() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -44,10 +44,10 @@ export function PrestamosActionsMenu() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-label="Acciones de préstamos"
+        aria-label="Acciones de cuentas"
         aria-haspopup="menu"
         aria-expanded={open}
-        title="Acciones de préstamos"
+        title="Acciones de cuentas"
         className="flex h-7 w-7 items-center justify-center rounded-full bg-muted/60 text-subtitle transition-colors hover:bg-muted hover:text-header"
       >
         <Ellipsis className="h-4 w-4" />
@@ -61,20 +61,11 @@ export function PrestamosActionsMenu() {
           <button
             type="button"
             role="menuitem"
-            onClick={() => go("/movimientos/nuevo/pago-prestamo")}
+            onClick={() => go("/cruds/cuentas?origen=dashboard")}
             className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] font-medium text-card-foreground transition-colors hover:bg-muted"
           >
-            <HandCoins className="h-4 w-4 text-subtitle" />
-            Pagar préstamo
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => go("/cruds/prestamos/nuevo?origen=dashboard")}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] font-medium text-card-foreground transition-colors hover:bg-muted"
-          >
-            <Coins className="h-4 w-4 text-subtitle" />
-            Nuevo préstamo
+            <Settings2 className="h-4 w-4 text-subtitle" />
+            Gestionar cuentas
           </button>
         </div>
       )}
