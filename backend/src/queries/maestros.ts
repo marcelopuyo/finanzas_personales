@@ -1,5 +1,6 @@
 import { getDb } from "../db";
-import { requireAdmin, requireUserId } from "../lib/auth";
+import { getSessionUser, requireAdmin, requireUserId } from "../lib/auth";
+import { convertir } from "../lib/cotizaciones";
 import { Concepto } from "../entities/concepto.entity";
 import { Cotizacion } from "../entities/cotizacion.entity";
 import { Cuenta } from "../entities/cuenta.entity";
@@ -47,6 +48,8 @@ export interface CuentaOut {
   incluirEnBalance: boolean;
   /** Orden manual de la cuenta (panel y listado); lo reordena el usuario. */
   orden: number;
+  /** Saldo convertido a la moneda predeterminada del usuario (export del CRUD). */
+  saldoEnMonedaPredeterminada?: number;
   tipo: { nombre: string } | null;
   tarjeta: null;
   moneda: { nombre: string; codigoISO: string; codigoPais: string | null } | null;
@@ -203,6 +206,56 @@ export async function getAllCuentas(): Promise<CuentaOut[]> {
       ? { nombre: r.moneda.nombre, codigoISO: r.moneda.codigoISO, codigoPais: r.moneda.codigoPais ?? null }
       : null,
   }));
+}
+
+/**
+ * Cuentas del usuario con su saldo YA convertido a la moneda predeterminada
+ * (misma conversión que el Balance Actual). Se usa en el listado/exportación
+ * del CRUD de cuentas para que la sumatoria del PDF quede en esa moneda.
+ * Ordenadas por (orden, id) como el panel del dashboard.
+ */
+export async function getCuentasConSaldoEnPredeterminada(): Promise<{
+  cuentas: (CuentaOut & { saldoEnMonedaPredeterminada: number })[];
+  monedaPredeterminadaISO: string;
+}> {
+  const userId = await requireUserId();
+  const ds = await getDb();
+  const sesion = await getSessionUser();
+  const predeterminada = sesion?.monedaPredeterminada;
+  const monedaPredeterminadaISO = predeterminada?.codigoISO ?? "USD";
+  const rows = await ds.getRepository(Cuenta).find({
+    where: { usuario: { id: userId }, eliminado: false },
+    relations: { tipo: true, moneda: true },
+    order: { orden: "ASC", id: "ASC" },
+  });
+  const hoy = new Date();
+  const cuentas: (CuentaOut & { saldoEnMonedaPredeterminada: number })[] = [];
+  for (const r of rows) {
+    cuentas.push({
+      id: r.id,
+      nombre: r.nombre,
+      saldo: r.saldo,
+      incluirEnBalance: r.incluirEnBalance,
+      orden: r.orden,
+      // Si la cuenta está en otra moneda se convierte a la predeterminada.
+      saldoEnMonedaPredeterminada: await convertir(
+        r.saldo,
+        r.moneda ?? undefined,
+        predeterminada,
+        hoy
+      ),
+      tipo: r.tipo ? { nombre: r.tipo.nombre } : null,
+      tarjeta: null,
+      moneda: r.moneda
+        ? {
+            nombre: r.moneda.nombre,
+            codigoISO: r.moneda.codigoISO,
+            codigoPais: r.moneda.codigoPais ?? null,
+          }
+        : null,
+    });
+  }
+  return { cuentas, monedaPredeterminadaISO };
 }
 
 export async function getCuentaById(id: number): Promise<CuentaOut | null> {

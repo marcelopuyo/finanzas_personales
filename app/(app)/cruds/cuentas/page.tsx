@@ -1,4 +1,4 @@
-import { getAllCuentas } from "@/backend/src/queries/maestros";
+import { getCuentasConSaldoEnPredeterminada } from "@/backend/src/queries/maestros";
 import { CuentasListClient } from "./list-client";
 
 export default async function CuentasPage({
@@ -7,6 +7,15 @@ export default async function CuentasPage({
   searchParams: Promise<{ origen?: string }>;
 }) {
   const { origen } = await searchParams;
-  const data = await getAllCuentas();
-  return <CuentasListClient initialData={data} origen={origen} />;
+  // Incluye el saldo de cada cuenta convertido a la moneda predeterminada del
+  // usuario (para que la sumatoria del export PDF quede en esa moneda).
+  const { cuentas, monedaPredeterminadaISO } =
+    await getCuentasConSaldoEnPredeterminada();
+  return (
+    <CuentasListClient
+      initialData={cuentas}
+      origen={origen}
+      currency={monedaPredeterminadaISO}
+    />
+  );
 }

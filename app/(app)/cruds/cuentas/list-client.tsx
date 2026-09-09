@@ -21,8 +21,10 @@ interface Props {
   /** Origen de navegación (?origen=...). Si es "dashboard" se muestra el botón
       volver para regresar al dashboard al estilo mobile app. */
   origen?: string;
+  /** ISO 4217 de la moneda predeterminada del usuario (export PDF). */
+  currency?: string;
 }
-export function CuentasListClient({ initialData, origen }: Props) {
+export function CuentasListClient({ initialData, origen, currency = "USD" }: Props) {
   // Estado local de las cuentas: CrudTable re-sincroniza `items` desde
   // `initialData` cuando cambia, así el toggle de Balance se refleja al instante.
   const [cuentas, setCuentas] = useState(initialData);
@@ -61,7 +63,29 @@ export function CuentasListClient({ initialData, origen }: Props) {
   const columns = useMemo<ColumnDef<CuentaOut>[]>(
     () => [
       { accessorKey: "nombre", header: "Nombre" },
-      { accessorKey: "saldo", header: "Saldo", meta: { align: "right" as const, isCurrency: true, exportValue: (row: CuentaOut) => numberToCurrency(row.saldo, row.moneda?.codigoISO ?? "ARS") }, cell: ({ getValue, row }) => numberToCurrency(getValue<number>() ?? 0, row.original.moneda?.codigoISO ?? "ARS") },
+      {
+        id: "saldo",
+        header: "Saldo",
+        // El valor subyacente (orden/sort y EXPORT PDF + total) es el saldo
+        // CONVERTIDO a la moneda predeterminada del usuario: así la sumatoria
+        // del PDF no mezcla monedas. La celda sigue mostrando el saldo en la
+        // moneda de cada cuenta.
+        accessorFn: (r) => r.saldoEnMonedaPredeterminada ?? r.saldo,
+        meta: {
+          align: "right" as const,
+          isCurrency: true,
+          exportValue: (row: CuentaOut) =>
+            numberToCurrency(
+              row.saldoEnMonedaPredeterminada ?? row.saldo,
+              currency
+            ),
+        },
+        cell: ({ row }) =>
+          numberToCurrency(
+            row.original.saldo,
+            row.original.moneda?.codigoISO ?? "ARS"
+          ),
+      },
       { accessorFn: (r) => r.tipo?.nombre ?? "", id: "tipo", header: "Tipo" },
       {
         accessorFn: (r) => r.moneda?.nombre ?? "",
@@ -91,7 +115,7 @@ export function CuentasListClient({ initialData, origen }: Props) {
         ),
       },
     ],
-    [pendingId, toggleBalance]
+    [pendingId, toggleBalance, currency]
   );
 
   // Al venir del dashboard (?origen=dashboard) se propaga el parámetro a
@@ -131,6 +155,7 @@ export function CuentasListClient({ initialData, origen }: Props) {
       title="Cuentas"
       columns={columns}
       initialData={cuentas}
+      currency={currency}
       deleteItem={eliminarCuenta}
       searchPlaceholder="Buscar cuenta..."
       createHref={`/cruds/cuentas/nuevo${origenQ}`}
