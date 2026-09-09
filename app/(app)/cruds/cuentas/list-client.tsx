@@ -1,13 +1,20 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { GripVertical } from "lucide-react";
 import { CrudTable } from "@/components/crud/CrudTable";
 import type { CuentaOut } from "@/backend/src/queries/maestros";
-import { actualizarCuenta, eliminarCuenta } from "@/backend/src/actions/maestros";
+import {
+  actualizarCuenta,
+  eliminarCuenta,
+  reordenarCuentas,
+} from "@/backend/src/actions/maestros";
 import type { ColumnDef } from "@tanstack/react-table";
 import { numberToCurrency } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { CurrencyFlag } from "@/components/ui/currency-flag";
 import { toast } from "sonner";
+import { OrdenarCuentas } from "./ordenar-cuentas";
 
 interface Props {
   initialData: CuentaOut[];
@@ -20,6 +27,10 @@ export function CuentasListClient({ initialData, origen }: Props) {
   // `initialData` cuando cambia, así el toggle de Balance se refleja al instante.
   const [cuentas, setCuentas] = useState(initialData);
   const [pendingId, setPendingId] = useState<number | null>(null);
+  const router = useRouter();
+  // Modo "reordenar": muestra la lista con arrastre (dedo/mouse) en lugar de la
+  // grilla. El orden se persiste en la BD por cada arrastre.
+  const [reorderMode, setReorderMode] = useState(false);
 
   // Mantener el estado en sync si la página refresca (mismo comportamiento que CrudTable).
   useEffect(() => {
@@ -89,5 +100,50 @@ export function CuentasListClient({ initialData, origen }: Props) {
   const desdeDashboard = origen === "dashboard";
   const origenQ = desdeDashboard ? "?origen=dashboard" : "";
 
-  return <CrudTable<CuentaOut> title="Cuentas" columns={columns} initialData={cuentas} deleteItem={eliminarCuenta} searchPlaceholder="Buscar cuenta..." createHref={`/cruds/cuentas/nuevo${origenQ}`} editHref={(id) => `/cruds/cuentas/${id}/editar${origenQ}`} getId={(i) => i.id} searchPredicate={(i, q) => i.nombre.toLowerCase().includes(q)} backHref={desdeDashboard ? "/dashboard" : undefined} mobileBottomNav />;
+  // Modo reordenar: pantalla de arrastre (dnd-kit). Cada arrastre persiste el
+  // orden; al cerrar se refresca la grilla para que quede en el nuevo orden.
+  if (reorderMode) {
+    return (
+      <OrdenarCuentas
+        cuentas={cuentas}
+        onReorder={async (ids) => {
+          try {
+            await reordenarCuentas(ids);
+          } catch (err) {
+            toast.error(
+              err instanceof Error
+                ? err.message
+                : "Error al reordenar las cuentas"
+            );
+            throw err;
+          }
+        }}
+        onDone={() => {
+          setReorderMode(false);
+          router.refresh();
+        }}
+      />
+    );
+  }
+
+  return (
+    <CrudTable<CuentaOut>
+      title="Cuentas"
+      columns={columns}
+      initialData={cuentas}
+      deleteItem={eliminarCuenta}
+      searchPlaceholder="Buscar cuenta..."
+      createHref={`/cruds/cuentas/nuevo${origenQ}`}
+      editHref={(id) => `/cruds/cuentas/${id}/editar${origenQ}`}
+      getId={(i) => i.id}
+      searchPredicate={(i, q) => i.nombre.toLowerCase().includes(q)}
+      backHref={desdeDashboard ? "/dashboard" : undefined}
+      mobileBottomNav
+      extraAction={{
+        label: "Ordenar",
+        icon: GripVertical,
+        onClick: () => setReorderMode(true),
+      }}
+    />
+  );
 }

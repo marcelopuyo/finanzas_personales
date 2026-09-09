@@ -342,6 +342,8 @@ export async function getCuentasConEvolucion(): Promise<CuentaConEvolucion[]> {
       tipo: [{ nombre: "Cuenta Bancaria" }, { nombre: "Caja Fisica" }],
     },
     relations: { tipo: true, moneda: true },
+    // Orden manual del usuario para el panel "Cuentas" del dashboard (orden, id).
+    order: { orden: "ASC", id: "ASC" },
   });
 
   const unMes = new Date();

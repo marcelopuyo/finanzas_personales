@@ -45,6 +45,8 @@ export interface CuentaOut {
   saldo: number;
   /** Si la cuenta participa del "Balance Actual" del dashboard. */
   incluirEnBalance: boolean;
+  /** Orden manual de la cuenta (panel y listado); lo reordena el usuario. */
+  orden: number;
   tipo: { nombre: string } | null;
   tarjeta: null;
   moneda: { nombre: string; codigoISO: string; codigoPais: string | null } | null;
@@ -185,16 +187,16 @@ export async function getAllCuentas(): Promise<CuentaOut[]> {
   const rows = await ds.getRepository(Cuenta).find({
     where: { usuario: { id: userId }, eliminado: false },
     relations: { tipo: true, moneda: true },
-    // Orden estable: evita que el listado "salte" de orden entre refrescos
-    // (cada toggle dispara un refresh() y un orden inestable hacía que los
-    // switches parecieran cambiar de cuenta).
-    order: { id: "ASC" },
+    // Orden manual del usuario (dashboard y listado): `orden` lo reordena el
+    // CRUD de cuentas; `id` como desempate estable.
+    order: { orden: "ASC", id: "ASC" },
   });
   return rows.map((r) => ({
     id: r.id,
     nombre: r.nombre,
     saldo: r.saldo,
     incluirEnBalance: r.incluirEnBalance,
+    orden: r.orden,
     tipo: r.tipo ? { nombre: r.tipo.nombre } : null,
     tarjeta: null,
     moneda: r.moneda
@@ -216,6 +218,7 @@ export async function getCuentaById(id: number): Promise<CuentaOut | null> {
         nombre: r.nombre,
         saldo: r.saldo,
         incluirEnBalance: r.incluirEnBalance,
+        orden: r.orden,
         tipo: r.tipo ? { nombre: r.tipo.nombre } : null,
         tarjeta: null,
         moneda: r.moneda

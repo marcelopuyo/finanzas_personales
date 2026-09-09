@@ -1,6 +1,7 @@
 "use server";
 
 import type { z } from "zod";
+import { In } from "typeorm";
 import { getDb } from "../db";
 import { requireAdmin, requireUserId } from "../lib/auth";
 import { dbError, refresh } from "../lib/action-helpers";
@@ -289,9 +290,16 @@ export async function crearCuenta(input: z.infer<typeof cuentaCreateSchema>) {
 
   try {
     const repo = ds.getRepository(Cuenta);
+    // Orden inicial: la cuenta nueva queda al final de la lista del usuario.
+    const maxOrden = await repo
+      .createQueryBuilder("c")
+      .select("COALESCE(MAX(c.orden), -1)", "max")
+      .where("c.usuarioId = :userId", { userId })
+      .getRawOne<{ max: number | null }>();
     const created = await repo.save(
       repo.create({
         ...rest,
+        orden: (maxOrden?.max ?? -1) + 1,
         tipo: tipoCuenta,
         moneda: monedaEntity,
         usuario: { id: userId },
@@ -367,6 +375,34 @@ export async function eliminarCuenta(id: number) {
   try {
     row.eliminado = true;
     await repo.save(row);
+    refresh();
+  } catch (error) {
+    dbError(error, "Cuenta");
+  }
+}
+
+/**
+ * Reordena las cuentas del usuario (arrastre dedo/mouse en el CRUD). Recibe la
+ * lista completa de ids en el orden deseado y persiste `orden = índice` en una
+ * transacción. Valida que todas pertenezcan al usuario y no estén eliminadas.
+ */
+export async function reordenarCuentas(ids: number[]) {
+  const userId = await requireUserId();
+  const ds = await getDb();
+  const repo = ds.getRepository(Cuenta);
+  const existentes = await repo.find({
+    where: { id: In(ids), usuario: { id: userId }, eliminado: false },
+  });
+  if (existentes.length !== ids.length) {
+    throw new Error("Alguna cuenta no existe o no te pertenece");
+  }
+  try {
+    await ds.transaction(async (manager) => {
+      const r = manager.getRepository(Cuenta);
+      for (let i = 0; i < ids.length; i++) {
+        await r.update({ id: ids[i] }, { orden: i });
+      }
+    });
     refresh();
   } catch (error) {
     dbError(error, "Cuenta");

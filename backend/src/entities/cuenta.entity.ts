@@ -30,6 +30,12 @@ export class Cuenta {
   @Column({ default: true })
   incluirEnBalance: boolean;
 
+  // Orden manual de la cuenta dentro del panel (dashboard) y del listado del
+  // CRUD. Lo reordena el usuario (arrastre con dedo/mouse) y se guarda por
+  // usuario. Al crear una cuenta nueva queda al final de la lista.
+  @Column({ type: "int", default: 0 })
+  orden: number;
+
   // FK a Tarjeta. La relación OneToOne se agrega al migrar el módulo de
   // tarjetas (Fase 4); por ahora se mapea como columna simple.
   @Column({ type: "int", nullable: true })

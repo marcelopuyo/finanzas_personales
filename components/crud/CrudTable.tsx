@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, FileDown, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, FileDown, Pencil, Plus, Search, Trash2, type LucideIcon } from "lucide-react";
 import { BottomActionBar } from "@/components/ui/bottom-action-bar";
 import { DataTable } from "@/components/ui/data-table";
 import { Modal } from "@/components/ui/modal";
@@ -42,6 +42,15 @@ interface CrudTableProps<T, TId = number> {
       desktop y también en la grilla mobile (bottomNav). Útiles para acciones
       por fila contextuales (p. ej. "Pagar" un préstamo). */
   trailingColumns?: ColumnDef<T>[];
+  /** Acción extra opcional del CRUD: en desktop un botón en el toolbar (junto a
+      Exportar/Nuevo) y en mobile una acción más en la barra inferior (al lado de
+      Buscar/Exportar). Útil para disparar un modo propio (p. ej. "Reordenar"). */
+  extraAction?: {
+    label: string;
+    icon: LucideIcon;
+    active?: boolean;
+    onClick: () => void;
+  };
   /** Contenido extra que se renderiza entre el título y la grilla (arriba del
       contenido). Útil para un resumen/header contextual (p. ej. el resumen de
       un período de trabajo con su monto a cobrar). */
@@ -75,6 +84,7 @@ export function CrudTable<T, TId = number>({
   mobileBottomNav = false,
   mobileHint,
   trailingColumns = [],
+  extraAction,
   topContent,
   showActions = true,
   emptyMessage = "Sin datos disponibles",
@@ -324,6 +334,17 @@ export function CrudTable<T, TId = number>({
           },
         },
         { key: "export", label: "Exportar", icon: FileDown, onClick: handleExportPdf },
+        ...(extraAction
+          ? [
+              {
+                key: "extra",
+                label: extraAction.label,
+                icon: extraAction.icon,
+                active: extraAction.active,
+                onClick: extraAction.onClick,
+              },
+            ]
+          : []),
       ]}
       right={[
         {
@@ -430,6 +451,21 @@ export function CrudTable<T, TId = number>({
         <div className="flex items-center gap-2">
           {showActions && (
             <>
+              {extraAction && (
+                <button
+                  type="button"
+                  onClick={extraAction.onClick}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-[13px] font-medium transition-colors",
+                    extraAction.active
+                      ? "border-primary/50 bg-primary/10 text-primary"
+                      : "border-border bg-card text-card-foreground hover:bg-muted"
+                  )}
+                >
+                  <extraAction.icon className="h-3.5 w-3.5" />
+                  {extraAction.label}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleExportPdf}
