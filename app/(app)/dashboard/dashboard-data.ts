@@ -1,9 +1,7 @@
 import {
   getBalanceActual,
   getCuentasConEvolucion,
-  getGastosPeriodo,
   getPrestamosPendientesReporte,
-  getEvolucionGastos,
   getEvolucionIngresos,
   getEvolucionResultados,
 } from "@/backend/src/queries/reportes";
@@ -59,7 +57,6 @@ export interface DashboardData {
     data: Record<string, string | number>[];
     series: { key: string; detalle: string; currency: string }[];
   };
-  evolucionGastos: { name: string; value: number }[];
   evolucionIngresos: { name: string; value: number }[];
   evolucionResultados: { name: string; value: number }[];
 }
@@ -68,20 +65,16 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   const [
     balance,
     cuentasEvol,
-    gastosPeriodo,
     gastosTodos,
     prestamos,
-    evolGastos,
     evolIngresos,
     evolResultados,
     periodosTrabajo,
   ] = await Promise.all([
     getBalanceActual().catch(() => 0),
     getCuentasConEvolucion().catch(() => []),
-    getGastosPeriodo().catch(() => [] as GastoOut[]),
     getAllGastos().catch(() => [] as GastoOut[]),
     getPrestamosPendientesReporte().catch(() => []),
-    getEvolucionGastos().catch(() => []),
     getEvolucionIngresos().catch(() => []),
     getEvolucionResultados().catch(() => []),
     getAllPeriodosTrabajo().catch(() => []),
@@ -124,36 +117,38 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   // es el día real del usuario, mientras que el servidor podría correr en otra
   // zona horaria (ej. Vercel en UTC) y desfasarse ±1 día de noche.
 
-  // --- Gastos por categoría ---
-  const gastosMap = new Map<
-    string,
-    { saldo: number; pagado: number; total: number }
-  >();
-  let montoTotalGastos = 0;
-  let montoSaldoGastos = 0;
-
-  gastosPeriodo.forEach((g) => {
-    const nombre = g.categoria?.nombre || "Sin categoría";
-    const entry = gastosMap.get(nombre) || {
-      saldo: 0,
-      pagado: 0,
-      total: 0,
-    };
-    entry.saldo += g.saldo;
-    entry.pagado += g.monto - g.saldo;
-    entry.total += g.monto;
-    gastosMap.set(nombre, entry);
-    montoTotalGastos += g.monto;
-    montoSaldoGastos += g.saldo;
+  // --- Gastos del mes en curso (FALLBACK SSR del badge "Mes actual") ---
+  // Ya no existe el "período de gasto": se toman los gastos PAGADOS (con
+  // fechaPago) del mes calendario del servidor. El cliente recalcula el badge
+  // con su fecha local tras el montaje (dashboard-client.tsx).
+  const hoyServ = new Date();
+  const desdeMes = `${hoyServ.getFullYear()}-${String(hoyServ.getMonth() + 1).padStart(2, "0")}-01`;
+  const hastaMes = `${hoyServ.getFullYear()}-${String(hoyServ.getMonth() + 1).padStart(2, "0")}-${String(hoyServ.getDate()).padStart(2, "0")}`;
+  const gastosMes = gastosTodos.filter((g) => {
+    if (!g.fechaPago) return false;
+    const f = String(g.fechaPago).slice(0, 10);
+    return f >= desdeMes && f <= hastaMes;
   });
 
-  const gastosResumen = Array.from(gastosMap.entries()).map(
-    ([name, data]) => ({
+  let montoTotalGastos = 0;
+  let montoSaldoGastos = 0;
+  const gastosResumen = (() => {
+    const map = new Map<string, { saldo: number; pagado: number }>();
+    for (const g of gastosMes) {
+      const nombre = g.categoria?.nombre || "Sin categoría";
+      const e = map.get(nombre) || { saldo: 0, pagado: 0 };
+      e.saldo += g.saldo;
+      e.pagado += g.monto - g.saldo;
+      map.set(nombre, e);
+      montoTotalGastos += g.monto;
+      montoSaldoGastos += g.saldo;
+    }
+    return Array.from(map.entries()).map(([name, data]) => ({
       name,
       saldo: data.saldo,
       pagado: data.pagado,
-    })
-  );
+    }));
+  })();
 
   // --- Ingresos por trabajo (jornadas + tareas + prorrateo de fijo/horas_fijas) ---
   // ⚠️ Estos totales son solo el FALLBACK SSR; el dashboard los recalcula en el
@@ -289,11 +284,8 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   );
 
   // --- Evolución ---
-  const evolucionGastos = evolGastos.map((e) => ({
-    name: e.periodo,
-    value: e.monto,
-  }));
-
+  // (La evolución de Gastos se calcula en el cliente por fecha de pago con la
+  // agrupación elegida; ver gastos-agrupacion.ts. Acá solo Ingresos y Resultados.)
   const evolucionIngresos = evolIngresos.map((e) => ({
     name: e.periodo,
     value: e.monto,
@@ -331,7 +323,6 @@ export async function fetchDashboardData(): Promise<DashboardData> {
       data: prestamosChartData,
       series: prestamosChartSeries,
     },
-    evolucionGastos,
     evolucionIngresos,
     evolucionResultados,
   };

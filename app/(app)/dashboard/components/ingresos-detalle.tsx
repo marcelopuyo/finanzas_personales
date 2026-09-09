@@ -47,7 +47,7 @@ function ImporteCell({
   );
 }
 
-function ActividadCell({
+export function ActividadCell({
   jornadas,
   tareas,
   currency,
@@ -94,7 +94,9 @@ function ActividadCell({
 }
 
 export function ingresosDetalleColumns(
-  currency: string
+  currency: string,
+  /** Al tocar el gráfico de actividad (sparkline) abre la pantalla del período. */
+  onOpenPeriodo?: (periodo: PeriodoTrabajoOut) => void
 ): ColumnDef<PeriodoTrabajoOut>[] {
   return [
   {
@@ -152,13 +154,30 @@ export function ingresosDetalleColumns(
     id: "actividad",
     header: "Jornadas/Tareas",
     meta: { align: "center" },
-    cell: ({ row }) => (
-      <ActividadCell
-        jornadas={row.original.jornadas}
-        tareas={row.original.tareas}
-        currency={currency}
-      />
-    ),
+    cell: ({ row }) => {
+      const contenido = (
+        <ActividadCell
+          jornadas={row.original.jornadas}
+          tareas={row.original.tareas}
+          currency={currency}
+        />
+      );
+      // Tocar el sparkline abre la pantalla del período (solo lectura si ya
+      // está cobrado). Sin handler queda como hoy (no clicable).
+      return onOpenPeriodo ? (
+        <button
+          type="button"
+          onClick={() => onOpenPeriodo(row.original)}
+          title="Ver período de trabajo"
+          aria-label={`Ver período de ${row.original.trabajo?.nombre ?? "trabajo"}`}
+          className="inline-flex cursor-pointer items-center justify-center rounded-md px-1.5 py-0.5 transition-colors hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-primary/40"
+        >
+          {contenido}
+        </button>
+      ) : (
+        contenido
+      );
+    },
   },
   ];
 }
@@ -166,13 +185,16 @@ export function ingresosDetalleColumns(
 export function IngresosDetalle({
   data,
   currency,
+  onOpenPeriodo,
 }: {
   data: PeriodoTrabajoOut[];
   currency: string;
+  /** Abre la pantalla del período al tocar su gráfico de actividad (sparkline). */
+  onOpenPeriodo?: (periodo: PeriodoTrabajoOut) => void;
 }) {
   return (
     <DataTable
-      columns={ingresosDetalleColumns(currency)}
+      columns={ingresosDetalleColumns(currency, onOpenPeriodo)}
       data={data}
       pageSize={5}
     />

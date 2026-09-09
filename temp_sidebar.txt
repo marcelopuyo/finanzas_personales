@@ -33,7 +33,6 @@ const navigation: NavItem[] = [
     icon: Wallet,
     children: [
       { label: "Categorías", href: "/categorias-gasto" },
-      { label: "Períodos", href: "/periodos-gasto" },
       { label: "Gastos", href: "/gastos" },
     ],
   },

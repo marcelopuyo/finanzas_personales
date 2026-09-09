@@ -24,6 +24,8 @@ export default async function MovimientoNuevoPage({
     origen?: string;
     destino?: string;
     periodo?: string;
+    prestamo?: string;
+    volverA?: string;
   }>;
 }) {
   const [{ tipo }, qs] = await Promise.all([params, searchParams]);
@@ -42,6 +44,12 @@ export default async function MovimientoNuevoPage({
     // Período de trabajo preseleccionado (icono de cobro por fila en el
     // listado "Por cobrar" del dashboard).
     periodo: num(qs.periodo),
+    // Préstamo a pagar preseleccionado (botón "Pagar" por fila en el CRUD de
+    // préstamos).
+    prestamo: qs.prestamo,
+    // Destino de Cancelar/guardar en modo directo (p. ej. la pantalla del
+    // período desde la que se lanzó el "+" de jornada/tarea).
+    volverA: qs.volverA,
   };
 
   const options = await getMovimientoOptions();

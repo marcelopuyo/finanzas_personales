@@ -8,10 +8,17 @@ import { categoriaGastoSchema, categoriaGastoFields } from "../../categoria-gast
 
 interface Props {
   data: CategoriaGastoOut;
+  /** Origen de navegación (?origen=...). Si es "dashboard", Cancelar / volver
+      regresan a la grilla conservando el origen (mantiene el botón volver). */
+  origen?: string;
 }
 
-export function EditarCategoriaGastoClient({ data }: Props) {
+export function EditarCategoriaGastoClient({ data, origen }: Props) {
   const params = useParams();
+  const destino =
+    origen === "dashboard"
+      ? "/cruds/categorias-gasto?origen=dashboard"
+      : "/cruds/categorias-gasto";
 
   return (
     <CrudForm
@@ -24,7 +31,8 @@ export function EditarCategoriaGastoClient({ data }: Props) {
           nombre: formData.nombre as string,
         });
       }}
-      cancelHref="/cruds/categorias-gasto"
+      cancelHref={destino}
+      successHref={destino}
       successMessage="Categoría actualizada correctamente"
     />
   );

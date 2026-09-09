@@ -270,3 +270,13 @@ function diffDias(desde: string, hasta: string): number {
   const d2 = Date.parse(`${hasta}T00:00:00Z`);
   return Math.round((d2 - d1) / 86400000);
 }
+
+/** ¿El período ya fue cobrado (pagado)? Un cobro real deja `fechaDeCobro`
+ *  con una fecha >= 1901-01-02; null o el centinela 1901-01-01 = pendiente
+ *  (misma lógica que el dashboard y los selects "no cobrado"). */
+export function periodoCobrado(
+  p: { fechaDeCobro?: Date | null } | null | undefined
+): boolean {
+  if (!p || !p.fechaDeCobro) return false;
+  return isoDate(p.fechaDeCobro) >= "1901-01-02";
+}

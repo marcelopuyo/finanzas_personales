@@ -14,12 +14,6 @@ export function gastosDetalleColumns(currency = "ARS"): ColumnDef<GastoOut>[] {
     cell: ({ getValue }) => dateTimeToString(getValue<string | Date>()),
   },
   {
-    accessorFn: (row) => row.periodo?.nombre ?? "",
-    id: "periodo",
-    header: "Período",
-    cell: ({ getValue }) => (getValue<string>() ? getValue<string>() : "-"),
-  },
-  {
     accessorKey: "descripcion",
     header: "Descripción",
     cell: ({ getValue }) => (getValue<string>() ? getValue<string>() : "-"),

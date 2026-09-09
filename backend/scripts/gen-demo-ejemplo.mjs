@@ -14,7 +14,7 @@ const uuid = (i) => `10000000-0000-4000-8000-${String(i).padStart(12, "0")}`;
 // referencias por nombre (los IDs enteros los asigna la BD)
 const cuentaId = (n) => `(SELECT id FROM cuenta WHERE nombre=${q(n)} AND "usuarioId"=${U})`;
 const catId = (n) => `(SELECT id FROM categoria_gasto WHERE nombre=${q(n)} AND "usuarioId"=${U})`;
-const perId = (n) => `(SELECT id FROM periodo_gasto WHERE nombre=${q(n)} AND "usuarioId"=${U})`;
+// perId (período de gasto) eliminado junto con la entidad periodo_gasto.
 const trabId = (n) => `(SELECT id FROM trabajo WHERE nombre=${q(n)} AND "usuarioId"=${U})`;
 const persId = (n) => `(SELECT id FROM persona WHERE nombre=${q(n)} AND "usuarioId"=${U})`;
 const tarjetaId = (n) => `(SELECT id FROM tarjeta WHERE nombre=${q(n)} AND "usuarioId"=${U})`;
@@ -54,16 +54,7 @@ const trabajos = [
   { nombre: "Clases Particulares", fechaInicio: "2026-03-01", precioHora: 1500, memos: "Tutorías de matemática", cuenta: "Caja Principal" },
 ];
 
-const periodosGasto = [
-  { nombre: "Enero 26", apertura: "2026-01-01", cierre: "2026-01-31" },
-  { nombre: "Febrero 26", apertura: "2026-02-01", cierre: "2026-02-28" },
-  { nombre: "Marzo 26", apertura: "2026-03-01", cierre: "2026-03-31" },
-  { nombre: "Abril 26", apertura: "2026-04-01", cierre: "2026-04-30" },
-  { nombre: "Mayo 26", apertura: "2026-05-01", cierre: "2026-05-31" },
-  { nombre: "Junio 26", apertura: "2026-06-01", cierre: "2026-06-30" },
-  { nombre: "Julio 26", apertura: "2026-07-01", cierre: "2026-07-31" },
-  { nombre: "Agosto 26", apertura: "2026-08-01", cierre: "2026-08-31" },
-];
+// (El array periodosGasto se eliminó junto con la entidad periodo_gasto.)
 
 // gastos: uuidIdx, desc, monto, categoria, periodo, cuenta (si pagado), fechaPago, fechaVenc, isPeriodico
 const gastos = [
@@ -180,9 +171,6 @@ cuentas.forEach((c) => out.push(`INSERT INTO cuenta (nombre, saldo, eliminado, "
 trabajos.forEach((t) =>
   out.push(`INSERT INTO trabajo (nombre, "fechaInicio", "precioHora", memos, eliminado, "usuarioId") VALUES (${q(t.nombre)}, ${D(t.fechaInicio)}, ${N(t.precioHora)}, ${q(t.memos)}, false, ${U});`)
 );
-periodosGasto.forEach((p) =>
-  out.push(`INSERT INTO periodo_gasto (nombre, "fechaApertura", "fechaCierre", eliminado, "usuarioId") VALUES (${q(p.nombre)}, ${D(p.apertura)}, ${D(p.cierre)}, false, ${U});`)
-);
 cotizaciones.forEach((c) =>
   out.push(`INSERT INTO cotizacion ("fechaInicial", "fechaFinal", cotizacion, eliminado, "monedaId", "usuarioId") VALUES (${D(c[0])}, ${D(c[1])}, ${N(c[2])}, false, 2, ${U});`)
 );
@@ -203,7 +191,7 @@ out.push("-- ===== GASTOS =====");
 gastos.forEach((g) => {
   const pagado = !!g.cuenta;
   out.push(
-    `INSERT INTO gasto (id, descripcion, monto, saldo, "fechaVencimiento", "fechaPago", "isPeriodico", eliminado, "periodoId", "categoriaId", "usuarioId") VALUES (${q(uuid(g.i))}, ${q(g.desc)}, ${N(g.monto)}, ${N(pagado ? 0 : g.monto)}, ${D(g.venc ?? null)}, ${D(g.pago ?? null)}, ${pagado ? "true" : "false"}, false, ${perId(g.per)}, ${catId(g.cat)}, ${U});`
+    `INSERT INTO gasto (id, descripcion, monto, saldo, "fechaVencimiento", "fechaPago", "isPeriodico", eliminado, "categoriaId", "usuarioId") VALUES (${q(uuid(g.i))}, ${q(g.desc)}, ${N(g.monto)}, ${N(pagado ? 0 : g.monto)}, ${D(g.venc ?? null)}, ${D(g.pago ?? null)}, ${pagado ? "true" : "false"}, false, ${catId(g.cat)}, ${U});`
   );
 });
 

@@ -31,7 +31,8 @@ const TITULOS: Record<MovimientoConcepto, string> = {
 };
 
 export function Confirmacion() {
-  const { data, navigateTo, resetData, options, direct } = useMovimientoStepper();
+  const { data, navigateTo, resetData, options, direct, volverA } =
+    useMovimientoStepper();
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
 
@@ -302,9 +303,10 @@ export function Confirmacion() {
         }
       }
       toast.success("Movimiento guardado correctamente");
-      // En modo directo (sin stepper) se vuelve al dashboard tras guardar.
+      // En modo directo (sin stepper) se vuelve al origen que lanzó el wizard
+      // (volverA, ej. la pantalla del período) o al dashboard por defecto.
       if (direct) {
-        router.push("/dashboard");
+        router.push(volverA ?? "/dashboard");
         return;
       }
       resetData();
@@ -340,7 +342,7 @@ export function Confirmacion() {
               type="button"
               onClick={() => {
                 if (direct) {
-                  router.push("/dashboard");
+                  router.push(volverA ?? "/dashboard");
                   return;
                 }
                 resetData();

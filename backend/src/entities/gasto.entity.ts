@@ -1,5 +1,4 @@
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
-import { PeriodoGasto } from "./periodo-gasto.entity";
 import { CategoriaGasto } from "./categoria-gasto.entity";
 import { Usuario } from "./usuario.entity";
 
@@ -30,11 +29,6 @@ export class Gasto {
     default: false,
   })
   eliminado: boolean;
-
-  // Lado propietario (ManyToOne). La relación inversa (movimientos) se agrega
-  // al migrar el módulo de movimientos (Fase 7).
-  @ManyToOne(() => PeriodoGasto)
-  periodo: PeriodoGasto;
 
   @ManyToOne(() => CategoriaGasto)
   categoria: CategoriaGasto;

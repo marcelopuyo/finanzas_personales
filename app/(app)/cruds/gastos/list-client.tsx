@@ -51,11 +51,6 @@ function gastosColumns(currency: string): ColumnDef<GastoOut>[] {
       id: "categoria",
       header: "Categoría",
     },
-    {
-      accessorFn: (row) => row.periodo?.nombre ?? "",
-      id: "periodo",
-      header: "Período",
-    },
   ];
 }
 
@@ -79,8 +74,7 @@ export function GastosListClient({ initialData, currency = "USD" }: Props) {
       getId={(item) => item.id}
       searchPredicate={(item, query) =>
         (item.descripcion ?? "").toLowerCase().includes(query) ||
-        (item.categoria?.nombre ?? "").toLowerCase().includes(query) ||
-        (item.periodo?.nombre ?? "").toLowerCase().includes(query)
+        (item.categoria?.nombre ?? "").toLowerCase().includes(query)
       }
       mobileBottomNav
     />

@@ -1,7 +1,13 @@
 import { fetchDashboardData } from "./dashboard-data";
 import { DashboardClient } from "./dashboard-client";
+import { DashboardScrollKeeper } from "./components/dashboard-scroll-keeper";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ periodos?: string }>;
+}) {
+  const { periodos } = await searchParams;
   let data: Awaited<ReturnType<typeof fetchDashboardData>>;
   try {
     data = await fetchDashboardData();
@@ -19,5 +25,13 @@ export default async function DashboardPage() {
       </div>
     );
   }
-  return <DashboardClient data={data} />;
+  return (
+    <>
+      {/* Restaura el scroll del <main> al volver de un CRUD (ver componente). */}
+      <DashboardScrollKeeper />
+      {/* periodosInicial: si se vuelve desde la pantalla de un período
+          (?periodos=cobrar|actuales) se reabre ese popup automáticamente. */}
+      <DashboardClient data={data} periodosInicial={periodos} />
+    </>
+  );
 }

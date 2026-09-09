@@ -2,15 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Coins, Ellipsis, Users } from "lucide-react";
+import { Ellipsis, Tag } from "lucide-react";
 
 /**
- * Menú desplegable (⋮) de acciones de préstamos, ubicado en la esquina superior
- * derecha del panel "Préstamos Pendientes". "Gestionar préstamos" abre el CRUD
- * de préstamos (su botón por fila "Pagar" lanza el wizard de pago con el
- * préstamo preseleccionado) y "Gestionar personas" abre el CRUD de personas.
+ * Menú desplegable (⋯) del panel "Gastos" del dashboard, ubicado en la esquina
+ * superior derecha del panel con la misma estética que los de
+ * Cuentas/Trabajo/Préstamos. Permite acceder al CRUD de categorías de gasto
+ * ("Gestionar categorías").
  */
-export function PrestamosActionsMenu() {
+export function GastosActionsMenu() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -44,10 +44,10 @@ export function PrestamosActionsMenu() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-label="Acciones de préstamos"
+        aria-label="Acciones de gastos"
         aria-haspopup="menu"
         aria-expanded={open}
-        title="Acciones de préstamos"
+        title="Acciones de gastos"
         className="flex h-7 w-7 items-center justify-center rounded-full bg-muted/60 text-subtitle transition-colors hover:bg-muted hover:text-header"
       >
         <Ellipsis className="h-4 w-4" />
@@ -61,20 +61,11 @@ export function PrestamosActionsMenu() {
           <button
             type="button"
             role="menuitem"
-            onClick={() => go("/cruds/prestamos?origen=dashboard")}
+            onClick={() => go("/cruds/categorias-gasto?origen=dashboard")}
             className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] font-medium text-card-foreground transition-colors hover:bg-muted"
           >
-            <Coins className="h-4 w-4 text-subtitle" />
-            Gestionar préstamos
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => go("/cruds/personas")}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] font-medium text-card-foreground transition-colors hover:bg-muted"
-          >
-            <Users className="h-4 w-4 text-subtitle" />
-            Gestionar personas
+            <Tag className="h-4 w-4 text-subtitle" />
+            Gestionar categorías
           </button>
         </div>
       )}

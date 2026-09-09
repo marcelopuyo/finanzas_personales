@@ -113,9 +113,14 @@ export function SparkLineChart({
     return (
       <>
         {tooltipNode}
+        {/* touch-action: pan-y → el scroll VERTICAL de la página sigue
+            funcionando, pero el navegador NO toma el gesto horizontal como
+            scroll de la grilla: los touchmove llegan al sparkline y el tooltip
+            va mostrando cada barra/día mientras se desliza (mobile). */}
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className="h-10 w-full overflow-visible"
+          style={{ touchAction: "pan-y" }}
           preserveAspectRatio="none"
           onTouchStart={handleBarTouch}
           onTouchMove={handleBarTouch}
@@ -198,9 +203,13 @@ export function SparkLineChart({
   return (
     <>
       {tooltipNode}
+      {/* touch-action: pan-y → mismo criterio que la variante de barras: el
+          scroll vertical de la página funciona, pero el gesto horizontal sobre
+          el gráfico no se convierte en scroll de la grilla/tarjeta. */}
       <svg
         viewBox={`0 0 ${width} ${height}`}
         className="h-10 w-full overflow-visible"
+        style={{ touchAction: "pan-y" }}
         preserveAspectRatio="none"
         onMouseMove={handleMove}
         onMouseLeave={() => setTooltip(null)}

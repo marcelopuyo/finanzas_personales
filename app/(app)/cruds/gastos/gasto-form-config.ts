@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { FormField } from "@/components/crud/CrudForm";
-import { fetchCategoriasGasto, fetchPeriodosGasto } from "./helpers";
+import { fetchCategoriasGasto } from "./helpers";
 
 /** Esquema zod para crear/editar Gasto */
 export const gastoSchema = z.object({
@@ -10,7 +10,6 @@ export const gastoSchema = z.object({
   fechaVencimiento: z.string().optional(),
   fechaPago: z.string().optional(),
   categoria: z.string().min(1, "Seleccione una categoría"),
-  periodo: z.string().min(1, "Seleccione un período"),
 });
 
 export type GastoFormData = z.infer<typeof gastoSchema>;
@@ -50,11 +49,5 @@ export const gastoFields: FormField[] = [
     label: "Categoría",
     type: "select",
     optionsFrom: fetchCategoriasGasto,
-  },
-  {
-    name: "periodo",
-    label: "Período",
-    type: "select",
-    optionsFrom: fetchPeriodosGasto,
   },
 ];

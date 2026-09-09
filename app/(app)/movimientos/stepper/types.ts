@@ -99,6 +99,12 @@ export interface MovimientoInitial {
   destino?: number;
   /** Cobro de sueldo: período de trabajo a cobrar preseleccionado (icono por fila del listado de períodos a cobrar). */
   periodo?: number;
+  /** Pago de préstamo: préstamo a pagar preseleccionado (botón "Pagar" por fila del CRUD de préstamos). */
+  prestamo?: string;
+  /** Destino de Cancelar/volver tras guardar en modo directo (p. ej. la pantalla
+      del período desde la que se lanzó el "+" de jornada/tarea). Si no viene, se
+      usa /dashboard. */
+  volverA?: string;
 }
 
 /** Valor de `?tipo=` en la URL para cada concepto (lo usan las tarjetas y el page). */

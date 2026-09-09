@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { KeyRound, LogOut, Moon, ShieldCheck, Sun } from "lucide-react";
+import { ArrowLeft, KeyRound, LogOut, Moon, ShieldCheck, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "@/components/layout/theme-provider";
 import { Modal } from "@/components/ui/modal";
@@ -95,12 +95,23 @@ export default function PerfilClient({
 
   return (
     <div className="mx-auto max-w-xl px-4 py-6">
-      <h1 className="text-[18px] font-semibold text-header">Perfil</h1>
-      <p className="mt-1 text-[13px] text-subtitle">
-        Opciones de tu cuenta
-      </p>
+      <div className="mb-5 flex items-center gap-3">
+        <Link
+          href="/dashboard"
+          aria-label="Volver al resumen"
+          className="rounded-lg p-1.5 text-subtitle transition-colors hover:bg-muted hover:text-header"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Link>
+        <div>
+          <h1 className="text-[18px] font-semibold text-header">Perfil</h1>
+          <p className="text-[13px] text-subtitle">
+            Opciones de tu cuenta
+          </p>
+        </div>
+      </div>
 
-      <div className="mt-4 space-y-4">
+      <div className="space-y-4">
         {/* Cuenta */}
         <section className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center gap-3">

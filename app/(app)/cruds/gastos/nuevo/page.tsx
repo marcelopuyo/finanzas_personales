@@ -18,7 +18,6 @@ export default function NuevoGastoPage() {
           isPeriodico: false,
           fechaVencimiento: (data.fechaVencimiento as string) || undefined,
           nombreCategoria: data.categoria as string,
-          nombrePeriodo: data.periodo as string,
         });
       }}
       cancelHref="/cruds/gastos"

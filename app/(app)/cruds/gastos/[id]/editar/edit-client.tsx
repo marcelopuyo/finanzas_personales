@@ -28,7 +28,6 @@ export function EditarGastoClient({ data }: Props) {
         fechaVencimiento: toDateInput(data.fechaVencimiento),
         fechaPago: toDateInput(data.fechaPago),
         categoria: data.categoria?.nombre ?? "",
-        periodo: data.periodo?.nombre ?? "",
       }}
       onSubmit={async (formData) => {
         await actualizarGasto(String(params.id), {
@@ -36,7 +35,6 @@ export function EditarGastoClient({ data }: Props) {
           monto: Number(formData.monto),
           fechaVencimiento: (formData.fechaVencimiento as string) || undefined,
           nombreCategoria: formData.categoria as string,
-          nombrePeriodo: formData.periodo as string,
         });
       }}
       cancelHref="/cruds/gastos"

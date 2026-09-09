@@ -1,10 +1,9 @@
-import { In, LessThanOrEqual, MoreThan, MoreThanOrEqual } from "typeorm";
+import { In, MoreThan } from "typeorm";
 import { getDb } from "../db";
 import { requireUserId } from "../lib/auth";
 import { CategoriaGasto } from "../entities/categoria-gasto.entity";
 import { Gasto } from "../entities/gasto.entity";
 import { Movimiento } from "../entities/movimiento.entity";
-import { PeriodoGasto } from "../entities/periodo-gasto.entity";
 
 // ============================================================
 // Tipos de salida (coinciden con los Response DTOs del backend)
@@ -12,13 +11,6 @@ import { PeriodoGasto } from "../entities/periodo-gasto.entity";
 export interface CategoriaGastoOut {
   id: number;
   nombre: string;
-}
-
-export interface PeriodoGastoOut {
-  id: number;
-  nombre: string;
-  fechaApertura: Date;
-  fechaCierre: Date;
 }
 
 export interface GastoOut {
@@ -30,7 +22,6 @@ export interface GastoOut {
   fechaPago: Date | null;
   isPeriodico: boolean;
   categoria: { nombre: string } | null;
-  periodo: { nombre: string } | null;
   /** Cuenta con la que se pagó el gasto (desde el Movimiento). */
   cuenta: string | null;
 }
@@ -59,66 +50,7 @@ export async function getCategoriaGastoById(
 }
 
 // ============================================================
-// Períodos de gasto
-// ============================================================
-export async function getAllPeriodosGasto(): Promise<PeriodoGastoOut[]> {
-  const userId = await requireUserId();
-  const ds = await getDb();
-  const rows = await ds.getRepository(PeriodoGasto).find({
-    where: { usuario: { id: userId }, eliminado: false },
-    // Más reciente primero.
-    order: { fechaApertura: "DESC" },
-  });
-  return rows.map((r) => ({
-    id: r.id,
-    nombre: r.nombre,
-    fechaApertura: r.fechaApertura,
-    fechaCierre: r.fechaCierre,
-  }));
-}
-
-export async function getPeriodoGastoById(
-  id: number
-): Promise<PeriodoGastoOut | null> {
-  const userId = await requireUserId();
-  const ds = await getDb();
-  const r = await ds.getRepository(PeriodoGasto).findOne({
-    where: { id, usuario: { id: userId }, eliminado: false },
-  });
-  return r
-    ? {
-        id: r.id,
-        nombre: r.nombre,
-        fechaApertura: r.fechaApertura,
-        fechaCierre: r.fechaCierre,
-      }
-    : null;
-}
-
-export async function getPeriodoGastoActual(): Promise<PeriodoGastoOut | null> {
-  const userId = await requireUserId();
-  const ds = await getDb();
-  const now = new Date();
-  const r = await ds.getRepository(PeriodoGasto).findOne({
-    where: {
-      usuario: { id: userId },
-      eliminado: false,
-      fechaApertura: LessThanOrEqual(now),
-      fechaCierre: MoreThanOrEqual(now),
-    },
-  });
-  return r
-    ? {
-        id: r.id,
-        nombre: r.nombre,
-        fechaApertura: r.fechaApertura,
-        fechaCierre: r.fechaCierre,
-      }
-    : null;
-}
-
-// ============================================================
-// Gastos (relaciones periodo y categoria)
+// Gastos (relaciones categoria)
 // ============================================================
 function mapGasto(r: Gasto): GastoOut {
   return {
@@ -130,7 +62,6 @@ function mapGasto(r: Gasto): GastoOut {
     fechaPago: r.fechaPago ?? null,
     isPeriodico: r.isPeriodico,
     categoria: r.categoria ? { nombre: r.categoria.nombre } : null,
-    periodo: r.periodo ? { nombre: r.periodo.nombre } : null,
     cuenta: null,
   };
 }
@@ -166,7 +97,7 @@ export async function getAllGastos(): Promise<GastoOut[]> {
   const ds = await getDb();
   const rows = await ds.getRepository(Gasto).find({
     where: { usuario: { id: userId }, eliminado: false },
-    relations: { periodo: true, categoria: true },
+    relations: { categoria: true },
     // Más recientes primero (por fecha de pago).
     order: { fechaPago: "DESC" },
   });
@@ -180,7 +111,7 @@ export async function getGastosPendientes(): Promise<GastoOut[]> {
   const ds = await getDb();
   const rows = await ds.getRepository(Gasto).find({
     where: { usuario: { id: userId }, eliminado: false, saldo: MoreThan(0) },
-    relations: { periodo: true, categoria: true },
+    relations: { categoria: true },
   });
   const mapped = rows.map(mapGasto);
   const cuentas = await resolveCuentas(ds, mapped.map((g) => g.id));
@@ -192,7 +123,7 @@ export async function getGastoById(id: string): Promise<GastoOut | null> {
   const ds = await getDb();
   const r = await ds.getRepository(Gasto).findOne({
     where: { id, usuario: { id: userId }, eliminado: false },
-    relations: { periodo: true, categoria: true },
+    relations: { categoria: true },
   });
   if (!r) return null;
   const mapped = mapGasto(r);

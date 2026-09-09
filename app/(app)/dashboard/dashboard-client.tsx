@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { SlidersHorizontal } from "lucide-react";
 import { StatBadge } from "@/components/ui/stat-badge";
 import { Tabs } from "@/components/ui/tabs";
@@ -13,11 +14,17 @@ import { DonutChart } from "./components/donut-chart";
 import { EvolutionChart } from "./components/line-chart";
 import { PrestamosChart } from "./components/prestamos-chart";
 import { PrestamosActionsMenu } from "./components/prestamos-actions-menu";
+import { GastosActionsMenu } from "./components/gastos-actions-menu";
 import { GastosDetalle } from "./components/gastos-detalle";
 import { IngresosDetalle } from "./components/ingresos-detalle";
 import { HistorialModal, type CuentaHistorial } from "./components/historial-modal";
 import { PeriodosModal, type TipoPeriodos } from "./components/periodos-modal";
 import type { DashboardData } from "./dashboard-data";
+import {
+  OPCIONES_AGRUPACION_GASTO,
+  gastosEvolucionPor,
+  type AgrupacionGasto,
+} from "./gastos-agrupacion";
 import {
   evolucionIngresosPorMes,
   ingresosDelMesActual,
@@ -29,6 +36,10 @@ import { cn, numberToCurrency, todayLocalISODate } from "@/lib/utils";
 
 interface Props {
   data: DashboardData;
+  /** Popup de períodos a reabrir al montar ("cobrar" | "actuales"). Se usa al
+      volver desde la pantalla de un período (?periodos=...) para restaurar el
+      listado desde el que se entró. */
+  periodosInicial?: string;
 }
 
 const SIN_CATEGORIA = "Sin categoría";
@@ -41,13 +52,19 @@ function toDateKey(v: string | Date | null | undefined): string {
   return String(v).slice(0, 10);
 }
 
-export function DashboardClient({ data }: Props) {
+export function DashboardClient({ data, periodosInicial }: Props) {
+  const router = useRouter();
   const [tabGastos, setTabGastos] = useState("resumen");
   const [tabIngresos, setTabIngresos] = useState("resumen");
   // Cuenta seleccionada para abrir su historial en popup
   const [cuentaHist, setCuentaHist] = useState<CuentaHistorial | null>(null);
-  // Popup de las tarjetas sintéticas de períodos (a cobrar / actuales).
-  const [periodosModal, setPeriodosModal] = useState<TipoPeriodos | null>(null);
+  // Popup de las tarjetas sintéticas de períodos (a cobrar / actuales). Si se
+  // volvió desde la pantalla de un período (periodosInicial) se abre directo.
+  const [periodosModal, setPeriodosModal] = useState<TipoPeriodos | null>(
+    periodosInicial === "cobrar" || periodosInicial === "actuales"
+      ? periodosInicial
+      : null
+  );
 
   // Fechas por defecto: primer día del mes actual → hoy
   const fechaPrimerDia = () => {
@@ -65,6 +82,9 @@ export function DashboardClient({ data }: Props) {
   const [dCta, setDCta] = useState<string[]>([]);
   const [dFd, setDFd] = useState(fechaPrimerDia);
   const [dFh, setDFh] = useState(fechaHoy);
+  // Agrupación del gráfico Histórico de Gastos (buckets por fecha de pago).
+  const [selAgrup, setSelAgrup] = useState<AgrupacionGasto>("mensual");
+  const [dAgrup, setDAgrup] = useState<AgrupacionGasto>("mensual");
 
   // Filtros de Ingresos (trabajo + fechas)
   const [selTra, setSelTra] = useState<string[]>([]);
@@ -135,13 +155,27 @@ export function DashboardClient({ data }: Props) {
     [todosLosIngresos, hoy]
   );
 
-  // Tarjetas sintéticas de períodos ("Por cobrar"/"Actuales"):
-  // se calculan en el cliente DESPUÉS del montaje para que el "hoy" sea el del
-  // navegador (el del servidor puede correrse ±1 día si corre en otra zona
-  // horaria, ej. Vercel en UTC con usuario en GMT-3 de noche). Durante el SSR y
-  // el primer render se muestran solo las cuentas reales; al montar se agregan
-  // las sintéticas (sin romper la hidratación).
-  const [sinteticas, setSinteticas] = useState<DashboardData["cuentas"]>([]);
+  // Tarjetas sintéticas de períodos ("Por cobrar"/"Actuales"): SIEMPRE visibles
+  // (el panel Trabajo existe aunque no haya nada pendiente). Se inicializan en
+  // $0 y el efecto de abajo (post-montaje) les pone los montos reales con el
+  // "hoy" del navegador (el del servidor puede correrse ±1 día según la zona
+  // horaria), sin romper la hidratación.
+  const [sinteticas, setSinteticas] = useState<DashboardData["cuentas"]>([
+    {
+      title: "Por cobrar",
+      value: numberToCurrency(0, data.monedaPredeterminadaISO),
+      labels: [],
+      values: [],
+      tipo: "Por cobrar",
+    },
+    {
+      title: "Actuales",
+      value: numberToCurrency(0, data.monedaPredeterminadaISO),
+      labels: [],
+      values: [],
+      tipo: "Actuales",
+    },
+  ]);
   // Badges "Mes actual" de Gastos, Ingresos y Resultados. El servidor (Vercel,
   // UTC) los calcula con `new Date()` y en el límite de mes puede quedar ±1
   // día/mes adelantado respecto al usuario (ej. GMT-3 de noche el 31 → el
@@ -162,31 +196,24 @@ export function DashboardClient({ data }: Props) {
       (acc, p) => acc + (p.montoACobrar || 0),
       0
     );
-    const cards: DashboardData["cuentas"] = [];
-    if (pendiente > 0) {
-      cards.push({
+    // Ambas tarjetas se muestran SIEMPRE (aunque el monto sea $0); cada una
+    // abre su listado (popup), vacío si no hay períodos del tipo.
+    setSinteticas([
+      {
         title: "Por cobrar",
         value: numberToCurrency(pendiente, data.monedaPredeterminadaISO),
         labels: [],
         values: [],
-        // Sin menú ⋮: el cobro se lanza desde el icono por fila del popup que
-        // abre la tarjeta al hacer clic (listado "Por cobrar").
         tipo: "Por cobrar",
-      });
-    }
-    if (periodosActuales.length > 0) {
-      // "Cargar jornada"/"Cargar tarea" viven en la columna por fila del popup
-      // "Actuales" (ver PeriodosModal); "Nuevo período" pasó al menú ⋯ del
-      // panel "Trabajo" (ver TrabajosActionsMenu). La tarjeta queda SIN ⋮.
-      cards.push({
+      },
+      {
         title: "Actuales",
         value: numberToCurrency(actual, data.monedaPredeterminadaISO),
         labels: [],
         values: [],
         tipo: "Actuales",
-      });
-    }
-    setSinteticas(cards);
+      },
+    ]);
 
     // Badge "Mes actual" de Gastos: fechaPago en [primer día del mes, hoy].
     const d = new Date();
@@ -287,26 +314,13 @@ export function DashboardClient({ data }: Props) {
     [gastosMesAnterior]
   );
 
-  // Evolución filtrada (sin fechas, para el panel Histórico):
-  // agrupa por período y suma montos, ordenado cronológicamente.
-  const filteredEvolucion = useMemo(() => {
-    const map = new Map<string, number>();
-    filteredSinFecha.forEach((g) => {
-      const nombre = g.periodo?.nombre || "Sin período";
-      map.set(nombre, (map.get(nombre) || 0) + g.monto);
-    });
-    const MESES: Record<string, number> = {
-      enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,
-      julio:7,agosto:8,septiembre:9,octubre:10,noviembre:11,diciembre:12,
-    };
-    return Array.from(map.entries())
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => {
-        const [ma] = a.name.toLowerCase().split(" ");
-        const [mb] = b.name.toLowerCase().split(" ");
-        return (MESES[ma] ?? 99) - (MESES[mb] ?? 99);
-      });
-  }, [filteredSinFecha]);
+  // Evolución del panel Histórico (sin filtro de fechas → TODO el histórico):
+  // agrupa por fecha de pago según la "Agrupación" elegida (mensual/quincenal/
+  // semanal/diario/anual) y ordena cronológicamente. Ya no usa el período de gasto.
+  const filteredEvolucion = useMemo(
+    () => gastosEvolucionPor(filteredSinFecha, selAgrup),
+    [filteredSinFecha, selAgrup]
+  );
 
   const activeFilters =
     selCat.length + selCta.length + 2; // fechas siempre activas (desde/hasta por defecto)
@@ -326,16 +340,21 @@ export function DashboardClient({ data }: Props) {
   );
 
   const openFilters = () => {
-    setDCat(selCat); setDCta(selCta); setDFd(selFd); setDFh(selFh); setOpen(true);
+    setDCat(selCat); setDCta(selCta); setDFd(selFd); setDFh(selFh);
+    setDAgrup(selAgrup);
+    setOpen(true);
   };
   const apply = () => {
-    setSelCat(dCat); setSelCta(dCta); setSelFd(dFd); setSelFh(dFh); setOpen(false);
+    setSelCat(dCat); setSelCta(dCta); setSelFd(dFd); setSelFh(dFh);
+    setSelAgrup(dAgrup);
+    setOpen(false);
   };
   const limpiar = () => {
     const fd = fechaPrimerDia();
     const fh = fechaHoy();
     setDCat([]); setDCta([]); setDFd(fd); setDFh(fh);
     setSelCat([]); setSelCta([]); setSelFd(fd); setSelFh(fh);
+    setDAgrup("mensual"); setSelAgrup("mensual");
     setOpen(false);
   };
 
@@ -542,12 +561,11 @@ export function DashboardClient({ data }: Props) {
       </div>
 
       {/* Panel Trabajo — tarjetas sintéticas de períodos de trabajo (Períodos a
-          Cobrar / Actuales). Solo se muestra si existen (se agregan tras el
-          montaje, como las sintéticas). */}
-      {sinteticas.length > 0 && (
-        <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
+          Cobrar / Actuales). SIEMPRE visible: aunque no haya nada pendiente,
+          permite gestionar trabajos/períodos y abrir ambos listados. */}
+      <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
           {/* Encabezado: título a la izquierda y menú (⋯) anclado al ángulo
-              superior derecho del panel (crear un nuevo período). */}
+              superior derecho del panel (gestionar trabajos y períodos). */}
           <div className="relative mb-3 pr-8">
             <h2 className="text-[16px] font-semibold text-header">Trabajo</h2>
             <div className="absolute right-0 top-0 flex items-center">
@@ -569,14 +587,13 @@ export function DashboardClient({ data }: Props) {
               />
             ))}
           </div>
-        </div>
-      )}
+      </div>
 
       {/* Gastos Section — filtro compartido */}
       {tabGastos === "resumen" ? (
         <DonutChart
           title="Gastos"
-          action={<div className="flex items-center gap-2">{filterBtn("hidden sm:inline-flex")}{gastosTabs}</div>}
+          action={<div className="flex items-center gap-2">{filterBtn("hidden sm:inline-flex")}{gastosTabs}<GastosActionsMenu /></div>}
           badge={<><StatBadge label="Mes actual" value={mesActualGastos} />{filterBtn("sm:hidden")}</>}
           currency={data.monedaPredeterminadaISO}
           data={filteredResumen.map((g) => ({
@@ -596,7 +613,7 @@ export function DashboardClient({ data }: Props) {
               <StatBadge label="Mes actual" value={mesActualGastos} />
               {filterBtn("sm:hidden")}
             </div>
-            <div className="flex items-center gap-2">{filterBtn("hidden sm:inline-flex")}{gastosTabs}</div>
+            <div className="flex items-center gap-2">{filterBtn("hidden sm:inline-flex")}{gastosTabs}<GastosActionsMenu /></div>
           </div>
           <GastosDetalle
             data={filteredGastos}
@@ -607,7 +624,7 @@ export function DashboardClient({ data }: Props) {
       ) : (
         <EvolutionChart
           title="Gastos"
-          action={<div className="flex items-center gap-2">{filterBtn("hidden sm:inline-flex")}{gastosTabs}</div>}
+          action={<div className="flex items-center gap-2">{filterBtn("hidden sm:inline-flex")}{gastosTabs}<GastosActionsMenu /></div>}
           badge={<><StatBadge label="Mes actual" value={mesActualGastos} />{filterBtn("sm:hidden")}</>}
           currency={data.monedaPredeterminadaISO}
           data={filteredEvolucion}
@@ -643,6 +660,9 @@ export function DashboardClient({ data }: Props) {
           <IngresosDetalle
             data={filteredIngresos}
             currency={data.monedaPredeterminadaISO}
+            onOpenPeriodo={(p) =>
+              router.push(`/cruds/periodos-trabajo/${p.id}?origen=dashboard`)
+            }
           />
         </div>
       ) : (
@@ -734,6 +754,22 @@ export function DashboardClient({ data }: Props) {
               className="w-full rounded-md border border-border bg-card px-2.5 py-1.5 text-[13px] text-card-foreground focus:outline-none focus:ring-2 focus:ring-primary/40" />
           </label>
         </div>
+        <div className="my-4 border-t border-border" />
+        <p className="mb-2 text-[13px] font-medium text-header">Agrupación</p>
+        <select
+          value={dAgrup}
+          onChange={(e) => setDAgrup(e.target.value as AgrupacionGasto)}
+          className="w-full rounded-md border border-border bg-card px-2.5 py-1.5 text-[13px] text-card-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+        >
+          {OPCIONES_AGRUPACION_GASTO.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1.5 text-[12px] text-subtitle">
+          Agrupa el gráfico Histórico por este período.
+        </p>
       </Modal>
 
       {/* Modal de filtros de Ingresos */}

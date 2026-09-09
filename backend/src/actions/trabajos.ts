@@ -31,6 +31,7 @@ import {
   formatearHora,
   modalidadAdmiteJornadas,
   modalidadAdmiteTareas,
+  periodoCobrado,
 } from "../lib/jornadas";
 import {
   jornadaTrabajoCreateSchema,
@@ -450,6 +451,12 @@ export async function crearJornadaTrabajo(
     }
     trabajoIdVal = periodoVal.trabajo.id;
     nombreTrabajoVal = periodoVal.trabajo.nombre;
+    // Un período ya cobrado no admite jornadas nuevas (histórico inmutable).
+    if (periodoCobrado(periodoVal)) {
+      throw new Error(
+        `El período del ${formatearFechaDMA(periodoVal.fechaDesde)} al ${formatearFechaDMA(periodoVal.fechaHasta)} ya fue cobrado: no se pueden agregar jornadas`
+      );
+    }
     const superpuesto = await encontrarPeriodoSuperpuesto(
       periodoRepoVal,
       periodoVal.trabajo.id,
@@ -622,6 +629,12 @@ export async function actualizarJornadaTrabajo(
   if (!existing) {
     throw new Error(`Jornada de trabajo con id ${id} no encontrada`);
   }
+  // Histórico inmutable: no se puede editar una jornada de un período cobrado.
+  if (periodoCobrado(existing.periodoTrabajo)) {
+    throw new Error(
+      "No se puede editar una jornada de un período ya cobrado"
+    );
+  }
 
   const idPeriodo = data.idPeriodo ?? existing.periodoTrabajo?.id;
   if (!idPeriodo) {
@@ -649,6 +662,12 @@ export async function actualizarJornadaTrabajo(
   });
   if (!periodoVal) {
     throw new Error(`Período de trabajo con id ${idPeriodo} no encontrado`);
+  }
+  // No se puede mover/guardar una jornada en un período ya cobrado.
+  if (periodoCobrado(periodoVal)) {
+    throw new Error(
+      `El período del ${formatearFechaDMA(periodoVal.fechaDesde)} al ${formatearFechaDMA(periodoVal.fechaHasta)} ya fue cobrado: no se pueden agregar ni editar jornadas`
+    );
   }
   if (
     !modalidadAdmiteJornadas(periodoVal.trabajo?.modalidadCobro ?? "horas_variables")
@@ -817,6 +836,12 @@ export async function eliminarJornadaTrabajo(id: string) {
   if (!row) {
     throw new Error(`Jornada de trabajo con id ${id} no encontrada`);
   }
+  // Histórico inmutable: no se elimina una jornada de un período cobrado.
+  if (periodoCobrado(row.periodoTrabajo)) {
+    throw new Error(
+      "No se puede eliminar una jornada de un período ya cobrado"
+    );
+  }
   if (
     !modalidadAdmiteJornadas(
       row.periodoTrabajo?.trabajo?.modalidadCobro ?? "horas_variables"
@@ -958,6 +983,12 @@ export async function crearTareaTrabajo(
             )})`
           );
         }
+        // Un período ya cobrado no admite tareas nuevas (histórico inmutable).
+        if (periodoCobrado(periodo)) {
+          throw new Error(
+            `El período del ${formatearFechaDMA(periodo.fechaDesde)} al ${formatearFechaDMA(periodo.fechaHasta)} ya fue cobrado: no se pueden agregar tareas`
+          );
+        }
         if (!fechaEnRango(data.fechaTarea, periodo.fechaDesde, periodo.fechaHasta)) {
           throw new Error(
             `La fecha de la tarea (${data.fechaTarea}) no corresponde al período "${formatearFechaDMA(
@@ -1021,6 +1052,12 @@ export async function actualizarTareaTrabajo(
   if (!existing) {
     throw new Error(`Tarea de trabajo con id ${id} no encontrada`);
   }
+  // Histórico inmutable: no se puede editar una tarea de un período cobrado.
+  if (periodoCobrado(existing.periodoTrabajo)) {
+    throw new Error(
+      "No se puede editar una tarea de un período ya cobrado"
+    );
+  }
   const modalidadActual =
     existing.periodoTrabajo?.trabajo?.modalidadCobro ?? "horas_variables";
   if (!modalidadAdmiteTareas(modalidadActual)) {
@@ -1068,6 +1105,12 @@ export async function actualizarTareaTrabajo(
           `El trabajo "${periodo.trabajo?.nombre ?? "?"}" no admite tareas (modalidad ${etiquetaModalidad(
             periodo.trabajo?.modalidadCobro ?? "horas_variables"
           )})`
+        );
+      }
+      // No se puede mover/guardar una tarea en un período ya cobrado.
+      if (periodoCobrado(periodo)) {
+        throw new Error(
+          `El período del ${formatearFechaDMA(periodo.fechaDesde)} al ${formatearFechaDMA(periodo.fechaHasta)} ya fue cobrado: no se pueden agregar ni editar tareas`
         );
       }
       if (!fechaEnRango(fechaTarea, periodo.fechaDesde, periodo.fechaHasta)) {
@@ -1126,6 +1169,12 @@ export async function eliminarTareaTrabajo(id: string) {
   });
   if (!row) {
     throw new Error(`Tarea de trabajo con id ${id} no encontrada`);
+  }
+  // Histórico inmutable: no se elimina una tarea de un período cobrado.
+  if (periodoCobrado(row.periodoTrabajo)) {
+    throw new Error(
+      "No se puede eliminar una tarea de un período ya cobrado"
+    );
   }
   if (
     !modalidadAdmiteTareas(

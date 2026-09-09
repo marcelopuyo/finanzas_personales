@@ -59,8 +59,8 @@ export function StepShell({
   );
 }
 
-/** Botones del wizard de movimientos. En modo directo: Cancelar (→ dashboard)
- * + Siguiente. En modo stepper: Atrás + Siguiente. */
+/** Botones del wizard de movimientos. En modo directo: Cancelar (→ volverA si
+ * viene, si no → dashboard) + Siguiente. En modo stepper: Atrás + Siguiente. */
 export function NavButtons({
   onBack,
   onNext,
@@ -74,12 +74,14 @@ export function NavButtons({
   nextLabel?: string;
   backLabel?: string;
 }) {
-  const { direct } = useMovimientoStepper();
+  const { direct, volverA } = useMovimientoStepper();
   const router = useRouter();
   return (
     <NavButtonsBase
       onBack={direct ? undefined : onBack}
-      onCancel={direct ? () => router.push("/dashboard") : undefined}
+      onCancel={
+        direct ? () => router.push(volverA ?? "/dashboard") : undefined
+      }
       onNext={onNext}
       nextDisabled={nextDisabled}
       nextLabel={nextLabel}

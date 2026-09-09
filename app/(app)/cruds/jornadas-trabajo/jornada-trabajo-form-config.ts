@@ -88,3 +88,31 @@ export const jornadaTrabajoFieldsEditar: FormField[] = [
   },
   campoCuentaPropina,
 ];
+
+// Para "Editar Jornada" DENTRO de la pantalla de un período: sin selector de
+// período (queda fijo al período que la contiene). El submit lo provee desde
+// los datos de la jornada (periodoTrabajoId).
+export const jornadaTrabajoSchemaEnPeriodo = z
+  .object({
+    fechaJornada: z.string().min(1, "Fecha requerida"),
+    horaDesde: z.string().regex(timeRegex, "Hora inválida (HH:MM)"),
+    horaHasta: z.string().regex(timeRegex, "Hora inválida (HH:MM)"),
+    montoPropina: z.coerce.number().optional(),
+    // Cuenta donde se deposita la propina (solo si propina > 0).
+    idCuenta: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if ((data.montoPropina ?? 0) > 0 && !data.idCuenta) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["idCuenta"],
+        message: "Seleccione la cuenta para la propina",
+      });
+    }
+  });
+
+// Campos de la edición en período fijo: sin el select de Período.
+export const jornadaTrabajoFieldsEditarEnPeriodo: FormField[] = [
+  ...camposBase,
+  campoCuentaPropina,
+];

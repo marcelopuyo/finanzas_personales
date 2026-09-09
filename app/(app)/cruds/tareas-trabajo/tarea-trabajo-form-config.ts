@@ -80,3 +80,21 @@ export const tareaTrabajoFieldsEditar: FormField[] = [
     optionsFrom: fetchPeriodosTrabajoPorTarea,
   },
 ];
+
+// Para "Editar Tarea" DENTRO de la pantalla de un período: sin selector de
+// período (queda fijo al período que la contiene). El submit lo provee desde
+// los datos de la tarea (periodoTrabajoId).
+export const tareaTrabajoSchemaEnPeriodo = z.object({
+  // "YYYY-MM-DDTHH:mm" (datetime-local). Se envía convertida a ISO (Z).
+  fechaHoraTarea: z.string().min(1, "Fecha/hora requerida"),
+  // Opcional, precargada con la fecha/hora y editable.
+  descripcion: z.string().optional(),
+  // Opcional INFORMATIVA (no afecta el monto).
+  horasTarea: z.coerce.number().optional(),
+  montoTarea: z.coerce.number().positive("El monto debe ser positivo"),
+});
+
+// Campos de la edición en período fijo: sin el select de Período.
+export const tareaTrabajoFieldsEditarEnPeriodo: FormField[] = [
+  ...camposBase,
+];

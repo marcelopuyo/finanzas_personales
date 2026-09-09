@@ -7,20 +7,13 @@ import { CategoriaGasto } from "../entities/categoria-gasto.entity";
 import { Cuenta } from "../entities/cuenta.entity";
 import { Gasto } from "../entities/gasto.entity";
 import { Movimiento } from "../entities/movimiento.entity";
-import { PeriodoGasto } from "../entities/periodo-gasto.entity";
 import { crearHistoricoCuenta, dbError, refresh } from "../lib/action-helpers";
-import {
-  getCategoriaGastoById,
-  getGastoById,
-  getPeriodoGastoById,
-} from "../queries/gastos";
+import { getCategoriaGastoById, getGastoById } from "../queries/gastos";
 import {
   categoriaGastoCreateSchema,
   categoriaGastoUpdateSchema,
   gastoCreateSchema,
   gastoUpdateSchema,
-  periodoGastoCreateSchema,
-  periodoGastoUpdateSchema,
 } from "../validation/gastos";
 
 // ============================================================
@@ -84,81 +77,13 @@ export async function eliminarCategoriaGasto(id: number) {
 }
 
 // ============================================================
-// PERÍODO DE GASTO
-// ============================================================
-export async function crearPeriodoGasto(
-  input: z.infer<typeof periodoGastoCreateSchema>
-) {
-  const userId = await requireUserId();
-  const data = periodoGastoCreateSchema.parse(input);
-  const ds = await getDb();
-  const repo = ds.getRepository(PeriodoGasto);
-  try {
-    const created = await repo.save(
-      repo.create({ ...data, usuario: { id: userId } })
-    );
-    refresh();
-    return getPeriodoGastoById(created.id);
-  } catch (error) {
-    dbError(error, "Período de gasto");
-  }
-}
-
-export async function actualizarPeriodoGasto(
-  id: number,
-  input: z.infer<typeof periodoGastoUpdateSchema>
-) {
-  const userId = await requireUserId();
-  const data = periodoGastoUpdateSchema.parse(input);
-  const ds = await getDb();
-  const repo = ds.getRepository(PeriodoGasto);
-  const existing = await repo.findOneBy({ id, usuario: { id: userId } });
-  if (!existing) {
-    throw new Error(`Período de gasto con id ${id} no encontrado`);
-  }
-  try {
-    Object.assign(existing, data);
-    await repo.save(existing);
-    refresh();
-    return getPeriodoGastoById(id);
-  } catch (error) {
-    dbError(error, "Período de gasto");
-  }
-}
-
-export async function eliminarPeriodoGasto(id: number) {
-  const userId = await requireUserId();
-  const ds = await getDb();
-  const repo = ds.getRepository(PeriodoGasto);
-  const row = await repo.findOneBy({ id, usuario: { id: userId }, eliminado: false });
-  if (!row) {
-    throw new Error(`Período de gasto con id ${id} no encontrado`);
-  }
-  try {
-    row.eliminado = true;
-    await repo.save(row);
-    refresh();
-  } catch (error) {
-    dbError(error, "Período de gasto");
-  }
-}
-
-// ============================================================
-// GASTO (periodo y categoria por nombre)
+// GASTO (categoria por nombre)
 // ============================================================
 export async function crearGasto(input: z.infer<typeof gastoCreateSchema>) {
   const userId = await requireUserId();
   const data = gastoCreateSchema.parse(input);
   const ds = await getDb();
-  const { nombrePeriodo, nombreCategoria, ...rest } = data;
-
-  const periodo = await ds.getRepository(PeriodoGasto).findOneBy({
-    nombre: nombrePeriodo,
-    usuario: { id: userId },
-  });
-  if (!periodo) {
-    throw new Error(`Período con nombre "${nombrePeriodo}" no encontrado`);
-  }
+  const { nombreCategoria, ...rest } = data;
 
   const categoria = await ds.getRepository(CategoriaGasto).findOneBy({
     nombre: nombreCategoria,
@@ -174,7 +99,6 @@ export async function crearGasto(input: z.infer<typeof gastoCreateSchema>) {
       repo.create({
         ...rest,
         saldo: rest.monto,
-        periodo,
         categoria,
         usuario: { id: userId },
       })
@@ -193,24 +117,13 @@ export async function actualizarGasto(
   const userId = await requireUserId();
   const data = gastoUpdateSchema.parse(input);
   const ds = await getDb();
-  const { nombrePeriodo, nombreCategoria, ...rest } = data;
+  const { nombreCategoria, ...rest } = data;
 
   const existing = await ds
     .getRepository(Gasto)
     .findOneBy({ id, usuario: { id: userId }, eliminado: false });
   if (!existing) {
     throw new Error(`Gasto con id ${id} no encontrado`);
-  }
-
-  if (nombrePeriodo) {
-    const periodo = await ds.getRepository(PeriodoGasto).findOneBy({
-      nombre: nombrePeriodo,
-      usuario: { id: userId },
-    });
-    if (!periodo) {
-      throw new Error(`Período con nombre "${nombrePeriodo}" no encontrado`);
-    }
-    existing.periodo = periodo;
   }
 
   if (nombreCategoria) {

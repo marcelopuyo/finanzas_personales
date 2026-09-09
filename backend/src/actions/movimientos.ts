@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "crypto";
-import { EntityManager, LessThanOrEqual, MoreThanOrEqual } from "typeorm";
+import { EntityManager } from "typeorm";
 import type { z } from "zod";
 import { getDb } from "../db";
 import { requireUserId } from "../lib/auth";
@@ -11,7 +11,6 @@ import { Cuenta } from "../entities/cuenta.entity";
 import { Gasto } from "../entities/gasto.entity";
 import { JornadaTrabajo } from "../entities/jornada-trabajo.entity";
 import { Movimiento } from "../entities/movimiento.entity";
-import { PeriodoGasto } from "../entities/periodo-gasto.entity";
 import { PeriodoTrabajo } from "../entities/periodo-trabajo.entity";
 import { Prestamo } from "../entities/prestamo.entity";
 import { Trabajo } from "../entities/trabajo.entity";
@@ -26,6 +25,7 @@ import {
   formatearFechaDMA,
   formatearHora,
   modalidadAdmiteJornadas,
+  periodoCobrado,
 } from "../lib/jornadas";
 import { montoEnMonedaPredeterminada } from "../lib/cotizaciones";
 import {
@@ -38,26 +38,6 @@ import { tareaTrabajoCreateSchema } from "../validation/trabajos";
 import { crearTareaTrabajo } from "./trabajos";
 
 // ---------------------------------------------------------------------------
-
-/** Busca el período de gasto cuyo rango (fechaApertura..fechaCierre) contiene la fecha dada. */
-async function findPeriodoGastoPorFecha(
-  manager: EntityManager,
-  fecha: string,
-  userId: number
-) {
-  const repo = manager.getRepository(PeriodoGasto);
-  const d = new Date(fecha);
-  const periodo = await repo.findOne({
-    where: {
-      usuario: { id: userId },
-      eliminado: false,
-      fechaApertura: LessThanOrEqual(d),
-      fechaCierre: MoreThanOrEqual(d),
-    },
-  });
-  if (!periodo) throw new Error(`No se encontró un período de gasto para la fecha ${fecha}`);
-  return periodo;
-}
 
 async function findCategoriaGasto(manager: EntityManager, id: number, userId: number) {
   const repo = manager.getRepository(CategoriaGasto);
@@ -356,9 +336,8 @@ export async function gastoDirecto(input: z.infer<typeof movimiento3Schema>) {
     const conceptoRepo = manager.getRepository(Concepto);
     const movRepo = manager.getRepository(Movimiento);
 
-    // 1. Crear el gasto — el período se resuelve por la FECHA ingresada (no por
-    //    el período actual), para que el gasto quede en el mes que corresponde.
-    const periodo = await findPeriodoGastoPorFecha(manager, data.fecha, userId);
+    // 1. Crear el gasto (ya no tiene período: el dashboard agrupa por fecha de
+    //    pago). Se resuelve solo la categoría.
     const categoria = await findCategoriaGasto(manager, data.idCategoriaGasto, userId);
 
     const nuevoGasto = await gastoRepo.save(
@@ -370,7 +349,6 @@ export async function gastoDirecto(input: z.infer<typeof movimiento3Schema>) {
         monto: montoPredeterminada,
         saldo: montoPredeterminada,
         fechaVencimiento: data.fecha as unknown as Date,
-        periodo,
         categoria,
         usuario: { id: userId },
       })
@@ -582,6 +560,12 @@ export async function cargarJornadaTrabajo(
       if (!periodo) {
         throw new Error(
           `Período de trabajo con id ${data.idPeriodo} no encontrado`
+        );
+      }
+      // Un período ya cobrado no admite jornadas nuevas (histórico inmutable).
+      if (periodoCobrado(periodo)) {
+        throw new Error(
+          `El período del ${formatearFechaDMA(periodo.fechaDesde)} al ${formatearFechaDMA(periodo.fechaHasta)} ya fue cobrado: no se pueden cargar jornadas`
         );
       }
       if (

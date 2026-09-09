@@ -1,4 +1,4 @@
-import { Between, In, IsNull, LessThanOrEqual, MoreThan, MoreThanOrEqual } from "typeorm";
+import { IsNull, MoreThan, MoreThanOrEqual } from "typeorm";
 import { getDb } from "../db";
 import { getSessionUser, requireUserId } from "../lib/auth";
 import { convertir } from "../lib/cotizaciones";
@@ -7,7 +7,6 @@ import { Cuenta } from "../entities/cuenta.entity";
 import { Gasto } from "../entities/gasto.entity";
 import { HistoricoCuenta } from "../entities/historico-cuenta.entity";
 import { Movimiento } from "../entities/movimiento.entity";
-import { PeriodoGasto } from "../entities/periodo-gasto.entity";
 import { PeriodoTrabajo } from "../entities/periodo-trabajo.entity";
 import { Prestamo } from "../entities/prestamo.entity";
 
@@ -34,20 +33,6 @@ export interface CuentaConEvolucion {
   monedaCodigoISO: string | null;
   /** Nombre del tipo de cuenta (para el icono de la tarjeta del dashboard). */
   tipoNombre: string | null;
-}
-
-export interface GastoPeriodo {
-  id: string;
-  descripcion: string | null;
-  monto: number;
-  saldo: number;
-  fechaVencimiento: Date | null;
-  fechaPago: Date | null;
-  isPeriodico: boolean;
-  categoria: { nombre: string } | null;
-  periodo: { nombre: string } | null;
-  /** Cuenta con la que se pagó el gasto (desde el Movimiento). */
-  cuenta: string | null;
 }
 
 // ============================================================
@@ -93,126 +78,12 @@ export async function getBalanceActual(): Promise<number> {
 }
 
 // ============================================================
-// 2) Gastos del período
+// 2) [ELIMINADA] Gastos del período — dependía de periodo_gasto.
+// 3) [ELIMINADA] Evolución de gastos por período — idem.
+// La evolución de Gastos se calcula en el cliente por fecha de pago
+// (app/(app)/dashboard/gastos-agrupacion.ts); la mensual por movimientos
+// está en la sección 4) siguiente.
 // ============================================================
-export async function getGastosPeriodo(
-  idPeriodo?: number,
-  fechaDesde?: string,
-  fechaHasta?: string
-): Promise<GastoPeriodo[]> {
-  const userId = await requireUserId();
-  const ds = await getDb();
-  const gastoRepo = ds.getRepository(Gasto);
-
-  if (fechaDesde && fechaHasta) {
-    const rows = await gastoRepo.find({
-      where: {
-        usuario: { id: userId },
-        eliminado: false,
-        fechaPago: Between(new Date(fechaDesde), new Date(fechaHasta)),
-      },
-      relations: { periodo: true, categoria: true },
-    });
-    return withCuentas(rows, ds);
-  }
-
-  let id = idPeriodo;
-  if (!id) {
-    // Se resuelve el período vigente con el "hoy" del servidor. Las columnas
-    // son `date` (medianoche UTC), así que se compara con FECHAS INCLUSIVAS
-    // usando el inicio/fin del día en UTC: antes, `fechaCierre >= now` (un
-    // timestamp con hora) fallaba el MISMO día de cierre del período (p. ej.
-    // el 31 si cierra el 31), dejando el badge "Mes actual" en 0. Además, el
-    // servidor corre en UTC (Vercel) y en el límite de mes puede quedar ±1 día
-    // adelantado al usuario (GMT-3 de noche el 31 → server ya en el 1°); el
-    // cliente recalcula el badge con su fecha local tras el montaje.
-    const hoyKey = new Date().toISOString().slice(0, 10);
-    const inicioDia = new Date(`${hoyKey}T00:00:00.000Z`);
-    const finDia = new Date(`${hoyKey}T23:59:59.999Z`);
-    const actual = await ds.getRepository(PeriodoGasto).findOne({
-      where: {
-        usuario: { id: userId },
-        eliminado: false,
-        fechaApertura: LessThanOrEqual(finDia),
-        fechaCierre: MoreThanOrEqual(inicioDia),
-      },
-    });
-    if (!actual) return [];
-    id = actual.id;
-  }
-
-  const rows = await gastoRepo.find({
-    where: { usuario: { id: userId }, eliminado: false, periodo: { id } },
-    relations: { periodo: true, categoria: true },
-  });
-  return withCuentas(rows, ds);
-}
-
-/** Resuelve las cuentas de pago para una lista de gastos en batch. */
-async function withCuentas(
-  rows: Gasto[],
-  ds: Awaited<ReturnType<typeof getDb>>
-): Promise<GastoPeriodo[]> {
-  const mapped = rows.map(mapGastoPeriodo);
-  const ids = mapped.map((g) => g.id).filter((id): id is string => !!id);
-  if (ids.length === 0) return mapped;
-
-  const movimientos = await ds.getRepository(Movimiento).find({
-    where: { gasto: { id: In(ids) }, eliminado: false },
-    relations: { cuenta: true, gasto: true },
-  });
-  const cuentas = new Map<string, string>();
-  for (const mov of movimientos) {
-    if (mov.gasto?.id && mov.cuenta?.nombre) {
-      cuentas.set(mov.gasto.id, mov.cuenta.nombre);
-    }
-  }
-  return mapped.map((g) => ({ ...g, cuenta: cuentas.get(g.id) ?? null }));
-}
-
-function mapGastoPeriodo(r: Gasto): GastoPeriodo {
-  return {
-    id: r.id,
-    descripcion: r.descripcion ?? null,
-    monto: r.monto,
-    saldo: r.saldo,
-    fechaVencimiento: r.fechaVencimiento ?? null,
-    fechaPago: r.fechaPago ?? null,
-    isPeriodico: r.isPeriodico,
-    categoria: r.categoria ? { nombre: r.categoria.nombre } : null,
-    periodo: r.periodo ? { nombre: r.periodo.nombre } : null,
-    cuenta: null,
-  };
-}
-
-// ============================================================
-// 3) Evolución de gastos (por período)
-// ============================================================
-export async function getEvolucionGastos(): Promise<EvolucionItem[]> {
-  const userId = await requireUserId();
-  const ds = await getDb();
-  // Cargamos gastos con su periodo y agrupamos manualmente (PeriodoGasto
-  // no tiene la inversa gastos para evitar ciclos de importación).
-  const gastos = await ds.getRepository(Gasto).find({
-    where: { usuario: { id: userId }, eliminado: false },
-    relations: { periodo: true },
-  });
-
-  const agrupado: Record<string, number> = {};
-  for (const g of gastos) {
-    const nombre = g.periodo?.nombre ?? "Sin período";
-    agrupado[nombre] = (agrupado[nombre] || 0) + g.monto;
-  }
-
-  // Ordenamos por id del período para consistencia con el backend
-  const periodos = await ds.getRepository(PeriodoGasto).find({
-    where: { usuario: { id: userId }, eliminado: false },
-    order: { id: "ASC" },
-  });
-  return periodos
-    .filter((p) => agrupado[p.nombre] !== undefined)
-    .map((p) => ({ periodo: p.nombre, monto: agrupado[p.nombre] ?? 0 }));
-}
 
 // ============================================================
 // 4) Evolución de gastos mensual — desde MOVIMIENTOS (moneda predeterminada)

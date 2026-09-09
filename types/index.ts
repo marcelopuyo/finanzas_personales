@@ -72,13 +72,6 @@ export interface ResponseInflacionDto {
   indice: number;
 }
 
-export interface ResponsePeriodoGastoDto {
-  id: number;
-  nombre: string;
-  fechaApertura: Date;
-  fechaCierre: Date;
-}
-
 export interface ResponseGastoDto {
   id: string;
   descripcion?: string;
@@ -88,7 +81,6 @@ export interface ResponseGastoDto {
   fechaPago?: string | Date;
   isPeriodico?: boolean;
   categoria?: { nombre: string };
-  periodo?: { nombre: string };
   cuenta?: { nombre: string };
 }
 

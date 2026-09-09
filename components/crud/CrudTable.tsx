@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, FileDown, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { BottomActionBar } from "@/components/ui/bottom-action-bar";
@@ -38,6 +38,20 @@ interface CrudTableProps<T, TId = number> {
   /** Texto opcional bajo el título en mobile (p. ej. "Tocá una fila para
       seleccionarla"). Solo aplica con mobileBottomNav. */
   mobileHint?: string;
+  /** Columnas extra que se agregan AL FINAL (después de Editar/Eliminar) en
+      desktop y también en la grilla mobile (bottomNav). Útiles para acciones
+      por fila contextuales (p. ej. "Pagar" un préstamo). */
+  trailingColumns?: ColumnDef<T>[];
+  /** Contenido extra que se renderiza entre el título y la grilla (arriba del
+      contenido). Útil para un resumen/header contextual (p. ej. el resumen de
+      un período de trabajo con su monto a cobrar). */
+  topContent?: ReactNode;
+  /** false = vista de solo lectura / sin acciones: oculta la columna
+      Editar/Eliminar, los botones Nuevo/Exportar (desktop), la barra inferior
+      y el FAB del modo mobile. La grilla se muestra igual. */
+  showActions?: boolean;
+  /** Mensaje de la grilla cuando no hay datos (default "Sin datos disponibles"). */
+  emptyMessage?: string;
 }
 
 /**
@@ -60,6 +74,10 @@ export function CrudTable<T, TId = number>({
   currency = "ARS",
   mobileBottomNav = false,
   mobileHint,
+  trailingColumns = [],
+  topContent,
+  showActions = true,
+  emptyMessage = "Sin datos disponibles",
 }: CrudTableProps<T, TId>) {
   const router = useRouter();
   const [items, setItems] = useState<T[]>(initialData ?? []);
@@ -119,33 +137,47 @@ export function CrudTable<T, TId = number>({
   const allColumns = useMemo<ColumnDef<T>[]>(
     () => [
       ...columns,
-      {
-        id: "actions",
-        header: "",
-        meta: { align: "center" as const },
-        cell: ({ row }: { row: { original: T } }) => (
-          <div className="flex items-center justify-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => router.push(editHref(getId(row.original)))}
-              className="rounded p-1 text-subtitle transition-colors hover:bg-muted hover:text-header"
-              aria-label="Editar"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setDeleteId(getId(row.original))}
-              className="rounded p-1 text-subtitle transition-colors hover:bg-muted hover:text-danger"
-              aria-label="Eliminar"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ),
-      } as ColumnDef<T>,
+      // Columna de acciones Editar/Eliminar: solo si la vista permite acciones
+      // (showActions=false la oculta, p. ej. vistas de solo lectura).
+      ...(showActions
+        ? [
+            {
+              id: "actions",
+              header: "",
+              meta: { align: "center" as const },
+              cell: ({ row }: { row: { original: T } }) => (
+                <div className="flex items-center justify-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => router.push(editHref(getId(row.original)))}
+                    className="rounded p-1 text-subtitle transition-colors hover:bg-muted hover:text-header"
+                    aria-label="Editar"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteId(getId(row.original))}
+                    className="rounded p-1 text-subtitle transition-colors hover:bg-muted hover:text-danger"
+                    aria-label="Eliminar"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ),
+            } as ColumnDef<T>,
+          ]
+        : []),
+      ...trailingColumns,
     ],
-    [columns, router, editHref, getId]
+    [columns, router, editHref, getId, trailingColumns, showActions]
+  );
+
+  // Columnas de la grilla mobile (bottomNav): datos + columnas finales (sin la
+  // columna de acciones Editar/Eliminar, que viven en la barra inferior).
+  const mobileColumns = useMemo<ColumnDef<T>[]>(
+    () => [...columns, ...trailingColumns],
+    [columns, trailingColumns]
   );
 
   const handleExportPdf = () => {
@@ -277,8 +309,8 @@ export function CrudTable<T, TId = number>({
   // Barra inferior fija (<lg): componente reutilizable BottomActionBar con
   // Buscar/Exportar a la izquierda, Editar/Eliminar a la derecha (se habilitan
   // al seleccionar una fila) y FAB central "+". El estado (selección, búsqueda)
-  // se mantiene acá y se pasa como props/callbacks.
-  const bottomBarEl = mobileBottomNav ? (
+  // se mantiene acá y se pasa como props/callbacks. Solo si hay acciones.
+  const bottomBarEl = mobileBottomNav && showActions ? (
     <BottomActionBar
       left={[
         {
@@ -319,13 +351,16 @@ export function CrudTable<T, TId = number>({
     <div
       className={cn(
         "mx-auto max-w-5xl px-4",
-        mobileBottomNav ? "py-6 pb-44 lg:py-8 lg:pb-8" : "py-8"
+        mobileBottomNav && showActions
+          ? "py-6 pb-44 lg:py-8 lg:pb-8"
+          : "py-8"
       )}
     >
       {/* ===== Variante mobile (bottomNav): barra inferior + selección por fila ===== */}
       {mobileBottomNav && (
         <div className="lg:hidden">
           {titleMobileEl}
+          {topContent}
           {mobileHint && (
             <p className="-mt-2 mb-3 text-[12px] text-subtitle">{mobileHint}</p>
           )}
@@ -345,12 +380,13 @@ export function CrudTable<T, TId = number>({
           )}
           <div className="rounded-lg border border-border bg-card p-4">
             <DataTable
-              columns={columns}
+              columns={mobileColumns}
               data={filtered}
               pageSize={10}
               getRowId={(row) => String(getId(row))}
               rowClassName={selectedCls}
               onRowClick={toggleRow}
+              emptyMessage={emptyMessage}
             />
           </div>
         </div>
@@ -377,6 +413,8 @@ export function CrudTable<T, TId = number>({
         <h1 className="mb-4 text-[18px] font-semibold text-header">{title}</h1>
       )}
 
+      {topContent}
+
       {/* Toolbar: búsqueda + botón Nuevo */}
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative flex-1 sm:max-w-sm">
@@ -390,22 +428,26 @@ export function CrudTable<T, TId = number>({
           />
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleExportPdf}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-4 py-1.5 text-[13px] font-medium text-card-foreground transition-colors hover:bg-muted"
-          >
-            <FileDown className="h-3.5 w-3.5" />
-            Exportar
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push(createHref)}
-            className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Nuevo
-          </button>
+          {showActions && (
+            <>
+              <button
+                type="button"
+                onClick={handleExportPdf}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-4 py-1.5 text-[13px] font-medium text-card-foreground transition-colors hover:bg-muted"
+              >
+                <FileDown className="h-3.5 w-3.5" />
+                Exportar
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push(createHref)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Nuevo
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -434,6 +476,7 @@ export function CrudTable<T, TId = number>({
             // Row key estable por id real (evita que los switches/estado de cada
             // fila "salten" a otra cuenta si el orden de los datos cambia).
             getRowId={(row) => String(getId(row))}
+            emptyMessage={emptyMessage}
           />
         )}
       </div>

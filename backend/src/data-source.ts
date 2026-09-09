@@ -9,7 +9,6 @@ import { Cotizacion } from "./entities/cotizacion.entity";
 import { HistoricoCuenta } from "./entities/historico-cuenta.entity";
 import { Inflacion } from "./entities/inflacion.entity";
 import { CategoriaGasto } from "./entities/categoria-gasto.entity";
-import { PeriodoGasto } from "./entities/periodo-gasto.entity";
 import { Gasto } from "./entities/gasto.entity";
 import { Tarjeta } from "./entities/tarjeta.entity";
 import { PeriodoTarjeta } from "./entities/periodo-tarjeta.entity";
@@ -33,7 +32,7 @@ import { pgSslOption } from "./lib/pg-ssl";
 
 export const ENTITIES = [
   Concepto, Persona, Moneda, TipoCuenta, Cuenta, Cotizacion,
-  HistoricoCuenta, Inflacion, CategoriaGasto, PeriodoGasto, Gasto,
+  HistoricoCuenta, Inflacion, CategoriaGasto, Gasto,
   Tarjeta, PeriodoTarjeta, MovimientoTarjeta,
   Trabajo, PeriodoTrabajo, JornadaTrabajo, TareaTrabajo, Prestamo, Movimiento,
   Usuario,

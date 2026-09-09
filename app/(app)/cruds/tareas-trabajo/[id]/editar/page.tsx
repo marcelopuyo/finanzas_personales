@@ -1,11 +1,14 @@
 import { getTareaTrabajoById } from "@/backend/src/queries/trabajos";
 import { EditarTareaTrabajoClient } from "./edit-client";
+
 export default async function EditarTareaTrabajoPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ periodoFijo?: string; volverA?: string }>;
 }) {
-  const { id } = await params;
+  const [{ id }, qs] = await Promise.all([params, searchParams]);
   const d = await getTareaTrabajoById(id);
   if (!d)
     return (
@@ -13,5 +16,11 @@ export default async function EditarTareaTrabajoPage({
         <p className="text-danger">Tarea no encontrada</p>
       </div>
     );
-  return <EditarTareaTrabajoClient data={d} />;
+  return (
+    <EditarTareaTrabajoClient
+      data={d}
+      periodoFijo={qs.periodoFijo === "1"}
+      volverA={qs.volverA}
+    />
+  );
 }

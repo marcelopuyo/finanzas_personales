@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Banknote, Briefcase, ClipboardList } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Modal } from "@/components/ui/modal";
 import { DataTable } from "@/components/ui/data-table";
@@ -34,21 +33,14 @@ export function PeriodosModal({
   onClose: () => void;
 }) {
   const router = useRouter();
-  // Lanza el wizard de cobro de sueldo con el período de la fila preseleccionado
-  // (y su monto a cobrar precargado), reutilizando el query param `periodo`.
-  const cobrar = (id: number) => {
-    router.push(`/movimientos/nuevo/cobro?periodo=${id}`);
-    onClose();
-  };
-
-  // Lanza el wizard de jornada/tarea con el período de la fila preseleccionado
-  // (columna por fila del popup "Actuales").
-  const cargarJornada = (id: number) => {
-    router.push(`/movimientos/nuevo/jornada?periodo=${id}`);
-    onClose();
-  };
-  const cargarTarea = (id: number) => {
-    router.push(`/movimientos/nuevo/tarea?periodo=${id}`);
+  // Tocar una fila abre la pantalla de gestión del período (CRUD de sus
+  // jornadas/tareas + resumen + Cobrar cuando corresponde). El cobro y el alta
+  // de jornadas/tareas viven DENTRO de esa pantalla, así que acá ya no hay
+  // columnas de acción por fila.
+  const abrirPeriodo = (id: number) => {
+    // `periodos` identifica el listado que cargó la fila: al volver desde la
+    // pantalla del período, el dashboard reabre este mismo popup.
+    router.push(`/cruds/periodos-trabajo/${id}?origen=dashboard&periodos=${tipo ?? ""}`);
     onClose();
   };
 
@@ -98,83 +90,9 @@ export function PeriodosModal({
     },
   ];
 
-  // Icono "Cobrar" por fila: lanza el wizard de cobro de sueldo directamente
-  // con ese período preseleccionado. Solo en el listado "Por cobrar"
-  // (los "Actuales" aún no están cerrados, no corresponden cobrarlos).
-  const columnasCobro: ColumnDef<PeriodoTrabajoOut>[] = [
-    {
-      id: "cobrar",
-      header: "Cobrar",
-      meta: { align: "center" } as const,
-      cell: ({ row }) => {
-        const p = row.original;
-        return (
-          <button
-            type="button"
-            onClick={() => cobrar(p.id)}
-            title="Cobrar"
-            aria-label={`Cobrar período de ${p.trabajo?.nombre ?? "trabajo"} (${dateTimeToString(p.fechaDesde)} al ${dateTimeToString(p.fechaHasta)})`}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted text-primary transition-colors hover:bg-primary/15"
-          >
-            <Banknote className="h-4 w-4" />
-          </button>
-        );
-      },
-    },
-  ];
-
-  // Columna "Cargar" (solo "Actuales"): por fila permite cargar la jornada
-  // (modalidad horas_variables) o la tarea (modalidad por_tarea) DENTRO de ese
-  // período. Los períodos fijo/horas_fijas no admiten cargas manuales.
-  const columnasCargar: ColumnDef<PeriodoTrabajoOut>[] = [
-    {
-      id: "cargar",
-      header: "Cargar",
-      meta: { align: "center" } as const,
-      cell: ({ row }) => {
-        const p = row.original;
-        const modalidad = p.trabajo?.modalidadCobro ?? "horas_variables";
-        const aria = `${p.trabajo?.nombre ?? "trabajo"} (${dateTimeToString(
-          p.fechaDesde
-        )} al ${dateTimeToString(p.fechaHasta)})`;
-        if (modalidad === "por_tarea") {
-          return (
-            <button
-              type="button"
-              onClick={() => cargarTarea(p.id)}
-              title="Cargar tarea"
-              aria-label={`Cargar tarea de ${aria}`}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted text-primary transition-colors hover:bg-primary/15"
-            >
-              <ClipboardList className="h-4 w-4" />
-            </button>
-          );
-        }
-        if (modalidad === "horas_variables") {
-          return (
-            <button
-              type="button"
-              onClick={() => cargarJornada(p.id)}
-              title="Cargar jornada"
-              aria-label={`Cargar jornada de ${aria}`}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted text-primary transition-colors hover:bg-primary/15"
-            >
-              <Briefcase className="h-4 w-4" />
-            </button>
-          );
-        }
-        // fijo / horas_fijas: no hay cargas manuales por período.
-        return <span className="text-subtitle">—</span>;
-      },
-    },
-  ];
-
-  const columns: ColumnDef<PeriodoTrabajoOut>[] =
-    tipo === "cobrar"
-      ? [...columnasBase, ...columnasCobro]
-      : tipo === "actuales"
-        ? [...columnasBase, ...columnasCargar]
-        : columnasBase;
+  // La grilla muestra solo columnas de datos: tocar una fila abre la pantalla
+  // de gestión del período (allí viven el Cobrar y el alta de jornadas/tareas).
+  const columns = columnasBase;
 
   const total = data.reduce((acc, p) => acc + (p.montoACobrar || 0), 0);
 
@@ -193,8 +111,16 @@ export function PeriodosModal({
             {numberToCurrency(total, currency)}
           </p>
         </div>
+        <p className="text-[12px] text-subtitle">
+          Tocá un período para ver/editar sus jornadas o tareas.
+        </p>
         {data.length ? (
-          <DataTable columns={columns} data={data} pageSize={8} />
+          <DataTable
+            columns={columns}
+            data={data}
+            pageSize={8}
+            onRowClick={(p) => abrirPeriodo(p.id)}
+          />
         ) : (
           <div className="flex h-24 items-center justify-center text-[13px] text-subtitle">
             No hay períodos para mostrar.

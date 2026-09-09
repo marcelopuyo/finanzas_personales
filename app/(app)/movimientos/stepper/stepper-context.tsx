@@ -22,6 +22,9 @@ interface StepperContextValue {
   options: MovimientoOptions;
   /** Modo directo (sin stepper): oculta el progreso y la navegación de pasos. */
   direct: boolean;
+  /** Destino de Cancelar/volver tras guardar en modo directo (si viene, ej. la
+      pantalla del período que lanzó el wizard). */
+  volverA?: string;
   handleSetData: (partial: Partial<MovimientoData>) => void;
   /** Selecciona el tipo de movimiento y limpia los campos del flujo anterior. */
   seleccionarConcepto: (concepto: MovimientoConcepto) => void;
@@ -91,6 +94,12 @@ export function MovimientoProvider({
     const periodoPre = preseleccionaPeriodo
       ? options.periodosTrabajo.find((p) => p.id === initial.periodo)
       : undefined;
+    // Préstamo preseleccionado por fila (botón "Pagar" de la grilla de
+    // préstamos): en PagoPrestamo se precarga el préstamo y su monto (saldo).
+    const prestamoPre =
+      initial.prestamo != null && initial.concepto === "PagoPrestamo"
+        ? options.prestamos.find((p) => p.id === initial.prestamo)
+        : undefined;
     return {
       ...base,
       concepto: initial.concepto,
@@ -98,10 +107,13 @@ export function MovimientoProvider({
       cuentaDestino: initial.destino ?? 0,
       cuentaPropina: esJornada ? (initial.cuenta ?? 0) : 0,
       periodoTrabajo: periodoPre?.id ?? 0,
+      idPrestamo: prestamoPre?.id ?? "",
       montoOrigen:
         initial.concepto === "CobroSueldo"
           ? (periodoPre?.montoACobrar ?? 0)
-          : 0,
+          : prestamoPre
+            ? prestamoPre.saldo
+            : 0,
     };
   });
 
@@ -176,6 +188,7 @@ export function MovimientoProvider({
         data,
         options,
         direct,
+        volverA: initial?.volverA,
         handleSetData,
         seleccionarConcepto,
         navigateTo,
