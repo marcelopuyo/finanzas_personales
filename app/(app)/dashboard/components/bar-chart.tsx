@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { ChartTooltip } from "./chart-tooltip";
+import { useHideTooltipOnTouch } from "./use-hide-tooltip-on-touch";
 
 interface BarChartProps {
   title: string;
@@ -39,6 +40,8 @@ export function StackedBarChart({
   badge,
   currency,
 }: BarChartProps) {
+  // El tooltip se oculta al levantar el dedo en mobile (ver el hook).
+  const touchReset = useHideTooltipOnTouch();
   const header = (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -61,7 +64,11 @@ export function StackedBarChart({
   }
 
   return (
-    <div className={`rounded-lg border border-border bg-card p-5 ${className}`}>
+    <div
+      onTouchEnd={touchReset.onTouchEnd}
+      onTouchCancel={touchReset.onTouchCancel}
+      className={`rounded-lg border border-border bg-card p-5 ${className}`}
+    >
       {header}
       <ResponsiveContainer width="100%" height={height}>
         <BarChart data={data} barGap={0} barCategoryGap="20%">

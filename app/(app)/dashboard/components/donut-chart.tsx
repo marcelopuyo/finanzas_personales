@@ -11,6 +11,7 @@ import {
   type TooltipContentProps,
 } from "recharts";
 import { cn, numberToCurrency } from "@/lib/utils";
+import { useHideTooltipOnTouch } from "./use-hide-tooltip-on-touch";
 
 export interface DonutDatum {
   name: string;
@@ -142,6 +143,8 @@ export function DonutChart({
   compare,
   invertTrend = false,
 }: DonutChartProps) {
+  // El tooltip se oculta al levantar el dedo en mobile (ver el hook).
+  const touchReset = useHideTooltipOnTouch();
   const header = (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -156,7 +159,11 @@ export function DonutChart({
   const total = slices.reduce((acc, s) => acc + s.value, 0);
 
   return (
-    <div className={`rounded-lg border border-border bg-card p-5 ${className}`}>
+    <div
+      onTouchEnd={touchReset.onTouchEnd}
+      onTouchCancel={touchReset.onTouchCancel}
+      className={`rounded-lg border border-border bg-card p-5 ${className}`}
+    >
       {header}
       {!slices.length ? (
         <div className="flex h-64 items-center justify-center text-[13px] text-subtitle">

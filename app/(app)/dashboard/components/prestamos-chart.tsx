@@ -12,6 +12,7 @@ import {
   type TooltipContentProps,
 } from "recharts";
 import { numberToCurrency } from "@/lib/utils";
+import { useHideTooltipOnTouch } from "./use-hide-tooltip-on-touch";
 
 export interface PrestamoSerie {
   /** dataKey de la serie (una por préstamo). */
@@ -92,6 +93,8 @@ export function PrestamosChart({
   badge,
   action,
 }: PrestamosChartProps) {
+  // El tooltip se oculta al levantar el dedo en mobile (ver el hook).
+  const touchReset = useHideTooltipOnTouch();
   const header = (
     <div className="relative mb-4 pr-8">
       {/* El título + badges pueden ocupar varias líneas en mobile; el menú (⋮)
@@ -124,7 +127,11 @@ export function PrestamosChart({
   ).sort();
 
   return (
-    <div className={`rounded-lg border border-border bg-card p-5 ${className}`}>
+    <div
+      onTouchEnd={touchReset.onTouchEnd}
+      onTouchCancel={touchReset.onTouchCancel}
+      className={`rounded-lg border border-border bg-card p-5 ${className}`}
+    >
       {header}
       <ResponsiveContainer width="100%" height={height}>
         <BarChart data={data} barGap={2} barCategoryGap="25%">
