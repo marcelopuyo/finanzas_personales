@@ -1,7 +1,6 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { SlidersHorizontal } from "lucide-react";
 import { StatBadge } from "@/components/ui/stat-badge";
 import { Tabs } from "@/components/ui/tabs";
@@ -53,7 +52,6 @@ function toDateKey(v: string | Date | null | undefined): string {
 }
 
 export function DashboardClient({ data, periodosInicial }: Props) {
-  const router = useRouter();
   const [tabGastos, setTabGastos] = useState("resumen");
   const [tabIngresos, setTabIngresos] = useState("resumen");
   // Cuenta seleccionada para abrir su historial en popup
@@ -660,9 +658,6 @@ export function DashboardClient({ data, periodosInicial }: Props) {
           <IngresosDetalle
             data={filteredIngresos}
             currency={data.monedaPredeterminadaISO}
-            onOpenPeriodo={(p) =>
-              router.push(`/cruds/periodos-trabajo/${p.id}?origen=dashboard`)
-            }
           />
         </div>
       ) : (

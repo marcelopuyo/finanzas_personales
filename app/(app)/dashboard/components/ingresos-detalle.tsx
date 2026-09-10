@@ -152,9 +152,8 @@ export function ingresosDetalleColumns(
     id: "actividad",
     header: "Jornadas/Tareas",
     // La columna del sparkline NO navega al período: el gráfico solo muestra el
-    // tooltip de cada barra. `stopRowClick` corta el click/tap de esta celda
-    // para que no dispare el onRowClick de la fila.
-    meta: { align: "center", stopRowClick: true },
+    // tooltip de cada barra.
+    meta: { align: "center" },
     cell: ({ row }) => (
       <ActividadCell
         jornadas={row.original.jornadas}
@@ -169,23 +168,11 @@ export function ingresosDetalleColumns(
 export function IngresosDetalle({
   data,
   currency,
-  onOpenPeriodo,
 }: {
   data: PeriodoTrabajoOut[];
   currency: string;
-  /**
-   * Abre la pantalla del período al tocar/hacer click en cualquier columna de
-   * la fila, EXCEPTO la del sparkline (Jornadas/Tareas), que solo muestra el
-   * tooltip de sus barras.
-   */
-  onOpenPeriodo?: (periodo: PeriodoTrabajoOut) => void;
 }) {
   return (
-    <DataTable
-      columns={ingresosDetalleColumns(currency)}
-      data={data}
-      pageSize={5}
-      onRowClick={onOpenPeriodo}
-    />
+    <DataTable columns={ingresosDetalleColumns(currency)} data={data} pageSize={5} />
   );
 }

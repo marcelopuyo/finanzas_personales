@@ -1,4 +1,6 @@
 "use client";
+import { useRouter } from "next/navigation";
+import { CalendarClock } from "lucide-react";
 import { CrudTable } from "@/components/crud/CrudTable";
 import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
 import { eliminarPeriodoTrabajo } from "@/backend/src/actions/trabajos";
@@ -108,6 +110,7 @@ export function PeriodosTrabajoListClient({
   origen,
   currency = "USD",
 }: Props) {
+  const router = useRouter();
   // Flecha "volver al dashboard" SIEMPRE visible. Al venir del panel Trabajo
   // (?origen=dashboard) se propaga el origen para que el "+" (wizard) mantenga
   // el viaje de ida y vuelta al dashboard.
@@ -125,7 +128,17 @@ export function PeriodosTrabajoListClient({
       getId={(i) => i.id}
       searchPredicate={() => true}
       mobileBottomNav
+      mobileHint="Tocá un período y luego Jornadas"
       backHref="/dashboard"
+      // En mobile el botón "Buscar" se reemplaza por "Jornadas": abre el
+      // detalle del período seleccionado (el mismo destino al que se llega
+      // desde Ingresos → Detalle tocando una fila) para cargar sus
+      // jornadas/tareas.
+      mobilePrimaryAction={{
+        label: "Jornadas",
+        icon: CalendarClock,
+        onClick: (id) => router.push(`/cruds/periodos-trabajo/${id}${origenQ}`),
+      }}
     />
   );
 }

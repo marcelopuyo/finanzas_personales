@@ -22,14 +22,6 @@ import { cn } from "@/lib/utils";
 
 type Align = "left" | "center" | "right";
 
-/** Meta opcional por columna. */
-interface ColumnMeta {
-  align?: Align;
-  /** Si es true, el click/tap en ESTA celda no dispara `onRowClick` (para
-   * celdas con controles o gráficos interactivos propios). */
-  stopRowClick?: boolean;
-}
-
 function alignClass(align?: Align): string {
   if (align === "center") return "text-center";
   if (align === "right") return "text-right";
@@ -99,7 +91,7 @@ export function DataTable<TData, TValue>({
               <tr key={headerGroup.id} className="border-b border-border">
                 {headerGroup.headers.map((header) => {
                   const meta = header.column.columnDef.meta as
-                    | ColumnMeta
+                    | { align?: Align }
                     | undefined;
                   const canSort = header.column.getCanSort();
                   const sorted = header.column.getIsSorted();
@@ -157,20 +149,14 @@ export function DataTable<TData, TValue>({
               >
                 {row.getVisibleCells().map((cell) => {
                   const meta = cell.column.columnDef.meta as
-                    | ColumnMeta
+                    | { align?: Align }
                     | undefined;
                   return (
                     <td
                       key={cell.id}
-                      onClick={
-                        meta?.stopRowClick
-                          ? (e) => e.stopPropagation()
-                          : undefined
-                      }
                       className={cn(
                         "px-3 py-2.5 text-card-foreground",
-                        alignClass(meta?.align),
-                        meta?.stopRowClick && "cursor-default"
+                        alignClass(meta?.align)
                       )}
                     >
                       {flexRender(
@@ -189,7 +175,7 @@ export function DataTable<TData, TValue>({
                 <tr>
                   {footerGroup.headers.map((footer) => {
                     const meta = footer.column.columnDef.meta as
-                      | ColumnMeta
+                      | { align?: Align }
                       | undefined;
                     return (
                       <td
