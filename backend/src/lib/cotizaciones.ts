@@ -338,6 +338,29 @@ export async function montoEnMonedaPredeterminada(
 }
 
 /**
+ * Inverso de `montoEnMonedaPredeterminada`: pasa un monto que está en la moneda
+ * PREDETERMINADA del usuario a la moneda de la cuenta indicada. Lo usa la UI
+ * del wizard (Gasto Directo) para precargar el campo "Monto", que se carga en
+ * la moneda de la cuenta.
+ */
+export async function montoPredeterminadaEnMonedaCuenta(
+  cuentaId: number,
+  monto: number,
+  fecha: Date
+): Promise<number> {
+  const sesion = await getSessionUser();
+  const predeterminada = sesion?.monedaPredeterminada;
+  if (!predeterminada) return monto;
+  const ds = await getDb();
+  const cuenta = await ds.getRepository(Cuenta).findOne({
+    where: { id: cuentaId },
+    relations: { moneda: true },
+  });
+  if (!cuenta?.moneda) return monto;
+  return convertir(monto, predeterminada, cuenta.moneda, fecha);
+}
+
+/**
  * Refresca (o crea) la cotización vigente de un par consultando la API ahora.
  * Usado por el panel admin ("cerrar vigente + re-consultar a la API").
  */

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { FormField } from "@/components/crud/CrudForm";
 import { fetchPersonas, fetchTarjetas, fetchPeriodosTarjeta } from "../options";
+import { personaQuickCreate } from "../persona-quick-create";
 
 export const movimientoTarjetaSchema = z.object({
   detalle: z.string().optional(),
@@ -18,7 +19,13 @@ export const movimientoTarjetaFields: FormField[] = [
   { name: "fecha", label: "Fecha", type: "date" },
   { name: "monto", label: "Monto", type: "number", placeholder: "0.00" },
   { name: "cuotas", label: "Cuotas", type: "number", placeholder: "1" },
-  { name: "persona", label: "Persona", type: "select", optionsFrom: fetchPersonas },
+  {
+    name: "persona",
+    label: "Persona",
+    type: "combobox",
+    optionsFrom: fetchPersonas,
+    quickCreate: personaQuickCreate,
+  },
   { name: "tarjeta", label: "Tarjeta", type: "select", optionsFrom: fetchTarjetas },
   { name: "periodo", label: "Período", type: "select", optionsFrom: fetchPeriodosTarjeta },
 ];

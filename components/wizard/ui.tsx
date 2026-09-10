@@ -5,6 +5,7 @@
 // `stepper-context` de movimientos). Las consumen el wizard de movimientos
 // (vía su `./ui`) y el wizard de alta de trabajos (`trabajo-wizard.tsx`).
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Combobox } from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
 
 export const inputCls =
@@ -183,6 +184,7 @@ export function AutoCompleteField({
   value,
   onChange,
   buscar,
+  onSelect,
   minChars = 3,
   placeholder,
 }: {
@@ -190,6 +192,9 @@ export function AutoCompleteField({
   value: string;
   onChange: (v: string) => void;
   buscar: (termino: string) => Promise<string[]>;
+  /** Se dispara SOLO cuando el usuario elige una sugerencia de la lista (no al
+      tipear). Sirve para autocompletar otros campos con ese dato. */
+  onSelect?: (value: string) => void;
   minChars?: number;
   placeholder?: string;
 }) {
@@ -256,6 +261,7 @@ export function AutoCompleteField({
                 onClick={() => {
                   onChange(s);
                   setAbierto(false);
+                  onSelect?.(s);
                 }}
                 className="block w-full px-3 py-2 text-left text-[13px] text-card-foreground transition-colors hover:bg-muted"
               >
@@ -369,6 +375,8 @@ export function SelectField({
   options,
   placeholder = "Seleccionar...",
   disabled = false,
+  onCreate,
+  createLabel,
 }: {
   label: string;
   value: string;
@@ -376,7 +384,30 @@ export function SelectField({
   options: { value: string; label: string }[];
   placeholder?: string;
   disabled?: boolean;
+  /** Si viene, el campo pasa a ser un COMBOBOX con buscador y fila de alta
+      rápida "＋ …" al pie (opción A): recibe el texto buscado como prefill.
+      Sin esta prop sigue siendo el `<select>` nativo de siempre. */
+  onCreate?: (prefill: string) => void;
+  /** Texto de la fila de alta rápida (p. ej. "Nueva categoría"). */
+  createLabel?: string;
 }) {
+  // Con alta rápida se usa el Combobox compartido: un <select> nativo no puede
+  // mostrar una acción dentro de la lista.
+  if (onCreate) {
+    return (
+      <Campo label={label}>
+        <Combobox
+          value={value}
+          onChange={onChange}
+          options={options}
+          placeholder={placeholder}
+          disabled={disabled}
+          onCreate={onCreate}
+          createLabel={createLabel}
+        />
+      </Campo>
+    );
+  }
   return (
     <Campo label={label}>
       <select

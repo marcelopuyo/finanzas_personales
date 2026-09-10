@@ -161,3 +161,44 @@ export async function buscarDescripcionesGasto(
   return Array.from(unicos).slice(0, 8);
 }
 
+/** Último gasto con una descripción exacta (para precargar categoría y monto). */
+export interface UltimoGastoOut {
+  descripcion: string;
+  categoriaId: number | null;
+  categoriaNombre: string | null;
+  /** Monto guardado tal cual (siempre en la MONEDA PREDETERMINADA del usuario). */
+  monto: number;
+}
+
+/**
+ * Gasto MÁS RECIENTE con esa descripción exacta (no eliminado, del usuario
+ * autenticado). "Más reciente" = fechaPago DESC y, si está vacía, por
+ * fechaVencimiento DESC (no hay columna de fecha de alta: la fecha de pago es
+ * la que define el orden histórico de gastos).
+ *
+ * Lo usa el autocompletar del Gasto Directo al elegir una sugerencia.
+ */
+export async function getUltimoGastoPorDescripcion(
+  descripcion: string
+): Promise<UltimoGastoOut | null> {
+  const userId = await requireUserId();
+  const ds = await getDb();
+  const r = await ds
+    .getRepository(Gasto)
+    .createQueryBuilder("g")
+    .leftJoinAndSelect("g.categoria", "categoria")
+    .where("g.descripcion = :descripcion", { descripcion })
+    .andWhere("g.eliminado = :eliminado", { eliminado: false })
+    .andWhere('g."usuarioId" = :userId', { userId })
+    .orderBy("g.fechaPago", "DESC", "NULLS LAST")
+    .addOrderBy("g.fechaVencimiento", "DESC", "NULLS LAST")
+    .getOne();
+  if (!r) return null;
+  return {
+    descripcion: r.descripcion,
+    categoriaId: r.categoria?.id ?? null,
+    categoriaNombre: r.categoria?.nombre ?? null,
+    monto: Number(r.monto),
+  };
+}
+

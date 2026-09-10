@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
-import { Modal } from "@/components/ui/modal";
+import { QuickCreateModal } from "@/components/ui/quick-create-modal";
 import type { ZodSchema } from "zod";
 
 export interface FormField {
@@ -92,12 +92,11 @@ export function CrudForm({
   const [asyncOptions, setAsyncOptions] = useState<
     Record<string, ComboboxOption[]>
   >({});
-  // Alta rápida (opción A): campo que la disparó + nombre a crear.
-  const [quickCreateField, setQuickCreateField] = useState<FormField | null>(
-    null
-  );
-  const [quickCreateName, setQuickCreateName] = useState("");
-  const [quickCreating, setQuickCreating] = useState(false);
+  // Alta rápida (opción A): campo que la disparó + texto buscado (prefill).
+  const [quickCreate, setQuickCreate] = useState<{
+    field: FormField;
+    prefill: string;
+  } | null>(null);
 
   // Cargar opciones asíncronas de los selects (ej. categorías, períodos)
   useEffect(() => {
@@ -150,57 +149,27 @@ export function CrudForm({
     "focus:outline-none focus:ring-2 focus:ring-primary/40"
   );
 
-  const closeQuickCreate = () => {
-    if (quickCreating) return;
-    setQuickCreateField(null);
-    setQuickCreateName("");
-  };
-
   /**
-   * Alta rápida: crea el maestro con el nombre tipeado, agrega la opción a la
-   * lista del campo y la deja seleccionada (sin perder lo ya cargado).
+   * Alta rápida resuelta (creada ahora o ya existente): agrega la opción a la
+   * lista del campo y la deja seleccionada, sin perder lo ya cargado.
    */
-  const handleQuickCreate = async () => {
-    const field = quickCreateField;
-    const config = field?.quickCreate;
-    const nombre = quickCreateName.trim();
-    if (!field || !config || !nombre) return;
-    // Si ya existe una opción con ese nombre, se selecciona en vez de crear:
-    // evita el error de unicidad de la BD (mismo nombre + usuario).
-    const existente = (asyncOptions[field.name] ?? field.options ?? []).find(
-      (o) => o.label.trim().toLowerCase() === nombre.toLowerCase()
-    );
-    if (existente) {
-      setValue(field.name, existente.value, {
-        shouldValidate: true,
-        shouldDirty: true,
-      });
-      setQuickCreateField(null);
-      setQuickCreateName("");
-      toast.info(`"${existente.label}" ya existía: se seleccionó`);
-      return;
-    }
-    setQuickCreating(true);
-    try {
-      const option = await config.create(nombre);
-      setAsyncOptions((prev) => ({
+  const handleQuickCreated = (option: ComboboxOption) => {
+    const field = quickCreate?.field;
+    if (!field) return;
+    setAsyncOptions((prev) => {
+      const list = prev[field.name] ?? field.options ?? [];
+      return {
         ...prev,
-        [field.name]: [...(prev[field.name] ?? field.options ?? []), option],
-      }));
-      setValue(field.name, option.value, {
-        shouldValidate: true,
-        shouldDirty: true,
-      });
-      setQuickCreateField(null);
-      setQuickCreateName("");
-      toast.success(`Se creó "${option.label}"`);
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "No se pudo crear el registro"
-      );
-    } finally {
-      setQuickCreating(false);
-    }
+        [field.name]: list.some((o) => o.value === option.value)
+          ? list
+          : [...list, option],
+      };
+    });
+    setValue(field.name, option.value, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+    setQuickCreate(null);
   };
 
   return (
@@ -285,10 +254,7 @@ export function CrudForm({
                       placeholder={field.placeholder}
                       onCreate={
                         field.quickCreate
-                          ? (prefill) => {
-                              setQuickCreateName(prefill);
-                              setQuickCreateField(field);
-                            }
+                          ? (prefill) => setQuickCreate({ field, prefill })
                           : undefined
                       }
                       createLabel={field.quickCreate?.label}
@@ -379,52 +345,22 @@ export function CrudForm({
 
       {/* Alta rápida (opción A): crear el maestro sin salir del formulario. Va
           fuera del <form> para que Enter no dispare el submit del gasto. */}
-      <Modal
-        open={quickCreateField !== null}
-        onClose={closeQuickCreate}
-        title={quickCreateField?.quickCreate?.title}
-        footer={
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={closeQuickCreate}
-              disabled={quickCreating}
-              className="rounded-lg px-3 py-2 text-[13px] font-medium text-subtitle transition-colors hover:bg-muted hover:text-header disabled:opacity-50"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleQuickCreate}
-              disabled={quickCreating || !quickCreateName.trim()}
-              className="rounded-lg bg-primary px-4 py-2 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
-            >
-              {quickCreating ? "Creando..." : "Crear"}
-            </button>
-          </div>
-        }
-      >
-        <label
-          htmlFor="crud-form-quick-create"
-          className="mb-1.5 block text-[13px] font-medium text-header"
-        >
-          Nombre
-        </label>
-        <input
-          id="crud-form-quick-create"
-          autoFocus
-          value={quickCreateName}
-          onChange={(e) => setQuickCreateName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              handleQuickCreate();
-            }
-          }}
-          placeholder={quickCreateField?.quickCreate?.placeholder ?? "Nombre"}
-          className={inputClasses}
+      {quickCreate?.field.quickCreate && (
+        <QuickCreateModal
+          open
+          title={quickCreate.field.quickCreate.title}
+          placeholder={quickCreate.field.quickCreate.placeholder}
+          initialName={quickCreate.prefill}
+          existing={
+            asyncOptions[quickCreate.field.name] ??
+            quickCreate.field.options ??
+            []
+          }
+          create={quickCreate.field.quickCreate.create}
+          onCreated={handleQuickCreated}
+          onClose={() => setQuickCreate(null)}
         />
-      </Modal>
+      )}
     </div>
   );
 }

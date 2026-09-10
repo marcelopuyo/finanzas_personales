@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { todayLocalISODate } from "@/lib/utils";
+import type { CategoriaGastoOut } from "@/backend/src/queries/gastos";
 import {
   CONCEPTO_STEP,
   type MovimientoConcepto,
@@ -26,6 +27,8 @@ interface StepperContextValue {
       pantalla del período que lanzó el wizard). */
   volverA?: string;
   handleSetData: (partial: Partial<MovimientoData>) => void;
+  /** Suma a las opciones una categoría de gasto creada al vuelo (alta rápida). */
+  addCategoriaGasto: (categoria: CategoriaGastoOut) => void;
   /** Selecciona el tipo de movimiento y limpia los campos del flujo anterior. */
   seleccionarConcepto: (concepto: MovimientoConcepto) => void;
   navigateTo: (step: number) => void;
@@ -37,7 +40,7 @@ const StepperContext = createContext<StepperContextValue | undefined>(
 );
 
 export function MovimientoProvider({
-  options,
+  options: optionsIniciales,
   fechaHoy,
   initial,
   direct = false,
@@ -52,6 +55,9 @@ export function MovimientoProvider({
   direct?: boolean;
   children: ReactNode;
 }) {
+  // Las opciones viven en estado para poder sumar maestros creados al vuelo
+  // (alta rápida de categoría de gasto, ver §77-§78).
+  const [options, setOptions] = useState<MovimientoOptions>(optionsIniciales);
   const [activeStep, setActiveStep] = useState(() =>
     initial ? CONCEPTO_STEP[initial.concepto] : 0
   );
@@ -92,13 +98,13 @@ export function MovimientoProvider({
         initial.concepto === "JornadaTrabajo" ||
         initial.concepto === "CargarTarea");
     const periodoPre = preseleccionaPeriodo
-      ? options.periodosTrabajo.find((p) => p.id === initial.periodo)
+      ? optionsIniciales.periodosTrabajo.find((p) => p.id === initial.periodo)
       : undefined;
     // Préstamo preseleccionado por fila (botón "Pagar" de la grilla de
     // préstamos): en PagoPrestamo se precarga el préstamo y su monto (saldo).
     const prestamoPre =
       initial.prestamo != null && initial.concepto === "PagoPrestamo"
-        ? options.prestamos.find((p) => p.id === initial.prestamo)
+        ? optionsIniciales.prestamos.find((p) => p.id === initial.prestamo)
         : undefined;
     return {
       ...base,
@@ -128,6 +134,15 @@ export function MovimientoProvider({
 
   const handleSetData = (partial: Partial<MovimientoData>) =>
     setData((prev) => ({ ...prev, ...partial }));
+
+  /** Alta rápida: suma la categoría recién creada a las opciones del stepper
+      (queda seleccionable y la confirmación la muestra por nombre). */
+  const addCategoriaGasto = (categoria: CategoriaGastoOut) =>
+    setOptions((prev) =>
+      prev.categoriasGasto.some((c) => c.id === categoria.id)
+        ? prev
+        : { ...prev, categoriasGasto: [...prev.categoriasGasto, categoria] }
+    );
 
   const resetData = () =>
     setData((prev) => ({
@@ -190,6 +205,7 @@ export function MovimientoProvider({
         direct,
         volverA: initial?.volverA,
         handleSetData,
+        addCategoriaGasto,
         seleccionarConcepto,
         navigateTo,
         resetData,

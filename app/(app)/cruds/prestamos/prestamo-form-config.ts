@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { FormField } from "@/components/crud/CrudForm";
 import { fetchPersonas, fetchCuentas } from "../options";
+import { personaQuickCreate } from "../persona-quick-create";
 
 export const prestamoSchema = z.object({
   detalle: z.string().optional(),
@@ -20,7 +21,19 @@ export const prestamoFields: FormField[] = [
   { name: "monto", label: "Monto", type: "number", placeholder: "0.00" },
   { name: "cuotas", label: "Cuotas", type: "number", placeholder: "1" },
   { name: "sentido", label: "Sentido", type: "select", options: [{ value: "otorgado", label: "Otorgado" }, { value: "obtenido", label: "Recibido" }] },
-  { name: "personaOrigen", label: "Prestador", type: "select", optionsFrom: fetchPersonas },
-  { name: "personaDestino", label: "Destinatario", type: "select", optionsFrom: fetchPersonas },
+  {
+    name: "personaOrigen",
+    label: "Prestador",
+    type: "combobox",
+    optionsFrom: fetchPersonas,
+    quickCreate: personaQuickCreate,
+  },
+  {
+    name: "personaDestino",
+    label: "Destinatario",
+    type: "combobox",
+    optionsFrom: fetchPersonas,
+    quickCreate: personaQuickCreate,
+  },
   { name: "cuenta", label: "Cuenta", type: "select", optionsFrom: fetchCuentas },
 ];
