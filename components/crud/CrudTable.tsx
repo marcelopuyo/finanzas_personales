@@ -21,6 +21,10 @@ interface CrudTableProps<T, TId = number> {
   fetchData?: () => Promise<T[]>;
   deleteItem: (id: TId) => Promise<unknown>;
   searchPlaceholder?: string;
+  /** false = oculta el buscador en la vista clásica (la grilla mobile no tiene
+      buscador). Se usa en vistas de solo lectura donde buscar no aporta
+      (p. ej. el detalle de un período ya cobrado). Default: true. */
+  showSearch?: boolean;
   createHref: string;
   editHref: (id: TId) => string;
   getId: (item: T) => TId;
@@ -61,6 +65,16 @@ interface CrudTableProps<T, TId = number> {
     icon: LucideIcon;
     onClick: (id: TId) => void;
   };
+  /** Acción por fila EXTRA, **solo desktop**: un botón más en la columna de
+      acciones, junto a Editar/Eliminar (ícono con el label como título/tooltip).
+      En mobile el equivalente va en la barra inferior
+      (`mobilePrimaryAction`), que no suma columnas a la grilla.
+      Requiere `showActions` (la columna de acciones es la que la contiene). */
+  rowAction?: {
+    label: string;
+    icon: LucideIcon;
+    onClick: (id: TId) => void;
+  };
   /** Contenido extra que se renderiza entre el título y la grilla (arriba del
       contenido). Útil para un resumen/header contextual (p. ej. el resumen de
       un período de trabajo con su monto a cobrar). */
@@ -85,6 +99,7 @@ export function CrudTable<T, TId = number>({
   initialData,
   deleteItem,
   searchPlaceholder = "Buscar...",
+  showSearch = true,
   createHref,
   editHref,
   getId,
@@ -96,6 +111,7 @@ export function CrudTable<T, TId = number>({
   trailingColumns = [],
   extraAction,
   mobilePrimaryAction,
+  rowAction,
   topContent,
   showActions = true,
   emptyMessage = "Sin datos disponibles",
@@ -165,6 +181,17 @@ export function CrudTable<T, TId = number>({
               meta: { align: "center" as const },
               cell: ({ row }: { row: { original: T } }) => (
                 <div className="flex items-center justify-center gap-1.5">
+                  {rowAction && (
+                    <button
+                      type="button"
+                      onClick={() => rowAction.onClick(getId(row.original))}
+                      className="rounded p-1 text-subtitle transition-colors hover:bg-muted hover:text-header"
+                      title={rowAction.label}
+                      aria-label={rowAction.label}
+                    >
+                      <rowAction.icon className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => router.push(editHref(getId(row.original)))}
@@ -188,7 +215,7 @@ export function CrudTable<T, TId = number>({
         : []),
       ...trailingColumns,
     ],
-    [columns, router, editHref, getId, trailingColumns, showActions]
+    [columns, router, editHref, getId, trailingColumns, showActions, rowAction]
   );
 
   // Columnas de la grilla mobile (bottomNav): datos + columnas finales (sin la
@@ -339,7 +366,6 @@ export function CrudTable<T, TId = number>({
                 label: mobilePrimaryAction.label,
                 icon: mobilePrimaryAction.icon,
                 disabled: selectedId === null,
-                active: true,
                 onClick: () =>
                   selectedId !== null && mobilePrimaryAction.onClick(selectedId),
               },
@@ -352,7 +378,6 @@ export function CrudTable<T, TId = number>({
                 key: "extra",
                 label: extraAction.label,
                 icon: extraAction.icon,
-                active: extraAction.active,
                 onClick: extraAction.onClick,
               },
             ]
@@ -364,7 +389,6 @@ export function CrudTable<T, TId = number>({
           label: "Editar",
           icon: Pencil,
           disabled: selectedId === null,
-          active: true,
           onClick: () => selectedId !== null && router.push(editHref(selectedId)),
         },
         {
@@ -372,7 +396,6 @@ export function CrudTable<T, TId = number>({
           label: "Eliminar",
           icon: Trash2,
           disabled: selectedId === null,
-          danger: true,
           onClick: () => selectedId !== null && setDeleteId(selectedId),
         },
       ]}
@@ -380,72 +403,25 @@ export function CrudTable<T, TId = number>({
     />
   ) : null;
 
-  return (
-    <div
-      className={cn(
-        "mx-auto max-w-5xl px-4",
-        mobileBottomNav && showActions
-          ? "py-6 pb-44 lg:py-8 lg:pb-8"
-          : "py-8"
-      )}
-    >
-      {/* ===== Variante mobile (bottomNav): barra inferior + selección por fila ===== */}
-      {mobileBottomNav && (
-        <div className="lg:hidden">
-          {titleMobileEl}
-          {topContent}
-          {mobileHint && (
-            <p className="-mt-2 mb-3 text-[12px] text-subtitle">{mobileHint}</p>
-          )}
-          <div className="rounded-lg border border-border bg-card p-4">
-            <DataTable
-              columns={mobileColumns}
-              data={filtered}
-              pageSize={10}
-              getRowId={(row) => String(getId(row))}
-              rowClassName={selectedCls}
-              onRowClick={toggleRow}
-              emptyMessage={emptyMessage}
+  // Toolbar de escritorio: buscador + acciones (Extra/Exportar/Nuevo). En las
+  // vistas de solo lectura sin buscador no se renderiza nada: sin esto quedaba
+  // un hueco entre el contenido de arriba (p. ej. el resumen del período) y la
+  // grilla.
+  const toolbarEl =
+    showSearch || showActions ? (
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        {showSearch && (
+          <div className="relative flex-1 sm:max-w-sm">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-subtitle" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={searchPlaceholder}
+              className="w-full rounded-full border border-border bg-card py-1.5 pl-8 pr-3 text-[13px] text-card-foreground placeholder:text-subtitle focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
           </div>
-        </div>
-      )}
-
-      {/* ===== Vista clásica (CRUD normal, o desktop dentro de bottomNav) ===== */}
-      <div className={mobileBottomNav ? "hidden lg:block" : ""}>
-      {/* Encabezado: si viene con backHref (p. ej. abierto desde el dashboard
-          con ?origen=dashboard) muestra el botón "volver" a la izquierda del
-          título, al estilo mobile app. */}
-      {backHref ? (
-        <div className="mb-4 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => router.push(backHref)}
-            className="rounded-lg p-1.5 text-subtitle transition-colors hover:bg-muted hover:text-header"
-            aria-label="Volver"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <h1 className="text-[18px] font-semibold text-header">{title}</h1>
-        </div>
-      ) : (
-        <h1 className="mb-4 text-[18px] font-semibold text-header">{title}</h1>
-      )}
-
-      {topContent}
-
-      {/* Toolbar: búsqueda + botón Nuevo */}
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 sm:max-w-sm">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-subtitle" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={searchPlaceholder}
-            className="w-full rounded-full border border-border bg-card py-1.5 pl-8 pr-3 text-[13px] text-card-foreground placeholder:text-subtitle focus:outline-none focus:ring-2 focus:ring-primary/40"
-          />
-        </div>
+        )}
         <div className="flex items-center gap-2">
           {showActions && (
             <>
@@ -484,6 +460,65 @@ export function CrudTable<T, TId = number>({
           )}
         </div>
       </div>
+    ) : null;
+
+  return (
+    <div
+      className={cn(
+        "mx-auto max-w-5xl px-4",
+        mobileBottomNav && showActions
+          ? "py-6 pb-44 lg:py-8 lg:pb-8"
+          : "py-8"
+      )}
+    >
+      {/* ===== Variante mobile (bottomNav): barra inferior + selección por fila ===== */}
+      {mobileBottomNav && (
+        <div className="lg:hidden">
+          {titleMobileEl}
+          {topContent}
+          {mobileHint && (
+            <p className="-mt-2 mb-3 text-[12px] text-subtitle">{mobileHint}</p>
+          )}
+          {/* En solo lectura (showActions=false) la grilla mobile no es
+              interactiva: sin selección de fila ni resaltado. */}
+          <div className="rounded-lg border border-border bg-card p-4">
+            <DataTable
+              columns={mobileColumns}
+              data={filtered}
+              pageSize={10}
+              getRowId={(row) => String(getId(row))}
+              rowClassName={showActions ? selectedCls : undefined}
+              onRowClick={showActions ? toggleRow : undefined}
+              emptyMessage={emptyMessage}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ===== Vista clásica (CRUD normal, o desktop dentro de bottomNav) ===== */}
+      <div className={mobileBottomNav ? "hidden lg:block" : ""}>
+      {/* Encabezado: si viene con backHref (p. ej. abierto desde el dashboard
+          con ?origen=dashboard) muestra el botón "volver" a la izquierda del
+          título, al estilo mobile app. */}
+      {backHref ? (
+        <div className="mb-4 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => router.push(backHref)}
+            className="rounded-lg p-1.5 text-subtitle transition-colors hover:bg-muted hover:text-header"
+            aria-label="Volver"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <h1 className="text-[18px] font-semibold text-header">{title}</h1>
+        </div>
+      ) : (
+        <h1 className="mb-4 text-[18px] font-semibold text-header">{title}</h1>
+      )}
+
+      {topContent}
+
+      {toolbarEl}
 
       {/* Tabla */}
       <div className="rounded-lg border border-border bg-card p-4">

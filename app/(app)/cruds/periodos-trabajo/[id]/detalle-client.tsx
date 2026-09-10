@@ -280,6 +280,10 @@ export function PeriodoTrabajoDetalleClient({
     [currency]
   );
 
+  // El modo mobile va SIEMPRE encendido, incluso en solo lectura: si se apaga
+  // (mobileBottomNav={editable}), la pantalla cae en la vista clásica y en
+  // mobile aparece el buscador de escritorio entre el resumen y la grilla.
+  // `showActions={editable}` es lo que oculta las acciones.
   if (esHoras) {
     return (
       <CrudTable<JornadaTrabajoOut, string>
@@ -297,12 +301,13 @@ export function PeriodoTrabajoDetalleClient({
           dateTimeToString(i.fechaJornada).includes(q) ||
           decimalToTime(i.horaDesde).includes(q)
         }
-        mobileBottomNav={editable}
+        mobileBottomNav
         showActions={editable}
+        showSearch={editable}
         backHref={backHref}
         topContent={summary}
         emptyMessage="No hay jornadas en este período todavía."
-        mobileHint="Tocá una jornada para seleccionarla"
+        mobileHint={editable ? "Tocá una jornada para seleccionarla" : undefined}
       />
     );
   }
@@ -324,18 +329,21 @@ export function PeriodoTrabajoDetalleClient({
           const texto = `${i.descripcion ?? ""} ${fechaHoraLocal(i.fechaHoraTarea)}`.toLowerCase();
           return texto.includes(q);
         }}
-        mobileBottomNav={editable}
+        mobileBottomNav
         showActions={editable}
+        showSearch={editable}
         backHref={backHref}
         topContent={summary}
         emptyMessage="No hay tareas en este período todavía."
-        mobileHint="Tocá una tarea para seleccionarla"
+        mobileHint={editable ? "Tocá una tarea para seleccionarla" : undefined}
       />
     );
   }
 
   // fijo / horas_fijas: el período no carga jornadas ni tareas → solo lectura
   // (resumen + estado). Si está cerrado y no cobrado, el Cobrar está en el resumen.
+  // Igual que arriba: mobileBottomNav se mantiene para no caer en la vista de
+  // escritorio (con buscador) en mobile.
   return (
     <CrudTable<JornadaTrabajoOut, string>
       title="Período de trabajo"
@@ -347,8 +355,9 @@ export function PeriodoTrabajoDetalleClient({
       editHref={(id) => `/cruds/jornadas-trabajo/${id}/editar?periodoFijo=1&volverA=${encodeURIComponent(selfUrl)}`}
       getId={(i) => i.id}
       searchPredicate={() => false}
-      mobileBottomNav={false}
+      mobileBottomNav
       showActions={false}
+      showSearch={false}
       backHref={backHref}
       topContent={summary}
       emptyMessage="Este período tiene modalidad fija: no carga jornadas ni tareas."

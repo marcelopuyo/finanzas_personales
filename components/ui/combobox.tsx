@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, Search } from "lucide-react";
+import { Check, ChevronDown, Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CurrencyFlag } from "./currency-flag";
 
@@ -24,12 +24,19 @@ interface ComboboxProps {
   className?: string;
   /** Devuelve texto extra por opción para la búsqueda (ej. código ISO). */
   searchKey?: (o: ComboboxOption) => string;
+  /** Alta rápida: agrega una fila fija al pie del desplegable ("＋ …") que
+      cierra el combo y llama al callback con el texto buscado, para abrir un
+      alta sin salir del formulario. */
+  onCreate?: (prefill: string) => void;
+  /** Texto de la fila de alta rápida (default "Nueva opción"). */
+  createLabel?: string;
 }
 
 /**
  * Combobox con buscador (mobile-first). Se usa para listas largas con bandera
  * (ej. selector de monedas), porque un <select> nativo no puede pintar
- * banderas dentro de las opciones.
+ * banderas dentro de las opciones. Con `onCreate` suma la fila de alta rápida
+ * al pie del desplegable (patrón "crear en el punto de decisión").
  */
 export function Combobox({
   value,
@@ -42,6 +49,8 @@ export function Combobox({
   disabled,
   className,
   searchKey,
+  onCreate,
+  createLabel = "Nueva opción",
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -156,6 +165,22 @@ export function Combobox({
               );
             })}
           </ul>
+          {/* Alta rápida: el texto buscado se manda como prefill del alta. */}
+          {onCreate && (
+            <button
+              type="button"
+              onClick={() => {
+                const prefill = query.trim();
+                setOpen(false);
+                setQuery("");
+                onCreate(prefill);
+              }}
+              className="flex w-full items-center gap-2 border-t border-border px-3 py-2 text-left text-[13px] font-medium text-primary transition-colors hover:bg-muted"
+            >
+              <Plus className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{createLabel}</span>
+            </button>
+          )}
         </div>
       )}
     </div>

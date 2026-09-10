@@ -11,12 +11,8 @@ export interface BottomBarAction {
   icon: LucideIcon;
   onClick?: () => void;
   /** Deshabilita visual e interactivamente la acción (p. ej. Editar/Eliminar
-      sin una fila seleccionada). */
+      sin una fila seleccionada): se pinta el mismo gris de la barra, apagado. */
   disabled?: boolean;
-  /** Cuando está habilitada usa el color danger (p. ej. Eliminar). */
-  danger?: boolean;
-  /** Cuando está habilitada usa el color primario (p. ej. Editar). */
-  active?: boolean;
 }
 
 interface BottomActionBarProps {
@@ -34,6 +30,10 @@ interface BottomActionBarProps {
  * flotante (FAB) centrado sobre ella. Se oculta en lg+ (ahí se usa la toolbar
  * clásica). Es puramente presentacional: el consumidor controla el estado
  * (selección de fila, búsqueda, etc.) y provee los callbacks.
+ *
+ * Estados (monocromo, decisión 2026-09-10): TODAS las acciones usan el gris de
+ * la barra (`text-sidebar-muted`, el mismo tono que "Exportar"); las
+ * deshabilitadas se ven más apagadas (`opacity-40`). Sin rojo ni azul.
  *
  * Uso:
  *   <BottomActionBar
@@ -57,13 +57,10 @@ export function BottomActionBar({
         onClick={a.disabled ? undefined : a.onClick}
         className={cn(
           "flex flex-col items-center gap-0.5 py-1 text-[10.5px] font-medium",
-          a.disabled
-            ? "pointer-events-none opacity-35"
-            : a.danger
-              ? "text-danger"
-              : a.active
-                ? "text-primary"
-                : "text-sidebar-muted"
+          // Barra MONOCROME: habilitado usa el mismo gris que "Exportar";
+          // deshabilitado es ese mismo gris, más apagado (sin rojo ni azul).
+          "text-sidebar-muted",
+          a.disabled && "pointer-events-none opacity-40"
         )}
       >
         <Icon className="h-5 w-5" />

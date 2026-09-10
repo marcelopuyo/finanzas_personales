@@ -116,6 +116,10 @@ export function PeriodosTrabajoListClient({
   // el viaje de ida y vuelta al dashboard.
   const desdeDashboard = origen === "dashboard";
   const origenQ = desdeDashboard ? "?origen=dashboard" : "";
+  // Abre el detalle del período (sus jornadas/tareas). Mismo destino para el
+  // botón de la barra inferior en mobile y para la acción por fila en desktop.
+  const abrirDetalle = (id: number) =>
+    router.push(`/cruds/periodos-trabajo/${id}`);
   return (
     <CrudTable<PeriodoTrabajoOut>
       title="Períodos de Trabajo"
@@ -139,7 +143,14 @@ export function PeriodosTrabajoListClient({
       mobilePrimaryAction={{
         label: "Jornadas",
         icon: CalendarClock,
-        onClick: (id) => router.push(`/cruds/periodos-trabajo/${id}`),
+        onClick: abrirDetalle,
+      }}
+      // En desktop la barra inferior no existe, así que el mismo acceso va como
+      // acción por fila en la columna de acciones (ícono con tooltip).
+      rowAction={{
+        label: "Ver jornadas/tareas del período",
+        icon: CalendarClock,
+        onClick: abrirDetalle,
       }}
     />
   );

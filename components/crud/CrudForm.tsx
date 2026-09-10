@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { Modal } from "@/components/ui/modal";
 import type { ZodSchema } from "zod";
 
 export interface FormField {
@@ -30,6 +31,19 @@ export interface FormField {
   placeholder?: string;
   /** Opciones extra que se agregan al final del select (además de options/optionsFrom). */
   extraOptions?: { value: string; label: string }[];
+  /** Alta rápida del maestro desde el propio campo (solo `combobox`): agrega
+      una fila "＋ …" al pie del desplegable que abre un modal con un único
+      campo "Nombre". Al crear, la opción se agrega a la lista y queda
+      SELECCIONADA, sin salir del formulario (no se pierde lo ya cargado). */
+  quickCreate?: {
+    /** Texto de la fila del desplegable (p. ej. "Nueva categoría"). */
+    label: string;
+    /** Título del modal de alta. */
+    title: string;
+    placeholder?: string;
+    /** Crea el registro y devuelve la opción lista para seleccionar. */
+    create: (nombre: string) => Promise<ComboboxOption>;
+  };
   /** Muestra el campo solo si la condición sobre los valores del formulario es true. */
   showIf?: (values: Record<string, unknown>) => boolean;
 }
@@ -78,6 +92,12 @@ export function CrudForm({
   const [asyncOptions, setAsyncOptions] = useState<
     Record<string, ComboboxOption[]>
   >({});
+  // Alta rápida (opción A): campo que la disparó + nombre a crear.
+  const [quickCreateField, setQuickCreateField] = useState<FormField | null>(
+    null
+  );
+  const [quickCreateName, setQuickCreateName] = useState("");
+  const [quickCreating, setQuickCreating] = useState(false);
 
   // Cargar opciones asíncronas de los selects (ej. categorías, períodos)
   useEffect(() => {
@@ -96,6 +116,7 @@ export function CrudForm({
     register,
     control,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
@@ -128,6 +149,59 @@ export function CrudForm({
     "border-border",
     "focus:outline-none focus:ring-2 focus:ring-primary/40"
   );
+
+  const closeQuickCreate = () => {
+    if (quickCreating) return;
+    setQuickCreateField(null);
+    setQuickCreateName("");
+  };
+
+  /**
+   * Alta rápida: crea el maestro con el nombre tipeado, agrega la opción a la
+   * lista del campo y la deja seleccionada (sin perder lo ya cargado).
+   */
+  const handleQuickCreate = async () => {
+    const field = quickCreateField;
+    const config = field?.quickCreate;
+    const nombre = quickCreateName.trim();
+    if (!field || !config || !nombre) return;
+    // Si ya existe una opción con ese nombre, se selecciona en vez de crear:
+    // evita el error de unicidad de la BD (mismo nombre + usuario).
+    const existente = (asyncOptions[field.name] ?? field.options ?? []).find(
+      (o) => o.label.trim().toLowerCase() === nombre.toLowerCase()
+    );
+    if (existente) {
+      setValue(field.name, existente.value, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+      setQuickCreateField(null);
+      setQuickCreateName("");
+      toast.info(`"${existente.label}" ya existía: se seleccionó`);
+      return;
+    }
+    setQuickCreating(true);
+    try {
+      const option = await config.create(nombre);
+      setAsyncOptions((prev) => ({
+        ...prev,
+        [field.name]: [...(prev[field.name] ?? field.options ?? []), option],
+      }));
+      setValue(field.name, option.value, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+      setQuickCreateField(null);
+      setQuickCreateName("");
+      toast.success(`Se creó "${option.label}"`);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "No se pudo crear el registro"
+      );
+    } finally {
+      setQuickCreating(false);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-xl px-4 py-8">
@@ -209,6 +283,15 @@ export function CrudForm({
                       onChange={(v) => controllerField.onChange(v)}
                       options={asyncOptions[field.name] || field.options || []}
                       placeholder={field.placeholder}
+                      onCreate={
+                        field.quickCreate
+                          ? (prefill) => {
+                              setQuickCreateName(prefill);
+                              setQuickCreateField(field);
+                            }
+                          : undefined
+                      }
+                      createLabel={field.quickCreate?.label}
                     />
                   )}
                 />
@@ -293,6 +376,55 @@ export function CrudForm({
           </div>
         </form>
       </div>
+
+      {/* Alta rápida (opción A): crear el maestro sin salir del formulario. Va
+          fuera del <form> para que Enter no dispare el submit del gasto. */}
+      <Modal
+        open={quickCreateField !== null}
+        onClose={closeQuickCreate}
+        title={quickCreateField?.quickCreate?.title}
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={closeQuickCreate}
+              disabled={quickCreating}
+              className="rounded-lg px-3 py-2 text-[13px] font-medium text-subtitle transition-colors hover:bg-muted hover:text-header disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleQuickCreate}
+              disabled={quickCreating || !quickCreateName.trim()}
+              className="rounded-lg bg-primary px-4 py-2 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {quickCreating ? "Creando..." : "Crear"}
+            </button>
+          </div>
+        }
+      >
+        <label
+          htmlFor="crud-form-quick-create"
+          className="mb-1.5 block text-[13px] font-medium text-header"
+        >
+          Nombre
+        </label>
+        <input
+          id="crud-form-quick-create"
+          autoFocus
+          value={quickCreateName}
+          onChange={(e) => setQuickCreateName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              handleQuickCreate();
+            }
+          }}
+          placeholder={quickCreateField?.quickCreate?.placeholder ?? "Nombre"}
+          className={inputClasses}
+        />
+      </Modal>
     </div>
   );
 }

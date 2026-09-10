@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { FormField } from "@/components/crud/CrudForm";
+import { crearCategoriaGasto } from "@/backend/src/actions/gastos";
 import { fetchCategoriasGasto } from "./helpers";
 
 /** Esquema zod para crear/editar Gasto */
@@ -47,7 +48,21 @@ export const gastoFields: FormField[] = [
   {
     name: "categoria",
     label: "Categoría",
-    type: "select",
+    type: "combobox",
     optionsFrom: fetchCategoriasGasto,
+    // Alta rápida (opción A): crear la categoría desde acá mismo, sin salir del
+    // formulario (así no se pierde el resto de lo cargado). El gasto guarda la
+    // categoría por NOMBRE (`nombreCategoria`), así que la opción nueva va con
+    // value = label = nombre.
+    quickCreate: {
+      label: "Nueva categoría",
+      title: "Nueva categoría de gasto",
+      placeholder: "Ej. Supermercado",
+      create: async (nombre) => {
+        const creada = await crearCategoriaGasto({ nombre });
+        if (!creada) throw new Error("No se pudo crear la categoría");
+        return { value: creada.nombre, label: creada.nombre };
+      },
+    },
   },
 ];
