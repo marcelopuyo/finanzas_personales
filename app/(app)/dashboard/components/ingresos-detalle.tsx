@@ -94,9 +94,7 @@ export function ActividadCell({
 }
 
 export function ingresosDetalleColumns(
-  currency: string,
-  /** Al tocar el gráfico de actividad (sparkline) abre la pantalla del período. */
-  onOpenPeriodo?: (periodo: PeriodoTrabajoOut) => void
+  currency: string
 ): ColumnDef<PeriodoTrabajoOut>[] {
   return [
   {
@@ -153,31 +151,17 @@ export function ingresosDetalleColumns(
   {
     id: "actividad",
     header: "Jornadas/Tareas",
-    meta: { align: "center" },
-    cell: ({ row }) => {
-      const contenido = (
-        <ActividadCell
-          jornadas={row.original.jornadas}
-          tareas={row.original.tareas}
-          currency={currency}
-        />
-      );
-      // Tocar el sparkline abre la pantalla del período (solo lectura si ya
-      // está cobrado). Sin handler queda como hoy (no clicable).
-      return onOpenPeriodo ? (
-        <button
-          type="button"
-          onClick={() => onOpenPeriodo(row.original)}
-          title="Ver período de trabajo"
-          aria-label={`Ver período de ${row.original.trabajo?.nombre ?? "trabajo"}`}
-          className="inline-flex cursor-pointer items-center justify-center rounded-md px-1.5 py-0.5 transition-colors hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-primary/40"
-        >
-          {contenido}
-        </button>
-      ) : (
-        contenido
-      );
-    },
+    // La columna del sparkline NO navega al período: el gráfico solo muestra el
+    // tooltip de cada barra. `stopRowClick` corta el click/tap de esta celda
+    // para que no dispare el onRowClick de la fila.
+    meta: { align: "center", stopRowClick: true },
+    cell: ({ row }) => (
+      <ActividadCell
+        jornadas={row.original.jornadas}
+        tareas={row.original.tareas}
+        currency={currency}
+      />
+    ),
   },
   ];
 }
@@ -189,14 +173,19 @@ export function IngresosDetalle({
 }: {
   data: PeriodoTrabajoOut[];
   currency: string;
-  /** Abre la pantalla del período al tocar su gráfico de actividad (sparkline). */
+  /**
+   * Abre la pantalla del período al tocar/hacer click en cualquier columna de
+   * la fila, EXCEPTO la del sparkline (Jornadas/Tareas), que solo muestra el
+   * tooltip de sus barras.
+   */
   onOpenPeriodo?: (periodo: PeriodoTrabajoOut) => void;
 }) {
   return (
     <DataTable
-      columns={ingresosDetalleColumns(currency, onOpenPeriodo)}
+      columns={ingresosDetalleColumns(currency)}
       data={data}
       pageSize={5}
+      onRowClick={onOpenPeriodo}
     />
   );
 }
