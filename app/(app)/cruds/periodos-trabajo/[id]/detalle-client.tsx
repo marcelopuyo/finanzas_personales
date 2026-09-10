@@ -39,19 +39,6 @@ function fechaHoraLocal(d: Date | string): string {
   )}:${pad(v.getMinutes())}`;
 }
 
-function etiquetaModalidadCliente(m: string): string {
-  switch (m) {
-    case "fijo":
-      return "Monto fijo";
-    case "horas_fijas":
-      return "Horas fijas";
-    case "por_tarea":
-      return "Por tarea";
-    default:
-      return "Horas variables";
-  }
-}
-
 /** Resumen del período que va arriba de la grilla. */
 function ResumenPeriodo({
   periodo,
@@ -89,7 +76,7 @@ function ResumenPeriodo({
             {trabajo?.nombre ?? "—"}
           </p>
           <p className="text-[12px] text-subtitle">
-            {etiquetaModalidadCliente(modalidad)} · {desde} al {hasta}
+            Desde {desde} al {hasta}
           </p>
         </div>
         {cobrable && (
@@ -219,22 +206,24 @@ export function PeriodoTrabajoDetalleClient({
   const jornadaColumns = useMemo<ColumnDef<JornadaTrabajoOut>[]>(
     () => [
       {
-        accessorKey: "fechaJornada",
-        header: "Fecha",
+        // Fecha + rango horario en una sola columna (la grilla entra mejor en
+        // mobile). El `accessorFn` deja el texto compuesto para la exportación.
+        id: "fechaHora",
+        header: "Fecha/Hora",
         meta: { align: "center" as const },
-        cell: ({ getValue }) => dateTimeToString(getValue<Date>()),
-      },
-      {
-        accessorKey: "horaDesde",
-        header: "Desde",
-        meta: { align: "center" as const },
-        cell: ({ getValue }) => decimalToTime(getValue<number>()),
-      },
-      {
-        accessorKey: "horaHasta",
-        header: "Hasta",
-        meta: { align: "center" as const },
-        cell: ({ getValue }) => decimalToTime(getValue<number>()),
+        accessorFn: (j) =>
+          `${dateTimeToString(j.fechaJornada)} ${decimalToTime(
+            j.horaDesde
+          )} - ${decimalToTime(j.horaHasta)}`,
+        cell: ({ row }) => (
+          <span className="whitespace-nowrap">
+            {dateTimeToString(row.original.fechaJornada)}{" "}
+            <span className="text-subtitle">
+              {decimalToTime(row.original.horaDesde)} -{" "}
+              {decimalToTime(row.original.horaHasta)}
+            </span>
+          </span>
+        ),
       },
       {
         accessorKey: "montoJornada",
