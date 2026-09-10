@@ -130,12 +130,12 @@ export function PeriodosTrabajoListClient({
       mobileBottomNav
       mobileHint="Tocá un período y luego Jornadas"
       backHref="/dashboard"
-      // En mobile el botón "Buscar" se reemplaza por "Jornadas": abre el
-      // detalle del período seleccionado (el mismo destino al que se llega
-      // desde Ingresos → Detalle tocando una fila) para cargar sus
-      // jornadas/tareas. NO se propaga `origen=dashboard`: el detalle usa ese
-      // parámetro para volver al dashboard, y acá tiene que volver a ESTE
-      // listado (sin `origen`, el detalle vuelve a /cruds/periodos-trabajo).
+      // En mobile la barra inferior suma "Jornadas": abre el detalle del
+      // período seleccionado (el mismo destino al que se llega desde
+      // Ingresos → Detalle tocando una fila) para cargar sus jornadas/tareas.
+      // NO se propaga `origen=dashboard`: el detalle usa ese parámetro para
+      // volver al dashboard, y acá tiene que volver a ESTE listado (sin
+      // `origen`, el detalle vuelve a /cruds/periodos-trabajo).
       mobilePrimaryAction={{
         label: "Jornadas",
         icon: CalendarClock,

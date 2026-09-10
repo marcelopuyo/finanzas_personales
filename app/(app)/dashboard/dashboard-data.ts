@@ -284,8 +284,9 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   );
 
   // --- Evolución ---
-  // (La evolución de Gastos se calcula en el cliente por fecha de pago con la
-  // agrupación elegida; ver gastos-agrupacion.ts. Acá solo Ingresos y Resultados.)
+  // (La evolución de Gastos se calcula en el cliente por fecha de pago,
+  // agrupada por mes calendario; ver gastos-agrupacion.ts. Acá solo Ingresos y
+  // Resultados.)
   const evolucionIngresos = evolIngresos.map((e) => ({
     name: e.periodo,
     value: e.monto,

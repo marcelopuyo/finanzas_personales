@@ -48,7 +48,7 @@ export function CuentasActionsMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         title="Acciones de cuentas"
-        className="flex h-7 w-7 items-center justify-center rounded-full bg-muted/60 text-subtitle transition-colors hover:bg-muted hover:text-header"
+        className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/60 text-subtitle transition-colors hover:bg-muted hover:text-header"
       >
         <Ellipsis className="h-4 w-4" />
       </button>

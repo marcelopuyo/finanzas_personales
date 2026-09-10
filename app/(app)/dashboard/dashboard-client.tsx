@@ -1,11 +1,12 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { SlidersHorizontal } from "lucide-react";
+import { Search, SlidersHorizontal } from "lucide-react";
 import { StatBadge } from "@/components/ui/stat-badge";
 import { Tabs } from "@/components/ui/tabs";
 import { Modal } from "@/components/ui/modal";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DateRangeFields } from "@/components/ui/date-picker";
 import { AccountCard } from "./components/account-card";
 import { CuentasActionsMenu } from "./components/cuentas-actions-menu";
 import { TrabajosActionsMenu } from "./components/trabajos-actions-menu";
@@ -19,11 +20,7 @@ import { IngresosDetalle } from "./components/ingresos-detalle";
 import { HistorialModal, type CuentaHistorial } from "./components/historial-modal";
 import { PeriodosModal, type TipoPeriodos } from "./components/periodos-modal";
 import type { DashboardData } from "./dashboard-data";
-import {
-  OPCIONES_AGRUPACION_GASTO,
-  gastosEvolucionPor,
-  type AgrupacionGasto,
-} from "./gastos-agrupacion";
+import { gastosEvolucionPor } from "./gastos-agrupacion";
 import {
   evolucionIngresosPorMes,
   ingresosDelMesActual,
@@ -80,9 +77,10 @@ export function DashboardClient({ data, periodosInicial }: Props) {
   const [dCta, setDCta] = useState<string[]>([]);
   const [dFd, setDFd] = useState(fechaPrimerDia);
   const [dFh, setDFh] = useState(fechaHoy);
-  // Agrupación del gráfico Histórico de Gastos (buckets por fecha de pago).
-  const [selAgrup, setSelAgrup] = useState<AgrupacionGasto>("mensual");
-  const [dAgrup, setDAgrup] = useState<AgrupacionGasto>("mensual");
+  // Búsqueda de la tab "Detalle" de Gastos: el ícono vive junto al botón
+  // "Filtros" (primera fila) y abre/cierra el input de búsqueda.
+  const [busquedaGastos, setBusquedaGastos] = useState("");
+  const [busquedaGastosOpen, setBusquedaGastosOpen] = useState(false);
 
   // Filtros de Ingresos (trabajo + fechas)
   const [selTra, setSelTra] = useState<string[]>([]);
@@ -313,11 +311,11 @@ export function DashboardClient({ data, periodosInicial }: Props) {
   );
 
   // Evolución del panel Histórico (sin filtro de fechas → TODO el histórico):
-  // agrupa por fecha de pago según la "Agrupación" elegida (mensual/quincenal/
-  // semanal/diario/anual) y ordena cronológicamente. Ya no usa el período de gasto.
+  // SIEMPRE agrupado por MES CALENDARIO según la fecha de pago, ordenado
+  // cronológicamente. Ya no usa el período de gasto.
   const filteredEvolucion = useMemo(
-    () => gastosEvolucionPor(filteredSinFecha, selAgrup),
-    [filteredSinFecha, selAgrup]
+    () => gastosEvolucionPor(filteredSinFecha, "mensual"),
+    [filteredSinFecha]
   );
 
   const activeFilters =
@@ -339,12 +337,10 @@ export function DashboardClient({ data, periodosInicial }: Props) {
 
   const openFilters = () => {
     setDCat(selCat); setDCta(selCta); setDFd(selFd); setDFh(selFh);
-    setDAgrup(selAgrup);
     setOpen(true);
   };
   const apply = () => {
     setSelCat(dCat); setSelCta(dCta); setSelFd(dFd); setSelFh(dFh);
-    setSelAgrup(dAgrup);
     setOpen(false);
   };
   const limpiar = () => {
@@ -352,7 +348,6 @@ export function DashboardClient({ data, periodosInicial }: Props) {
     const fh = fechaHoy();
     setDCat([]); setDCta([]); setDFd(fd); setDFh(fh);
     setSelCat([]); setSelCta([]); setSelFd(fd); setSelFh(fh);
-    setDAgrup("mensual"); setSelAgrup("mensual");
     setOpen(false);
   };
 
@@ -362,8 +357,13 @@ export function DashboardClient({ data, periodosInicial }: Props) {
     <button
       type="button"
       onClick={openFilters}
+      aria-label={activeFilters > 0 ? `Filtros (${activeFilters} aplicados)` : "Filtros"}
+      title="Filtros"
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors",
+        // Alto fijo h-8 (32px) = el de los Tabs y el del botón de búsqueda, para
+        // que la fila de controles del panel quede pareja. Además evita que el
+        // botón crezca 2px cuando aparece el badge de filtros activos.
+        "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12px] font-medium transition-colors",
         activeFilters > 0
           ? "border-primary/40 bg-primary/10 text-primary"
           : "border-border bg-muted text-card-foreground hover:bg-card",
@@ -371,12 +371,37 @@ export function DashboardClient({ data, periodosInicial }: Props) {
       )}
     >
       <SlidersHorizontal className="h-3.5 w-3.5" />
-      Filtros
       {activeFilters > 0 && (
         <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
           {activeFilters}
         </span>
       )}
+    </button>
+  );
+
+  // Botón de búsqueda de la tab "Detalle" de Gastos: solo el ícono, con el mismo
+  // estilo pill del botón "Filtros" en tono gris. Alterna el input expandido.
+  const toggleBusquedaGastos = () => {
+    // Al cerrar se limpia el texto para no dejar la grilla filtrada sin input.
+    if (busquedaGastosOpen) setBusquedaGastos("");
+    setBusquedaGastosOpen(!busquedaGastosOpen);
+  };
+  const gastoSearchBtn = (className?: string) => (
+    <button
+      type="button"
+      onClick={toggleBusquedaGastos}
+      aria-label={
+        busquedaGastosOpen ? "Cerrar búsqueda de gastos" : "Buscar gastos"
+      }
+      aria-expanded={busquedaGastosOpen}
+      title={busquedaGastosOpen ? "Cerrar búsqueda" : "Buscar"}
+      className={cn(
+        // Alto fijo h-8 (32px): mismo que "Filtros" y los Tabs.
+        "inline-flex h-8 items-center justify-center rounded-full border border-border bg-muted px-3 text-card-foreground transition-colors hover:bg-card",
+        className
+      )}
+    >
+      <Search className="h-3.5 w-3.5" />
     </button>
   );
 
@@ -468,8 +493,11 @@ export function DashboardClient({ data, periodosInicial }: Props) {
     <button
       type="button"
       onClick={openIngFilters}
+      aria-label={activeIngFilters > 0 ? `Filtros (${activeIngFilters} aplicados)` : "Filtros"}
+      title="Filtros"
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors",
+        // Alto fijo h-8 (32px): mismo que los Tabs (coherente con el panel Gastos).
+        "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12px] font-medium transition-colors",
         activeIngFilters > 0
           ? "border-primary/40 bg-primary/10 text-primary"
           : "border-border bg-muted text-card-foreground hover:bg-card",
@@ -477,7 +505,6 @@ export function DashboardClient({ data, periodosInicial }: Props) {
       )}
     >
       <SlidersHorizontal className="h-3.5 w-3.5" />
-      Filtros
       {activeIngFilters > 0 && (
         <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
           {activeIngFilters}
@@ -610,13 +637,17 @@ export function DashboardClient({ data, periodosInicial }: Props) {
               <h3 className="text-[16px] font-semibold text-header">Gastos</h3>
               <StatBadge label="Mes actual" value={mesActualGastos} />
               {filterBtn("sm:hidden")}
+              {gastoSearchBtn("sm:hidden")}
             </div>
-            <div className="flex items-center gap-2">{filterBtn("hidden sm:inline-flex")}{gastosTabs}<GastosActionsMenu /></div>
+            <div className="flex items-center gap-2">{filterBtn("hidden sm:inline-flex")}{gastoSearchBtn("hidden sm:inline-flex")}{gastosTabs}<GastosActionsMenu /></div>
           </div>
           <GastosDetalle
             data={filteredGastos}
             total={todosLosGastos.length}
             currency={data.monedaPredeterminadaISO}
+            search={busquedaGastos}
+            onSearchChange={setBusquedaGastos}
+            searchOpen={busquedaGastosOpen}
           />
         </div>
       ) : (
@@ -737,34 +768,12 @@ export function DashboardClient({ data, periodosInicial }: Props) {
         </div>
         <div className="my-4 border-t border-border" />
         <p className="mb-2 text-[13px] font-medium text-header">Fecha de pago</p>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1">
-            <span className="text-[12px] text-subtitle">Desde</span>
-            <input type="date" value={dFd} onChange={(e) => setDFd(e.target.value)}
-              className="w-full rounded-md border border-border bg-card px-2.5 py-1.5 text-[13px] text-card-foreground focus:outline-none focus:ring-2 focus:ring-primary/40" />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-[12px] text-subtitle">Hasta</span>
-            <input type="date" value={dFh} onChange={(e) => setDFh(e.target.value)}
-              className="w-full rounded-md border border-border bg-card px-2.5 py-1.5 text-[13px] text-card-foreground focus:outline-none focus:ring-2 focus:ring-primary/40" />
-          </label>
-        </div>
-        <div className="my-4 border-t border-border" />
-        <p className="mb-2 text-[13px] font-medium text-header">Agrupación</p>
-        <select
-          value={dAgrup}
-          onChange={(e) => setDAgrup(e.target.value as AgrupacionGasto)}
-          className="w-full rounded-md border border-border bg-card px-2.5 py-1.5 text-[13px] text-card-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-        >
-          {OPCIONES_AGRUPACION_GASTO.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-        <p className="mt-1.5 text-[12px] text-subtitle">
-          Agrupa el gráfico Histórico por este período.
-        </p>
+        <DateRangeFields
+          desde={dFd}
+          hasta={dFh}
+          onChangeDesde={setDFd}
+          onChangeHasta={setDFh}
+        />
       </Modal>
 
       {/* Modal de filtros de Ingresos */}
@@ -797,18 +806,12 @@ export function DashboardClient({ data, periodosInicial }: Props) {
         </div>
         <div className="my-4 border-t border-border" />
         <p className="mb-2 text-[13px] font-medium text-header">Fecha</p>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1">
-            <span className="text-[12px] text-subtitle">Desde</span>
-            <input type="date" value={dFdIng} onChange={(e) => setDFdIng(e.target.value)}
-              className="w-full rounded-md border border-border bg-card px-2.5 py-1.5 text-[13px] text-card-foreground focus:outline-none focus:ring-2 focus:ring-primary/40" />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-[12px] text-subtitle">Hasta</span>
-            <input type="date" value={dFhIng} onChange={(e) => setDFhIng(e.target.value)}
-              className="w-full rounded-md border border-border bg-card px-2.5 py-1.5 text-[13px] text-card-foreground focus:outline-none focus:ring-2 focus:ring-primary/40" />
-          </label>
-        </div>
+        <DateRangeFields
+          desde={dFdIng}
+          hasta={dFhIng}
+          onChangeDesde={setDFdIng}
+          onChangeHasta={setDFhIng}
+        />
       </Modal>
 
       {/* Popup de historial de cuenta */}

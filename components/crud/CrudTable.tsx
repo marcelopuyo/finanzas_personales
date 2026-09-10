@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, FileDown, Pencil, Plus, Search, Trash2, type LucideIcon } from "lucide-react";
 import { BottomActionBar } from "@/components/ui/bottom-action-bar";
@@ -32,8 +32,8 @@ interface CrudTableProps<T, TId = number> {
   currency?: string;
   /** Modo mobile con barra inferior de acciones + FAB central (lg:hidden). En
       <lg la grilla muestra solo las columnas de datos; la fila se selecciona
-      tocándola (queda resaltada) y Buscar/Exportar/Editar/Eliminar/Nuevo viven
-      en la barra inferior. En desktop el CRUD no cambia. */
+      tocándola (queda resaltada) y Exportar/Editar/Eliminar/Nuevo viven en la
+      barra inferior. En desktop el CRUD no cambia. */
   mobileBottomNav?: boolean;
   /** Texto opcional bajo el título en mobile (p. ej. "Tocá una fila para
       seleccionarla"). Solo aplica con mobileBottomNav. */
@@ -44,18 +44,18 @@ interface CrudTableProps<T, TId = number> {
   trailingColumns?: ColumnDef<T>[];
   /** Acción extra opcional del CRUD: en desktop un botón en el toolbar (junto a
       Exportar/Nuevo) y en mobile una acción más en la barra inferior (al lado de
-      Buscar/Exportar). Útil para disparar un modo propio (p. ej. "Reordenar"). */
+      Exportar). Útil para disparar un modo propio (p. ej. "Reordenar"). */
   extraAction?: {
     label: string;
     icon: LucideIcon;
     active?: boolean;
     onClick: () => void;
   };
-  /** Acción propia que REEMPLAZA al botón "Buscar" de la barra inferior mobile
-      (la búsqueda expandible deja de mostrarse). Recibe el id de la fila
-      seleccionada y queda deshabilitada mientras no haya ninguna. Útil cuando
-      el CRUD no necesita búsqueda en mobile y en su lugar conviene una acción
-      de fila (p. ej. abrir el detalle del período para cargar sus jornadas). */
+  /** Acción propia adicional de la barra inferior mobile, ubicada a la
+      izquierda de Exportar. Recibe el id de la fila seleccionada y queda
+      deshabilitada mientras no haya ninguna. Útil para una acción de fila
+      contextual (p. ej. abrir el detalle del período para cargar sus
+      jornadas). */
   mobilePrimaryAction?: {
     label: string;
     icon: LucideIcon;
@@ -109,9 +109,6 @@ export function CrudTable<T, TId = number>({
   const [deleting, setDeleting] = useState(false);
   // Selección por fila (solo mobile con barra inferior): una a la vez.
   const [selectedId, setSelectedId] = useState<TId | null>(null);
-  // Búsqueda expandible del modo mobile (la abre el botón "Buscar" de la barra).
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
-  const mobileSearchRef = useRef<HTMLInputElement>(null);
 
   const load = () => {
     if (!fetchData) return;
@@ -328,11 +325,10 @@ export function CrudTable<T, TId = number>({
   );
 
   // Barra inferior fija (<lg): componente reutilizable BottomActionBar con
-  // Buscar/Exportar a la izquierda, Editar/Eliminar a la derecha (se habilitan
-  // al seleccionar una fila) y FAB central "+". Con `mobilePrimaryAction` el
-  // botón "Buscar" se reemplaza por esa acción, que también opera sobre la fila
-  // seleccionada. El estado (selección, búsqueda) se mantiene acá y se pasa como
-  // props/callbacks. Solo si hay acciones.
+  // Exportar (más `mobilePrimaryAction`/`extraAction` opcionales) a la
+  // izquierda, Editar/Eliminar a la derecha (se habilitan al seleccionar una
+  // fila) y FAB central "+". El estado (selección de fila) se mantiene acá y se
+  // pasa como props/callbacks. Solo si hay acciones.
   const bottomBarEl = mobileBottomNav && showActions ? (
     <BottomActionBar
       left={[
@@ -348,18 +344,7 @@ export function CrudTable<T, TId = number>({
                   selectedId !== null && mobilePrimaryAction.onClick(selectedId),
               },
             ]
-          : [
-              {
-                key: "search",
-                label: "Buscar",
-                icon: Search,
-                active: mobileSearchOpen,
-                onClick: () => {
-                  setMobileSearchOpen((o) => !o);
-                  setTimeout(() => mobileSearchRef.current?.focus(), 0);
-                },
-              },
-            ]),
+          : []),
         { key: "export", label: "Exportar", icon: FileDown, onClick: handleExportPdf },
         ...(extraAction
           ? [
@@ -411,21 +396,6 @@ export function CrudTable<T, TId = number>({
           {topContent}
           {mobileHint && (
             <p className="-mt-2 mb-3 text-[12px] text-subtitle">{mobileHint}</p>
-          )}
-          {/* Búsqueda expandible: la abre el botón "Buscar" de la barra. No
-              aplica si esa acción fue reemplazada por una propia. */}
-          {mobileSearchOpen && !mobilePrimaryAction && (
-            <div className="relative mb-3">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtitle" />
-              <input
-                ref={mobileSearchRef}
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={searchPlaceholder}
-                className="w-full rounded-full border border-border bg-card py-2 pl-9 pr-3 text-[13px] text-card-foreground placeholder:text-subtitle focus:outline-none focus:ring-2 focus:ring-primary/40"
-              />
-            </div>
           )}
           <div className="rounded-lg border border-border bg-card p-4">
             <DataTable

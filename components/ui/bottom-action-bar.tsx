@@ -15,12 +15,12 @@ export interface BottomBarAction {
   disabled?: boolean;
   /** Cuando está habilitada usa el color danger (p. ej. Eliminar). */
   danger?: boolean;
-  /** Cuando está habilitada usa el color primario (p. ej. Editar / Buscar activo). */
+  /** Cuando está habilitada usa el color primario (p. ej. Editar). */
   active?: boolean;
 }
 
 interface BottomActionBarProps {
-  /** Acciones del lado izquierdo (típicamente Buscar / Exportar). */
+  /** Acciones del lado izquierdo (típicamente Exportar). */
   left?: BottomBarAction[];
   /** Acciones del lado derecho (típicamente Editar / Eliminar). */
   right?: BottomBarAction[];
@@ -37,7 +37,7 @@ interface BottomActionBarProps {
  *
  * Uso:
  *   <BottomActionBar
- *     left={[{ key: "search", label: "Buscar", icon: Search, onClick: ... }]}
+ *     left={[{ key: "export", label: "Exportar", icon: FileDown, onClick: ... }]}
  *     right={[{ key: "edit", label: "Editar", icon: Pencil, disabled: !sel, onClick: ... }]}
  *     fabAction={{ label: "Nuevo", onClick: () => router.push(createHref) }}
  *   />

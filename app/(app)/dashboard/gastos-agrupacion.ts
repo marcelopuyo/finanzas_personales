@@ -5,6 +5,10 @@
 // de existir) por buckets CALENDARIO según la FECHA DE PAGO (`fechaPago`) del gasto:
 // Mensual, Quincenal, Semanal, Diario, Anual. Los gastos sin `fechaPago` (pendientes)
 // quedan fuera (decisión 2026-09-09, plan-agrupacion-historico-gastos.md).
+//
+// NOTA (2026-09-10): el dashboard usa SIEMPRE `mensual` (mes calendario); el selector
+// "Agrupación" se quitó del modal de Filtros de Gastos. El resto de las opciones se
+// conservan acá por si se vuelven a exponer.
 import type { GastoOut } from "@/backend/src/queries/gastos";
 
 export type AgrupacionGasto =
