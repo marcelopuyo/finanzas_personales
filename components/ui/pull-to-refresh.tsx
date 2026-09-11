@@ -41,14 +41,30 @@ const MAX_SPIN_MS = 8000;
 /** Recorrido del gesto antes de decidir que es un pull vertical. */
 const DECIDE_PX = 4;
 
+/**
+ * Estilo del indicador:
+ * - `ios`: el contenido se ESTIRA hacia abajo y el indicador (ícono suelto)
+ *   viaja con él, girando media vuelta a medida que se tira.
+ * - `android` (Material): el contenido NO se mueve; un círculo con sombra baja
+ *   desde el tope (por debajo de la barra superior) y gira una vuelta completa.
+ */
+export type PullToRefreshVariant = "ios" | "android";
+
 interface PullToRefreshProps {
   children: React.ReactNode;
   /** Clases del contenedor que scrollea (padding/layout; en la app: las que
       tenía el `<main>`). El componente agrega `relative` y `overscroll-none`. */
   className?: string;
+  /** Estilo del indicador (default: "ios"). */
+  variant?: PullToRefreshVariant;
 }
 
-export function PullToRefresh({ children, className }: PullToRefreshProps) {
+export function PullToRefresh({
+  children,
+  className,
+  variant = "ios",
+}: PullToRefreshProps) {
+  const ios = variant === "ios";
   const router = useRouter();
   const scrollRef = useRef<HTMLElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -69,42 +85,67 @@ export function PullToRefresh({ children, className }: PullToRefreshProps) {
   const paint = useCallback(
     (dy: number, animate = false) => {
       pulled.current = dy;
+      const progress = Math.min(1, dy / THRESHOLD);
       const content = contentRef.current;
-      if (content) {
-        if (dy === 0) {
-          // ⚠️ En REPOSO el transform se ELIMINA: un ancestro con `transform`
-          // (o `will-change: transform`) pasa a ser containing block de los
-          // `position: fixed` de adentro → modales, overlay y tooltips de los
-          // gráficos quedarían mal posicionados. Solo se transforma mientras
-          // dura el gesto (y ahí no hay nada fijo abierto).
-          if (animate) {
-            content.style.transition =
-              "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)";
-            content.style.transform = "translateY(0px)";
-            window.setTimeout(() => {
-              if (pulled.current !== 0) return; // empezó otro pull
+      const badge = badgeRef.current;
+
+      if (ios) {
+        // ---- iOS: el contenido se estira y el indicador baja con él ----
+        if (content) {
+          if (dy === 0) {
+            // ⚠️ En REPOSO el transform se ELIMINA: un ancestro con `transform`
+            // (o `will-change: transform`) pasa a ser containing block de los
+            // `position: fixed` de adentro → modales, overlay y tooltips de los
+            // gráficos quedarían mal posicionados. Solo se transforma mientras
+            // dura el gesto (y ahí no hay nada fijo abierto).
+            if (animate) {
+              content.style.transition =
+                "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)";
+              content.style.transform = "translateY(0px)";
+              window.setTimeout(() => {
+                if (pulled.current !== 0) return; // empezó otro pull
+                content.style.transition = "";
+                content.style.transform = "";
+                content.style.willChange = "";
+              }, 280);
+            } else {
               content.style.transition = "";
               content.style.transform = "";
               content.style.willChange = "";
-            }, 280);
+            }
           } else {
-            content.style.transition = "";
-            content.style.transform = "";
-            content.style.willChange = "";
+            content.style.transition = "none";
+            content.style.willChange = "transform";
+            content.style.transform = `translateY(${dy}px)`;
           }
-        } else {
-          content.style.transition = "none";
-          content.style.willChange = "transform";
-          content.style.transform = `translateY(${dy}px)`;
         }
+        if (badge) {
+          badge.style.transition = animate
+            ? "transform 260ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease-out"
+            : "none";
+          badge.style.opacity = String(progress);
+          badge.style.transform = `translateY(${dy}px)`;
+        }
+      } else if (badge) {
+        // ---- Android (Material): círculo flotante, el contenido no se mueve ----
+        const reveal = dy === 0 ? 0 : progress;
+        badge.style.transition = animate
+          ? "transform 220ms ease-out, opacity 220ms ease-out"
+          : "none";
+        badge.style.opacity = String(reveal);
+        badge.style.transform = `translateY(${-(1 - reveal) * 24}px) scale(${
+          0.7 + 0.3 * reveal
+        })`;
       }
-      const progress = Math.min(1, dy / THRESHOLD);
-      if (badgeRef.current) badgeRef.current.style.opacity = String(progress);
+
+      // Giro del ícono mientras se tira: media vuelta (iOS) o vuelta completa
+      // (Android). Al refrescar, el giro pasa a la animación CSS (`animate-spin`).
       if (iconRef.current && !spinning) {
-        iconRef.current.style.transform = `rotate(${progress * 180}deg)`;
+        const turns = ios ? 180 : 360;
+        iconRef.current.style.transform = `rotate(${progress * turns}deg)`;
       }
     },
-    [spinning]
+    [ios, spinning]
   );
 
   /** Dispara el refresco: transition + `router.refresh()` (RSC de la ruta). */
@@ -201,17 +242,38 @@ export function PullToRefresh({ children, className }: PullToRefreshProps) {
       className={cn("relative h-full overflow-y-auto overscroll-none", className)}
     >
       <div ref={contentRef} className="relative">
-        {/* Indicador (se revela en el hueco que abre el tirón, como en iOS). */}
+        {children}
+      </div>
+
+      {/* Indicador. iOS: viaja con el contenido (se revela en el hueco que
+          abre el tirón). Android: círculo con sombra que baja desde el tope,
+          por debajo de la barra superior. Va fuera del contenido para que la
+          posición sea independiente del estiramiento. */}
+      <div
+        aria-hidden
+        className={cn(
+          "pointer-events-none absolute left-1/2 -translate-x-1/2",
+          ios ? "top-3" : "top-14"
+        )}
+      >
         <div
           ref={badgeRef}
-          aria-hidden
-          className="pointer-events-none absolute -top-11 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center text-subtitle opacity-0"
+          className={cn(
+            "flex items-center justify-center opacity-0",
+            !ios &&
+              "h-9 w-9 rounded-full border border-border bg-card text-subtitle shadow-lg"
+          )}
         >
-          <div ref={iconRef} className={cn(spinning && "animate-spin")}>
-            <RefreshCw className="h-5 w-5" />
+          <div
+            ref={iconRef}
+            className={cn(
+              "flex items-center justify-center text-subtitle",
+              spinning && "animate-spin"
+            )}
+          >
+            <RefreshCw className={ios ? "h-5 w-5" : "h-4 w-4"} />
           </div>
         </div>
-        {children}
       </div>
       <span role="status" aria-live="polite" className="sr-only">
         {spinning ? "Actualizando…" : ""}

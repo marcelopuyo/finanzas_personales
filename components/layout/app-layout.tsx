@@ -22,7 +22,10 @@ export default function AppLayout({
   return (
     <div className="h-screen overflow-hidden bg-background">
       <TopBar initial={initial} userLabel={userLabel} />
-      <PullToRefresh className="px-4 pt-14 pb-4 lg:px-6 lg:pb-6 lg:pt-14">
+      <PullToRefresh
+        variant="android"
+        className="px-4 pt-14 pb-4 lg:px-6 lg:pb-6 lg:pt-14"
+      >
         {children}
       </PullToRefresh>
     </div>
