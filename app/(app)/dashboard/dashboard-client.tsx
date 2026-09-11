@@ -632,14 +632,24 @@ export function DashboardClient({ data, periodosInicial }: Props) {
         />
       ) : tabGastos === "detalle" ? (
         <div className="rounded-lg border border-border bg-card p-5">
+          {/* Cabecera de "Gastos" (mobile, < sm): fila 1 = título + badge +
+              Filtros; fila 2 = Búsqueda + pestañas + ⋯. En desktop (sm+) todo
+              va en una sola fila, con Filtros/Búsqueda/pestañas/⋯ a la derecha
+              del badge. Los botones son los mismos: cada uno se muestra sólo en
+              la fila que le corresponde (`sm:hidden` / `hidden sm:inline-flex`). */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-[16px] font-semibold text-header">Gastos</h3>
               <StatBadge label="Mes actual" value={mesActualGastos} />
               {filterBtn("sm:hidden")}
-              {gastoSearchBtn("sm:hidden")}
             </div>
-            <div className="flex items-center gap-2">{filterBtn("hidden sm:inline-flex")}{gastoSearchBtn("hidden sm:inline-flex")}{gastosTabs}<GastosActionsMenu /></div>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {gastoSearchBtn("sm:hidden")}
+              {filterBtn("hidden sm:inline-flex")}
+              {gastoSearchBtn("hidden sm:inline-flex")}
+              {gastosTabs}
+              <GastosActionsMenu />
+            </div>
           </div>
           <GastosDetalle
             data={filteredGastos}
