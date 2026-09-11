@@ -19,6 +19,17 @@ interface TooltipState {
   value: number;
 }
 
+/**
+ * Formatea el label del tooltip cuando es una fecha ISO ("2026-09-10", con o
+ * sin hora) al formato de la app: "10-09-2026". Los labels que ya vienen
+ * formateados (ej. `ingresos-detalle` usa `dateTimeToString`) se muestran tal
+ * cual: si no matchea el patrón ISO, se devuelve el original.
+ */
+function labelTooltip(label: string): string {
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(label);
+  return iso ? `${iso[3]}-${iso[2]}-${iso[1]}` : label;
+}
+
 export function SparkLineChart({
   data,
   labels,
@@ -54,7 +65,7 @@ export function SparkLineChart({
     >
       {tooltip.label && (
         <p className="text-[10px] leading-tight text-subtitle">
-          {tooltip.label}
+          {labelTooltip(tooltip.label)}
         </p>
       )}
       <p className="text-[11px] font-semibold leading-tight text-card-foreground">

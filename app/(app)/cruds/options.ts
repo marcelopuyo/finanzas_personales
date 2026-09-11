@@ -31,6 +31,19 @@ export async function fetchCuentas() {
   return rows.map((r) => ({ value: r.nombre, label: r.nombre }));
 }
 
+/**
+ * Cuentas con saldo MAYOR A 0 (para el ALTA de préstamos: no tiene sentido
+ * prestar/recibir plata contra una cuenta vacía o sobregirada). En la edición
+ * se usan TODAS (`fetchCuentas`) para que la cuenta del préstamo no desaparezca
+ * del select si quedó en 0. El saldo es numeric en Postgres → llega string.
+ */
+export async function fetchCuentasConSaldo() {
+  const rows = await getAllCuentas();
+  return rows
+    .filter((r) => Number(r.saldo ?? 0) > 0)
+    .map((r) => ({ value: r.nombre, label: r.nombre }));
+}
+
 // Variante con value = ID (para la cuenta de propina de las jornadas).
 export async function fetchCuentasId() {
   const rows = await getAllCuentas();

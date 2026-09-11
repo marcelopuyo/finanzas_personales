@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { FormField } from "@/components/crud/CrudForm";
-import { fetchPersonas, fetchCuentas } from "../options";
+import { fetchPersonas, fetchCuentas, fetchCuentasConSaldo } from "../options";
 import { personaQuickCreate } from "../persona-quick-create";
 import { labelContraparte } from "@/lib/prestamos";
 
@@ -39,3 +39,13 @@ export const prestamoFields: FormField[] = [
   },
   { name: "cuenta", label: "Cuenta", type: "select", optionsFrom: fetchCuentas },
 ];
+
+/**
+ * Variante para el ALTA (`/cruds/prestamos/nuevo`): el select de Cuenta sólo
+ * ofrece las cuentas con saldo > 0. La EDICIÓN sigue usando `prestamoFields`
+ * (todas las cuentas) para que la cuenta actual del préstamo, si quedó en 0,
+ * no desaparezca del select al editar.
+ */
+export const prestamoFieldsNuevo: FormField[] = prestamoFields.map((f) =>
+  f.name === "cuenta" ? { ...f, optionsFrom: fetchCuentasConSaldo } : f
+);

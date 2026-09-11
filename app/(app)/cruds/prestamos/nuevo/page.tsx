@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { CrudForm } from "@/components/crud/CrudForm";
 import { crearPrestamo } from "@/backend/src/actions/prestamos";
-import { prestamoSchema, prestamoFields } from "../prestamo-form-config";
+import { prestamoSchema, prestamoFieldsNuevo } from "../prestamo-form-config";
 import { todayLocalISODate } from "@/lib/utils";
 
 function NuevoPrestamoForm() {
@@ -22,7 +22,7 @@ function NuevoPrestamoForm() {
   return (
     <CrudForm
       title="Nuevo Préstamo"
-      fields={prestamoFields}
+      fields={prestamoFieldsNuevo}
       schema={prestamoSchema}
       // Fecha precargada con HOY (la calcula el navegador al montar el
       // formulario, por lo que es la fecha local del usuario y puede editarse).
