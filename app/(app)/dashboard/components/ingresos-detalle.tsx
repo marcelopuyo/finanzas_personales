@@ -98,23 +98,27 @@ export function ingresosDetalleColumns(
 ): ColumnDef<PeriodoTrabajoOut>[] {
   return [
   {
-    accessorKey: "fechaDesde",
-    header: "Desde",
-    meta: { align: "center" },
-    cell: ({ getValue }) => dateTimeToString(getValue<string | Date>()),
-  },
-  {
-    accessorKey: "fechaHasta",
-    header: "Hasta",
-    meta: { align: "center" },
-    cell: ({ getValue }) => dateTimeToString(getValue<string | Date>()),
-  },
-  {
     accessorFn: (row) => row.trabajo?.nombre ?? "",
     id: "trabajo",
     header: "Trabajo",
     cell: ({ getValue }) => (getValue<string>() ? getValue<string>() : "-"),
     footer: "Total",
+  },
+  {
+    // "Desde" y "Hasta" fusionadas en una sola columna. El accessor expone
+    // `fechaDesde`, así el orden por defecto y el clic en el header son
+    // CRONOLÓGICOS por fecha de inicio (no por el texto "dd-mm-aaaa al ...").
+    id: "periodo",
+    header: "Período",
+    accessorFn: (row) => row.fechaDesde,
+    sortingFn: (a, b) =>
+      new Date(a.original.fechaDesde).getTime() -
+      new Date(b.original.fechaDesde).getTime(),
+    meta: { align: "center" },
+    cell: ({ row }) =>
+      `${dateTimeToString(row.original.fechaDesde)} al ${dateTimeToString(
+        row.original.fechaHasta
+      )}`,
   },
   {
     accessorKey: "montoACobrar",
@@ -173,6 +177,12 @@ export function IngresosDetalle({
   currency: string;
 }) {
   return (
-    <DataTable columns={ingresosDetalleColumns(currency)} data={data} pageSize={5} />
+    <DataTable
+      columns={ingresosDetalleColumns(currency)}
+      data={data}
+      pageSize={5}
+      // Por defecto se ordena por el período más reciente (fecha desde DESC).
+      initialSorting={[{ id: "periodo", desc: true }]}
+    />
   );
 }

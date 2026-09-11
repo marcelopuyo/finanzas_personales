@@ -151,7 +151,12 @@ export function DonutChart({
         <h3 className="text-[16px] font-semibold text-header">{title}</h3>
         {badge}
       </div>
-      {action && <div className="flex items-center gap-2">{action}</div>}
+      {action && (
+        // Mobile: el grupo ocupa todo el ancho del panel para que el botón ⋯
+        // (que se pega al borde derecho con `ml-auto`) quede siempre en la
+        // misma posición. En desktop vuelve a shrink-to-fit (a la derecha).
+        <div className="flex w-full items-center gap-2 sm:w-auto">{action}</div>
+      )}
     </div>
   );
 

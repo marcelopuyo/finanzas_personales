@@ -527,6 +527,23 @@ export function DashboardClient({ data, periodosInicial }: Props) {
     />
   );
 
+  // Acciones de la cabecera de "Gastos" (Filtros + pestañas + ⋯, más el botón de
+  // Búsqueda en la pestaña Detalle). En mobile el grupo ocupa todo el ancho del
+  // panel y el ⋯ se pega al BORDE DERECHO con `ml-auto`, así queda en la misma
+  // posición esté o no el botón de búsqueda; en desktop van todos en línea, a la
+  // derecha del badge (`sm:w-auto` / `sm:ml-0`).
+  const gastosHeaderActions = (buscar = false) => (
+    <div className="flex w-full items-center gap-1 sm:w-auto sm:gap-2">
+      {buscar && gastoSearchBtn("sm:hidden")}
+      {filterBtn("hidden sm:inline-flex")}
+      {buscar && gastoSearchBtn("hidden sm:inline-flex")}
+      {gastosTabs}
+      <div className="ml-auto sm:ml-0">
+        <GastosActionsMenu />
+      </div>
+    </div>
+  );
+
   const ingresosTabs = (
     <Tabs
       tabs={[
@@ -620,7 +637,7 @@ export function DashboardClient({ data, periodosInicial }: Props) {
       {tabGastos === "resumen" ? (
         <DonutChart
           title="Gastos"
-          action={<div className="flex items-center gap-2">{filterBtn("hidden sm:inline-flex")}{gastosTabs}<GastosActionsMenu /></div>}
+          action={gastosHeaderActions()}
           badge={<><StatBadge label="Mes actual" value={mesActualGastos} />{filterBtn("sm:hidden")}</>}
           currency={data.monedaPredeterminadaISO}
           data={filteredResumen.map((g) => ({
@@ -635,23 +652,19 @@ export function DashboardClient({ data, periodosInicial }: Props) {
       ) : tabGastos === "detalle" ? (
         <div className="rounded-lg border border-border bg-card p-5">
           {/* Cabecera de "Gastos" (mobile, < sm): fila 1 = título + badge +
-              Filtros; fila 2 = Búsqueda + pestañas + ⋯. En desktop (sm+) todo
-              va en una sola fila, con Filtros/Búsqueda/pestañas/⋯ a la derecha
-              del badge. Los botones son los mismos: cada uno se muestra sólo en
-              la fila que le corresponde (`sm:hidden` / `hidden sm:inline-flex`). */}
+              Filtros; fila 2 = Búsqueda + pestañas + ⋯ (el ⋯ siempre pegado al
+              borde derecho, esté o no el botón de búsqueda). En desktop (sm+)
+              todo va en una sola fila, con Filtros/Búsqueda/pestañas/⋯ a la
+              derecha del badge. Los botones son los mismos: cada uno se muestra
+              sólo en la fila que le corresponde (`sm:hidden` /
+              `hidden sm:inline-flex`). */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-[16px] font-semibold text-header">Gastos</h3>
               <StatBadge label="Mes actual" value={mesActualGastos} />
               {filterBtn("sm:hidden")}
             </div>
-            <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-2">
-              {gastoSearchBtn("sm:hidden")}
-              {filterBtn("hidden sm:inline-flex")}
-              {gastoSearchBtn("hidden sm:inline-flex")}
-              {gastosTabs}
-              <GastosActionsMenu />
-            </div>
+            {gastosHeaderActions(true)}
           </div>
           <GastosDetalle
             data={filteredGastos}
@@ -665,7 +678,7 @@ export function DashboardClient({ data, periodosInicial }: Props) {
       ) : (
         <EvolutionChart
           title="Gastos"
-          action={<div className="flex items-center gap-2">{filterBtn("hidden sm:inline-flex")}{gastosTabs}<GastosActionsMenu /></div>}
+          action={gastosHeaderActions()}
           badge={<><StatBadge label="Mes actual" value={mesActualGastos} />{filterBtn("sm:hidden")}</>}
           currency={data.monedaPredeterminadaISO}
           data={filteredEvolucion}

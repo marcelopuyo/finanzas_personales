@@ -41,6 +41,8 @@ interface DataTableProps<TData, TValue> {
   rowClassName?: (originalRow: TData) => string;
   /** Click en una fila (recibe el registro original). Activa cursor pointer. */
   onRowClick?: (originalRow: TData) => void;
+  /** Orden inicial de la tabla, p. ej. `[{ id: "periodo", desc: true }]`. */
+  initialSorting?: SortingState;
 }
 
 /**
@@ -55,8 +57,9 @@ export function DataTable<TData, TValue>({
   getRowId,
   rowClassName,
   onRowClick,
+  initialSorting,
 }: DataTableProps<TData, TValue>) {
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [sorting, setSorting] = useState<SortingState>(initialSorting ?? []);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize });
 
   const table = useReactTable({
