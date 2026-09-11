@@ -80,10 +80,11 @@ const gastos = [
   { i: 20, desc: "Internet", monto: 30000, cat: "Servicios", per: "Agosto 26", venc: "2026-08-20" }, // pendiente
 ];
 
-// prestamos: uuidIdx, detalle, fecha, monto, saldo, cuotas, sentido, origen, destino, cuenta
+// prestamos: uuidIdx, detalle, fecha, monto, saldo, sentido, contraparte, cuenta
+// (modelo 2026-09-10: una sola persona = contraparte; sin cuotas)
 const prestamos = [
-  { i: 2, detalle: "Prestamo a Laura", fecha: "2026-02-10", monto: 240000, saldo: 120000, cuotas: 6, sentido: "otorgado", origen: "Marcelo Ejemplo", destino: "Laura Gomez", cuenta: "Banco Nacion" },
-  { i: 3, detalle: "Prestamo de Pedro", fecha: "2026-04-15", monto: 300000, saldo: 225000, cuotas: 12, sentido: "obtenido", origen: "Pedro Martinez", destino: "Marcelo Ejemplo", cuenta: "Banco Nacion" },
+  { i: 2, detalle: "Prestamo a Laura", fecha: "2026-02-10", monto: 240000, saldo: 120000, sentido: "otorgado", contraparte: "Laura Gomez", cuenta: "Banco Nacion" },
+  { i: 3, detalle: "Prestamo de Pedro", fecha: "2026-04-15", monto: 300000, saldo: 225000, sentido: "obtenido", contraparte: "Pedro Martinez", cuenta: "Banco Nacion" },
 ];
 
 // movimientos de préstamos: fecha, conceptoId, monto, cuenta, prestamoIdx
@@ -198,7 +199,7 @@ gastos.forEach((g) => {
 out.push("-- ===== PRESTAMOS =====");
 prestamos.forEach((p) =>
   out.push(
-    `INSERT INTO prestamo (id, detalle, fecha, monto, saldo, cuotas, sentido, eliminado, "personaOrigenId", "personaDestinoId", "cuentaId", "usuarioId") VALUES (${q(uuid(p.i))}, ${q(p.detalle)}, ${D(p.fecha)}, ${N(p.monto)}, ${N(p.saldo)}, ${p.cuotas}, ${q(p.sentido)}, false, ${persId(p.origen)}, ${persId(p.destino)}, ${cuentaId(p.cuenta)}, ${U});`
+    `INSERT INTO prestamo (id, detalle, fecha, monto, saldo, sentido, eliminado, "personaContraparteId", "cuentaId", "usuarioId") VALUES (${q(uuid(p.i))}, ${q(p.detalle)}, ${D(p.fecha)}, ${N(p.monto)}, ${N(p.saldo)}, ${q(p.sentido)}, false, ${persId(p.contraparte)}, ${cuentaId(p.cuenta)}, ${U});`
   )
 );
 

@@ -28,7 +28,7 @@ function NuevoPrestamoForm() {
       // formulario, por lo que es la fecha local del usuario y puede editarse).
       defaultValues={{ cuenta, fecha: todayLocalISODate() }}
       onSubmit={async (d) => {
-        await crearPrestamo({ detalle: (d.detalle as string) || undefined, fecha: d.fecha as string, monto: Number(d.monto), cuotas: Number(d.cuotas), sentido: d.sentido as "otorgado" | "obtenido", personaOrigen: d.personaOrigen as string, personaDestino: d.personaDestino as string, cuenta: d.cuenta as string });
+        await crearPrestamo({ detalle: (d.detalle as string) || undefined, fecha: d.fecha as string, monto: Number(d.monto), sentido: d.sentido as "otorgado" | "obtenido", personaContraparte: d.personaContraparte as string, cuenta: d.cuenta as string });
       }}
       cancelHref={destino}
       successHref={destino}

@@ -8,14 +8,23 @@ export default async function CuentasPage({
 }) {
   const { origen } = await searchParams;
   // Incluye el saldo de cada cuenta convertido a la moneda predeterminada del
-  // usuario (para que la sumatoria del export PDF quede en esa moneda).
-  const { cuentas, monedaPredeterminadaISO } =
-    await getCuentasConSaldoEnPredeterminada();
+  // usuario (para que la sumatoria del export PDF quede en esa moneda) y los
+  // datos de la fila sintética de préstamos (§13: neto + flag del balance).
+  const {
+    cuentas,
+    monedaPredeterminadaISO,
+    monedaPredeterminada,
+    prestamosNeto,
+    incluirPrestamosEnBalance,
+  } = await getCuentasConSaldoEnPredeterminada();
   return (
     <CuentasListClient
       initialData={cuentas}
       origen={origen}
       currency={monedaPredeterminadaISO}
+      monedaPredeterminada={monedaPredeterminada}
+      prestamosNeto={prestamosNeto}
+      incluirPrestamosEnBalance={incluirPrestamosEnBalance}
     />
   );
 }

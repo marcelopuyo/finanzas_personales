@@ -20,9 +20,6 @@ export class Prestamo {
   @Column({ type: "numeric", precision: 10, scale: 2, default: 0 })
   saldo: number;
 
-  @Column({ type: "int" })
-  cuotas: number;
-
   @Column()
   sentido: string;
 
@@ -34,11 +31,11 @@ export class Prestamo {
   // Relaciones propietarias (ManyToOne). Las relaciones OneToOne a
   // Movimiento/MovimientoTarjeta y la inversa movimientosCobros se agregan
   // cuando se migren/necesiten esos módulos.
+  //
+  // La CONTRAPARTE del préstamo (la otra parte es siempre el usuario de la app;
+  // su rol —Prestador/Destinatario— se deriva de `sentido`).
   @ManyToOne(() => Persona)
-  personaOrigen: Persona;
-
-  @ManyToOne(() => Persona)
-  personaDestino: Persona;
+  personaContraparte: Persona;
 
   @ManyToOne(() => Cuenta, { onDelete: "CASCADE" })
   cuenta: Cuenta;

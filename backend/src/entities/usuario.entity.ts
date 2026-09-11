@@ -43,6 +43,12 @@ export class Usuario {
   @ManyToOne(() => Moneda, { nullable: false })
   monedaPredeterminada?: Moneda;
 
+  /** True = el saldo NETO de los préstamos (lo que me deben − lo que debo)
+   * forma parte del Balance Actual. Default: false (no cambia el balance hasta
+   * activarlo desde la fila "Préstamos (neto)" del CRUD de Cuentas). */
+  @Column({ default: false })
+  incluirPrestamosEnBalance: boolean;
+
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   creadoEn: Date;
 }

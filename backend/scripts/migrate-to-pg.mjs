@@ -28,7 +28,7 @@ const TABLES = [
   "periodo_tarjeta",   // tarjeta
   "gasto",             // periodo_gasto, categoria_gasto
   "periodo_trabajo",   // trabajo
-  "prestamo",          // personaOrigen/personaDestino, cuenta
+  "prestamo",          // personaContraparte, cuenta
   "jornada_trabajo",   // periodo_trabajo
   "movimiento",        // concepto, cuenta, prestamo, gasto
   "historico_cuenta",  // cuenta, movimiento

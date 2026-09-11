@@ -25,22 +25,14 @@ export async function crearPrestamo(
   const userId = await requireUserId();
   const data = prestamoCreateSchema.parse(input);
   const ds = await getDb();
-  const { personaOrigen, personaDestino, cuenta, ...rest } = data;
+  const { personaContraparte, cuenta, ...rest } = data;
 
-  const personaOrigenEntity = await ds.getRepository(Persona).findOneBy({
-    nombre: personaOrigen,
+  const personaContraparteEntity = await ds.getRepository(Persona).findOneBy({
+    nombre: personaContraparte,
     usuario: { id: userId },
   });
-  if (!personaOrigenEntity) {
-    throw new Error(`Persona "${personaOrigen}" no encontrada`);
-  }
-
-  const personaDestinoEntity = await ds.getRepository(Persona).findOneBy({
-    nombre: personaDestino,
-    usuario: { id: userId },
-  });
-  if (!personaDestinoEntity) {
-    throw new Error(`Persona "${personaDestino}" no encontrada`);
+  if (!personaContraparteEntity) {
+    throw new Error(`Persona "${personaContraparte}" no encontrada`);
   }
 
   const cuentaEntity = await ds.getRepository(Cuenta).findOneBy({
@@ -59,8 +51,7 @@ export async function crearPrestamo(
         // El saldo inicial SIEMPRE es igual al monto (decisión 2026-08-12);
         // el saldo solo cambia con los pagos del préstamo.
         saldo: data.monto,
-        personaOrigen: personaOrigenEntity,
-        personaDestino: personaDestinoEntity,
+        personaContraparte: personaContraparteEntity,
         cuenta: cuentaEntity,
         usuario: { id: userId },
       })
@@ -122,7 +113,7 @@ export async function actualizarPrestamo(
   const userId = await requireUserId();
   const data = prestamoUpdateSchema.parse(input);
   const ds = await getDb();
-  const { personaOrigen, personaDestino, cuenta, ...rest } = data;
+  const { personaContraparte, cuenta, ...rest } = data;
 
   const repo = ds.getRepository(Prestamo);
   const existing = await repo.findOneBy({ id, usuario: { id: userId }, eliminado: false });
@@ -130,26 +121,15 @@ export async function actualizarPrestamo(
     throw new Error(`Préstamo con id ${id} no encontrado`);
   }
 
-  if (personaOrigen) {
-    const personaOrigenEntity = await ds.getRepository(Persona).findOneBy({
-      nombre: personaOrigen,
+  if (personaContraparte) {
+    const personaContraparteEntity = await ds.getRepository(Persona).findOneBy({
+      nombre: personaContraparte,
       usuario: { id: userId },
     });
-    if (!personaOrigenEntity) {
-      throw new Error(`Persona "${personaOrigen}" no encontrada`);
+    if (!personaContraparteEntity) {
+      throw new Error(`Persona "${personaContraparte}" no encontrada`);
     }
-    existing.personaOrigen = personaOrigenEntity;
-  }
-
-  if (personaDestino) {
-    const personaDestinoEntity = await ds.getRepository(Persona).findOneBy({
-      nombre: personaDestino,
-      usuario: { id: userId },
-    });
-    if (!personaDestinoEntity) {
-      throw new Error(`Persona "${personaDestino}" no encontrada`);
-    }
-    existing.personaDestino = personaDestinoEntity;
+    existing.personaContraparte = personaContraparteEntity;
   }
 
   if (cuenta) {

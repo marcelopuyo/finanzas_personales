@@ -83,6 +83,10 @@ interface CrudTableProps<T, TId = number> {
       Editar/Eliminar, los botones Nuevo/Exportar (desktop), la barra inferior
       y el FAB del modo mobile. La grilla se muestra igual. */
   showActions?: boolean;
+  /** Marca filas que **no son registros reales** (p. ej. la fila sintética
+      "Préstamos (neto)" del CRUD de Cuentas): no se renderizan los botones de
+      acción (se muestra "—") y la fila no se puede seleccionar en mobile. */
+  isSyntheticRow?: (item: T) => boolean;
   /** Mensaje de la grilla cuando no hay datos (default "Sin datos disponibles"). */
   emptyMessage?: string;
 }
@@ -114,6 +118,7 @@ export function CrudTable<T, TId = number>({
   rowAction,
   topContent,
   showActions = true,
+  isSyntheticRow,
   emptyMessage = "Sin datos disponibles",
 }: CrudTableProps<T, TId>) {
   const router = useRouter();
@@ -179,43 +184,56 @@ export function CrudTable<T, TId = number>({
               id: "actions",
               header: "",
               meta: { align: "center" as const },
-              cell: ({ row }: { row: { original: T } }) => (
-                <div className="flex items-center justify-center gap-1.5">
-                  {rowAction && (
+              // Fila sintética (no es un registro real): sin acciones.
+              cell: ({ row }: { row: { original: T } }) =>
+                isSyntheticRow?.(row.original) ? (
+                  <span className="text-subtitle">—</span>
+                ) : (
+                  <div className="flex items-center justify-center gap-1.5">
+                    {rowAction && (
+                      <button
+                        type="button"
+                        onClick={() => rowAction.onClick(getId(row.original))}
+                        className="rounded p-1 text-subtitle transition-colors hover:bg-muted hover:text-header"
+                        title={rowAction.label}
+                        aria-label={rowAction.label}
+                      >
+                        <rowAction.icon className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={() => rowAction.onClick(getId(row.original))}
+                      onClick={() => router.push(editHref(getId(row.original)))}
                       className="rounded p-1 text-subtitle transition-colors hover:bg-muted hover:text-header"
-                      title={rowAction.label}
-                      aria-label={rowAction.label}
+                      aria-label="Editar"
                     >
-                      <rowAction.icon className="h-3.5 w-3.5" />
+                      <Pencil className="h-3.5 w-3.5" />
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => router.push(editHref(getId(row.original)))}
-                    className="rounded p-1 text-subtitle transition-colors hover:bg-muted hover:text-header"
-                    aria-label="Editar"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDeleteId(getId(row.original))}
-                    className="rounded p-1 text-subtitle transition-colors hover:bg-muted hover:text-danger"
-                    aria-label="Eliminar"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ),
+                    <button
+                      type="button"
+                      onClick={() => setDeleteId(getId(row.original))}
+                      className="rounded p-1 text-subtitle transition-colors hover:bg-muted hover:text-danger"
+                      aria-label="Eliminar"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ),
             } as ColumnDef<T>,
           ]
         : []),
       ...trailingColumns,
     ],
-    [columns, router, editHref, getId, trailingColumns, showActions, rowAction]
+    [
+      columns,
+      router,
+      editHref,
+      getId,
+      trailingColumns,
+      showActions,
+      rowAction,
+      isSyntheticRow,
+    ]
   );
 
   // Columnas de la grilla mobile (bottomNav): datos + columnas finales (sin la
@@ -323,8 +341,10 @@ export function CrudTable<T, TId = number>({
     mobileBottomNav && selectedId !== null && getId(item) === selectedId
       ? "bg-primary/10 shadow-[inset_2px_0_0_0_var(--primary)]"
       : "";
-  // Toca una fila → selecciona/deselecciona (una sola a la vez).
+  // Toca una fila → selecciona/deselecciona (una sola a la vez). Las filas
+  // sintéticas (no son registros reales) no se seleccionan.
   const toggleRow = (item: T) => {
+    if (isSyntheticRow?.(item)) return;
     const id = getId(item);
     setSelectedId((prev) => (prev === id ? null : id));
   };

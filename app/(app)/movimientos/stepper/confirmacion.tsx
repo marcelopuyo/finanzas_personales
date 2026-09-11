@@ -8,6 +8,7 @@ import { useMovimientoStepper } from "./stepper-context";
 import { StepShell, Fila, formatFecha } from "./ui";
 import { CONCEPTO_STEP, MOTIVOS_TRANSFERENCIA, type MovimientoConcepto } from "./types";
 import { numberToCurrency, timeToDecimal } from "@/lib/utils";
+import { fraseContraparte } from "@/lib/prestamos";
 import {
   cobrarSueldo,
   pagarPrestamo,
@@ -81,10 +82,10 @@ export function Confirmacion() {
       {
         label: "Préstamo",
         value: prestamo
-          ? `${prestamo.detalle ?? "Préstamo"} — Saldo ${numberToCurrency(
+          ? `${prestamo.detalle ?? "Préstamo"} — ${prestamo.personaContraparte?.nombre ?? "—"} (${fraseContraparte(prestamo.sentido)}) · Saldo ${numberToCurrency(
               prestamo.saldo,
-              cuentaISO(data.cuentaOrigen)
-            )} (${prestamo.personaOrigen?.nombre ?? "—"} → ${prestamo.personaDestino?.nombre ?? "—"})`
+              prestamo.monedaISO ?? cuentaISO(data.cuentaOrigen)
+            )}`
           : "—",
       }
     );

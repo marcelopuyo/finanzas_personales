@@ -721,7 +721,11 @@ export function DashboardClient({ data, periodosInicial }: Props) {
         badge={
           <div className="flex flex-wrap items-center gap-2">
             {data.prestamosTotales.map((t) => (
-              <StatBadge key={t.currency} label={t.currency} value={t.value} />
+              <StatBadge
+                key={t.currency}
+                label={`Saldo neto (${t.currency})`}
+                value={t.value}
+              />
             ))}
           </div>
         }

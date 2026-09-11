@@ -118,10 +118,9 @@ export interface ResponsePrestamoDto {
   fecha: Date;
   monto: number;
   saldo: number;
-  cuotas: number;
   sentido: string;
-  personaOrigen: string;
-  personaDestino: string;
+  /** Contraparte del préstamo (la otra parte es el usuario). */
+  personaContraparte: string;
   cuenta: string;
 }
 

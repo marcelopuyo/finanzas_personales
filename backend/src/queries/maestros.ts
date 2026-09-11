@@ -1,6 +1,7 @@
 import { getDb } from "../db";
 import { getSessionUser, requireAdmin, requireUserId } from "../lib/auth";
 import { convertir } from "../lib/cotizaciones";
+import { getPrestamosNetoEnPredeterminada } from "../lib/prestamos";
 import { Concepto } from "../entities/concepto.entity";
 import { Cotizacion } from "../entities/cotizacion.entity";
 import { Cuenta } from "../entities/cuenta.entity";
@@ -217,6 +218,16 @@ export async function getAllCuentas(): Promise<CuentaOut[]> {
 export async function getCuentasConSaldoEnPredeterminada(): Promise<{
   cuentas: (CuentaOut & { saldoEnMonedaPredeterminada: number })[];
   monedaPredeterminadaISO: string;
+  /** Moneda predeterminada del usuario (la usa la fila sintética de préstamos). */
+  monedaPredeterminada: {
+    nombre: string;
+    codigoISO: string;
+    codigoPais: string | null;
+  } | null;
+  /** Saldo neto de los préstamos pendientes en la moneda predeterminada (§13). */
+  prestamosNeto: number;
+  /** Si ese neto forma parte del Balance Actual (flag del usuario, §13). */
+  incluirPrestamosEnBalance: boolean;
 }> {
   const userId = await requireUserId();
   const ds = await getDb();
@@ -255,7 +266,19 @@ export async function getCuentasConSaldoEnPredeterminada(): Promise<{
         : null,
     });
   }
-  return { cuentas, monedaPredeterminadaISO };
+  return {
+    cuentas,
+    monedaPredeterminadaISO,
+    monedaPredeterminada: predeterminada
+      ? {
+          nombre: predeterminada.nombre,
+          codigoISO: predeterminada.codigoISO,
+          codigoPais: predeterminada.codigoPais ?? null,
+        }
+      : null,
+    prestamosNeto: await getPrestamosNetoEnPredeterminada(userId),
+    incluirPrestamosEnBalance: sesion?.incluirPrestamosEnBalance ?? false,
+  };
 }
 
 export async function getCuentaById(id: number): Promise<CuentaOut | null> {

@@ -14,7 +14,11 @@ import type { ZodSchema } from "zod";
 
 export interface FormField {
   name: string;
-  label: string;
+  /** Rótulo del campo. Puede ser una función de los valores del formulario
+      (p. ej. el campo de contraparte de un préstamo cambia según el sentido). */
+  label: string | ((values: Record<string, unknown>) => string);
+  /** Aclaración opcional debajo del control (también puede ser función). */
+  hint?: string | ((values: Record<string, unknown>) => string);
   type:
     | "text"
     | "select"
@@ -71,6 +75,15 @@ function sanitizeNumber(raw: string): string {
   const i = s.indexOf(".");
   if (i !== -1) s = s.slice(0, i + 1) + s.slice(i + 1).replace(/\./g, "");
   return s;
+}
+
+/** Resuelve un texto de config que puede ser fijo o función de los valores. */
+function resolverTexto(
+  valor: string | ((values: Record<string, unknown>) => string) | undefined,
+  values: Record<string, unknown>
+): string {
+  if (!valor) return "";
+  return typeof valor === "function" ? valor(values) : valor;
 }
 
 /**
@@ -202,7 +215,7 @@ export function CrudForm({
                 htmlFor={field.name}
                 className="mb-1.5 block text-[13px] font-medium text-header"
               >
-                {field.label}
+                {resolverTexto(field.label, values)}
               </label>
               {field.type === "select" ? (
                 <Controller
@@ -312,6 +325,11 @@ export function CrudForm({
                   placeholder={field.placeholder}
                   className={inputClasses}
                 />
+              )}
+              {resolverTexto(field.hint, values) && (
+                <p className="mt-1 text-[12px] text-subtitle">
+                  {resolverTexto(field.hint, values)}
+                </p>
               )}
               {errors[field.name] && (
                 <p className="mt-1 text-[12px] text-danger">

@@ -5,6 +5,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -12,6 +13,7 @@ import {
   type TooltipContentProps,
 } from "recharts";
 import { numberToCurrency } from "@/lib/utils";
+import { fraseContraparte } from "@/lib/prestamos";
 import { useHideTooltipOnTouch } from "./use-hide-tooltip-on-touch";
 
 export interface PrestamoSerie {
@@ -21,6 +23,9 @@ export interface PrestamoSerie {
   detalle: string;
   /** ISO de la moneda del préstamo (agrupa en barras independientes). */
   currency: string;
+  /** Sentido: `otorgado` (me deben → verde, hacia arriba) ·
+      `obtenido` (yo debo → rojo, hacia abajo). */
+  sentido: string;
 }
 
 interface PrestamosChartProps {
@@ -36,7 +41,8 @@ interface PrestamosChartProps {
 
 /**
  * Tooltip del gráfico de préstamos: por cada segmento (préstamo) activo muestra
- * el campo `detalle` de la base y su monto formateado en la moneda del préstamo.
+ * el campo `detalle` de la base, su **saldo pendiente** en valor absoluto (en la
+ * moneda del préstamo) y la dirección (*te debe* / *le debés*).
  */
 function PrestamosTooltip({
   active,
@@ -47,13 +53,16 @@ function PrestamosTooltip({
   if (!active || !payload?.length) return null;
   const seriePorKey = new Map(series.map((s) => [s.key, s]));
   const items = payload
-    .filter((p) => Number(p.value) > 0)
+    .filter((p) => Number(p.value) !== 0)
     .map((p) => {
       const s = seriePorKey.get(String(p.dataKey));
       return {
         detalle: s?.detalle ?? String(p.name ?? p.dataKey ?? ""),
-        monto: Number(p.value) || 0,
+        // Los obtenidos vienen NEGATIVOS (barras hacia abajo): se muestran en
+        // valor absoluto + la dirección en palabras.
+        monto: Math.abs(Number(p.value) || 0),
         currency: s?.currency ?? "ARS",
+        frase: fraseContraparte(s?.sentido ?? "otorgado"),
       };
     });
   if (!items.length) return null;
@@ -67,8 +76,11 @@ function PrestamosTooltip({
             className="flex items-center justify-between gap-4 text-[12px]"
           >
             <span className="text-card-foreground">{it.detalle}</span>
-            <span className="font-medium text-card-foreground">
-              {numberToCurrency(it.monto, it.currency)}
+            <span className="text-right">
+              <span className="font-medium text-card-foreground">
+                {numberToCurrency(it.monto, it.currency)}
+              </span>
+              <span className="text-subtitle"> · {it.frase}</span>
             </span>
           </div>
         ))}
@@ -78,11 +90,16 @@ function PrestamosTooltip({
 }
 
 /**
- * Gráfico de préstamos pendientes: el eje X son las personas; por cada moneda
- * distinta se dibuja una barra independiente (agrupadas sobre la persona), y
- * los préstamos de la misma persona y moneda se apilan como segmentos.
- * Cada moneda tiene su PROPIO eje Y (la primera a la izquierda y el resto a la
- * derecha) para que las barras de monedas con escalas dispares se vean completas.
+ * Gráfico de préstamos pendientes **divergente**: el eje X son las
+ * CONTRAPARTES; por cada moneda distinta se dibuja una barra independiente
+ * (agrupadas sobre la contraparte) y los préstamos de la misma contraparte y
+ * moneda se apilan como segmentos.
+ *
+ * El **saldo pendiente** se grafica FIRMADO por el sentido: hacia ARRIBA y en
+ * verde lo que ME DEBEN (otorgados), hacia ABAJO y en rojo lo que YO DEBO
+ * (obtenidos) — con una línea de cero en el medio. Cada moneda tiene su PROPIO
+ * eje Y con **dominio simétrico** (`[-max, max]`), así el cero queda siempre en
+ * el medio y las dos zonas se leen igual en todas las monedas.
  */
 export function PrestamosChart({
   title,
@@ -102,6 +119,25 @@ export function PrestamosChart({
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-[16px] font-semibold text-header">{title}</h3>
         {badge}
+      </div>
+      {/* Leyenda de las dos zonas del gráfico divergente (arriba/abajo). */}
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-subtitle">
+        <span className="inline-flex items-center gap-1.5">
+          <span
+            className="h-2.5 w-2.5 rounded-full"
+            style={{ background: "var(--success)" }}
+            aria-hidden="true"
+          />
+          me deben
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span
+            className="h-2.5 w-2.5 rounded-full"
+            style={{ background: "var(--danger)" }}
+            aria-hidden="true"
+          />
+          yo debo
+        </span>
       </div>
       {action && (
         <div className="absolute right-0 top-0 flex items-center">{action}</div>
@@ -126,6 +162,28 @@ export function PrestamosChart({
     new Set(series.map((s) => s.currency))
   ).sort();
 
+  // Máximo ABSOLUTO por moneda (sumando los segmentos del mismo signo de cada
+  // contraparte): define el dominio SIMÉTRICO `[-max, max]` de cada eje. Así el
+  // cero queda siempre en el medio, la línea de cero es una sola en pantalla y
+  // las zonas "me deben" (arriba) / "yo debo" (abajo) se leen igual con
+  // cualquier moneda.
+  const maxAbsPorMoneda = new Map<string, number>();
+  data.forEach((row) => {
+    const positivos = new Map<string, number>();
+    const negativos = new Map<string, number>();
+    series.forEach((s) => {
+      const v = Number(row[s.key] ?? 0);
+      if (v > 0) {
+        positivos.set(s.currency, (positivos.get(s.currency) ?? 0) + v);
+      } else if (v < 0) {
+        negativos.set(s.currency, (negativos.get(s.currency) ?? 0) + -v);
+      }
+    });
+    [...positivos, ...negativos].forEach(([currency, v]) => {
+      maxAbsPorMoneda.set(currency, Math.max(maxAbsPorMoneda.get(currency) ?? 0, v));
+    });
+  });
+
   return (
     <div
       onTouchEnd={touchReset.onTouchEnd}
@@ -147,13 +205,19 @@ export function PrestamosChart({
             tickLine={false}
           />
           {/* Un eje Y por moneda (cada moneda tiene su propia escala): la
-              primera a la izquierda y el resto a la derecha. Así los préstamos
-              de cada moneda se ven completos aunque las escalas difieran. */}
+              primera a la izquierda y el resto a la derecha. Dominio simétrico
+              para que el cero quede en el medio. Los ticks van en valor
+              ABSOLUTO (el signo lo da la zona del gráfico). */}
           {currencies.map((c, i) => (
             <YAxis
               key={c}
               yAxisId={c}
               orientation={i === 0 ? "left" : "right"}
+              domain={[
+                -(maxAbsPorMoneda.get(c) ?? 1),
+                maxAbsPorMoneda.get(c) ?? 1,
+              ]}
+              tickFormatter={(v) => String(Math.abs(Number(v)))}
               tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
               axisLine={false}
               tickLine={false}
@@ -171,6 +235,12 @@ export function PrestamosChart({
               }}
             />
           ))}
+          {/* Línea de cero: separa "me deben" (arriba) de "yo debo" (abajo). */}
+          <ReferenceLine
+            y={0}
+            yAxisId={currencies[0]}
+            stroke="var(--border)"
+          />
           <Tooltip
             cursor={false}
             content={<PrestamosTooltip series={series} />}
@@ -182,7 +252,8 @@ export function PrestamosChart({
               name={s.detalle}
               yAxisId={s.currency}
               stackId={s.currency}
-              fill="var(--success)"
+              // Verde lo que me deben (otorgado) · rojo lo que yo debo (obtenido).
+              fill={s.sentido === "obtenido" ? "var(--danger)" : "var(--success)"}
               stroke="var(--card)"
               strokeWidth={2}
               radius={[0, 0, 0, 0]}

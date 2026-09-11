@@ -11,10 +11,9 @@ export const prestamoCreateSchema = z.object({
   detalle: z.string().optional(),
   fecha: dateString,
   monto: z.number().positive(),
-  cuotas: z.number().positive(),
   sentido: sentidoSchema,
-  personaOrigen: z.string().min(1), // nombre
-  personaDestino: z.string().min(1), // nombre
+  // La CONTRAPARTE (la otra parte es siempre el usuario de la app).
+  personaContraparte: z.string().min(1), // nombre
   cuenta: z.string().min(1), // nombre
 });
 export const prestamoUpdateSchema = prestamoCreateSchema.partial();

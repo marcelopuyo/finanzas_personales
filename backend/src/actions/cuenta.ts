@@ -64,3 +64,30 @@ export async function actualizarMonedaPredeterminada(
 
   return { ok: true };
 }
+
+// -------------------------------------------------- préstamos en el balance
+const incluirPrestamosSchema = z.object({
+  incluir: z.boolean(),
+});
+
+/**
+ * Activa/desactiva que el saldo NETO de los préstamos (lo que le deben menos lo
+ * que debe) forme parte del Balance Actual (§13 del plan de préstamos). Se
+ * maneja con el switch de la fila "Préstamos (neto)" del CRUD de Cuentas.
+ */
+export async function actualizarIncluirPrestamosEnBalance(
+  input: z.infer<typeof incluirPrestamosSchema>
+) {
+  const userId = await requireUserId();
+  const data = incluirPrestamosSchema.parse(input);
+
+  const ds = await getDb();
+  const usuario = await ds.getRepository(Usuario).findOneBy({ id: userId });
+  if (!usuario) throw new Error("Usuario no encontrado");
+
+  usuario.incluirPrestamosEnBalance = data.incluir;
+  await ds.getRepository(Usuario).save(usuario);
+  refresh();
+
+  return { ok: true };
+}

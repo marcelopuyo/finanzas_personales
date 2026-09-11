@@ -7,9 +7,8 @@ import {
   DateField,
   SelectField,
   NumberField,
-  formatFecha,
 } from "./ui";
-import { numberToCurrency } from "@/lib/utils";
+import { prestamoLabel } from "@/lib/prestamos";
 import { STEP_CONFIRMACION } from "./types";
 
 export function PagoPrestamo() {
@@ -48,7 +47,7 @@ export function PagoPrestamo() {
         placeholder="Seleccionar préstamo..."
         options={options.prestamos.map((p) => ({
           value: p.id,
-          label: `${p.detalle ?? "Préstamo"} — Monto ${numberToCurrency(p.monto)} · Saldo ${numberToCurrency(p.saldo)} · ${formatFecha(p.fecha)} (${p.personaOrigen?.nombre ?? "—"} → ${p.personaDestino?.nombre ?? "—"})`,
+          label: prestamoLabel(p),
         }))}
       />
 

@@ -9,10 +9,9 @@ export interface PrestamoOut {
   fecha: Date;
   monto: number;
   saldo: number;
-  cuotas: number;
   sentido: string;
-  personaOrigen: { nombre: string } | null;
-  personaDestino: { nombre: string } | null;
+  /** Contraparte del préstamo (la otra parte es el usuario). */
+  personaContraparte: { id: number; nombre: string } | null;
   cuenta: { nombre: string } | null;
   /** ISO 4217 de la moneda del préstamo (moneda de su cuenta). */
   monedaISO: string;
@@ -25,13 +24,9 @@ function mapPrestamo(r: Prestamo): PrestamoOut {
     fecha: r.fecha,
     monto: r.monto,
     saldo: r.saldo,
-    cuotas: r.cuotas,
     sentido: r.sentido,
-    personaOrigen: r.personaOrigen
-      ? { nombre: r.personaOrigen.nombre }
-      : null,
-    personaDestino: r.personaDestino
-      ? { nombre: r.personaDestino.nombre }
+    personaContraparte: r.personaContraparte
+      ? { id: r.personaContraparte.id, nombre: r.personaContraparte.nombre }
       : null,
     cuenta: r.cuenta ? { nombre: r.cuenta.nombre } : null,
     monedaISO: r.cuenta?.moneda?.codigoISO ?? "ARS",
@@ -39,8 +34,7 @@ function mapPrestamo(r: Prestamo): PrestamoOut {
 }
 
 const PRESTAMO_RELATIONS = {
-  personaOrigen: true,
-  personaDestino: true,
+  personaContraparte: true,
   cuenta: { moneda: true },
 } as const;
 

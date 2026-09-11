@@ -3,6 +3,7 @@ import { getDb } from "../db";
 import { getSessionUser, requireUserId } from "../lib/auth";
 import { convertir } from "../lib/cotizaciones";
 import { aporteProrrateado, modalidadProrratea } from "../lib/jornadas";
+import { getPrestamosNetoEnPredeterminada } from "../lib/prestamos";
 import { Cuenta } from "../entities/cuenta.entity";
 import { Gasto } from "../entities/gasto.entity";
 import { HistoricoCuenta } from "../entities/historico-cuenta.entity";
@@ -72,6 +73,14 @@ export async function getBalanceActual(): Promise<number> {
   let saldoGastos = 0;
   for (const g of gastos) {
     saldoGastos += g.saldo;
+  }
+
+  // Préstamos pendientes (§13): si el usuario activó el flag, el saldo NETO
+  // (lo que le deben menos lo que debe) suma al balance. Se maneja con el
+  // switch de la fila "Préstamos (neto)" del CRUD de Cuentas. Puede ser
+  // negativo (debe más de lo que le deben).
+  if (sesion?.incluirPrestamosEnBalance) {
+    saldoCajas += await getPrestamosNetoEnPredeterminada(userId);
   }
 
   return saldoCajas - saldoGastos;
@@ -283,12 +292,11 @@ export async function getPrestamosPendientesReporte(): Promise<
     fecha: Date;
     monto: number;
     saldo: number;
-    cuotas: number;
     sentido: string;
     /** ISO de la moneda del préstamo (moneda de su cuenta). */
     monedaISO: string;
-    personaOrigen: { nombre: string } | null;
-    personaDestino: { nombre: string } | null;
+    /** Contraparte del préstamo (la otra parte es el usuario). */
+    personaContraparte: { nombre: string } | null;
     cuenta: { nombre: string } | null;
   }[]
 > {
@@ -297,8 +305,7 @@ export async function getPrestamosPendientesReporte(): Promise<
   const rows = await ds.getRepository(Prestamo).find({
     where: { usuario: { id: userId }, eliminado: false, saldo: MoreThan(0) },
     relations: {
-      personaDestino: true,
-      personaOrigen: true,
+      personaContraparte: true,
       cuenta: { moneda: true },
     },
   });
@@ -308,14 +315,10 @@ export async function getPrestamosPendientesReporte(): Promise<
     fecha: r.fecha,
     monto: r.monto,
     saldo: r.saldo,
-    cuotas: r.cuotas,
     sentido: r.sentido,
     monedaISO: r.cuenta?.moneda?.codigoISO ?? "ARS",
-    personaOrigen: r.personaOrigen
-      ? { nombre: r.personaOrigen.nombre }
-      : null,
-    personaDestino: r.personaDestino
-      ? { nombre: r.personaDestino.nombre }
+    personaContraparte: r.personaContraparte
+      ? { nombre: r.personaContraparte.nombre }
       : null,
     cuenta: r.cuenta ? { nombre: r.cuenta.nombre } : null,
   }));

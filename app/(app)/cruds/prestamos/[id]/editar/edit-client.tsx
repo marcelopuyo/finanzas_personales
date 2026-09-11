@@ -17,7 +17,7 @@ export function EditarPrestamoClient({ data, origen }: Props) {
     origen === "dashboard"
       ? "/cruds/prestamos?origen=dashboard"
       : "/cruds/prestamos";
-  return <CrudForm title="Editar Préstamo" fields={prestamoFields} schema={prestamoSchema} defaultValues={{ detalle: data.detalle ?? "", fecha: dt(data.fecha), monto: data.monto, cuotas: data.cuotas, sentido: data.sentido as "otorgado" | "obtenido", personaOrigen: data.personaOrigen?.nombre ?? "", personaDestino: data.personaDestino?.nombre ?? "", cuenta: data.cuenta?.nombre ?? "" }} onSubmit={async (f) => {
-    await actualizarPrestamo(String(p.id), { detalle: (f.detalle as string) || undefined, fecha: f.fecha as string, monto: Number(f.monto), cuotas: Number(f.cuotas), sentido: f.sentido as "otorgado" | "obtenido", personaOrigen: f.personaOrigen as string, personaDestino: f.personaDestino as string, cuenta: f.cuenta as string });
+  return <CrudForm title="Editar Préstamo" fields={prestamoFields} schema={prestamoSchema} defaultValues={{ detalle: data.detalle ?? "", fecha: dt(data.fecha), monto: data.monto, sentido: data.sentido as "otorgado" | "obtenido", personaContraparte: data.personaContraparte?.nombre ?? "", cuenta: data.cuenta?.nombre ?? "" }} onSubmit={async (f) => {
+    await actualizarPrestamo(String(p.id), { detalle: (f.detalle as string) || undefined, fecha: f.fecha as string, monto: Number(f.monto), sentido: f.sentido as "otorgado" | "obtenido", personaContraparte: f.personaContraparte as string, cuenta: f.cuenta as string });
   }} cancelHref={destino} successHref={destino} successMessage="Préstamo actualizado correctamente" />;
 }

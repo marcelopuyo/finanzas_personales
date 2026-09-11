@@ -7,14 +7,29 @@ import type { PrestamoOut } from "@/backend/src/queries/prestamos";
 import { eliminarPrestamo } from "@/backend/src/actions/prestamos";
 import type { ColumnDef } from "@tanstack/react-table";
 import { dateTimeToString, numberToCurrency } from "@/lib/utils";
+import { fraseContraparte } from "@/lib/prestamos";
 const columns: ColumnDef<PrestamoOut>[] = [
   { accessorKey: "detalle", header: "Detalle", cell: ({ getValue }) => getValue<string|null>() ?? "—" },
   { accessorKey: "fecha", header: "Fecha", cell: ({ getValue }) => dateTimeToString(getValue<Date>()), meta: { align: "center" as const } },
   { accessorKey: "monto", header: "Monto", meta: { align: "right" as const, isCurrency: true, exportValue: (row: PrestamoOut) => numberToCurrency(row.monto, row.monedaISO ?? "ARS") }, cell: ({ getValue, row }) => numberToCurrency(getValue<number>() ?? 0, row.original.monedaISO ?? "ARS") },
   { accessorKey: "saldo", header: "Saldo", meta: { align: "right" as const, isCurrency: true, exportValue: (row: PrestamoOut) => numberToCurrency(row.saldo, row.monedaISO ?? "ARS") }, cell: ({ getValue, row }) => numberToCurrency(getValue<number>() ?? 0, row.original.monedaISO ?? "ARS") },
-  { accessorFn: (r) => r.personaOrigen?.nombre ?? "", id: "origen", header: "Origen" },
-  { accessorFn: (r) => r.personaDestino?.nombre ?? "", id: "destino", header: "Destino" },
-  { accessorKey: "sentido", header: "Sentido" },
+  // Una sola columna para la contraparte: el nombre y, debajo, la relación
+  // ("te debe" si yo presté, "le debés" si me prestaron). Reemplaza a
+  // Origen + Destino + Sentido → la grilla entra mucho mejor en mobile.
+  {
+    id: "personaContraparte",
+    header: "Contraparte",
+    accessorFn: (r) =>
+      `${r.personaContraparte?.nombre ?? ""} ${fraseContraparte(r.sentido)}`,
+    cell: ({ row }) => (
+      <span className="flex flex-col">
+        <span>{row.original.personaContraparte?.nombre ?? "—"}</span>
+        <span className="text-[12px] text-subtitle">
+          {fraseContraparte(row.original.sentido)}
+        </span>
+      </span>
+    ),
+  },
 ];
 interface Props {
   initialData: PrestamoOut[];

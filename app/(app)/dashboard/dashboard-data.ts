@@ -49,13 +49,17 @@ export interface DashboardData {
   ingresosMesActual: string;
   /** Resultado (ingresos − gastos) del mes actual, formateado (FALLBACK SSR). */
   resultadosMesActual: string;
-  /** Totales de préstamos pendientes por moneda (para el badge del gráfico). */
+  /** Totales de préstamos pendientes por moneda (para el badge del gráfico).
+   * Con el modelo de contraparte única es el **saldo neto**: Σ saldo(otorgado)
+   * − Σ saldo(obtenido), convertido… no: cada moneda con su propio total (el
+   * badge muestra el neto de esa moneda, puede ser negativo). */
   prestamosTotales: { currency: string; value: string }[];
-  /** Datos del gráfico de préstamos: una fila por persona; cada préstamo es un
-   * segmento apilado y las monedas distintas generan barras agrupadas. */
+  /** Datos del gráfico de préstamos: una fila por CONTRAPARTE; cada préstamo es
+   * un segmento apilado (saldo firmado por sentido) y las monedas distintas
+   * generan barras agrupadas con su propio eje. */
   prestamosChart: {
     data: Record<string, string | number>[];
-    series: { key: string; detalle: string; currency: string }[];
+    series: { key: string; detalle: string; currency: string; sentido: string }[];
   };
   evolucionIngresos: { name: string; value: number }[];
   evolucionResultados: { name: string; value: number }[];
@@ -202,17 +206,23 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     monedaPredeterminadaISO
   );
 
-  // --- Préstamos pendientes (gráfico) ---
-  // Barras agrupadas por persona; por cada moneda distinta se genera una barra
-  // independiente, y los préstamos de la misma persona y moneda se apilan como
-  // segmentos (cada préstamo = una serie, tooltip con detalle + monto).
+  // --- Préstamos pendientes (gráfico DIVERGENTE) ---
+  // Cada préstamo entra con su SALDO pendiente **firmado** según el sentido:
+  // `otorgado` (yo presté) → positivo (me deben, hacia arriba);
+  // `obtenido` (me prestaron) → negativo (yo debo, hacia abajo).
+  // Las barras se agrupan por CONTRAPARTE y cada préstamo es un segmento
+  // apilado; cada moneda distinta se dibuja como una barra con su propio eje.
   const prestamosPorPersona = new Map<
     string,
-    Map<string, { detalle: string; monto: number; monedaISO: string }>
+    Map<
+      string,
+      { detalle: string; monto: number; monedaISO: string; sentido: string }
+    >
   >();
   prestamos.forEach((p) => {
-    const nombre = p.personaDestino?.nombre || "Sin nombre";
+    const nombre = p.personaContraparte?.nombre || "Sin nombre";
     const monedaISO = p.monedaISO ?? "ARS";
+    const signo = p.sentido === "obtenido" ? -1 : 1;
     let persona = prestamosPorPersona.get(nombre);
     if (!persona) {
       persona = new Map();
@@ -220,8 +230,9 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     }
     persona.set(`p-${p.id}`, {
       detalle: p.detalle || "Préstamo",
-      monto: p.monto,
+      monto: (p.saldo ?? 0) * signo,
       monedaISO,
+      sentido: p.sentido,
     });
   });
 
@@ -237,6 +248,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     key: string;
     detalle: string;
     currency: string;
+    sentido: string;
   }[] = [];
   prestamosPorPersona.forEach((persona, nombre) => {
     const row: Record<string, string | number> = { name: nombre };
@@ -250,6 +262,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     key: string;
     detalle: string;
     currency: string;
+    sentido: string;
   }[] = [];
   prestamosPorPersona.forEach((persona) =>
     persona.forEach((v, k) =>
@@ -257,6 +270,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
         key: k,
         detalle: v.detalle,
         currency: v.monedaISO,
+        sentido: v.sentido,
       })
     )
   );
@@ -267,16 +281,18 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   );
   prestamosChartSeries.push(...prestamosOrdenados);
 
-  // Totales por moneda para el badge (las barras mantienen su propia moneda).
-  const totalPorMoneda = new Map<string, number>();
+  // Neto por moneda para el badge: Σ saldos firmados (otorgados − obtenidos).
+  // Puede ser negativo (debés más de lo que te deben).
+  const netoPorMoneda = new Map<string, number>();
   prestamos.forEach((p) => {
     const monedaISO = p.monedaISO ?? "ARS";
-    totalPorMoneda.set(
+    const signo = p.sentido === "obtenido" ? -1 : 1;
+    netoPorMoneda.set(
       monedaISO,
-      (totalPorMoneda.get(monedaISO) || 0) + p.monto
+      (netoPorMoneda.get(monedaISO) || 0) + (p.saldo ?? 0) * signo
     );
   });
-  const prestamosTotales = Array.from(totalPorMoneda.entries()).map(
+  const prestamosTotales = Array.from(netoPorMoneda.entries()).map(
     ([currency, total]) => ({
       currency,
       value: numberToCurrency(total, currency),
