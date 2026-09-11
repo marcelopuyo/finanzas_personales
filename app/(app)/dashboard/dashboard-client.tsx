@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { StatBadge } from "@/components/ui/stat-badge";
 import { Tabs } from "@/components/ui/tabs";
@@ -28,6 +29,7 @@ import {
 } from "./ingresos-helpers";
 import type { GastoOut } from "@/backend/src/queries/gastos";
 import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
+import { periodoCobrado } from "@/backend/src/lib/jornadas";
 import { cn, numberToCurrency, todayLocalISODate } from "@/lib/utils";
 
 interface Props {
@@ -49,6 +51,7 @@ function toDateKey(v: string | Date | null | undefined): string {
 }
 
 export function DashboardClient({ data, periodosInicial }: Props) {
+  const router = useRouter();
   const [tabGastos, setTabGastos] = useState("resumen");
   const [tabIngresos, setTabIngresos] = useState("resumen");
   // Cuenta seleccionada para abrir su historial en popup
@@ -113,18 +116,17 @@ export function DashboardClient({ data, periodosInicial }: Props) {
     new Date(prevYear, prevMonth, 0).getDate()
   ).padStart(2, "0")}`;
 
-  // Listados de períodos para los popups de las tarjetas sintéticas:
+  // Listados de períodos para las tarjetas sintéticas del panel Trabajo
+  // ("cobrado" = tiene fecha de cobro real, según el helper del backend):
   // - "Por cobrar": cerrados (fecha final < hoy) y no cobrados.
   // - "Actuales": no cobrados, ya comenzados (desde <= hoy) y con
   //   fecha final >= hoy (misma condición que la tarjeta del dashboard).
+  // La tarjeta "Finalizados" no necesita listado acá: sólo navega al CRUD de
+  // períodos filtrado por los ya cobrados.
   const periodosCobrar = useMemo(
     () =>
       todosLosIngresos
-        .filter((p) => {
-          const noCobrado =
-            !p.fechaDeCobro || toDateKey(p.fechaDeCobro) < "1901-01-02";
-          return noCobrado && toDateKey(p.fechaHasta) < hoy;
-        })
+        .filter((p) => !periodoCobrado(p) && toDateKey(p.fechaHasta) < hoy)
         .sort((a, b) =>
           toDateKey(b.fechaHasta).localeCompare(toDateKey(a.fechaHasta))
         ),
@@ -134,28 +136,27 @@ export function DashboardClient({ data, periodosInicial }: Props) {
   const periodosActuales = useMemo(
     () =>
       todosLosIngresos
-        .filter((p) => {
-          const noCobrado =
-            !p.fechaDeCobro || toDateKey(p.fechaDeCobro) < "1901-01-02";
-          // Misma condición que la tarjeta "Actuales" del dashboard:
-          // no cobrado, ya comenzado (desde <= hoy) y no terminado (hasta >= hoy).
-          return (
-            noCobrado &&
+        .filter(
+          (p) =>
+            // Misma condición que la tarjeta "Actuales" del dashboard:
+            // no cobrado, ya comenzado (desde <= hoy) y no terminado (hasta >= hoy).
+            !periodoCobrado(p) &&
             toDateKey(p.fechaHasta) >= hoy &&
             toDateKey(p.fechaDesde) <= hoy
-          );
-        })
+        )
         .sort((a, b) =>
           toDateKey(a.fechaHasta).localeCompare(toDateKey(b.fechaHasta))
         ),
     [todosLosIngresos, hoy]
   );
 
-  // Tarjetas sintéticas de períodos ("Por cobrar"/"Actuales"): SIEMPRE visibles
-  // (el panel Trabajo existe aunque no haya nada pendiente). Se inicializan en
-  // $0 y el efecto de abajo (post-montaje) les pone los montos reales con el
-  // "hoy" del navegador (el del servidor puede correrse ±1 día según la zona
-  // horaria), sin romper la hidratación.
+  // Tarjetas sintéticas de períodos ("Por cobrar"/"Actuales"/"Finalizados"):
+  // SIEMPRE visibles (el panel Trabajo existe aunque no haya nada pendiente).
+  // "Por cobrar" y "Actuales" se inicializan en $0 y el efecto de abajo
+  // (post-montaje) les pone los montos reales con el "hoy" del navegador (el
+  // del servidor puede correrse ±1 día según la zona horaria), sin romper la
+  // hidratación. "Finalizados" NO muestra monto (solo el nombre) porque lleva
+  // al CRUD de períodos filtrado.
   const [sinteticas, setSinteticas] = useState<DashboardData["cuentas"]>([
     {
       title: "Por cobrar",
@@ -170,6 +171,13 @@ export function DashboardClient({ data, periodosInicial }: Props) {
       labels: [],
       values: [],
       tipo: "Actuales",
+    },
+    {
+      title: "Finalizados",
+      value: "",
+      labels: [],
+      values: [],
+      tipo: "Finalizados",
     },
   ]);
   // Badges "Mes actual" de Gastos, Ingresos y Resultados. El servidor (Vercel,
@@ -192,8 +200,9 @@ export function DashboardClient({ data, periodosInicial }: Props) {
       (acc, p) => acc + (p.montoACobrar || 0),
       0
     );
-    // Ambas tarjetas se muestran SIEMPRE (aunque el monto sea $0); cada una
-    // abre su listado (popup), vacío si no hay períodos del tipo.
+    // Las tres tarjetas se muestran SIEMPRE: "Por cobrar"/"Actuales" con su
+    // monto (aunque sea $0) abren su popup (vacío si no hay períodos del tipo)
+    // y "Finalizados" (sin monto) lleva al CRUD de períodos filtrado.
     setSinteticas([
       {
         title: "Por cobrar",
@@ -208,6 +217,13 @@ export function DashboardClient({ data, periodosInicial }: Props) {
         labels: [],
         values: [],
         tipo: "Actuales",
+      },
+      {
+        title: "Finalizados",
+        value: "",
+        labels: [],
+        values: [],
+        tipo: "Finalizados",
       },
     ]);
 
@@ -604,12 +620,13 @@ export function DashboardClient({ data, periodosInicial }: Props) {
         </div>
       </div>
 
-      {/* Panel Trabajo — tarjetas sintéticas de períodos de trabajo (Períodos a
-          Cobrar / Actuales). SIEMPRE visible: aunque no haya nada pendiente,
-          permite gestionar trabajos/períodos y abrir ambos listados. */}
+      {/* Panel Trabajo — tarjetas sintéticas de períodos de trabajo (Períodos
+          por Cobrar / Actuales / Finalizados). SIEMPRE visible: aunque no haya
+          nada pendiente, permite gestionar trabajos (⋯) y abrir los listados
+          de períodos. */}
       <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
           {/* Encabezado: título a la izquierda y menú (⋯) anclado al ángulo
-              superior derecho del panel (gestionar trabajos y períodos). */}
+              superior derecho del panel (gestionar trabajos). */}
           <div className="relative mb-3 pr-8">
             <h2 className="text-[16px] font-semibold text-header">Trabajo</h2>
             <div className="absolute right-0 top-0 flex items-center">
@@ -624,8 +641,15 @@ export function DashboardClient({ data, periodosInicial }: Props) {
                 onOpen={() => {
                   if (cuenta.title === "Por cobrar") {
                     setPeriodosModal("cobrar");
-                  } else {
+                  } else if (cuenta.title === "Actuales") {
                     setPeriodosModal("actuales");
+                  } else if (cuenta.title === "Finalizados") {
+                    // "Finalizados": abre el CRUD de períodos filtrado por los
+                    // ya cobrados (?estado=cobrado) conservando el viaje de ida
+                    // y vuelta al dashboard (?origen=dashboard).
+                    router.push(
+                      "/cruds/periodos-trabajo?estado=cobrado&origen=dashboard"
+                    );
                   }
                 }}
               />

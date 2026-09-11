@@ -1,9 +1,11 @@
 "use client";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarClock } from "lucide-react";
 import { CrudTable } from "@/components/crud/CrudTable";
 import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
 import { eliminarPeriodoTrabajo } from "@/backend/src/actions/trabajos";
+import { periodoCobrado } from "@/backend/src/lib/jornadas";
 import { ActividadCell } from "@/app/(app)/dashboard/components/ingresos-detalle";
 import type { ColumnDef } from "@tanstack/react-table";
 import { dateTimeToString, numberToCurrency } from "@/lib/utils";
@@ -104,11 +106,15 @@ interface Props {
       (tooltips) y montos de la grilla/PDF (mismo criterio que el dashboard de
       ingresos y el CRUD de gastos). */
   currency?: string;
+  /** Vista "Finalizados" (llega desde la tarjeta del panel Trabajo con
+      `?estado=cobrado`): lista ÚNICAMENTE los períodos ya cobrados. */
+  soloCobrados?: boolean;
 }
 export function PeriodosTrabajoListClient({
   initialData,
   origen,
   currency = "USD",
+  soloCobrados = false,
 }: Props) {
   const router = useRouter();
   // Flecha "volver al dashboard" SIEMPRE visible. Al venir del panel Trabajo
@@ -120,11 +126,18 @@ export function PeriodosTrabajoListClient({
   // botón de la barra inferior en mobile y para la acción por fila en desktop.
   const abrirDetalle = (id: number) =>
     router.push(`/cruds/periodos-trabajo/${id}`);
+  // Vista "Finalizados": se descartan los períodos pendientes. El array va
+  // MEMOIZADO porque `CrudTable` re-sincroniza su estado desde `initialData`
+  // (si se recreara en cada render se produciría un loop de re-sync).
+  const dataGrilla = useMemo(
+    () => (soloCobrados ? initialData.filter((p) => periodoCobrado(p)) : initialData),
+    [initialData, soloCobrados]
+  );
   return (
     <CrudTable<PeriodoTrabajoOut>
-      title="Períodos de Trabajo"
+      title={soloCobrados ? "Períodos Finalizados" : "Períodos de Trabajo"}
       columns={periodoTrabajoColumns(currency)}
-      initialData={initialData}
+      initialData={dataGrilla}
       currency={currency}
       deleteItem={eliminarPeriodoTrabajo}
       createHref={`/cruds/periodos-trabajo/nuevo${origenQ}`}

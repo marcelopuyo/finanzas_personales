@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   CalendarCheck,
   CalendarClock,
+  CircleCheck,
   Landmark,
   MoreVertical,
   Wallet,
@@ -23,6 +24,7 @@ const ICONOS_POR_TIPO: Record<string, LucideIcon> = {
   "Caja Fisica": Wallet,
   "Por cobrar": CalendarClock,
   "Actuales": CalendarCheck,
+  "Finalizados": CircleCheck,
 };
 
 interface AccountCardProps {
@@ -67,9 +69,18 @@ export function AccountCard({
         <Icon className="h-4.5 w-4.5 flex-none text-label" />
         <div className="min-w-0">
           <p className="text-[12px] leading-4 text-label">{title}</p>
-          <p className="mt-0.5 truncate text-[18px] font-semibold leading-7 tracking-tight text-value">
-            {value}
-          </p>
+          {/* Las tarjetas sin monto (ej. "Finalizados") muestran SOLO el nombre,
+              pero reservan la MISMA altura que la línea del importe
+              (mt-0.5 + leading-7 = 30px) para medir igual que las demás: en
+              mobile el grid es de 1 columna, así que cada tarjeta está en su
+              propia fila y el `stretch` del grid no las iguala. */}
+          {value ? (
+            <p className="mt-0.5 truncate text-[18px] font-semibold leading-7 tracking-tight text-value">
+              {value}
+            </p>
+          ) : (
+            <div className="mt-0.5 h-7" aria-hidden="true" />
+          )}
         </div>
       </div>
       {/* El área del gráfico siempre ocupa la misma altura (mt-2 + h-10 = 48px):

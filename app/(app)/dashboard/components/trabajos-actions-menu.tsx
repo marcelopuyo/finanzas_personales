@@ -2,14 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Briefcase, CalendarRange, Ellipsis } from "lucide-react";
+import { Briefcase, Ellipsis } from "lucide-react";
 
 /**
  * Menú desplegable (⋯) del panel "Trabajo" del dashboard (tarjetas sintéticas
  * de períodos), ubicado en la esquina superior derecha del panel con la misma
- * estética que el de Cuentas/Préstamos. Permite crear un nuevo período de
- * trabajo navegando con ?origen=dashboard para que el "volver" regrese al
- * dashboard (patrón mobile app).
+ * estética que el de Cuentas/Préstamos.
+ *
+ * Solo gestiona TRABAJOS: los PERÍODOS se abren desde las propias tarjetas del
+ * panel (Por cobrar / Actuales → popup del listado; Finalizados → CRUD filtrado
+ * por los ya cobrados), así que la opción "Gestionar períodos" se quitó
+ * (2026-09-10).
  */
 export function TrabajosActionsMenu() {
   const router = useRouter();
@@ -67,15 +70,6 @@ export function TrabajosActionsMenu() {
           >
             <Briefcase className="h-4 w-4 text-subtitle" />
             Gestionar trabajos
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => go("/cruds/periodos-trabajo?origen=dashboard")}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] font-medium text-card-foreground transition-colors hover:bg-muted"
-          >
-            <CalendarRange className="h-4 w-4 text-subtitle" />
-            Gestionar períodos
           </button>
         </div>
       )}
