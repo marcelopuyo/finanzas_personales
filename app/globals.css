@@ -101,6 +101,14 @@
 /* La familia de la UI (SF Pro Display con fallback a Inter) se aplica desde
    el token --font-sans (definido arriba) mediante la clase `font-sans` que el
    RootLayout pone en <body> (app/layout.tsx) — no duplicar aquí la cadena. */
+/* El "tirar para actualizar" de la app es propio (components/ui/pull-to-refresh.tsx):
+   se desactiva el nativo del navegador (Chrome Android) para que no compitan
+   los dos gestos — el nativo recarga toda la página y perdería el estado. */
+html,
+body {
+  overscroll-behavior-y: none;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
