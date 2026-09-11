@@ -396,8 +396,10 @@ export function DashboardClient({ data, periodosInicial }: Props) {
       aria-expanded={busquedaGastosOpen}
       title={busquedaGastosOpen ? "Cerrar búsqueda" : "Buscar"}
       className={cn(
-        // Alto fijo h-8 (32px): mismo que "Filtros" y los Tabs.
-        "inline-flex h-8 items-center justify-center rounded-full border border-border bg-muted px-3 text-card-foreground transition-colors hover:bg-card",
+        // Alto fijo h-8 (32px): mismo que "Filtros" y los Tabs. En mobile es un
+        // botón CUADRADO (w-8, sin padding) para que la fila 2 del panel Gastos
+        // entre en una sola línea a 320px; en desktop vuelve a ser píldora.
+        "inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-muted text-card-foreground transition-colors hover:bg-card sm:w-auto sm:px-3",
         className
       )}
     >
@@ -643,7 +645,7 @@ export function DashboardClient({ data, periodosInicial }: Props) {
               <StatBadge label="Mes actual" value={mesActualGastos} />
               {filterBtn("sm:hidden")}
             </div>
-            <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-2">
               {gastoSearchBtn("sm:hidden")}
               {filterBtn("hidden sm:inline-flex")}
               {gastoSearchBtn("hidden sm:inline-flex")}

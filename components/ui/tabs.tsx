@@ -24,7 +24,10 @@ export function Tabs({ tabs, activeTab, onTabChange }: TabsProps) {
             onClick={() => onTabChange(tab.id)}
             aria-pressed={isActive}
             className={cn(
-              "rounded-full px-3 py-1 text-[13px] leading-5 transition-all duration-150",
+              // Mobile: pastilla compacta (px-1/text-[12px]) para que en la
+              // fila de controles del panel quepan pestañas + botones en 320px.
+              // Desktop (sm+): medida original (px-3/text-[13px]).
+              "rounded-full px-1 py-1 text-[12px] leading-5 transition-all duration-150 sm:px-3 sm:text-[13px]",
               isActive
                 ? "bg-card text-card-foreground shadow-sm"
                 : "text-subtitle hover:text-tabs-hover"
