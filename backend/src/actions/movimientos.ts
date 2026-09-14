@@ -27,6 +27,7 @@ import {
   modalidadAdmiteJornadas,
   periodoCobrado,
   periodoCobrable,
+  periodoComenzado,
 } from "../lib/jornadas";
 import { montoEnMonedaPredeterminada } from "../lib/cotizaciones";
 import {
@@ -100,21 +101,28 @@ export async function cobrarSueldo(input: z.infer<typeof movimiento1Schema>) {
 
     const periodoTrabajo = await periodoTrabajoRepo.findOne({
       where: { id: data.idPeriodoTrabajo, trabajo: { usuario: { id: userId } } },
+      // La modalidad decide si se admite el COBRO ADELANTADO (fijo/horas_fijas).
+      relations: { trabajo: true },
     });
     if (!periodoTrabajo) throw new Error(`PeriodoTrabajo con id ${data.idPeriodoTrabajo} no encontrado`);
 
     // Guards del cobro (decisión 2026-09-14). El período PUEDE cobrarse en
-    // curso (COBRO ADELANTADO de fijo/horas_fijas, mientras sigue vigente y sin
-    // tocar sus fechas), pero NUNCA dos veces ni antes de empezar:
+    // curso (COBRO ADELANTADO, solo fijo/horas_fijas y sin tocar sus fechas),
+    // pero NUNCA dos veces ni antes de empezar:
     const hoyKey = new Date().toISOString().slice(0, 10);
     if (periodoCobrado(periodoTrabajo)) {
       throw new Error(
         `El período del ${formatearFechaDMA(periodoTrabajo.fechaDesde)} al ${formatearFechaDMA(periodoTrabajo.fechaHasta)} ya fue cobrado: no se puede volver a cobrar`
       );
     }
-    if (!periodoCobrable(periodoTrabajo, hoyKey)) {
+    if (!periodoComenzado(periodoTrabajo, hoyKey)) {
       throw new Error(
         `El período del ${formatearFechaDMA(periodoTrabajo.fechaDesde)} al ${formatearFechaDMA(periodoTrabajo.fechaHasta)} todavía no comenzó: no se puede cobrar por adelantado`
+      );
+    }
+    if (!periodoCobrable(periodoTrabajo, hoyKey)) {
+      throw new Error(
+        `El período del ${formatearFechaDMA(periodoTrabajo.fechaDesde)} al ${formatearFechaDMA(periodoTrabajo.fechaHasta)} todavía no terminó: solo los trabajos de monto fijo u horas fijas pueden cobrarse por adelantado`
       );
     }
 

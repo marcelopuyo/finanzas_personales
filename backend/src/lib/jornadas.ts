@@ -290,24 +290,34 @@ export function periodoComenzado(
 }
 
 /**
- * ¿Se puede COBRAR el período? (ya comenzó y no está cobrado).
+ * ¿Se puede COBRAR el período? (según la modalidad y el estado del período).
  *
- * Decisión del usuario 2026-09-14: se admite el **COBRO ADELANTADO** de los
- * períodos de trabajos `fijo` / `horas_fijas` — o sea cobrar mientras el período
- * está EN CURSO, sin tocar sus fechas de apertura/cierre — porque en esas
- * modalidades no se cargan jornadas ni tareas y el monto no depende de lo
- * trabajado. En `horas_variables` / `por_tarea` el monto se arma con las
- * jornadas/tareas del período, así que cobrar antes de que cierre no tiene
- * sentido (pero la función no lo restringe: la UI sí).
+ * Decisión del usuario 2026-09-14 — **COBRO ADELANTADO solo para trabajos de
+ * monto FIJO u HORAS FIJAS**, que no cargan jornadas ni tareas:
+ *  · `fijo` / `horas_fijas` → se puede cobrar desde que EMPEZÓ (mientras el
+ *    período está en curso y sin tocar sus fechas de apertura/cierre).
+ *  · `horas_variables` / `por_tarea` → recién cuando el período CERRÓ
+ *    (`fechaHasta < hoy`), como siempre: el monto se arma con las
+ *    jornadas/tareas cargadas, así que cobrar antes no tiene sentido.
  *
  * Un período cobrado NUNCA se puede volver a cobrar (el `fechaDeCobro` es el
  * candado) y uno que todavía no empezó tampoco.
  */
 export function periodoCobrable(
-  p: { fechaDesde: Date | string; fechaDeCobro?: Date | null },
+  p: {
+    fechaDesde: Date | string;
+    fechaHasta: Date | string;
+    fechaDeCobro?: Date | null;
+    trabajo?: { modalidadCobro?: string | null } | null;
+  },
   hoyISO: string
 ): boolean {
-  return !periodoCobrado(p) && periodoComenzado(p, hoyISO);
+  if (periodoCobrado(p)) return false;
+  if (!periodoComenzado(p, hoyISO)) return false;
+  const modalidad = p.trabajo?.modalidadCobro ?? "horas_variables";
+  // fijo/horas_fijas: adelantado permitido. Resto: hace falta que haya cerrado.
+  if (modalidadProrratea(modalidad)) return true;
+  return isoDate(p.fechaHasta) < hoyISO;
 }
 
 /**
