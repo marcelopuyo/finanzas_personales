@@ -62,6 +62,10 @@ export const trabajoUpdateSchema = trabajoBase
   .superRefine((val, ctx) => requierePrecioSiPorHora(val, ctx, false));
 
 // ---- Período de trabajo ----
+// ⚠️ `fechaDeCobro` NO se acepta en el alta ni en la edición (decisión del
+// usuario 2026-09-14): es el resultado del COBRO real — lo setea `cobrarSueldo`
+// al crear el movimiento y solo `anularMovimiento` lo limpia. Así no queda un
+// período marcado como cobrado sin su ingreso correspondiente.
 export const periodoTrabajoCreateSchema = z.object({
   fechaDesde: dateString,
   fechaHasta: dateString,
@@ -70,7 +74,6 @@ export const periodoTrabajoCreateSchema = z.object({
   // Modalidad 'horas_fijas': horas del período (el sistema calcula el monto).
   horasPeriodo: z.number().optional(),
   fechaEstimadaCobro: dateString.optional(),
-  fechaDeCobro: dateString.optional(),
   nombreTrabajo: z.string().min(1), // nombre del trabajo
 });
 export const periodoTrabajoUpdateSchema = periodoTrabajoCreateSchema.partial();

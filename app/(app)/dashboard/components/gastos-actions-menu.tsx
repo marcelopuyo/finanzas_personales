@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePendingNav } from "@/components/ui/nav-progress";
 import { Ellipsis, Tag } from "lucide-react";
 
 /**
@@ -11,7 +11,7 @@ import { Ellipsis, Tag } from "lucide-react";
  * ("Gestionar categorías").
  */
 export function GastosActionsMenu() {
-  const router = useRouter();
+  const { go: navigate } = usePendingNav();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -36,7 +36,8 @@ export function GastosActionsMenu() {
 
   const go = (href: string) => {
     setOpen(false);
-    router.push(href);
+    // Feedback global mientras llega la página (barra de progreso, 2026-09-14).
+    navigate(href);
   };
 
   return (

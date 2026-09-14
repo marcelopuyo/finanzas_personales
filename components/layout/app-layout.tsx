@@ -1,5 +1,6 @@
 import TopBar from "./top-bar";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
+import { NavProgress } from "@/components/ui/nav-progress";
 
 /**
  * Layout del área protegida de la app: una ÚNICA top bar fija (logo a la
@@ -22,6 +23,9 @@ export default function AppLayout({
   return (
     <div className="h-screen overflow-hidden bg-background">
       <TopBar initial={initial} userLabel={userLabel} />
+      {/* Barra de progreso global de navegación (2026-09-14): se enciende con
+          `startNav()`/`usePendingNav()` y se apaga al cambiar de ruta. */}
+      <NavProgress />
       <PullToRefresh
         variant="android"
         className="px-4 pt-14 pb-4 lg:px-6 lg:pb-6 lg:pt-14"

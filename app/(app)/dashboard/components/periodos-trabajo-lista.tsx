@@ -1,12 +1,20 @@
 "use client";
 
+import Link from "next/link";
 import { CalendarCheck, CalendarClock } from "lucide-react";
 import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
+import { periodoCobrado } from "@/backend/src/lib/jornadas";
+import { LinkNavStatus } from "@/components/ui/nav-progress";
 import { cn, dateTimeToString, numberToCurrency } from "@/lib/utils";
 
-/** Suma el monto a cobrar de un conjunto de períodos. */
-function totalACobrar(periodos: PeriodoTrabajoOut[]): number {
-  return periodos.reduce((acc, p) => acc + (p.montoACobrar || 0), 0);
+/** Suma el monto PENDIENTE de cobro del grupo: excluye los períodos YA COBRADOS
+    (con el cobro adelantado del 2026-09-14 un período puede seguir "en curso"
+    pero estar pago; ese dinero ya no se espera). */
+function totalPendiente(periodos: PeriodoTrabajoOut[]): number {
+  return periodos.reduce(
+    (acc, p) => acc + (periodoCobrado(p) ? 0 : p.montoACobrar || 0),
+    0
+  );
 }
 
 /** Rango de fechas de la fila: "dd-mm-aaaa al dd-mm-aaaa". Sin la palabra
@@ -50,6 +58,10 @@ interface Props {
   /** Tocar CUALQUIER fila abre el CRUD de períodos completo (decisión
       2026-09-13: antes abría la pantalla de jornadas/tareas del período). */
   onOpen: () => void;
+  /** Destino de la fila. Se usa `<Link>` (y no el `onOpen`) para que Next haga
+      PREFETCH y la navegación sea instantánea (2026-09-14); `onOpen` queda como
+      fallback para quien no pase `href`. */
+  href?: string;
 }
 
 /**
@@ -67,19 +79,20 @@ export function PeriodosTrabajoLista({
   enCurso,
   currency,
   onOpen,
+  href,
 }: Props) {
   const grupos = [
     {
       cobrar: true,
       label: "Por cobrar",
       visibles: porCobrar,
-      monto: totalACobrar(porCobrar),
+      monto: totalPendiente(porCobrar),
     },
     {
       cobrar: false,
       label: "En curso",
       visibles: enCurso,
-      monto: totalACobrar(enCurso),
+      monto: totalPendiente(enCurso),
     },
   ];
 
@@ -104,29 +117,51 @@ export function PeriodosTrabajoLista({
               {numberToCurrency(monto, currency)}
             </span>
           </div>
-          {visibles.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={onOpen}
-              className="w-full border-t border-border py-2.5 text-left transition-colors hover:bg-muted/40"
-            >
-              {/* Fila 1: trabajo + monto. Fila 2: fechas a todo el ancho. */}
-              <div className="flex items-center justify-between gap-3">
-                <p className="min-w-0 truncate text-[13.5px] font-medium text-header">
-                  {p.trabajo?.nombre ?? "—"}
-                </p>
-                <span className="shrink-0 text-[13.5px] font-semibold text-value">
-                  {numberToCurrency(p.montoACobrar || 0, currency)}
-                </span>
-              </div>
-              {/* Sin `truncate`: en pantallas muy chicas (320px) las fechas
-                  bajan a una segunda línea en vez de cortarse. */}
-              <p className="mt-0.5 text-[11.5px] text-subtitle">
-                {rangoPeriodo(p)}
-              </p>
-            </button>
-          ))}
+          {visibles.map((p) => {
+            // Cobrado = ya tiene `fechaDeCobro` real. Con el COBRO ADELANTADO
+            // (decisión del usuario 2026-09-14) un período fijo/horas_fijas puede
+            // estar cobrado y seguir EN CURSO: sigue listado en este grupo y se
+            // marca con el tag para no confundirlo con uno pendiente.
+            const cobrado = periodoCobrado(p);
+            const filaCls =
+              "block w-full border-t border-border py-2.5 text-left transition-colors hover:bg-muted/40 active:bg-muted/60";
+            const contenido = (
+              <>
+                {/* Fila 1: trabajo + monto. Fila 2: fechas (+ tag si ya se cobró). */}
+                <div className="flex items-center justify-between gap-3">
+                  <p className="min-w-0 truncate text-[13.5px] font-medium text-header">
+                    {p.trabajo?.nombre ?? "—"}
+                  </p>
+                  <span className="shrink-0 text-[13.5px] font-semibold text-value">
+                    {numberToCurrency(p.montoACobrar || 0, currency)}
+                  </span>
+                </div>
+                {/* Sin `truncate`: en pantallas muy chicas (320px) las fechas
+                    bajan a una segunda línea en vez de cortarse. */}
+                <div className="mt-0.5 flex items-center justify-between gap-2">
+                  <p className="text-[11.5px] text-subtitle">{rangoPeriodo(p)}</p>
+                  {cobrado && (
+                    <span className="shrink-0 rounded-full border border-success/45 bg-success/10 px-1.5 py-px text-[9px] font-semibold tracking-wide text-success uppercase">
+                      Cobrado
+                    </span>
+                  )}
+                </div>
+              </>
+            );
+            // `<Link>` en vez de `<button onClick>`: Next prefetchea el destino al
+            // entrar en viewport y la navegación deja de tener espera visible.
+            return href ? (
+              <Link key={p.id} href={href} className={filaCls}>
+                {/* Avisa a la barra de progreso global mientras llega el CRUD. */}
+                <LinkNavStatus />
+                {contenido}
+              </Link>
+            ) : (
+              <button key={p.id} type="button" onClick={onOpen} className={filaCls}>
+                {contenido}
+              </button>
+            );
+          })}
         </div>
       ))}
     </>

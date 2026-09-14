@@ -7,8 +7,12 @@
 //  - Con TAREAS   → se cuenta lo real por FECHA LOCAL de la tarea
 //    (`fechaTarea`, la que eligió el usuario; decisión 2026-09-05).
 //  - Sin hijos y trabajo fijo/horas_fijas → se PRORRATEA el montoACobrar.
+//    ⚠️ Excepto COBRO ADELANTADO (decisión usuario 2026-09-14): si el período se
+//    cobró ANTES de su fecha de cierre, aporta el TOTAL en la FECHA DEL COBRO
+//    (el dinero entró ese día) y no se prorratea.
 //  - Otros (sin hijos, horas_variables/por_tarea) → 0.
 import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
+import { cobroAdelantado } from "@/backend/src/lib/jornadas";
 
 const SIN_TRABAJO = "Sin trabajo";
 
@@ -106,6 +110,12 @@ export function ingresosEnRango(
         if ((desde && f < desde) || (hasta && f > hasta)) continue;
         add(nombre, t.montoTarea || 0);
       }
+    } else if (esProrrateo(p) && cobroAdelantado(p)) {
+      // COBRO ADELANTADO: el período aporta el TOTAL en la fecha del cobro (no
+      // prorrateado), así el rango lo incluye solo si esa fecha cae dentro.
+      const f = ymd(p.fechaDeCobro);
+      if ((desde && f < desde) || (hasta && f > hasta)) continue;
+      add(nombre, p.montoACobrar ?? 0);
     } else if (esProrrateo(p)) {
       add(
         nombre,
@@ -152,6 +162,10 @@ export function ingresosDelMesActual(
         const f = ymd(t.fechaTarea);
         if (f >= desde && f <= hoy) total += t.montoTarea || 0;
       }
+    } else if (esProrrateo(p) && cobroAdelantado(p)) {
+      // COBRO ADELANTADO: el mes del cobro reconoce el TOTAL (si cae en [1°, hoy]).
+      const f = ymd(p.fechaDeCobro);
+      if (f >= desde && f <= hoy) total += p.montoACobrar ?? 0;
     } else if (esProrrateo(p)) {
       // fijo y horas_fijas: aporte "a la fecha" del mes actual = monto del
       // período × (días del tramo dentro del mes transcurridos hasta hoy /
@@ -201,6 +215,12 @@ export function evolucionIngresosPorMes(
       jornadas.forEach(sumarJornada);
     } else if (tareas.length > 0) {
       tareas.forEach(sumarTarea);
+    } else if (esProrrateo(p) && cobroAdelantado(p)) {
+      // COBRO ADELANTADO: TODO el monto en el mes del cobro (sin prorratear).
+      // Se toma "YYYY-MM" del string de fecha (sin `Date`, para no tener
+      // corrimientos de zona horaria).
+      const ymCobro = ymd(p.fechaDeCobro).slice(0, 7);
+      if (ymCobro) add(ymCobro, p.montoACobrar ?? 0);
     } else if (esProrrateo(p)) {
       const monto = p.montoACobrar ?? 0;
       if (monto <= 0) continue;

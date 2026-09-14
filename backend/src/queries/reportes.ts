@@ -2,7 +2,7 @@ import { IsNull, MoreThan, MoreThanOrEqual } from "typeorm";
 import { getDb } from "../db";
 import { getSessionUser, requireUserId } from "../lib/auth";
 import { convertir } from "../lib/cotizaciones";
-import { aporteProrrateado, modalidadProrratea } from "../lib/jornadas";
+import { aporteProrrateado, cobroAdelantado, modalidadProrratea } from "../lib/jornadas";
 import { getPrestamosNetoEnPredeterminada } from "../lib/prestamos";
 import { Cuenta } from "../entities/cuenta.entity";
 import { Gasto } from "../entities/gasto.entity";
@@ -209,6 +209,14 @@ export async function getEvolucionIngresos(): Promise<EvolucionItem[]> {
     if (modalidadProrratea(modalidad)) {
       const monto = p.montoACobrar ?? 0;
       if (monto <= 0) continue;
+      // COBRO ADELANTADO (decisión del usuario 2026-09-14): si el período se
+      // cobró ANTES de su fecha de cierre, el ingreso se reconoce COMPLETO en el
+      // mes del cobro (el dinero entró ese mes) y NO se prorratea — si no,
+      // quedaría reconocido a medias y el gráfico no mostraría el total cobrado.
+      if (cobroAdelantado(p)) {
+        sumarKey(ymDeFecha(p.fechaDeCobro as Date), monto);
+        continue;
+      }
       const hoyKey = new Date().toISOString().slice(0, 10);
       const hoyYM = hoyKey.slice(0, 7);
       const desde = `${ymDeFecha(p.fechaDesde)}-${pad2(

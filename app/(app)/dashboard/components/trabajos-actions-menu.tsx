@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePendingNav } from "@/components/ui/nav-progress";
 import { Briefcase, Ellipsis } from "lucide-react";
 
 /**
@@ -15,7 +15,7 @@ import { Briefcase, Ellipsis } from "lucide-react";
  * (2026-09-10).
  */
 export function TrabajosActionsMenu() {
-  const router = useRouter();
+  const { go: navigate } = usePendingNav();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -40,7 +40,8 @@ export function TrabajosActionsMenu() {
 
   const go = (href: string) => {
     setOpen(false);
-    router.push(href);
+    // Feedback global mientras llega la página (barra de progreso, 2026-09-14).
+    navigate(href);
   };
 
   return (

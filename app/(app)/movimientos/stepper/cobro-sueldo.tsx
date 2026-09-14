@@ -2,11 +2,21 @@
 
 import { useMovimientoStepper } from "./stepper-context";
 import { StepShell, NavButtons, DateField, SelectField, NumberField, formatFecha } from "./ui";
-import { numberToCurrency } from "@/lib/utils";
+import { numberToCurrency, todayLocalISODate } from "@/lib/utils";
+import { periodoCobrable } from "@/backend/src/lib/jornadas";
 import { STEP_CONFIRMACION } from "./types";
 
 export function CobroSueldo() {
   const { data, handleSetData, navigateTo, options } = useMovimientoStepper();
+
+  // Solo períodos COBRABLES (decisión 2026-09-14): ya comenzados y sin cobrar.
+  // El cobro ADELANTADO de un período fijo/horas_fijas en curso está permitido;
+  // uno que todavía no empezó no se ofrece (y el backend lo rechaza). Se filtra
+  // ACÁ y no en `movimiento-data.ts` porque esa lista la comparten los pasos de
+  // jornada/tarea y la confirmación (que necesitan todos los períodos).
+  const cobrables = options.periodosTrabajo.filter((p) =>
+    periodoCobrable(p, todayLocalISODate())
+  );
 
   const isValid =
     data.periodoTrabajo > 0 && data.cuentaOrigen > 0 && data.montoOrigen > 0;
@@ -35,14 +45,14 @@ export function CobroSueldo() {
         value={data.periodoTrabajo ? String(data.periodoTrabajo) : ""}
         onChange={(v) => {
           const id = Number(v);
-          const pt = options.periodosTrabajo.find((p) => p.id === id);
+          const pt = cobrables.find((p) => p.id === id);
           // Al elegir el período se precarga el monto a cobrar (como el original).
           handleSetData({
             periodoTrabajo: id,
             montoOrigen: pt?.montoACobrar ?? 0,
           });
         }}
-        options={options.periodosTrabajo.map((p) => ({
+        options={cobrables.map((p) => ({
           value: String(p.id),
           label: `${p.trabajo?.nombre ?? "Trabajo"}: ${formatFecha(p.fechaDesde)} al ${formatFecha(p.fechaHasta)} — ${numberToCurrency(p.montoACobrar ?? 0)}`,
         }))}

@@ -120,10 +120,11 @@ export function DashboardClient({ data, periodosInicial }: Props) {
   // Listados de períodos para las tarjetas sintéticas del panel Trabajo
   // ("cobrado" = tiene fecha de cobro real, según el helper del backend):
   // - "Por cobrar": cerrados (fecha final < hoy) y no cobrados.
-  // - "Actuales": no cobrados, ya comenzados (desde <= hoy) y con
-  //   fecha final >= hoy (misma condición que la tarjeta del dashboard).
+  // - "Actuales": ya comenzados (desde <= hoy) y con fecha final >= hoy
+  //   (misma condición que la tarjeta del dashboard), cobrados O NO (el cobro
+  //   adelantado dejó períodos cobrados que siguen en curso).
   // La tarjeta "Finalizados" no necesita listado acá: sólo navega al CRUD de
-  // períodos filtrado por los ya cobrados.
+  // períodos filtrado por los ya cobrados y terminados.
   const periodosCobrar = useMemo(
     () =>
       todosLosIngresos
@@ -139,9 +140,12 @@ export function DashboardClient({ data, periodosInicial }: Props) {
       todosLosIngresos
         .filter(
           (p) =>
-            // Misma condición que la tarjeta "Actuales" del dashboard:
-            // no cobrado, ya comenzado (desde <= hoy) y no terminado (hasta >= hoy).
-            !periodoCobrado(p) &&
+            // Misma condición que la tarjeta "Actuales" del dashboard: ya
+            // comenzado (desde <= hoy) y no terminado (hasta >= hoy).
+            // ⚠️ Incluye los YA COBRADOS: con el COBRO ADELANTADO (decisión del
+            // usuario 2026-09-14) un período fijo/horas_fijas puede estar cobrado
+            // y seguir en curso; el panel lo sigue mostrando acá, con el tag
+            // "Cobrado" (ver periodos-trabajo-lista.tsx).
             toDateKey(p.fechaHasta) >= hoy &&
             toDateKey(p.fechaDesde) <= hoy
         )
@@ -575,6 +579,9 @@ export function DashboardClient({ data, periodosInicial }: Props) {
             // ya los devuelve ordenados por "Desde" DESC), no el detalle del
             // período (decisión 2026-09-13). Con `origen=dashboard` la flecha
             // "Volver" regresa acá y el "+"/editar conservan el viaje.
+            // 2026-09-14: se navega con `<Link href>` (prefetch ⇒ instantáneo) y
+            // `onOpen` queda como fallback.
+            href="/cruds/periodos-trabajo?origen=dashboard"
             onOpen={() =>
               router.push("/cruds/periodos-trabajo?origen=dashboard")
             }

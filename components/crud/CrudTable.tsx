@@ -10,6 +10,7 @@ import {
   type SwipeRowAction,
 } from "@/components/crud/SwipeRowActions";
 import { Modal } from "@/components/ui/modal";
+import { usePendingNav } from "@/components/ui/nav-progress";
 import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
@@ -163,6 +164,10 @@ export function CrudTable<T, TId = number>({
   emptyMessage = "Sin datos disponibles",
 }: CrudTableProps<T, TId>) {
   const router = useRouter();
+  // Navegaciones con feedback (2026-09-14): `nav(href, key)` enciende la barra
+  // de progreso global y marca el control tocado (FAB "Nuevo", "Editar") con un
+  // spinner mientras llega la página nueva.
+  const { pendingKey, go: nav } = usePendingNav();
   const [items, setItems] = useState<T[]>(initialData ?? []);
   const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState<string | null>(null);
@@ -244,7 +249,7 @@ export function CrudTable<T, TId = number>({
                     )}
                     <button
                       type="button"
-                      onClick={() => router.push(editHref(getId(row.original)))}
+                      onClick={() => nav(editHref(getId(row.original)), "edit")}
                       className="rounded p-1 text-subtitle transition-colors hover:bg-muted hover:text-header"
                       aria-label="Editar"
                     >
@@ -267,7 +272,7 @@ export function CrudTable<T, TId = number>({
     ],
     [
       columns,
-      router,
+      nav,
       editHref,
       getId,
       trailingColumns,
@@ -420,7 +425,8 @@ export function CrudTable<T, TId = number>({
         {backHref && (
           <button
             type="button"
-            onClick={() => router.push(backHref)}
+            onClick={() => nav(backHref, "back")}
+            aria-busy={pendingKey === "back" || undefined}
             className="rounded-lg p-1.5 text-subtitle transition-colors hover:bg-muted hover:text-header"
             aria-label="Volver"
           >
@@ -453,7 +459,7 @@ export function CrudTable<T, TId = number>({
         key: "edit",
         label: "Editar",
         icon: Pencil,
-        onClick: () => router.push(editHref(id)),
+        onClick: () => nav(editHref(id), "edit"),
       },
       {
         key: "delete",
@@ -479,7 +485,11 @@ export function CrudTable<T, TId = number>({
     // oculta la píldora y deja el FAB solo).
     swipeMode ? (
       <BottomActionBar
-        fabAction={{ label: "Nuevo", onClick: () => router.push(createHref) }}
+        fabAction={{
+          label: "Nuevo",
+          onClick: () => nav(createHref, "fab"),
+          pending: pendingKey === "fab",
+        }}
       />
     ) : (
     <BottomActionBar
@@ -514,7 +524,9 @@ export function CrudTable<T, TId = number>({
           label: "Editar",
           icon: Pencil,
           disabled: selectedId === null,
-          onClick: () => selectedId !== null && router.push(editHref(selectedId)),
+          pending: pendingKey === "edit",
+          onClick: () =>
+            selectedId !== null && nav(editHref(selectedId), "edit"),
         },
         {
           key: "delete",
@@ -524,7 +536,11 @@ export function CrudTable<T, TId = number>({
           onClick: () => selectedId !== null && setDeleteId(selectedId),
         },
       ]}
-      fabAction={{ label: "Nuevo", onClick: () => router.push(createHref) }}
+      fabAction={{
+        label: "Nuevo",
+        onClick: () => nav(createHref, "fab"),
+        pending: pendingKey === "fab",
+      }}
     />
     )
   ) : null;
@@ -576,8 +592,12 @@ export function CrudTable<T, TId = number>({
               </button>
               <button
                 type="button"
-                onClick={() => router.push(createHref)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
+                onClick={() => nav(createHref, "nuevo")}
+                aria-busy={pendingKey === "nuevo" || undefined}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90",
+                  pendingKey === "nuevo" && "opacity-70"
+                )}
               >
                 <Plus className="h-3.5 w-3.5" />
                 Nuevo
@@ -648,7 +668,8 @@ export function CrudTable<T, TId = number>({
         <div className="mb-4 flex items-center gap-3">
           <button
             type="button"
-            onClick={() => router.push(backHref)}
+            onClick={() => nav(backHref, "back")}
+            aria-busy={pendingKey === "back" || undefined}
             className="rounded-lg p-1.5 text-subtitle transition-colors hover:bg-muted hover:text-header"
             aria-label="Volver"
           >

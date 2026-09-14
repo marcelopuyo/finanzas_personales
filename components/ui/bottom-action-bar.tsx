@@ -3,6 +3,7 @@
 import type { LucideIcon } from "lucide-react";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { NavSpinner } from "@/components/ui/nav-progress";
 
 export interface BottomBarAction {
   /** Id único de la acción (usado como key). */
@@ -13,6 +14,9 @@ export interface BottomBarAction {
   /** Deshabilita visual e interactivamente la acción (p. ej. Editar/Eliminar
       sin una fila seleccionada): se pinta el mismo gris de la barra, apagado. */
   disabled?: boolean;
+  /** La acción disparó una NAVEGACIÓN y está en curso: se cambia el ícono por un
+      spinner (feedback de 2026-09-14). */
+  pending?: boolean;
 }
 
 interface BottomActionBarProps {
@@ -21,7 +25,7 @@ interface BottomActionBarProps {
   /** Acciones del lado derecho (típicamente Editar / Eliminar). */
   right?: BottomBarAction[];
   /** FAB central flotante sobre la barra (típicamente "Nuevo"). */
-  fabAction?: { label?: string; onClick?: () => void };
+  fabAction?: { label?: string; onClick?: () => void; pending?: boolean };
 }
 
 /**
@@ -67,7 +71,11 @@ export function BottomActionBar({
           // Sin borde: el círculo va limpio (pedido del usuario 2026-09-13).
           className="flex h-12 w-12 items-center justify-center rounded-full bg-header text-background shadow-lg transition-transform active:scale-95"
         >
-          <Plus className="h-5 w-5" />
+          {fabAction.pending ? (
+            <NavSpinner className="h-5 w-5" />
+          ) : (
+            <Plus className="h-5 w-5" />
+          )}
         </button>
       </div>
     );
@@ -80,16 +88,18 @@ export function BottomActionBar({
         key={a.key}
         type="button"
         aria-disabled={a.disabled}
+        aria-busy={a.pending || undefined}
         onClick={a.disabled ? undefined : a.onClick}
         className={cn(
           "flex flex-col items-center gap-0.5 py-1 text-[10.5px] font-medium",
           // Barra MONOCROME: habilitado usa el mismo gris que "Exportar";
           // deshabilitado es ese mismo gris, más apagado (sin rojo ni azul).
           "text-sidebar-muted",
-          a.disabled && "pointer-events-none opacity-40"
+          a.disabled && "pointer-events-none opacity-40",
+          a.pending && "opacity-80"
         )}
       >
-        <Icon className="h-5 w-5" />
+        {a.pending ? <NavSpinner className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
         <span>{a.label}</span>
       </button>
     );
@@ -122,7 +132,11 @@ export function BottomActionBar({
               title={fabAction.label ?? "Nuevo"}
               className="absolute left-1/2 top-0 z-10 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-header text-background shadow-lg transition-transform active:scale-95"
             >
-              <Plus className="h-6 w-6" />
+              {fabAction.pending ? (
+                <NavSpinner className="h-6 w-6" />
+              ) : (
+                <Plus className="h-6 w-6" />
+              )}
             </button>
           )}
         </div>

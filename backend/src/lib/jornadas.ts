@@ -280,3 +280,48 @@ export function periodoCobrado(
   if (!p || !p.fechaDeCobro) return false;
   return isoDate(p.fechaDeCobro) >= "1901-01-02";
 }
+
+/** ¿El período ya comenzó? (`fechaDesde <= hoy`). */
+export function periodoComenzado(
+  p: { fechaDesde: Date | string },
+  hoyISO: string
+): boolean {
+  return isoDate(p.fechaDesde) <= hoyISO;
+}
+
+/**
+ * ¿Se puede COBRAR el período? (ya comenzó y no está cobrado).
+ *
+ * Decisión del usuario 2026-09-14: se admite el **COBRO ADELANTADO** de los
+ * períodos de trabajos `fijo` / `horas_fijas` — o sea cobrar mientras el período
+ * está EN CURSO, sin tocar sus fechas de apertura/cierre — porque en esas
+ * modalidades no se cargan jornadas ni tareas y el monto no depende de lo
+ * trabajado. En `horas_variables` / `por_tarea` el monto se arma con las
+ * jornadas/tareas del período, así que cobrar antes de que cierre no tiene
+ * sentido (pero la función no lo restringe: la UI sí).
+ *
+ * Un período cobrado NUNCA se puede volver a cobrar (el `fechaDeCobro` es el
+ * candado) y uno que todavía no empezó tampoco.
+ */
+export function periodoCobrable(
+  p: { fechaDesde: Date | string; fechaDeCobro?: Date | null },
+  hoyISO: string
+): boolean {
+  return !periodoCobrado(p) && periodoComenzado(p, hoyISO);
+}
+
+/**
+ * ¿Fue un **COBRO ADELANTADO**? Sí: el período está cobrado y el cobro se
+ * registró ANTES de su fecha de cierre (decisión del usuario 2026-09-14).
+ *
+ * Se usa para el reconocimiento de INGRESOS: en un cobro adelantado el período
+ * aporta el **TOTAL** (`montoACobrar`) en el mes del cobro en lugar de
+ * prorratearse día a día (el dinero entró ese mes). Si el cobro fue posterior al
+ * cierre, el prorrateo ya suma el 100% y no se cambia nada.
+ */
+export function cobroAdelantado(
+  p: { fechaHasta: Date | string; fechaDeCobro?: Date | null }
+): boolean {
+  if (!periodoCobrado(p) || !p.fechaDeCobro) return false;
+  return isoDate(p.fechaDeCobro) < isoDate(p.fechaHasta);
+}

@@ -9,6 +9,7 @@ import {
   eliminarJornadaTrabajo,
   eliminarTareaTrabajo,
 } from "@/backend/src/actions/trabajos";
+import { cobroAdelantado, periodoCobrable } from "@/backend/src/lib/jornadas";
 import type {
   JornadaTrabajoOut,
   PeriodoTrabajoOut,
@@ -101,6 +102,8 @@ function datosPeriodo(periodo: PeriodoTrabajoOut) {
     totalHoras,
     montoHoras,
     montoPropina,
+    // Cobro ADELANTADO: cobrado antes de la fecha de cierre del período.
+    adelantado: cobroAdelantado(periodo),
     total: Number(periodo.montoACobrar ?? 0),
   };
 }
@@ -117,7 +120,9 @@ function cabeceraPeriodo(
     { label: "Período", value: `Desde ${d.desde} al ${d.hasta}` },
     {
       label: "Estado",
-      value: d.cobrado ? `Cobrado el ${d.fechaCobro}` : "Pendiente",
+      value: d.cobrado
+        ? `Cobrado${d.adelantado ? " (adelantado)" : ""} el ${d.fechaCobro}`
+        : "Pendiente",
     },
     { label: d.etiquetaItems, value: String(d.items.length) },
   ];
@@ -149,10 +154,14 @@ function ResumenPeriodo({
   periodo,
   currency,
   cobrable,
+  enCurso,
 }: {
   periodo: PeriodoTrabajoOut;
   currency: string;
+  /** Se puede cobrar (ya empezó y no está cobrado). */
   cobrable: boolean;
+  /** El período está vigente hoy (empezó y todavía no cerró). */
+  enCurso: boolean;
 }) {
   const router = useRouter();
   const {
@@ -168,6 +177,7 @@ function ResumenPeriodo({
     totalHoras,
     montoHoras,
     montoPropina,
+    adelantado,
   } = datosPeriodo(periodo);
 
   return (
@@ -255,6 +265,24 @@ function ResumenPeriodo({
           {numberToCurrency(Number(periodo.montoACobrar ?? 0), currency)}
         </p>
       </div>
+
+      {/* COBRO ADELANTADO (fijo/horas_fijas en curso): se avisa que el cobro se
+          hace por adelantado y que NO se tocan las fechas del período. */}
+      {cobrable && enCurso && (
+        <p className="mt-2 text-[12px] text-subtitle">
+          Período <span className="font-medium text-header">en curso</span>{" "}
+          (cierra el {hasta}): el cobro es{" "}
+          <span className="font-medium text-header">por adelantado</span> y no
+          modifica las fechas del período.
+        </p>
+      )}
+      {cobrado && adelantado && fechaCobro && (
+        <p className="mt-2 text-[12px] text-subtitle">
+          Cobrado{" "}
+          <span className="font-medium text-success">por adelantado</span> el{" "}
+          {fechaCobro}.
+        </p>
+      )}
     </div>
   );
 }
@@ -285,9 +313,18 @@ export function PeriodoTrabajoDetalleClient({
   const fc = periodo.fechaDeCobro ? new Date(periodo.fechaDeCobro) : null;
   const cobrado = !!fc && fc.getFullYear() >= 1901;
   const editable = !cobrado;
-  // Solo se puede cobrar un período cerrado (fechaHasta < hoy) y no cobrado.
-  const cobrable =
-    !cobrado && toDateKey(periodo.fechaHasta) < todayLocalISODate();
+  // COBRO ADELANTADO (decisión del usuario 2026-09-14): se puede cobrar apenas
+  // el período EMPEZÓ (no hace falta esperar al cierre) — pensado para los
+  // trabajos `fijo` / `horas_fijas`, que no cargan jornadas ni tareas. El
+  // `fechaDeCobro` que deja el cobro es el candado: un período cobrado no se
+  // vuelve a cobrar nunca (y las fechas del período NO se tocan).
+  const hoyKey = todayLocalISODate();
+  const cobrable = periodoCobrable(periodo, hoyKey);
+  // Vigente hoy (empezó y no cerró): se usa para avisar que el cobro es
+  // "por adelantado".
+  const enCurso =
+    toDateKey(periodo.fechaDesde) <= hoyKey &&
+    toDateKey(periodo.fechaHasta) >= hoyKey;
 
   // Vuelta: al dashboard se vuelve con el popup que cargó la pantalla reabierto
   // (?periodos=...). Si se entró sin popup (URL directa), se va al listado de
@@ -303,7 +340,12 @@ export function PeriodoTrabajoDetalleClient({
     : "/cruds/periodos-trabajo";
 
   const summary = (
-    <ResumenPeriodo periodo={periodo} currency={currency} cobrable={cobrable} />
+    <ResumenPeriodo
+      periodo={periodo}
+      currency={currency}
+      cobrable={cobrable}
+      enCurso={enCurso}
+    />
   );
 
   // Cabecera que el PDF exporta arriba de la grilla (los datos del período).

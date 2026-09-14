@@ -10,7 +10,10 @@ export const periodoTrabajoSchema = z.object({
   // Modalidad 'horas_fijas': horas del período (el sistema calcula el monto).
   horasPeriodo: z.coerce.number().optional(),
   fechaEstimadaCobro: z.string().optional(),
-  fechaDeCobro: z.string().optional(),
+  // ⚠️ `fechaDeCobro` NO está en el formulario: es el resultado del COBRO real
+  // (lo setea `cobrarSueldo` al crear el movimiento, y solo `anularMovimiento`
+  // lo limpia). Editarlo a mano marcaba el período como cobrado SIN registrar
+  // el ingreso ni subir el saldo (decisión del usuario 2026-09-14).
   nombreTrabajo: z.string().min(1, "Seleccione un trabajo"),
 });
 export type PeriodoTrabajoFormData = z.infer<typeof periodoTrabajoSchema>;
@@ -46,7 +49,7 @@ export function periodoTrabajoFieldsEditar(
     { name: "fechaHasta", label: "Hasta", type: "date" },
     valorField,
     { name: "fechaEstimadaCobro", label: "Estimación de Cobro", type: "date" },
-    { name: "fechaDeCobro", label: "Fecha de Cobro", type: "date" },
+    // NOTA: no hay campo "Fecha de Cobro": se obtiene cobrando el período.
     { name: "nombreTrabajo", label: "Trabajo", type: "select", optionsFrom: fetchTrabajos },
   ];
 }

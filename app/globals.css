@@ -135,3 +135,59 @@ body {
   z-index: 50;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   TRANSICIONES DE PÁGINA (2026-09-14)
+
+   La app navega dentro del <main> (no hay recarga), así que el usuario necesita
+   feedback mientras llega la página nueva. Dos piezas, ambas CSS puro:
+
+   1) `.nav-bar` → barra de progreso global (2px bajo la top bar). Simula avance
+      "indeterminado": crece rápido y se frena, que es lo que se percibe como
+      progreso. Se desmonta cuando la ruta termina de cambiar.
+   2) `.sk-fade` → aparición RETARDADA (anti-flicker) de los skeletons de
+      `loading.tsx`: si la página tarda menos de ~150ms en estar lista, el
+      skeleton nunca se ve (evita el parpadeo que se siente peor que nada).
+      `both` mantiene el estado inicial (invisible) durante el retraso.
+   ───────────────────────────────────────────────────────────────────────── */
+@keyframes nav-bar {
+  0% {
+    width: 0;
+  }
+  12% {
+    width: 52%;
+  }
+  40% {
+    width: 76%;
+  }
+  100% {
+    width: 92%;
+  }
+}
+.nav-bar {
+  animation: nav-bar 9s cubic-bezier(0.14, 0.9, 0.2, 1) forwards;
+}
+
+@keyframes fade-in-delayed {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.sk-fade {
+  animation: fade-in-delayed 220ms ease-out 150ms both;
+}
+
+/* Accesibilidad: con "reducir movimiento" no animamos nada (la barra aparece
+   completa y los skeletons se ven al instante). */
+@media (prefers-reduced-motion: reduce) {
+  .nav-bar {
+    animation: none;
+    width: 100%;
+  }
+  .sk-fade {
+    animation: none;
+  }
+}
+

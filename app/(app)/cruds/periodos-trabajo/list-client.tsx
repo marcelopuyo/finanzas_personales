@@ -318,8 +318,18 @@ export function PeriodosTrabajoListClient({
   // Vista "Finalizados": se descartan los períodos pendientes. El array va
   // MEMOIZADO porque `CrudTable` re-sincroniza su estado desde `initialData`
   // (si se recreara en cada render se produciría un loop de re-sync).
+  // ⚠️ Con el COBRO ADELANTADO (2026-09-14) "cobrado" ya no implica "terminado":
+  // un período fijo/horas_fijas puede estar cobrado y seguir EN CURSO, así que
+  // esta vista exige además que el período haya cerrado (fechaHasta < hoy).
   const dataGrilla = useMemo(
-    () => (soloCobrados ? initialData.filter((p) => periodoCobrado(p)) : initialData),
+    () =>
+      soloCobrados
+        ? initialData.filter(
+            (p) =>
+              periodoCobrado(p) &&
+              toDateKey(p.fechaHasta) < todayLocalISODate()
+          )
+        : initialData,
     [initialData, soloCobrados]
   );
   return (
