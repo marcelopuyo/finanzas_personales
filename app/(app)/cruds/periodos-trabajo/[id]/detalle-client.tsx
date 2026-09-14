@@ -56,6 +56,94 @@ function horasATexto(horas: number): string {
   )}`;
 }
 
+/** Datos derivados del período. Los usan el resumen en pantalla y la cabecera
+    del PDF, para no duplicar los cálculos ni poder desincronizarse. */
+function datosPeriodo(periodo: PeriodoTrabajoOut) {
+  const trabajo = periodo.trabajo;
+  const modalidad = trabajo?.modalidadCobro ?? "horas_variables";
+  const esTareas = modalidad === "por_tarea";
+  const esHoras = modalidad === "horas_variables";
+  const etiquetaItems = esTareas ? "Tareas" : "Jornadas";
+  const items = esTareas ? (periodo.tareas ?? []) : (periodo.jornadas ?? []);
+  const desde = dateTimeToString(periodo.fechaDesde);
+  const hasta = dateTimeToString(periodo.fechaHasta);
+  const fechaEst = periodo.fechaEstimadaCobro
+    ? dateTimeToString(periodo.fechaEstimadaCobro)
+    : null;
+  // Cobrado (histórico) vs pendiente: define el estado y el título del recuadro
+  // del monto.
+  const fcCobro = periodo.fechaDeCobro
+    ? new Date(periodo.fechaDeCobro)
+    : null;
+  const cobrado = !!fcCobro && fcCobro.getFullYear() >= 1901;
+  const fechaCobro = fcCobro && cobrado ? dateTimeToString(fcCobro) : null;
+  // Totales de las jornadas cargadas: horas trabajadas (HH.MM → decimales),
+  // monto de esas horas y propina. Aplican sólo a la modalidad `horas_variables`
+  // (fijo/horas_fijas no cargan jornadas y `por_tarea` usa tareas), así que se
+  // ocultan en las otras modalidades para no mostrar ceros engañosos.
+  const jornadas = periodo.jornadas ?? [];
+  const totalHoras = jornadas.reduce((suma, j) => suma + horasDeJornada(j), 0);
+  const montoHoras = jornadas.reduce((suma, j) => suma + (j.montoJornada || 0), 0);
+  const montoPropina = jornadas.reduce(
+    (suma, j) => suma + (j.montoPropina || 0),
+    0
+  );
+  return {
+    trabajo,
+    esHoras,
+    etiquetaItems,
+    items,
+    desde,
+    hasta,
+    fechaEst,
+    cobrado,
+    fechaCobro,
+    totalHoras,
+    montoHoras,
+    montoPropina,
+    total: Number(periodo.montoACobrar ?? 0),
+  };
+}
+
+/** Cabecera del PDF: los datos del período que se exportan arriba de la grilla
+    de jornadas/tareas (mismos valores que el resumen en pantalla). */
+function cabeceraPeriodo(
+  periodo: PeriodoTrabajoOut,
+  currency: string
+): { label: string; value: string }[] {
+  const d = datosPeriodo(periodo);
+  const filas: { label: string; value: string }[] = [
+    { label: "Trabajo", value: d.trabajo?.nombre ?? "—" },
+    { label: "Período", value: `Desde ${d.desde} al ${d.hasta}` },
+    {
+      label: "Estado",
+      value: d.cobrado ? `Cobrado el ${d.fechaCobro}` : "Pendiente",
+    },
+    { label: d.etiquetaItems, value: String(d.items.length) },
+  ];
+  if (d.esHoras) {
+    filas.push(
+      { label: "Horas", value: horasATexto(d.totalHoras) },
+      {
+        label: "Monto de horas",
+        value: numberToCurrency(d.montoHoras, currency),
+      },
+      {
+        label: "Monto de propina",
+        value: numberToCurrency(d.montoPropina, currency),
+      }
+    );
+  }
+  if (!d.cobrado) {
+    filas.push({ label: "Fecha est. cobro", value: d.fechaEst ?? "—" });
+  }
+  filas.push({
+    label: d.cobrado ? "Total cobrado" : "Total a cobrar",
+    value: numberToCurrency(d.total, currency),
+  });
+  return filas;
+}
+
 /** Resumen del período que va arriba de la grilla. */
 function ResumenPeriodo({
   periodo,
@@ -67,35 +155,20 @@ function ResumenPeriodo({
   cobrable: boolean;
 }) {
   const router = useRouter();
-  const trabajo = periodo.trabajo;
-  const modalidad = trabajo?.modalidadCobro ?? "horas_variables";
-  const esTareas = modalidad === "por_tarea";
-  const etiquetaItems = esTareas ? "Tareas" : "Jornadas";
-  const items = esTareas ? (periodo.tareas ?? []) : (periodo.jornadas ?? []);
-  const desde = dateTimeToString(periodo.fechaDesde);
-  const hasta = dateTimeToString(periodo.fechaHasta);
-  const fechaEst = periodo.fechaEstimadaCobro
-    ? dateTimeToString(periodo.fechaEstimadaCobro)
-    : null;
-  // Cobrado (histórico) vs pendiente: define el chip de estado y el título del
-  // recuadro del monto.
-  const fcCobro = periodo.fechaDeCobro
-    ? new Date(periodo.fechaDeCobro)
-    : null;
-  const cobrado = !!fcCobro && fcCobro.getFullYear() >= 1901;
-  const fechaCobro = fcCobro && cobrado ? dateTimeToString(fcCobro) : null;
-  // Totales de las jornadas cargadas: horas trabajadas (HH.MM → decimales),
-  // monto de esas horas y propina. Aplican sólo a la modalidad `horas_variables`
-  // (fijo/horas_fijas no cargan jornadas y `por_tarea` usa tareas), así que se
-  // ocultan en las otras modalidades para no mostrar ceros engañosos.
-  const esHoras = modalidad === "horas_variables";
-  const jornadas = periodo.jornadas ?? [];
-  const totalHoras = jornadas.reduce((suma, j) => suma + horasDeJornada(j), 0);
-  const montoHoras = jornadas.reduce((suma, j) => suma + (j.montoJornada || 0), 0);
-  const montoPropina = jornadas.reduce(
-    (suma, j) => suma + (j.montoPropina || 0),
-    0
-  );
+  const {
+    trabajo,
+    etiquetaItems,
+    items,
+    desde,
+    hasta,
+    fechaEst,
+    cobrado,
+    fechaCobro,
+    esHoras,
+    totalHoras,
+    montoHoras,
+    montoPropina,
+  } = datosPeriodo(periodo);
 
   return (
     <div className="mb-4 rounded-lg border border-border bg-card p-4">
@@ -233,6 +306,12 @@ export function PeriodoTrabajoDetalleClient({
     <ResumenPeriodo periodo={periodo} currency={currency} cobrable={cobrable} />
   );
 
+  // Cabecera que el PDF exporta arriba de la grilla (los datos del período).
+  const exportInfo = useMemo(
+    () => cabeceraPeriodo(periodo, currency),
+    [periodo, currency]
+  );
+
   // Jornadas/tareas del período (order cronológico para mostrarlas).
   const jornadas = useMemo(
     () =>
@@ -360,6 +439,7 @@ export function PeriodoTrabajoDetalleClient({
         showSearch={editable}
         backHref={backHref}
         topContent={summary}
+        exportInfo={exportInfo}
         emptyMessage="No hay jornadas en este período todavía."
         mobileHint={editable ? "Tocá una jornada para seleccionarla" : undefined}
       />
@@ -388,6 +468,7 @@ export function PeriodoTrabajoDetalleClient({
         showSearch={editable}
         backHref={backHref}
         topContent={summary}
+        exportInfo={exportInfo}
         emptyMessage="No hay tareas en este período todavía."
         mobileHint={editable ? "Tocá una tarea para seleccionarla" : undefined}
       />

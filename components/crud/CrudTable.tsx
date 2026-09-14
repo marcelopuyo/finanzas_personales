@@ -43,6 +43,13 @@ interface CrudTableProps<T, TId = number> {
   backHref?: string;
   /** ISO 4217 para formatear columnas currency en la exportación PDF (default ARS). */
   currency?: string;
+  /** Filas por página de la grilla (mobile y desktop). Default 10. */
+  rowsPerPage?: number;
+  /** Filas "label: valor" que se exportan al PDF **arriba de la grilla** (debajo
+      del título). Sirve para que el PDF lleve la CABECERA del contexto y no sólo
+      la grilla (p. ej. los datos del período de trabajo: trabajo, rango de
+      fechas, estado, horas, total a cobrar). */
+  exportInfo?: { label: string; value: string }[];
   /** Modo mobile con barra inferior de acciones + FAB central (lg:hidden). En
       <lg la grilla muestra solo las columnas de datos; la fila se selecciona
       tocándola (queda resaltada) y Exportar/Editar/Eliminar/Nuevo viven en la
@@ -140,6 +147,8 @@ export function CrudTable<T, TId = number>({
   searchPredicate,
   backHref,
   currency = "ARS",
+  rowsPerPage = 10,
+  exportInfo,
   mobileBottomNav = false,
   mobileHint,
   mobileSwipe,
@@ -351,8 +360,29 @@ export function CrudTable<T, TId = number>({
     doc.setFontSize(14);
     doc.text(title, 14, 16);
 
+    // Cabecera del contexto (opcional): "label: valor" en 2 columnas, arriba de
+    // la grilla. Se compone con el MISMO autoTable, sin encabezado ni bordes.
+    let startY = 22;
+    if (exportInfo && exportInfo.length > 0) {
+      autoTable(doc, {
+        startY,
+        body: exportInfo.map((f) => [f.label, f.value]),
+        theme: "plain",
+        styles: { fontSize: 9, cellPadding: 0.7 },
+        columnStyles: {
+          0: { textColor: [110, 117, 130], cellWidth: 42 },
+          1: { fontStyle: "bold", textColor: [33, 37, 41] },
+        },
+        margin: { left: 14, right: 14 },
+      });
+      const ultimo = (
+        doc as unknown as { lastAutoTable?: { finalY?: number } }
+      ).lastAutoTable;
+      startY = (ultimo?.finalY ?? startY) + 5;
+    }
+
     autoTable(doc, {
-      startY: 22,
+      startY,
       head: [exportCols.map((c) => c.header)],
       body,
       styles: { fontSize: 9, cellPadding: 2 },
@@ -585,11 +615,12 @@ export function CrudTable<T, TId = number>({
             onRowTap={swipeMode ? swipeRowTap : undefined}
             width={mobileSwipe?.width}
           >
-            <div className="rounded-lg border border-border bg-card p-4">
+            <div className="rounded-lg border border-border bg-card p-3">
               <DataTable
                 columns={mobileColumns}
                 data={filtered}
-                pageSize={10}
+                pageSize={rowsPerPage}
+                dense
                 getRowId={(row) => String(getId(row))}
                 // El tinte por estado va primero: así el resaltado de la fila
                 // seleccionada (bg-primary) gana cuando hay una selección.
@@ -654,7 +685,7 @@ export function CrudTable<T, TId = number>({
           <DataTable
             columns={allColumns}
             data={filtered}
-            pageSize={10}
+            pageSize={rowsPerPage}
             // Row key estable por id real (evita que los switches/estado de cada
             // fila "salten" a otra cuenta si el orden de los datos cambia).
             getRowId={(row) => String(getId(row))}

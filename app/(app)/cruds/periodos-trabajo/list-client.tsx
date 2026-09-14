@@ -339,6 +339,9 @@ export function PeriodosTrabajoListClient({
       }
       initialData={dataGrilla}
       currency={currency}
+      // 5 filas por página (decisión del usuario 2026-09-13): con 10 la grilla
+      // mobile quedaba demasiado alta.
+      rowsPerPage={5}
       // Color de la FUENTE por estado (decisión 2026-09-13): verde = por cobrar,
       // rojo = en curso, sin color = cobrados. En la vista "Finalizados"
       // (soloCobrados) todas las filas están cobradas, así que no se pinta ninguna.

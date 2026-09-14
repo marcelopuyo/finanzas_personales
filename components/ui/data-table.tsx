@@ -43,6 +43,11 @@ interface DataTableProps<TData, TValue> {
   onRowClick?: (originalRow: TData) => void;
   /** Orden inicial de la tabla, p. ej. `[{ id: "periodo", desc: true }]`. */
   initialSorting?: SortingState;
+  /** Variante COMPACTA para las grillas mobile: `px-1.5` en vez de `px-3` (el
+      ancho del celular es escaso: a 320px una tabla de 3 columnas con fechas y
+      montos no entraba por el padding lateral) y tipografía de 12px. Solo
+      cambia el estilo, no el comportamiento. */
+  dense?: boolean;
 }
 
 /**
@@ -58,9 +63,12 @@ export function DataTable<TData, TValue>({
   rowClassName,
   onRowClick,
   initialSorting,
+  dense = false,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>(initialSorting ?? []);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize });
+  // Padding lateral de las celdas: compacto en las grillas mobile.
+  const cellPad = dense ? "px-1.5 py-2" : "px-3 py-2.5";
 
   const table = useReactTable({
     data,
@@ -88,7 +96,12 @@ export function DataTable<TData, TValue>({
   return (
     <>
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-[13px]">
+        <table
+          className={cn(
+            "w-full border-collapse",
+            dense ? "text-[12px]" : "text-[13px]"
+          )}
+        >
           <thead>
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id} className="border-b border-border">
@@ -102,7 +115,8 @@ export function DataTable<TData, TValue>({
                     <th
                       key={header.id}
                       className={cn(
-                        "whitespace-nowrap px-3 py-2.5 font-medium text-subtitle",
+                        "whitespace-nowrap font-medium text-subtitle",
+                        cellPad,
                         alignClass(meta?.align)
                       )}
                     >
@@ -162,7 +176,8 @@ export function DataTable<TData, TValue>({
                     <td
                       key={cell.id}
                       className={cn(
-                        "px-3 py-2.5 text-card-foreground",
+                        "text-card-foreground",
+                        cellPad,
                         alignClass(meta?.align)
                       )}
                     >
@@ -188,7 +203,8 @@ export function DataTable<TData, TValue>({
                       <td
                         key={footer.id}
                         className={cn(
-                          "border-t border-border bg-muted/40 px-3 py-2.5 font-medium text-card-foreground",
+                          "border-t border-border bg-muted/40 font-medium text-card-foreground",
+                          cellPad,
                           alignClass(meta?.align)
                         )}
                       >
