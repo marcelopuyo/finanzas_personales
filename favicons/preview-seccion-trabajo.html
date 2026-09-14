@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Sección "Trabajo" sin tarjetas — alternativas de diseño</title>
+<style>
+  :root{
+    /* Paleta dark real de la app (app/globals.css) */
+    --bg:#151517; --panel:#1b1b1c; --card:#353638; --muted:#1e1e20;
+    --border:#3e3f42; --primary:#4c6ef5; --success:#51cf66;
+    --label:#9a9b9e; --value:#fff; --subtitle:#808185; --header:#fff;
+    --text:#e2e4f0; --danger:#ff6b6b; --warn:#fcc419;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);padding:32px 20px 72px;
+       font-family:Inter,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif}
+  .wrap{max-width:1000px;margin:0 auto;min-width:0}
+  h1{font-size:20px;font-weight:600;margin:0 0 6px;letter-spacing:-.01em;color:var(--header)}
+  .sub{color:var(--subtitle);font-size:13px;margin:0 0 4px;line-height:1.7}
+  h2{font-size:15px;font-weight:600;margin:44px 0 6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--header)}
+  .tag{display:inline-flex;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);color:var(--subtitle);font-weight:400}
+  .tag.rec{border-color:rgba(76,110,245,.55);background:rgba(76,110,245,.12);color:#9db2ff}
+  .desc{font-size:12.5px;color:var(--subtitle);margin:0 0 14px;line-height:1.7;max-width:760px}
+  .frames{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap;min-width:0}
+
+  /* Marco de celular / desktop */
+  .phone{width:380px;max-width:100%;flex:0 1 380px;min-width:0;background:var(--bg);border:1px solid var(--border);border-radius:16px;padding:12px;position:relative}
+  .phone::after{content:"360–390px";position:absolute;top:-9px;left:12px;font-size:10px;color:var(--subtitle);background:var(--bg);padding:0 6px}
+  .desk{width:100%;max-width:940px;flex:1 1 100%;min-width:0;background:var(--bg);border:1px solid var(--border);border-radius:16px;padding:14px;position:relative}
+  .desk::after{content:"desktop";position:absolute;top:-9px;left:12px;font-size:10px;color:var(--subtitle);background:var(--bg);padding:0 6px}
+
+  /* Panel (el mismo contenedor que usa hoy el panel Trabajo) */
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+  .panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}
+  .panel-title{font-size:16px;font-weight:600;color:var(--header)}
+  .dots{color:var(--subtitle);font-size:18px;line-height:1;letter-spacing:1px}
+
+  /* Sub-encabezado de bloque */
+  .blk{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:2px 0 2px}
+  .blk-t{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--subtitle);font-weight:600}
+  .blk-v{font-size:13px;font-weight:600;color:var(--value)}
+
+  /* Filas de período */
+  .row{display:flex;align-items:center;justify-content:space-between;gap:12px;
+       padding:10px 2px;border-top:1px solid rgba(62,63,66,.7);cursor:pointer}
+  .row:hover{background:rgba(255,255,255,.02)}
+  .row:first-of-type{border-top:0}
+  .r-main{min-width:0}
+  .r-name{font-size:13.5px;font-weight:500;color:var(--header);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .r-sub{font-size:11.5px;color:var(--subtitle);margin-top:1px}
+  .r-amt{font-size:13.5px;font-weight:600;color:var(--value);white-space:nowrap}
+  .r-amt.dim{color:var(--subtitle);font-weight:500}
+
+  .foot{margin-top:12px;padding-top:10px;border-top:1px solid var(--border);
+        font-size:12.5px;color:#9db2ff;display:flex;justify-content:space-between;align-items:center}
+  .foot .mut{color:var(--subtitle)}
+
+  /* Chip de estado (alternativa B) */
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;letter-spacing:.04em;
+        text-transform:uppercase;padding:2px 7px;border-radius:999px;border:1px solid var(--border);color:var(--subtitle)}
+  .chip.cobrar{border-color:rgba(81,207,102,.45);background:rgba(81,207,102,.10);color:#8ce49d}
+  .chip.curso{border-color:rgba(255,107,107,.45);background:rgba(255,107,107,.10);color:#ff9b9b}
+  .chip-row{display:flex;align-items:center;gap:9px;min-width:0}
+
+  /* Totales en línea (B) */
+  .totline{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--subtitle);margin:0 0 6px}
+  .totline b{color:var(--value);font-weight:600}
+
+  /* Encabezado de columnas (C) */
+  .cols{display:flex;align-items:center;gap:10px;font-size:11px;color:var(--subtitle);
+        text-transform:uppercase;letter-spacing:.06em;padding:0 2px 6px;border-bottom:1px solid var(--border)}
+  .c-name{flex:1;min-width:0}
+  .c-per{width:130px;text-align:left}
+  .c-amt{width:96px;text-align:right}
+  .sepgroup{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--subtitle);
+            font-weight:600;padding:12px 2px 4px}
+  .g-row{display:flex;align-items:center;gap:10px;padding:9px 2px;border-top:1px solid rgba(62,63,66,.55);cursor:pointer}
+  .g-row:hover{background:rgba(255,255,255,.02)}
+  .g-name{flex:1;min-width:0;font-size:13.5px;font-weight:500;color:var(--header);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .g-per{width:130px;font-size:12px;color:var(--subtitle);white-space:nowrap}
+  .g-amt{width:96px;text-align:right;font-size:13.5px;font-weight:600;color:var(--value);white-space:nowrap}
+  /* 2 columnas de filas en desktop */
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:0 26px;min-width:0}
+  @media (max-width:560px){
+    .twocol{grid-template-columns:1fr;gap:0}
+    .c-per,.g-per{width:96px}
+    .c-amt,.g-amt{width:82px}
+  }
+  .twocol .sepgroup{margin-top:0}
+
+  /* Segmentado (D) */
+  .seg{display:inline-flex;background:var(--muted);border:1px solid var(--border);border-radius:999px;padding:2px;gap:2px}
+  .seg span{font-size:12px;padding:4px 12px;border-radius:999px;color:var(--subtitle);white-space:nowrap}
+  .seg span.on{background:var(--card);color:var(--header);font-weight:600}
+  .badge-n{font-size:10px;opacity:.75}
+
+  .pros{margin:14px 0 0;font-size:12.5px;color:var(--subtitle);line-height:1.8;max-width:760px}
+  .pros b{color:var(--text)}
+  .pros .p{color:#8ce49d}
+  .pros .c{color:#ff9b9b}
+  .note{margin-top:46px;border-top:1px solid var(--border);padding-top:14px;font-size:12px;color:var(--subtitle);line-height:1.8}
+  code{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:11px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Sección "Trabajo" sin tarjetas — 4 alternativas</h1>
+  <p class="sub">Sólo <b>períodos en curso</b> y <b>por cobrar</b> listados dentro del panel, sin las 3 tarjetas sintéticas.</p>
+  <p class="sub">Los datos son los reales de hoy en dev: <b>En curso</b> US$ 5.973,45 (4 períodos) · <b>Por cobrar</b> US$ 3.625,54 (8 períodos, 2 páginas).</p>
+  <p class="sub" style="border-left:2px solid var(--primary);padding-left:10px"><b>✅ Implementada: alternativa B</b>, con dos ajustes posteriores: chips <b>verde = Por cobrar</b> / <b>rojo = En curso</b>, y <b>sin accesos al pie</b> (no hay “Ver todos” ni “Finalizados”; los totales del encabezado son solo resumen).</p>
+
+  <!-- ============================ A ============================ -->
+  <h2>A — Dos bloques con subtotal, filas tipo lista <span class="tag rec">recomendada</span></h2>
+  <p class="desc">Subencabezado "EN CURSO" / "POR COBRAR" con su subtotal a la derecha y, debajo, una fila por período (nombre + rango de fechas + monto). En desktop los dos bloques van lado a lado.</p>
+  <div class="frames">
+    <div class="phone">
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Trabajo</div><div class="dots">⋯</div></div>
+
+        <div class="blk"><div class="blk-t">En curso · 4</div><div class="blk-v">US$ 5.973,45</div></div>
+        <div class="row"><div class="r-main"><div class="r-name">QA Test - Por Tarea</div><div class="r-sub">01-09 al 30-09</div></div><div class="r-amt">US$ 423,45</div></div>
+        <div class="row"><div class="r-main"><div class="r-name">QA Test - Fijo</div><div class="r-sub">01-09 al 30-09</div></div><div class="r-amt">US$ 3.000,00</div></div>
+        <div class="row"><div class="r-main"><div class="r-name">TRT</div><div class="r-sub">01-09 al 30-09</div></div><div class="r-amt">US$ 1.000,00</div></div>
+
+        <div class="blk" style="margin-top:16px"><div class="blk-t">Por cobrar · 8</div><div class="blk-v">US$ 3.625,54</div></div>
+        <div class="row"><div class="r-main"><div class="r-name">Labado Autos</div><div class="r-sub">06-09 · est. cobro 12-09</div></div><div class="r-amt">US$ 200,00</div></div>
+        <div class="row"><div class="r-main"><div class="r-name">Duffys</div><div class="r-sub">25-07 al 07-08 · est. 15-08</div></div><div class="r-amt">US$ 818,99</div></div>
+        <div class="row"><div class="r-main"><div class="r-name">Movimiento Hotel</div><div class="r-sub">12-08 al 30-08 · est. 23-08</div></div><div class="r-amt">US$ 320,00</div></div>
+
+        <div class="foot"><span>Ver los 8 por cobrar →</span><span class="mut">Finalizados →</span></div>
+      </div>
+    </div>
+
+    <div class="desk">
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Trabajo</div><div class="dots">⋯</div></div>
+        <div class="twocol">
+          <div>
+            <div class="blk"><div class="blk-t">En curso · 4</div><div class="blk-v">US$ 5.973,45</div></div>
+            <div class="row"><div class="r-main"><div class="r-name">QA Test - Por Tarea</div><div class="r-sub">01-09 al 30-09</div></div><div class="r-amt">US$ 423,45</div></div>
+            <div class="row"><div class="r-main"><div class="r-name">QA Test - Fijo</div><div class="r-sub">01-09 al 30-09</div></div><div class="r-amt">US$ 3.000,00</div></div>
+            <div class="row"><div class="r-main"><div class="r-name">QA Test - Horas Fijas</div><div class="r-sub">01-09 al 30-09</div></div><div class="r-amt">US$ 1.550,00</div></div>
+            <div class="row"><div class="r-main"><div class="r-name">TRT</div><div class="r-sub">01-09 al 30-09</div></div><div class="r-amt">US$ 1.000,00</div></div>
+            <div class="row"><div class="r-main"><div class="r-name" style="color:var(--subtitle);font-weight:400">Ver todos →</div></div></div>
+          </div>
+          <div>
+            <div class="blk"><div class="blk-t">Por cobrar · 8</div><div class="blk-v">US$ 3.625,54</div></div>
+            <div class="row"><div class="r-main"><div class="r-name">Labado Autos</div><div class="r-sub">06-09 · est. cobro 12-09</div></div><div class="r-amt">US$ 200,00</div></div>
+            <div class="row"><div class="r-main"><div class="r-name">Duffys</div><div class="r-sub">25-07 al 07-08 · est. 15-08</div></div><div class="r-amt">US$ 818,99</div></div>
+            <div class="row"><div class="r-main"><div class="r-name">Movimiento Hotel</div><div class="r-sub">12-08 al 30-08 · est. 23-08</div></div><div class="r-amt">US$ 320,00</div></div>
+            <div class="row"><div class="r-main"><div class="r-name">Atlas</div><div class="r-sub">29-07 al 05-08 · est. 09-08</div></div><div class="r-amt">US$ 267,90</div></div>
+            <div class="row"><div class="r-main"><div class="r-name" style="color:var(--subtitle);font-weight:400">Ver todos →</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="pros"><span class="p">✔</span> Mantiene el agrupamiento actual (en curso / por cobrar) y los subtotales que hoy dan las tarjetas. <span class="p">✔</span> Muestra los períodos reales, no un número. <span class="p">✔</span> Desktop: los dos bloques entran lado a lado sin scroll. <span class="p">✔</span> Cada fila puede ser clicable → misma pantalla del período que abre hoy el popup. <span class="c">✘</span> Ocupa más alto que una tarjeta si hay muchos períodos (se puede cortar a "los 4 más próximos" + "Ver todos").</p>
+
+  <!-- ============================ B ============================ -->
+  <h2>B — Una sola lista cronológica con chip de estado</h2>
+  <p class="desc">Se pierden los bloques: todo va en una lista ordenada por urgencia (primero lo más viejo por cobrar, después lo que está en curso) y cada fila lleva un chip <b>POR COBRAR</b> / <b>EN CURSO</b>. Los totales van en una línea arriba del listado.</p>
+  <div class="frames">
+    <div class="phone">
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Trabajo</div><div class="dots">⋯</div></div>
+        <div class="totline"><span>Por cobrar <b>US$ 3.625,54</b></span><span>En curso <b>US$ 5.973,45</b></span></div>
+        <div class="row">
+          <div class="chip-row"><span class="chip cobrar">Por cobrar</span><div class="r-main"><div class="r-name">Duffys</div><div class="r-sub">25-07 al 07-08 · est. 15-08</div></div></div>
+          <div class="r-amt">US$ 818,99</div>
+        </div>
+        <div class="row">
+          <div class="chip-row"><span class="chip cobrar">Por cobrar</span><div class="r-main"><div class="r-name">Movimiento Hotel</div><div class="r-sub">12-08 al 30-08 · est. 23-08</div></div></div>
+          <div class="r-amt">US$ 320,00</div>
+        </div>
+        <div class="row">
+          <div class="chip-row"><span class="chip cobrar">Por cobrar</span><div class="r-main"><div class="r-name">Labado Autos</div><div class="r-sub">06-09 · est. cobro 12-09</div></div></div>
+          <div class="r-amt">US$ 200,00</div>
+        </div>
+        <div class="row">
+          <div class="chip-row"><span class="chip curso">En curso</span><div class="r-main"><div class="r-name">TRT</div><div class="r-sub">01-09 al 30-09</div></div></div>
+          <div class="r-amt">US$ 1.000,00</div>
+        </div>
+        <div class="row">
+          <div class="chip-row"><span class="chip curso">En curso</span><div class="r-main"><div class="r-name">QA Test - Fijo</div><div class="r-sub">01-09 al 30-09</div></div></div>
+          <div class="r-amt">US$ 3.000,00</div>
+        </div>
+        <div class="foot"><span>Ver todos →</span><span class="mut">Finalizados →</span></div>
+      </div>
+    </div>
+  </div>
+  <p class="pros"><span class="p">✔</span> Es la más compacta y la que menos estructura agrega (una lista, se reutiliza tal cual en mobile y desktop). <span class="p">✔</span> Prioriza por urgencia: lo viejo sin cobrar primero. <span class="c">✘</span> El ojo tiene que leer el chip en cada fila para saber el estado (hoy eso se ve de un golpe con las tarjetas). <span class="c">✘</span> Se pierde el "corte" visual en curso / por cobrar si hay muchos períodos mezclados.</p>
+
+  <!-- ============================ C ============================ -->
+  <h2>C — Grilla con encabezado de columnas</h2>
+  <p class="desc">Formato "tabla liviana": encabezado <b>Trabajo · Período · Monto</b> y grupos separados por un rótulo. En desktop las filas se reparten en 2 columnas.</p>
+  <div class="frames">
+    <div class="phone">
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Trabajo</div><div class="dots">⋯</div></div>
+        <div class="cols"><div class="c-name">Trabajo</div><div class="c-per">Período</div><div class="c-amt">Monto</div></div>
+        <div class="sepgroup">Por cobrar · US$ 3.625,54</div>
+        <div class="g-row"><div class="g-name">Labado Autos</div><div class="g-per">06-09</div><div class="g-amt">US$ 200,00</div></div>
+        <div class="g-row"><div class="g-name">Duffys</div><div class="g-per">25-07 al 07-08</div><div class="g-amt">US$ 818,99</div></div>
+        <div class="g-row"><div class="g-name">Movimiento Hotel</div><div class="g-per">12-08 al 30-08</div><div class="g-amt">US$ 320,00</div></div>
+        <div class="sepgroup">En curso · US$ 5.973,45</div>
+        <div class="g-row"><div class="g-name">TRT</div><div class="g-per">01-09 al 30-09</div><div class="g-amt">US$ 1.000,00</div></div>
+        <div class="g-row"><div class="g-name">QA Test - Fijo</div><div class="g-per">01-09 al 30-09</div><div class="g-amt">US$ 3.000,00</div></div>
+        <div class="foot"><span>Ver todos →</span><span class="mut">Finalizados →</span></div>
+      </div>
+    </div>
+  </div>
+  <p class="pros"><span class="p">✔</span> Alinea montos y fechas en columnas: se comparan de un vistazo. <span class="p">✔</span> Es lo más parecido al popup actual, así que la tabla ya está "resuelta" visualmente. <span class="c">✘</span> A 360–390px el nombre del trabajo se comprime (necesita truncado) y la fila queda cargada. <span class="c">✘</span> Un encabezado de columnas fijo para 2 grupos se siente más "sistema" que "resumen".</p>
+
+  <!-- ============================ D ============================ -->
+  <h2>D — Pestañas dentro del panel (segmented)</h2>
+  <p class="desc">Un control segmentado <b>En curso (4) / Por cobrar (8)</b> arriba y, debajo, la lista del que esté activo con su total. Sólo se muestra un grupo por vez.</p>
+  <div class="frames">
+    <div class="phone">
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Trabajo</div><div class="dots">⋯</div></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <div class="seg"><span class="on">En curso <span class="badge-n">4</span></span><span>Por cobrar <span class="badge-n">8</span></span></div>
+          <div class="blk-v">US$ 5.973,45</div>
+        </div>
+        <div style="margin-top:10px">
+          <div class="row"><div class="r-main"><div class="r-name">QA Test - Por Tarea</div><div class="r-sub">01-09 al 30-09 · por tarea</div></div><div class="r-amt">US$ 423,45</div></div>
+          <div class="row"><div class="r-main"><div class="r-name">QA Test - Fijo</div><div class="r-sub">01-09 al 30-09 · monto fijo</div></div><div class="r-amt">US$ 3.000,00</div></div>
+          <div class="row"><div class="r-main"><div class="r-name">TRT</div><div class="r-sub">01-09 al 30-09</div></div><div class="r-amt">US$ 1.000,00</div></div>
+        </div>
+        <div class="foot"><span>Ver todos →</span><span class="mut">Finalizados →</span></div>
+      </div>
+    </div>
+  </div>
+  <p class="pros"><span class="p">✔</span> La más compacta de las cuatro: el panel no crece aunque haya 20 períodos. <span class="p">✔</span> El total del grupo activo queda grande y visible. <span class="c">✘</span> Requiere un toque para ver el otro grupo (hoy las dos tarjetas se ven al mismo tiempo). <span class="c">✘</span> Es un control nuevo dentro del dashboard (hay que decidir si en desktop también se usa o si ahí se muestran los dos bloques).</p>
+
+  <div class="note">
+    <b>Notas comunes a las 4:</b>
+    <ul style="margin:6px 0 0 18px;padding:0">
+      <li>Se reutiliza el mismo contenedor del panel (<code>rounded-lg border bg-card p-4</code>) y la estética ya existente (nombre 16px semibold, filas 13,5px, montos en <code>text-value</code>).</li>
+      <li>"Finalizados" deja de ser tarjeta y pasa a ser un acceso en el pie del panel (o al menú ⋯ junto a "Gestionar trabajos").</li>
+      <li>Los períodos siguen abriendo la pantalla del período con <code>?origen=dashboard&amp;periodos=…</code> (el viaje de ida y vuelta ya funciona así desde los popups).</li>
+      <li>Las alternativas A, C y D pueden convivir: en mobile mostrar el grupo completo (A) y limitar a N filas en desktop, o pestañas (D) si se quiere algo muy compacto.</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

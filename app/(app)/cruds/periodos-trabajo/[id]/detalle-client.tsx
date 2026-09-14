@@ -39,6 +39,23 @@ function fechaHoraLocal(d: Date | string): string {
   )}:${pad(v.getMinutes())}`;
 }
 
+/** Horas decimales de una jornada. Convierte el formato HH.MM del backend
+    (ej. 17.3 = 17:30) a horas decimales con la MISMA fórmula que
+    `calcularMontoJornada` (backend/src/lib/jornadas.ts). */
+function horasDeJornada(j: JornadaTrabajoOut): number {
+  const aDecimal = (v: number) => ((v - Math.trunc(v)) * 100) / 60 + Math.trunc(v);
+  return Math.max(0, aDecimal(j.horaHasta) - aDecimal(j.horaDesde));
+}
+
+/** Horas decimales a "H:MM" (ej. 8.5 → "8:30"). */
+function horasATexto(horas: number): string {
+  const totalMinutos = Math.round(horas * 60);
+  return `${Math.floor(totalMinutos / 60)}:${String(totalMinutos % 60).padStart(
+    2,
+    "0"
+  )}`;
+}
+
 /** Resumen del período que va arriba de la grilla. */
 function ResumenPeriodo({
   periodo,
@@ -67,6 +84,18 @@ function ResumenPeriodo({
     : null;
   const cobrado = !!fcCobro && fcCobro.getFullYear() >= 1901;
   const fechaCobro = fcCobro && cobrado ? dateTimeToString(fcCobro) : null;
+  // Totales de las jornadas cargadas: horas trabajadas (HH.MM → decimales),
+  // monto de esas horas y propina. Aplican sólo a la modalidad `horas_variables`
+  // (fijo/horas_fijas no cargan jornadas y `por_tarea` usa tareas), así que se
+  // ocultan en las otras modalidades para no mostrar ceros engañosos.
+  const esHoras = modalidad === "horas_variables";
+  const jornadas = periodo.jornadas ?? [];
+  const totalHoras = jornadas.reduce((suma, j) => suma + horasDeJornada(j), 0);
+  const montoHoras = jornadas.reduce((suma, j) => suma + (j.montoJornada || 0), 0);
+  const montoPropina = jornadas.reduce(
+    (suma, j) => suma + (j.montoPropina || 0),
+    0
+  );
 
   return (
     <div className="mb-4 rounded-lg border border-border bg-card p-4">
@@ -111,12 +140,37 @@ function ResumenPeriodo({
           {etiquetaItems}:{" "}
           <span className="font-medium text-card-foreground">{items.length}</span>
         </span>
-        <span className="text-subtitle">
-          Fecha est. cobro:{" "}
-          <span className="font-medium text-card-foreground">
-            {fechaEst ?? "—"}
+        {esHoras && (
+          <>
+            <span className="text-subtitle">
+              Horas:{" "}
+              <span className="font-medium text-card-foreground">
+                {horasATexto(totalHoras)}
+              </span>
+            </span>
+            <span className="text-subtitle">
+              Monto de horas:{" "}
+              <span className="font-medium text-card-foreground">
+                {numberToCurrency(montoHoras, currency)}
+              </span>
+            </span>
+            <span className="text-subtitle">
+              Monto de propina:{" "}
+              <span className="font-medium text-card-foreground">
+                {numberToCurrency(montoPropina, currency)}
+              </span>
+            </span>
+          </>
+        )}
+        {/* La fecha estimada de cobro ya no aporta nada en un período cobrado. */}
+        {!cobrado && (
+          <span className="text-subtitle">
+            Fecha est. cobro:{" "}
+            <span className="font-medium text-card-foreground">
+              {fechaEst ?? "—"}
+            </span>
           </span>
-        </span>
+        )}
       </div>
 
       {/* Recuadro oscuro con el total (a cobrar o cobrado). */}

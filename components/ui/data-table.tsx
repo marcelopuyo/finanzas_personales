@@ -143,6 +143,10 @@ export function DataTable<TData, TValue>({
             {table.getRowModel().rows.map((row) => (
               <tr
                 key={row.id}
+                // Id de la fila en el DOM: lo usa el menú deslizante
+                // (`SwipeRowActions`) para resolver a qué registro pertenece la
+                // fila que se está arrastrando.
+                data-row-id={row.id}
                 onClick={onRowClick ? () => onRowClick(row.original) : undefined}
                 className={cn(
                   "border-b border-border last:border-0 transition-colors hover:bg-muted/40",

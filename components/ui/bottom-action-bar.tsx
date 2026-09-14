@@ -47,6 +47,32 @@ export function BottomActionBar({
   right = [],
   fabAction,
 }: BottomActionBarProps) {
+  /** Sin acciones (modo "swipe" en mobile) la barra NO se renderiza y queda solo
+      el FAB: va en el ángulo inferior DERECHO y un poco más chico (centrado y a
+      `top-0` del contenedor quedaba cortado por abajo). */
+  const hayAcciones = left.length + right.length > 0;
+
+  if (!hayAcciones) {
+    if (!fabAction?.onClick) return null;
+    return (
+      <div
+        className="fixed bottom-4 right-4 z-30 lg:hidden"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <button
+          type="button"
+          onClick={fabAction.onClick}
+          aria-label={fabAction.label ?? "Agregar"}
+          title={fabAction.label ?? "Nuevo"}
+          // Sin borde: el círculo va limpio (pedido del usuario 2026-09-13).
+          className="flex h-12 w-12 items-center justify-center rounded-full bg-header text-background shadow-lg transition-transform active:scale-95"
+        >
+          <Plus className="h-5 w-5" />
+        </button>
+      </div>
+    );
+  }
+
   const renderAction = (a: BottomBarAction) => {
     const Icon = a.icon;
     return (
@@ -76,7 +102,7 @@ export function BottomActionBar({
     >
       <div className="mx-auto max-w-md px-4">
         <div className="relative">
-          {/* Barra única y continua */}
+          {/* Barra única y continua (lado izquierdo / centro libre / lado derecho) */}
           <div className="flex h-14 items-stretch justify-between rounded-[26px] border border-border bg-sidebar shadow-lg">
             <div className="flex flex-1 items-center justify-around">
               {left.map(renderAction)}
@@ -87,14 +113,14 @@ export function BottomActionBar({
               {right.map(renderAction)}
             </div>
           </div>
-          {/* FAB centrado flotando sobre la barra */}
+          {/* FAB centrado flotando sobre la barra (sin borde: círculo limpio) */}
           {fabAction?.onClick && (
             <button
               type="button"
               onClick={fabAction.onClick}
               aria-label={fabAction.label ?? "Agregar"}
               title={fabAction.label ?? "Nuevo"}
-              className="absolute left-1/2 top-0 z-10 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-4 border-background bg-header text-background shadow-lg transition-transform active:scale-95"
+              className="absolute left-1/2 top-0 z-10 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-header text-background shadow-lg transition-transform active:scale-95"
             >
               <Plus className="h-6 w-6" />
             </button>

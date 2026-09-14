@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, FileDown, Pencil, Plus, Search, Trash2, type LucideIcon } from "lucide-react";
 import { BottomActionBar } from "@/components/ui/bottom-action-bar";
 import { DataTable } from "@/components/ui/data-table";
+import {
+  SwipeRowActions,
+  type SwipeRowAction,
+} from "@/components/crud/SwipeRowActions";
 import { Modal } from "@/components/ui/modal";
 import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
@@ -15,6 +19,11 @@ import { cn, numberToCurrency } from "@/lib/utils";
 interface CrudTableProps<T, TId = number> {
   title: string;
   columns: ColumnDef<T>[];
+  /** Columnas de la grilla MOBILE (`<lg`). Si no se pasan, la grilla mobile usa
+      `columns` (+ `trailingColumns`). Sirve para mostrar MENOS columnas en
+      mobile (p. ej. el CRUD de períodos, cuya tabla de 6 columnas desborda el
+      ancho del celular). En desktop siempre se usan `columns`. */
+  mobileColumns?: ColumnDef<T>[];
   /** Datos precargados desde Server Component (patrón recomendado). */
   initialData?: T[];
   /** Función de fetch legacy (opcional si se usa initialData). */
@@ -42,6 +51,21 @@ interface CrudTableProps<T, TId = number> {
   /** Texto opcional bajo el título en mobile (p. ej. "Tocá una fila para
       seleccionarla"). Solo aplica con mobileBottomNav. */
   mobileHint?: string;
+  /** Modo "swipe" mobile (`<lg`): reemplaza las opciones de la barra inferior
+      por un menú que se revela al deslizar la fila hacia la IZQUIERDA (estilo
+      WhatsApp) y hace que la fila NO se seleccione al tocarla. Requiere
+      `mobileBottomNav`. El FAB "Nuevo" se conserva (la barra desaparece). */
+  mobileSwipe?: {
+    /** Toque simple sobre una fila (el swipe NO lo dispara). */
+    onRowTap?: (id: TId) => void;
+    /** Acciones EXTRA por fila, que se agregan ANTES de Editar y Eliminar (esas
+        dos siempre están: "Eliminar" necesita abrir el modal de confirmación
+        que vive en `CrudTable`). Ej.: "Nueva jornada" en el CRUD de períodos. */
+    extraActions?: (id: TId) => SwipeRowAction[];
+    /** Ancho de la franja revelada, en px (default 148). Conviene subirlo cuando
+        hay 3+ acciones, para que las etiquetas entren. */
+    width?: number;
+  };
   /** Columnas extra que se agregan AL FINAL (después de Editar/Eliminar) en
       desktop y también en la grilla mobile (bottomNav). Útiles para acciones
       por fila contextuales (p. ej. "Pagar" un préstamo). */
@@ -87,6 +111,11 @@ interface CrudTableProps<T, TId = number> {
       "Préstamos (neto)" del CRUD de Cuentas): no se renderizan los botones de
       acción (se muestra "—") y la fila no se puede seleccionar en mobile. */
   isSyntheticRow?: (item: T) => boolean;
+  /** Clases extra por fila según el registro (p. ej. un tinte verde/rojo según
+      el estado del período). Se aplican tanto a la grilla mobile como a la
+      tabla desktop; en mobile el resaltado de la fila SELECCIONADA tiene
+      prioridad sobre el tinte. */
+  rowClassName?: (item: T) => string;
   /** Mensaje de la grilla cuando no hay datos (default "Sin datos disponibles"). */
   emptyMessage?: string;
 }
@@ -99,6 +128,7 @@ interface CrudTableProps<T, TId = number> {
 export function CrudTable<T, TId = number>({
   title,
   columns,
+  mobileColumns: mobileColumnsProp,
   fetchData,
   initialData,
   deleteItem,
@@ -112,6 +142,7 @@ export function CrudTable<T, TId = number>({
   currency = "ARS",
   mobileBottomNav = false,
   mobileHint,
+  mobileSwipe,
   trailingColumns = [],
   extraAction,
   mobilePrimaryAction,
@@ -119,6 +150,7 @@ export function CrudTable<T, TId = number>({
   topContent,
   showActions = true,
   isSyntheticRow,
+  rowClassName,
   emptyMessage = "Sin datos disponibles",
 }: CrudTableProps<T, TId>) {
   const router = useRouter();
@@ -237,10 +269,12 @@ export function CrudTable<T, TId = number>({
   );
 
   // Columnas de la grilla mobile (bottomNav): datos + columnas finales (sin la
-  // columna de acciones Editar/Eliminar, que viven en la barra inferior).
+  // columna de acciones Editar/Eliminar, que viven en el menú de la barra
+  // inferior o en el swipe). Si la vista pasa `mobileColumns`, se usan esas
+  // (permite un set REDUCIDO de columnas en mobile).
   const mobileColumns = useMemo<ColumnDef<T>[]>(
-    () => [...columns, ...trailingColumns],
-    [columns, trailingColumns]
+    () => [...(mobileColumnsProp ?? columns), ...trailingColumns],
+    [mobileColumnsProp, columns, trailingColumns]
   );
 
   const handleExportPdf = () => {
@@ -365,11 +399,44 @@ export function CrudTable<T, TId = number>({
         )}
         <h1 className="text-[20px] font-semibold text-header">{title}</h1>
       </div>
-      <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-muted px-2 text-[12px] font-semibold text-subtitle">
-        {filtered.length}
-      </span>
+      <div className="flex items-center gap-2">
+        <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-muted px-2 text-[12px] font-semibold text-subtitle">
+          {filtered.length}
+        </span>
+      </div>
     </div>
   );
+
+  // ── Modo "swipe" (mobile): acciones por fila + sin selección ──
+  // `data-row-id` (que agrega DataTable a cada <tr>) es el puente entre la fila
+  // del DOM y el registro: acá se resuelven las acciones de esa fila.
+  const swipeMode = mobileBottomNav && !!mobileSwipe;
+  const swipeActionsFor = (rowId: string): SwipeRowAction[] | null => {
+    if (!mobileSwipe) return null;
+    const item = filtered.find((i) => String(getId(i)) === rowId);
+    if (!item || isSyntheticRow?.(item)) return null;
+    const id = getId(item);
+    return [
+      // Acciones propias de la vista, primero.
+      ...(mobileSwipe.extraActions?.(id) ?? []),
+      {
+        key: "edit",
+        label: "Editar",
+        icon: Pencil,
+        onClick: () => router.push(editHref(id)),
+      },
+      {
+        key: "delete",
+        label: "Eliminar",
+        icon: Trash2,
+        onClick: () => setDeleteId(id),
+      },
+    ];
+  };
+  const swipeRowTap = (rowId: string) => {
+    const item = filtered.find((i) => String(getId(i)) === rowId);
+    if (item) mobileSwipe?.onRowTap?.(getId(item));
+  };
 
   // Barra inferior fija (<lg): componente reutilizable BottomActionBar con
   // Exportar (más `mobilePrimaryAction`/`extraAction` opcionales) a la
@@ -377,6 +444,14 @@ export function CrudTable<T, TId = number>({
   // fila) y FAB central "+". El estado (selección de fila) se mantiene acá y se
   // pasa como props/callbacks. Solo si hay acciones.
   const bottomBarEl = mobileBottomNav && showActions ? (
+    // Modo swipe: las acciones viven en el menú deslizante de cada fila, así que
+    // la barra queda SOLO con el FAB "Nuevo" (BottomActionBar sin acciones
+    // oculta la píldora y deja el FAB solo).
+    swipeMode ? (
+      <BottomActionBar
+        fabAction={{ label: "Nuevo", onClick: () => router.push(createHref) }}
+      />
+    ) : (
     <BottomActionBar
       left={[
         ...(mobilePrimaryAction
@@ -421,6 +496,7 @@ export function CrudTable<T, TId = number>({
       ]}
       fabAction={{ label: "Nuevo", onClick: () => router.push(createHref) }}
     />
+    )
   ) : null;
 
   // Toolbar de escritorio: buscador + acciones (Extra/Exportar/Nuevo). En las
@@ -487,7 +563,10 @@ export function CrudTable<T, TId = number>({
       className={cn(
         "mx-auto max-w-5xl px-4",
         mobileBottomNav && showActions
-          ? "py-6 pb-44 lg:py-8 lg:pb-8"
+          ? // En modo swipe no hay barra inferior: alcanza con despejar el FAB.
+            swipeMode
+            ? "py-6 pb-28 lg:py-8 lg:pb-8"
+            : "py-6 pb-44 lg:py-8 lg:pb-8"
           : "py-8"
       )}
     >
@@ -501,17 +580,31 @@ export function CrudTable<T, TId = number>({
           )}
           {/* En solo lectura (showActions=false) la grilla mobile no es
               interactiva: sin selección de fila ni resaltado. */}
-          <div className="rounded-lg border border-border bg-card p-4">
-            <DataTable
-              columns={mobileColumns}
-              data={filtered}
-              pageSize={10}
-              getRowId={(row) => String(getId(row))}
-              rowClassName={showActions ? selectedCls : undefined}
-              onRowClick={showActions ? toggleRow : undefined}
-              emptyMessage={emptyMessage}
-            />
-          </div>
+          <SwipeRowActions
+            actionsFor={swipeMode ? swipeActionsFor : undefined}
+            onRowTap={swipeMode ? swipeRowTap : undefined}
+            width={mobileSwipe?.width}
+          >
+            <div className="rounded-lg border border-border bg-card p-4">
+              <DataTable
+                columns={mobileColumns}
+                data={filtered}
+                pageSize={10}
+                getRowId={(row) => String(getId(row))}
+                // El tinte por estado va primero: así el resaltado de la fila
+                // seleccionada (bg-primary) gana cuando hay una selección.
+                rowClassName={(row) =>
+                  cn(rowClassName?.(row), showActions ? selectedCls(row) : "")
+                }
+                // En modo swipe la fila no se selecciona: el toque lo maneja
+                // SwipeRowActions (`onRowTap`).
+                onRowClick={
+                  swipeMode ? undefined : showActions ? toggleRow : undefined
+                }
+                emptyMessage={emptyMessage}
+              />
+            </div>
+          </SwipeRowActions>
         </div>
       )}
 
@@ -565,6 +658,7 @@ export function CrudTable<T, TId = number>({
             // Row key estable por id real (evita que los switches/estado de cada
             // fila "salten" a otra cuenta si el orden de los datos cambia).
             getRowId={(row) => String(getId(row))}
+            rowClassName={rowClassName}
             emptyMessage={emptyMessage}
           />
         )}
