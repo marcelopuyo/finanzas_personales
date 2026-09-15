@@ -253,7 +253,9 @@ export function PullToRefresh({
         aria-hidden
         className={cn(
           "pointer-events-none absolute left-1/2 -translate-x-1/2",
-          ios ? "top-3" : "top-14"
+          // Android: por debajo de la top bar, que en standalone crece con el
+          // safe-area (`--app-top`, el mismo offset que usa `app-layout.tsx`).
+          ios ? "top-3" : "top-[var(--app-top)]"
         )}
       >
         <div

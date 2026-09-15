@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, LayoutDashboard, LogOut, ShieldCheck } from "lucide-react";
+import { clearDataCaches } from "@/lib/pwa";
 import { cn } from "@/lib/utils";
 
 // Tabs del panel admin (accesos a los CRUDs administrados).
@@ -55,6 +56,9 @@ export default function AdminShell({
     } catch {
       /* ignora: se navega igual */
     } finally {
+      // PWA: borrar el HTML cacheado de las pantallas (contiene montos y nombres
+      // del usuario): sin sesión no debe quedar nada en el dispositivo.
+      await clearDataCaches();
       window.location.href = "/login";
     }
   }

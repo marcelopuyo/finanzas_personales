@@ -7,8 +7,10 @@ import { toast } from "sonner";
 import { useTheme } from "@/components/layout/theme-provider";
 import { Modal } from "@/components/ui/modal";
 import { Combobox } from "@/components/ui/combobox";
+import { InstallButton } from "@/components/pwa/install-button";
 import { cambiarPassword, actualizarMonedaPredeterminada } from "@/backend/src/actions/cuenta";
 import { NO_REMEMBER, PENDING_CLEAR } from "@/lib/session-flags";
+import { clearDataCaches } from "@/lib/pwa";
 import { cn } from "@/lib/utils";
 
 const inputCls =
@@ -73,6 +75,9 @@ export default function PerfilClient({
     } catch {
       /* ignora: se navega igual */
     } finally {
+      // PWA: borrar el HTML cacheado de las pantallas (contiene montos y nombres
+      // del usuario): sin sesión no debe quedar nada en el dispositivo.
+      await clearDataCaches();
       // Limpiar los flags de la sesión "no recordar" para que la guardia
       // no restaure la sesión tras el logout explícito.
       sessionStorage.removeItem(NO_REMEMBER);
@@ -205,6 +210,8 @@ export default function PerfilClient({
           >
             <KeyRound className="h-4 w-4" /> Cambiar contraseña
           </button>
+          {/* PWA: instalar la app en el dispositivo (se oculta si ya está instalada). */}
+          <InstallButton />
           {esAdmin && (
             <Link
               href="/admin"

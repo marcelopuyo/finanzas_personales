@@ -5,6 +5,7 @@ import "flag-icons/css/flag-icons.min.css";
 import ThemeProvider from "@/components/layout/theme-provider";
 import { ToasterProvider } from "@/components/layout/toaster";
 import { SessionGuard } from "@/components/auth/session-guard";
+import { SwRegister } from "@/components/pwa/sw-register";
 import { THEME_COOKIE } from "@/lib/theme";
 import "./globals.css";
 
@@ -32,15 +33,24 @@ export const metadata: Metadata = {
   // navegador en iOS y Android). El manifest vive en /app/manifest.ts y Next
   // lo enlaza automáticamente como <link rel="manifest">.
   manifest: "/manifest.webmanifest",
-  other: {
-    // Legacy de iOS: habilita el modo "app" al abrir desde el Home Screen.
-    "apple-mobile-web-app-capable": "yes",
+  // iOS: emite `mobile-web-app-capable` (estándar) + `apple-mobile-web-app-capable`
+  // (legacy), el nombre bajo el ícono (`apple-mobile-web-app-title`, hoy salía del
+  // <title>) y la barra de estado translúcida, que es la que permite el borde a
+  // borde controlado por safe-area (ver AppLayout/TopBar).
+  appleWebApp: {
+    capable: true,
+    title: "Finanzas",
+    statusBarStyle: "black-translucent",
   },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // PWA standalone: el contenido ocupa también las áreas seguras (notch y barra
+  // inferior). Sin esto iOS deja una banda muerta arriba; con esto, cada parte de
+  // la chrome suma su `env(safe-area-inset-*)` (top bar, bottom bar, FAB).
+  viewportFit: "cover",
   // Tema para la barra del navegador (Android) y el área de la barra de estado
   // en modo standalone (iOS), según el scheme del dispositivo.
   themeColor: [
@@ -91,6 +101,9 @@ export default async function RootLayout({
       <body className="min-h-full bg-background font-sans">
         <ThemeProvider>
           <SessionGuard />
+          {/* PWA: registra el service worker (solo producción) y avisa cuando hay
+              una versión nueva. No dibuja nada. */}
+          <SwRegister />
           {children}
           <ToasterProvider />
         </ThemeProvider>

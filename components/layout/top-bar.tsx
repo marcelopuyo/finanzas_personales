@@ -20,29 +20,38 @@ export default function TopBar({
   userLabel?: string;
 }) {
   return (
-    <header className="fixed top-0 right-0 left-0 z-50 flex h-14 items-center justify-between border-b border-border bg-sidebar px-4 sm:px-6">
-      <Link
-        href="/dashboard"
-        aria-label="Ir al resumen"
-        title="Resumen"
-        className="rounded-lg transition-opacity hover:opacity-90"
-      >
-        <Logo size={20} />
-      </Link>
-
-      <Link
-        href="/perfil"
-        aria-label={userLabel}
-        title={userLabel}
-        className="rounded-full transition-opacity hover:opacity-90"
-      >
-        <span
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#414346] text-[15px] font-semibold text-[#f0f1f2]"
-          style={{ width: 32, height: 32 }}
+    <header
+      className="fixed top-0 right-0 left-0 z-50 border-b border-border bg-sidebar"
+      // PWA standalone: con `viewport-fit: cover` el contenido pasa por debajo de
+      // la barra de estado / notch, así que el header crece con el safe-area y
+      // conserva sus 3.5rem (h-14) de contenido. El scroll compensa con el mismo
+      // valor en `app-layout.tsx`.
+      style={{ paddingTop: "env(safe-area-inset-top)" }}
+    >
+      <div className="flex h-14 items-center justify-between px-4 sm:px-6">
+        <Link
+          href="/dashboard"
+          aria-label="Ir al resumen"
+          title="Resumen"
+          className="rounded-lg transition-opacity hover:opacity-90"
         >
-          {initial}
-        </span>
-      </Link>
+          <Logo size={20} />
+        </Link>
+
+        <Link
+          href="/perfil"
+          aria-label={userLabel}
+          title={userLabel}
+          className="rounded-full transition-opacity hover:opacity-90"
+        >
+          <span
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#414346] text-[15px] font-semibold text-[#f0f1f2]"
+            style={{ width: 32, height: 32 }}
+          >
+            {initial}
+          </span>
+        </Link>
+      </div>
     </header>
   );
 }

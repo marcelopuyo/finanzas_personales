@@ -54,7 +54,12 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
+  // Los estáticos de la PWA quedan FUERA del guard (2026-09-14): al evaluar si
+  // la app es instalable, el navegador pide el manifest y los iconos (estos
+  // últimos SIN credenciales), así que si el proxy los redirige a /login la
+  // instalación falla de forma silenciosa. `/offline` también es público: se
+  // muestra justamente cuando no hay red para validar la sesión.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon\\.svg|icon\\.png|apple-icon\\.png).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon\\.svg|icon\\.png|apple-icon\\.png|manifest\\.webmanifest|sw\\.js|icons/|offline(?:$|/)).*)",
   ],
 };

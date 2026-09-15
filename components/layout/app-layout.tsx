@@ -1,6 +1,7 @@
 import TopBar from "./top-bar";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { NavProgress } from "@/components/ui/nav-progress";
+import { OfflineNotice } from "@/components/pwa/offline-notice";
 
 /**
  * Layout del área protegida de la app: una ÚNICA top bar fija (logo a la
@@ -21,15 +22,22 @@ export default function AppLayout({
   userLabel?: string;
 }) {
   return (
-    <div className="h-screen overflow-hidden bg-background">
+    <div className="h-dvh overflow-hidden bg-background">
       <TopBar initial={initial} userLabel={userLabel} />
       {/* Barra de progreso global de navegación (2026-09-14): se enciende con
           `startNav()`/`usePendingNav()` y se apaga al cambiar de ruta. */}
       <NavProgress />
       <PullToRefresh
         variant="android"
-        className="px-4 pt-14 pb-4 lg:px-6 lg:pb-6 lg:pt-14"
+        // El padding superior (`--app-top`, en globals.css) suma el safe-area: en
+        // standalone (PWA) la top bar es `fixed` y crece con
+        // `env(safe-area-inset-top)` para no quedar bajo el notch / la barra de
+        // estado (viewport-fit: cover).
+        className="px-4 pt-[var(--app-top)] pb-4 lg:px-6 lg:pb-6"
       >
+        {/* Aviso "sin conexión": es `sticky`, así que empuja el contenido solo
+            cuando está visible. */}
+        <OfflineNotice />
         {children}
       </PullToRefresh>
     </div>

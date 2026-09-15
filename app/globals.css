@@ -51,6 +51,11 @@
   --danger: #dc2626;
   --warning: #d97706;
 
+  /* PWA (standalone): alto de la top bar + área segura superior (notch / barra de
+     estado con viewport-fit: cover). Es el offset que compensan el scroll
+     (app-layout.tsx), el banner "sin conexión" y el indicador del pull-to-refresh. */
+  --app-top: calc(3.5rem + env(safe-area-inset-top));
+
   /* DeepSeek semantic tokens — Light */
   --sidebar: #ffffff;
   --sidebar-foreground: #1f2937;
