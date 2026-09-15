@@ -90,7 +90,11 @@ export function OfflineNotice() {
     <div className="sticky top-[var(--app-top)] z-30 -mx-4 mb-3 border-b border-warning/30 bg-background px-4 py-2 lg:-mx-6 lg:px-6">
       <p className="flex items-center gap-2 text-[12px] font-medium text-warning">
         <WifiOff className="h-3.5 w-3.5 shrink-0" />
-        Sin conexión · mostrando datos guardados
+        Sin conexión · estás viendo una versión guardada
+      </p>
+      <p className="mt-0.5 pl-[22px] text-[11px] leading-snug text-subtitle">
+        Solo lectura: no vas a poder guardar cambios hasta que se restablezca la
+        conexión.
       </p>
     </div>
   );

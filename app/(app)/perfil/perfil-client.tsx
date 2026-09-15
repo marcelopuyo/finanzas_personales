@@ -10,7 +10,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { InstallButton } from "@/components/pwa/install-button";
 import { cambiarPassword, actualizarMonedaPredeterminada } from "@/backend/src/actions/cuenta";
 import { NO_REMEMBER, PENDING_CLEAR } from "@/lib/session-flags";
-import { clearDataCaches } from "@/lib/pwa";
+import { clearAllCaches } from "@/lib/pwa";
 import { cn } from "@/lib/utils";
 
 const inputCls =
@@ -75,9 +75,9 @@ export default function PerfilClient({
     } catch {
       /* ignora: se navega igual */
     } finally {
-      // PWA: borrar el HTML cacheado de las pantallas (contiene montos y nombres
-      // del usuario): sin sesión no debe quedar nada en el dispositivo.
-      await clearDataCaches();
+      // PWA: el logout es VOLUNTARIO → se borra TODO el caché (documentos con
+      // montos y nombres incluidos) y no queda nada del usuario en el dispositivo.
+      await clearAllCaches();
       // Limpiar los flags de la sesión "no recordar" para que la guardia
       // no restaure la sesión tras el logout explícito.
       sessionStorage.removeItem(NO_REMEMBER);

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { toast } from "sonner";
-import { clearDataCaches, PWA_SW_URL, SW_MSG } from "@/lib/pwa";
+import { PWA_SW_URL, SW_MSG } from "@/lib/pwa";
 import { captureInstallPrompt } from "@/lib/pwa-install";
 
 /**
@@ -22,12 +22,6 @@ export function SwRegister() {
   useEffect(() => {
     // Captura global del prompt de instalación (el botón vive en Perfil).
     captureInstallPrompt();
-
-    // Si caemos en /login (logout, o el proxy mandó por sesión vencida) no debe
-    // quedar HTML con datos del usuario en el dispositivo.
-    if (window.location.pathname.startsWith("/login")) {
-      void clearDataCaches();
-    }
 
     if (!("serviceWorker" in navigator)) return;
 

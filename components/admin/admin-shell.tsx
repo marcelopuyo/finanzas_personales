@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, LayoutDashboard, LogOut, ShieldCheck } from "lucide-react";
-import { clearDataCaches } from "@/lib/pwa";
+import { RouteCache } from "@/components/pwa/route-cache";
+import { clearAllCaches } from "@/lib/pwa";
 import { cn } from "@/lib/utils";
 
 // Tabs del panel admin (accesos a los CRUDs administrados).
@@ -56,9 +57,9 @@ export default function AdminShell({
     } catch {
       /* ignora: se navega igual */
     } finally {
-      // PWA: borrar el HTML cacheado de las pantallas (contiene montos y nombres
-      // del usuario): sin sesión no debe quedar nada en el dispositivo.
-      await clearDataCaches();
+      // PWA: el logout es VOLUNTARIO → se borra TODO el caché (documentos con
+      // montos y nombres incluidos) y no queda nada del usuario en el dispositivo.
+      await clearAllCaches();
       window.location.href = "/login";
     }
   }
@@ -73,6 +74,9 @@ export default function AdminShell({
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      {/* PWA: guarda/refresca el documento de cada pantalla del panel admin para
+          poder verla sin conexión (el SW hace el fetch con la cookie de sesión). */}
+      <RouteCache />
       <header className="sticky top-0 z-40 border-b border-border bg-sidebar">
         <div className="flex h-14 items-center gap-3 px-4 lg:px-6">
           {/* Marca */}

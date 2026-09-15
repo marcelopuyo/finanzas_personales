@@ -38,8 +38,10 @@ export const SW_MSG = {
   servedFromCache: "fp:served-from-cache",
   /** Pestaña → SW: "¿este documento me lo serviste de la caché?". */
   amIFromCache: "fp:am-i-from-cache",
-  /** Pestaña → SW: borrar las cachés de datos (logout / sesión vencida). */
-  clearDataCaches: "fp:clear-data-caches",
+  /** Pestaña → SW: guardá/refrescá el documento de esta ruta (cada ingreso). */
+  cacheRoute: "fp:cache-route",
+  /** Pestaña → SW: borrar TODO el caché (logout explícito). */
+  clearAllCaches: "fp:clear-all-caches",
   /** Pestaña → SW: el usuario aceptó la versión nueva (el SW deja de esperar). */
   skipWaiting: "fp:skip-waiting",
 } as const;
@@ -62,29 +64,27 @@ export function isIOS(): boolean {
 }
 
 /**
- * Borra las cachés de DATOS (documentos con montos y nombres del usuario).
+ * Borra TODO el caché de la app (documentos con datos + estáticos) y pide al
+ * service worker que vuelva a precachear la base del modo offline (página de
+ * offline + iconos + manifest, que no contienen datos del usuario).
  *
- * Se llama en el logout y cuando la app cae en `/login` (sesión vencida): así
- * no queda información financiera en el dispositivo sin sesión, ni siquiera
- * offline. Los estáticos (chunks, fuentes, iconos) se conservan: no son datos
- * del usuario y permiten que la app siga arrancando rápido.
+ * Se llama SOLO en el **logout explícito** (decisión del usuario, 2026-09-15):
+ * cerrar sesión a mano debe dejar el dispositivo limpio. ⚠️ NO se llama al caer
+ * en `/login`, porque ahí se borraría la caché de quien solo dejó vencer la
+ * sesión y quiere poder abrir la app sin conexión.
  */
-export async function clearDataCaches(): Promise<void> {
+export async function clearAllCaches(): Promise<void> {
   if (typeof window === "undefined") return;
   try {
     if (typeof caches !== "undefined") {
       const keys = await caches.keys();
-      await Promise.all(
-        keys
-          .filter((key) => key.startsWith(PWA_DATA_CACHE_PREFIX))
-          .map((key) => caches.delete(key))
-      );
+      await Promise.all(keys.map((key) => caches.delete(key)));
     }
   } catch {
     /* la limpieza nunca debe romper el logout */
   }
-  // Avisar al SW para que descarte también lo que tenga en memoria.
+  // El SW además vuelve a precachear la base del modo offline.
   navigator.serviceWorker?.controller?.postMessage({
-    type: SW_MSG.clearDataCaches,
+    type: SW_MSG.clearAllCaches,
   });
 }

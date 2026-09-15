@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/backend/src/lib/auth";
 import AppLayout from "@/components/layout/app-layout";
+import { RouteCache } from "@/components/pwa/route-cache";
 
 // Layout del grupo protegido (app): si no hay sesión válida, redirige a /login.
 // Luego renderiza el AppLayout (top bar global con logo → Resumen y avatar →
@@ -18,6 +19,9 @@ export default async function ProtectedLayout({
 
   return (
     <AppLayout initial={initial} userLabel={userLabel}>
+      {/* PWA: guarda/refresca el documento de cada pantalla visitada para poder
+          verla sin conexión. Solo acá (área autenticada): /login nunca se cachea. */}
+      <RouteCache />
       {children}
     </AppLayout>
   );

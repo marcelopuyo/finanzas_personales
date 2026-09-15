@@ -12,8 +12,12 @@
  * - NAVEGACIONES (documentos) → network-first SIN timeout: si la red responde,
  *   siempre se ven datos frescos; la caché entra solo cuando la red falla.
  * - `/api/**` y POST (Server Actions) → red siempre, nunca caché.
- * - La caché de documentos (`fp-data-*`) se BORRA en el logout y al caer en
- *   `/login`: es HTML con montos y nombres del usuario.
+ * - Cada ingreso a una pantalla REFRESCA el documento guardado de esa ruta
+ *   (`fp:cache-route`, lo pide `RouteCache` en cada cambio de pantalla): el
+ *   snapshot offline es siempre el del ÚLTIMO ingreso, no el del primero.
+ * - La caché de documentos (`fp-data-*`) es HTML con montos y nombres del
+ *   usuario: se BORRA ENTERA en el logout explícito (decisión 2026-09-15).
+ *   ⚠️ NO se borra al caer en `/login` (ahí solo venció la sesión).
  * - Actualización: el SW nuevo queda en `waiting` hasta que el usuario acepta
  *   (la app muestra un toast con "Recargar"); al reabrir la app entra solo.
  */
@@ -24,8 +28,6 @@ const CACHE_PREFIX = "fp-";
 const ASSET_CACHE = `${CACHE_PREFIX}assets-${VERSION}`;
 const DATA_CACHE = `${CACHE_PREFIX}data-${VERSION}`;
 const META_CACHE = `${CACHE_PREFIX}meta-${VERSION}`;
-const DATA_PREFIX = `${CACHE_PREFIX}data-`;
-const META_PREFIX = `${CACHE_PREFIX}meta-`;
 
 /** Estáticos que se precachean al instalar (no tienen datos del usuario). */
 const PRECACHE = [
@@ -45,8 +47,17 @@ const PRECACHE = [
  */
 const PRECACHE_DOCS = ["/dashboard"];
 
-/** Tope de documentos cacheados (los más viejos se van descartando). */
-const DOCS_LIMIT = 30;
+/**
+ * Tope de documentos cacheados (los más viejos se van descartando). Se cuentan
+ * por URL completa, así que cada variante con filtros (`?estado=…`) es una
+ * entrada: el tope cubre de sobra todas las pantallas de la app.
+ */
+const DOCS_LIMIT = 60;
+/**
+ * Si el documento de una ruta se guardó hace menos que esto, `cache-route` no lo
+ * vuelve a pedir: acaba de guardarlo su propia navegación.
+ */
+const FRESH_MS = 10 * 1000;
 /** Vencimiento de un documento cacheado: 15 días. */
 const DOCS_TTL = 15 * 24 * 60 * 60 * 1000;
 /** Ruta de la página que se muestra cuando no hay red ni documento cacheado. */
@@ -55,7 +66,8 @@ const OFFLINE_URL = "/offline";
 // Mensajes (mismos valores que `SW_MSG` en `lib/pwa.ts`).
 const MSG_SERVED_FROM_CACHE = "fp:served-from-cache";
 const MSG_AM_I_FROM_CACHE = "fp:am-i-from-cache";
-const MSG_CLEAR_DATA_CACHES = "fp:clear-data-caches";
+const MSG_CACHE_ROUTE = "fp:cache-route";
+const MSG_CLEAR_ALL_CACHES = "fp:clear-all-caches";
 const MSG_SKIP_WAITING = "fp:skip-waiting";
 
 /**
@@ -278,18 +290,64 @@ async function readDocument(request) {
   const response = await cache.match(request);
   if (!response) return undefined;
 
-  const meta = await caches.open(META_CACHE);
-  const stamp = await meta.match(request.url);
-  const at = stamp ? Number(await stamp.text()) : 0;
+  const at = await documentTimestamp(request.url);
 
   // Sin marca de tiempo (o vencido) se descarta: mejor /offline que datos viejos.
-  if (!Number.isFinite(at) || at === 0 || Date.now() - at > DOCS_TTL) {
+  if (!at || Date.now() - at > DOCS_TTL) {
     await cache.delete(request);
+    const meta = await caches.open(META_CACHE);
     await meta.delete(request.url);
     return undefined;
   }
 
   return response;
+}
+
+/** Marca de tiempo (ms) del documento guardado para esa URL (0 = no hay). */
+async function documentTimestamp(href) {
+  const meta = await caches.open(META_CACHE);
+  const stamp = await meta.match(href);
+  const at = stamp ? Number(await stamp.text()) : 0;
+  return Number.isFinite(at) ? at : 0;
+}
+
+/**
+ * Guarda (o refresca) el documento de una ruta que la app está mostrando.
+ *
+ * Lo pide `RouteCache` en cada cambio de pantalla, así el snapshot offline es
+ * siempre el del ÚLTIMO ingreso. El fetch lo hace el SW (mismo origen ⇒ manda la
+ * cookie de sesión), por eso funciona aunque la navegación haya sido de cliente
+ * (RSC, sin petición de documento).
+ */
+async function cacheRoute(rawUrl) {
+  if (typeof rawUrl !== "string" || !rawUrl.startsWith("/")) return;
+
+  let url;
+  try {
+    url = new URL(rawUrl, self.location.origin);
+  } catch {
+    return;
+  }
+  if (url.origin !== self.location.origin) return;
+  // `?sw=` es el interruptor de QA del registro, no una ruta real.
+  url.searchParams.delete("sw");
+
+  // Si su propia navegación lo acaba de guardar, no hace falta re-pedirlo.
+  const at = await documentTimestamp(url.href);
+  if (at && Date.now() - at < FRESH_MS) return;
+
+  try {
+    const request = new Request(url.href, {
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+    const response = await fetch(request);
+    if (response.ok && response.type === "basic" && !response.redirected) {
+      await storeDocument(request, response.clone());
+    }
+  } catch {
+    /* sin red: se conserva el documento que ya estaba */
+  }
 }
 
 /** Descarta documentos vencidos y, si sobran, los más viejos hasta DOCS_LIMIT. */
@@ -336,9 +394,16 @@ self.addEventListener("message", (event) => {
     return;
   }
 
-  // Logout / sesión vencida: fuera todo el HTML con datos del usuario.
-  if (data.type === MSG_CLEAR_DATA_CACHES) {
-    event.waitUntil(clearData());
+  // La app avisa qué pantalla está mostrando: se guarda/refresca su documento.
+  if (data.type === MSG_CACHE_ROUTE) {
+    event.waitUntil(cacheRoute(data.url));
+    return;
+  }
+
+  // Logout explícito: fuera TODO lo cacheado y se vuelve a precachear la base
+  // del modo offline (página de offline + iconos, que no son datos del usuario).
+  if (data.type === MSG_CLEAR_ALL_CACHES) {
+    event.waitUntil(clearAllCaches());
     return;
   }
 
@@ -352,14 +417,16 @@ self.addEventListener("message", (event) => {
   }
 });
 
-async function clearData() {
+/** Borra TODO el caché de la app y deja lista la base del modo offline. */
+async function clearAllCaches() {
   const keys = await caches.keys();
   await Promise.all(
     keys
-      .filter(
-        (key) => key.startsWith(DATA_PREFIX) || key.startsWith(META_PREFIX)
-      )
+      .filter((key) => key.startsWith(CACHE_PREFIX))
       .map((key) => caches.delete(key))
   );
   servedFromCache.clear();
+  // `/dashboard` no se precachea acá: al salir ya no hay sesión (el fetch
+  // redirige a /login y se descarta solo).
+  await precache();
 }
