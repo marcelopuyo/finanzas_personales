@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Fingerprint } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { NO_REMEMBER, PENDING_CLEAR } from "@/lib/session-flags";
-import { biometriaDisponible, entrarConBiometria } from "@/lib/webauthn-client";
+import { entrarConBiometria, estadoBiometria } from "@/lib/webauthn-client";
 
 const inputCls =
   "w-full rounded-md border border-border bg-card px-3 py-2 text-[13px] text-card-foreground placeholder:text-subtitle focus:outline-none focus:ring-2 focus:ring-primary/40";
@@ -32,8 +32,11 @@ export default function LoginClient({
   const [error, setError] = useState(errorParam === "token-invalido" ? "Token de verificación inválido o expirado" : "");
   const [loading, setLoading] = useState(false);
 
-  // Login con biometría (WebAuthn/passkeys).
-  const [biometria, setBiometria] = useState(false);
+  // Login con biometría (WebAuthn/passkeys). `webAuthn` = la ceremonia se puede
+  // intentar (HTTPS + API); NO se exige que el sistema reporte biometría, porque
+  // en iPhone eso da false si el usuario no tiene gestor de llaves configurado y
+  // igual la ceremonia funciona.
+  const [webAuthn, setWebAuthn] = useState(false);
   const [loadingBiometria, setLoadingBiometria] = useState(false);
   const [errorBiometria, setErrorBiometria] = useState("");
 
@@ -41,8 +44,8 @@ export default function LoginClient({
   // servidor). Si no puede, el botón no se muestra y queda el login normal.
   useEffect(() => {
     let cancelado = false;
-    void biometriaDisponible().then((ok) => {
-      if (!cancelado) setBiometria(ok);
+    void estadoBiometria().then((e) => {
+      if (!cancelado) setWebAuthn(e.puedeIntentar);
     });
     return () => {
       cancelado = true;
@@ -175,7 +178,7 @@ export default function LoginClient({
             ya tiene una passkey activada (`passkeyEnDispositivo`, que resuelve
             el servidor) y si el equipo ofrece biometría: así el primer login de
             un dispositivo nuevo es siempre con contraseña. */}
-        {passkeyEnDispositivo && biometria && (
+        {passkeyEnDispositivo && webAuthn && (
           <div className="mt-4">
             <div className="flex items-center gap-3">
               <span className="h-px flex-1 bg-border" />

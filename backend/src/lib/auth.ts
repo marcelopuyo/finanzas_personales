@@ -69,13 +69,21 @@ export async function verifyShortToken<T = Record<string, unknown>>(
   }
 }
 
-/** Firma un JWT con el userId en el subject. */
+/**
+ * Firma un JWT con el userId en el subject.
+ *
+ * `remember` viaja DENTRO del token: el cliente necesita saber si la sesión debe
+ * morir con la pestaña (`false`) o sobrevivir al cierre de la app (`true`), y no
+ * alcanza con mirar la cookie — iOS y las PWA conservan cookies "de sesión" entre
+ * cierres (ver `getSessionKind`).
+ */
 export async function signToken(
   userId: number,
   scope: TokenScope = "access",
-  expiresIn?: string
+  expiresIn?: string,
+  remember = false
 ): Promise<string> {
-  return new SignJWT({ scope })
+  return new SignJWT({ scope, recordar: remember })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(String(userId))
     .setIssuedAt()
@@ -86,13 +94,15 @@ export async function signToken(
 /** Verifica un JWT y devuelve el payload, o null si es inválido/expirado. */
 export async function verifyToken(
   token: string
-): Promise<{ userId: number; scope: TokenScope } | null> {
+): Promise<{ userId: number; scope: TokenScope; remember: boolean } | null> {
   try {
     const { payload } = await jwtVerify(token, getSecret());
     const userId = Number(payload.sub);
     const scope = (payload.scope as TokenScope) ?? "access";
     if (!Number.isFinite(userId)) return null;
-    return { userId, scope };
+    // Los tokens emitidos antes de este cambio no traen el claim: se asumen
+    // persistentes, para no cerrar sesiones "recordar" al actualizar.
+    return { userId, scope, remember: payload.recordar !== false };
   } catch {
     return null;
   }
@@ -155,7 +165,7 @@ export async function setAuthCookie(
   userId: number,
   remember = false
 ): Promise<void> {
-  const token = await signToken(userId, "access", remember ? "30d" : "24h");
+  const token = await signToken(userId, "access", remember ? "30d" : "24h", remember);
   const store = await cookies();
   store.set(COOKIE_NAME, token, {
     httpOnly: true,
@@ -164,6 +174,27 @@ export async function setAuthCookie(
     path: "/",
     ...(remember ? { maxAge: REMEMBER_MAX_AGE_SECONDS } : {}),
   });
+}
+
+/**
+ * Tipo de la sesión actual: `temporal` (sin "mantener la sesión"), `persistente`
+ * (con "mantener la sesión") o `none`.
+ *
+ * Lo consulta `SessionGuard` en cada arranque. Es imprescindible porque el
+ * navegador no alcanza para decidir: **iOS (y las PWAs instaladas) conservan las
+ * cookies de sesión entre cierres**, así que una sesión "no recordar" puede
+ * reaparecer en un arranque nuevo y dejar entrar sin contraseña ni biometría.
+ */
+export async function getSessionKind(): Promise<
+  "none" | "temporal" | "persistente"
+> {
+  const store = await cookies();
+  const token = store.get(COOKIE_NAME)?.value;
+  if (!token) return "none";
+
+  const payload = await verifyToken(token);
+  if (!payload || payload.scope !== "access") return "none";
+  return payload.remember ? "persistente" : "temporal";
 }
 
 /** Elimina la cookie de sesión (logout). */

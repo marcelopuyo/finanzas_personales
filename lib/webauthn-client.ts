@@ -15,15 +15,166 @@ export interface ResultadoBiometria {
   error?: string;
 }
 
-/** ¿El dispositivo ofrece biometría (huella/Face ID/Windows Hello)? */
-export async function biometriaDisponible(): Promise<boolean> {
-  if (typeof window === "undefined" || !("PublicKeyCredential" in window)) {
-    return false;
+/** Por qué el dispositivo (no) puede usar biometría. */
+export type MotivoBiometria =
+  | "ok"
+  | "sin-ventana" // SSR: todavía no hay `window`
+  | "insegura" // HTTP: WebAuthn exige contexto seguro
+  | "sin-api" // el navegador no expone WebAuthn
+  | "sin-metodo" // existe la API pero no la comprobación
+  | "sin-respuesta" // la comprobación no respondió (timeout)
+  | "error" // la comprobación tiró una excepción
+  | "no-disponible"; // el sistema no reporta autenticador con biometría
+
+export interface EstadoBiometria {
+  /** true solo si el sistema confirmó que hay biometría usable. */
+  soportado: boolean;
+  /**
+   * La API existe y el contexto es seguro ⇒ **la ceremonia se puede intentar**.
+   *
+   * Es lo que gobierna el botón "Activar": `isUserVerifyingPlatformAuthenticator`
+   * es solo un PISTA. En iPhone devuelve `false` si el usuario no tiene un gestor
+   * de llaves de acceso configurado (llavero de iCloud apagado, o un gestor de
+   * terceros) **aunque iOS después ofrezca administrarlas** y la creación
+   * termine funcionando. Con `soportado` como candado, esa persona no podía ni
+   * intentarlo.
+   */
+  puedeIntentar: boolean;
+  motivo: MotivoBiometria;
+  /** Mensaje del error original, si hubo. */
+  detalle?: string;
+  /**
+   * Línea de diagnóstico (para reportar problemas en dispositivos donde la
+   * comprobación falla): origen, contexto seguro, presencia de la API, resultado
+   * crudo, capacidades del cliente, modo standalone y user agent.
+   */
+  diagnostico: string;
+}
+
+/** El navegador no siempre contesta: si no lo hace en 3s, seguimos. */
+const TIMEOUT_MS = 3000;
+
+/** ¿Se puede intentar una ceremonia WebAuthn? (contexto seguro + API presente). */
+export function webAuthnUsable(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    window.isSecureContext === true &&
+    "PublicKeyCredential" in window &&
+    typeof navigator !== "undefined" &&
+    Boolean(navigator.credentials)
+  );
+}
+
+/**
+ * ¿El dispositivo ofrece biometría (huella/Face ID/Windows Hello)?
+ *
+ * Devuelve el MOTIVO además del resultado: en iPhone/Safari puede fallar por
+ * cosas muy distintas (falta HTTPS, WebView, Face ID sin llavero de iCloud…)
+ * y con un booleano no hay forma de saber cuál.
+ */
+export async function estadoBiometria(): Promise<EstadoBiometria> {
+  if (typeof window === "undefined") {
+    return {
+      soportado: false,
+      puedeIntentar: false,
+      motivo: "sin-ventana",
+      diagnostico: "sin window (SSR)",
+    };
   }
+
+  const hayApi = "PublicKeyCredential" in window;
+  const segmentos: string[] = [
+    window.location.origin,
+    `seguro:${window.isSecureContext}`,
+    `api:${hayApi}`,
+  ];
+
+  // Modo app instalada (en iOS, `standalone` es un caso aparte).
+  const standalone =
+    window.matchMedia?.("(display-mode: standalone)").matches ||
+    (navigator as unknown as { standalone?: boolean }).standalone === true;
+  segmentos.push(`standalone:${standalone ? "sí" : "no"}`);
+
+  if (!hayApi) {
+    return {
+      soportado: false,
+      puedeIntentar: false,
+      motivo: window.isSecureContext ? "sin-api" : "insegura",
+      diagnostico: [...segmentos, `ua:${navigator.userAgent}`].join(" · "),
+    };
+  }
+
+  const pkc = PublicKeyCredential as unknown as {
+    isUserVerifyingPlatformAuthenticatorAvailable?: () => Promise<boolean>;
+    getClientCapabilities?: () => Promise<Record<string, boolean>>;
+  };
+
+  if (typeof pkc.isUserVerifyingPlatformAuthenticatorAvailable !== "function") {
+    return {
+      soportado: false,
+      puedeIntentar: false,
+      motivo: "sin-metodo",
+      diagnostico: [...segmentos, `ua:${navigator.userAgent}`].join(" · "),
+    };
+  }
+
+  let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
-    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-  } catch {
-    return false;
+    const resultado = await Promise.race([
+      pkc.isUserVerifyingPlatformAuthenticatorAvailable(),
+      new Promise<"timeout">((resolve) => {
+        timeout = setTimeout(() => resolve("timeout"), TIMEOUT_MS);
+      }),
+    ]);
+
+    if (resultado === "timeout") {
+      return {
+        soportado: false,
+        puedeIntentar: true,
+        motivo: "sin-respuesta",
+        diagnostico: [...segmentos, "uvpa:sin-respuesta", `ua:${navigator.userAgent}`].join(" · "),
+      };
+    }
+
+    // Dato extra (Safari 17.4+): capacidades declaradas del cliente.
+    let caps = "n/d";
+    try {
+      if (typeof pkc.getClientCapabilities === "function") {
+        const c = await pkc.getClientCapabilities();
+        caps = `uvpa:${c?.userVerifyingPlatformAuthenticator ?? "?"}`;
+      }
+    } catch {
+      /* opcional */
+    }
+
+    return {
+      soportado: resultado === true,
+      puedeIntentar: true,
+      motivo: resultado === true ? "ok" : "no-disponible",
+      diagnostico: [
+        ...segmentos,
+        `uvpa:${resultado}`,
+        `caps:${caps}`,
+        `ua:${navigator.userAgent}`,
+      ].join(" · "),
+    };
+  } catch (error) {
+    const detalle = (error as Error)?.message ?? String(error);
+    const nombre = (error as Error)?.name ?? "";
+    const seguridad = nombre === "SecurityError";
+    return {
+      soportado: false,
+      puedeIntentar: !seguridad,
+      motivo: seguridad ? "insegura" : "error",
+      detalle: `${nombre}: ${detalle}`,
+      diagnostico: [
+        ...segmentos,
+        `uvpa:error(${nombre})`,
+        `ua:${navigator.userAgent}`,
+      ].join(" · "),
+    };
+  } finally {
+    if (timeout) clearTimeout(timeout);
   }
 }
 

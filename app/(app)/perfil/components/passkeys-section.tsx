@@ -11,7 +11,41 @@ import {
 } from "@/backend/src/actions/webauthn";
 import type { CredencialWebauthnOut } from "@/backend/src/queries/webauthn";
 import { dateToLocaleDateString } from "@/lib/utils";
-import { activarBiometria, biometriaDisponible } from "@/lib/webauthn-client";
+import { activarBiometria, estadoBiometria } from "@/lib/webauthn-client";
+import type { EstadoBiometria, MotivoBiometria } from "@/lib/webauthn-client";
+
+/**
+ * Texto según el MOTIVO por el que no se puede usar biometría. "No disponible"
+ * a secas es engañoso en iPhone (Face ID existe): casi siempre es el contexto,
+ * el navegador o la configuración del sistema.
+ */
+function mensajeDeBiometria(estado: EstadoBiometria | null): string {
+  if (!estado) return "Comprobando la biometría de este dispositivo...";
+
+  const sufijo = " Podés seguir entrando con tu contraseña.";
+  const mensajes: Record<MotivoBiometria, string> = {
+    ok: "",
+    "sin-ventana": "Comprobando la biometría de este dispositivo...",
+    insegura:
+      "La biometría necesita una conexión segura (HTTPS): el navegador la bloquea en páginas HTTP." +
+      sufijo,
+    "sin-api":
+      "Este navegador no expone la API de biometría (pasa en navegadores integrados dentro de otra app)." +
+      sufijo,
+    "sin-metodo":
+      "Este navegador no incluye la comprobación de biometría." + sufijo,
+    "sin-respuesta":
+      "El navegador no respondió a la comprobación de biometría." + sufijo,
+    error: `El navegador rechazó la comprobación de biometría${
+      estado.detalle ? ` (${estado.detalle})` : ""
+    }.` + sufijo,
+    "no-disponible":
+      "El sistema no reporta biometría disponible para este sitio (por ejemplo, Face ID/Touch ID sin el llavero de iCloud, o Windows Hello sin configurar)." +
+      sufijo,
+  };
+
+  return mensajes[estado.motivo];
+}
 
 /**
  * Sección "Acceso con biometría" de Perfil: lista las passkeys (una por
@@ -24,7 +58,7 @@ export function PasskeysSection({
   credenciales: CredencialWebauthnOut[];
 }) {
   const router = useRouter();
-  const [disponible, setDisponible] = useState(false);
+  const [estado, setEstado] = useState<EstadoBiometria | null>(null);
   const [activando, setActivando] = useState(false);
   const [aRevocar, setARevocar] = useState<CredencialWebauthnOut | null>(null);
   const [aRenombrar, setARenombrar] = useState<CredencialWebauthnOut | null>(null);
@@ -35,8 +69,8 @@ export function PasskeysSection({
   // del navegador, no existe en el servidor).
   useEffect(() => {
     let cancelado = false;
-    void biometriaDisponible().then((ok) => {
-      if (!cancelado) setDisponible(ok);
+    void estadoBiometria().then((e) => {
+      if (!cancelado) setEstado(e);
     });
     return () => {
       cancelado = true;
@@ -155,23 +189,45 @@ export function PasskeysSection({
           </p>
         )}
 
-        {/* Alta de ESTE dispositivo */}
+        {/* Alta de ESTE dispositivo. El botón se muestra si la ceremonia se
+            PUEDE intentar (HTTPS + API): que el sistema no reporte biometría
+            configurada no lo bloquea, porque el navegador puede ofrecer
+            administrar las llaves de acceso igual. */}
         <div className="mt-3">
-          {disponible ? (
-            <button
-              type="button"
-              onClick={handleActivar}
-              disabled={activando}
-              className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
-            >
-              <Fingerprint className="h-4 w-4" />
-              {activando ? "Activando..." : "Activar en este dispositivo"}
-            </button>
+          {estado?.puedeIntentar ? (
+            <>
+              <button
+                type="button"
+                onClick={handleActivar}
+                disabled={activando}
+                className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                <Fingerprint className="h-4 w-4" />
+                {activando ? "Activando..." : "Activar en este dispositivo"}
+              </button>
+              {!estado.soportado && (
+                <p className="mt-2 text-[11px] text-subtitle">
+                  El sistema no reporta biometría configurada para este sitio
+                  (suele ser el llavero de iCloud o el gestor de llaves de acceso
+                  apagado). Probá igual: si el navegador te ofrece{" "}
+                  <b>administrar tus llaves de acceso</b>, aceptá y volvé a
+                  intentar.
+                </p>
+              )}
+            </>
           ) : (
-            <p className="text-[11px] text-subtitle">
-              Este dispositivo no tiene biometría disponible (o el navegador no
-              la soporta). Podés seguir entrando con tu contraseña.
-            </p>
+            <>
+              <p className="text-[11px] text-subtitle">
+                {mensajeDeBiometria(estado)}
+              </p>
+              {/* Diagnóstico: sirve para reportar fallas en dispositivos donde la
+                  comprobación da "no disponible" (iPhone, WebView, etc.). */}
+              {estado && estado.motivo !== "sin-ventana" && (
+                <p className="mt-2 rounded-md bg-muted px-2 py-1.5 text-[10px] leading-4 break-all text-subtitle">
+                  {estado.diagnostico}
+                </p>
+              )}
+            </>
           )}
         </div>
       </section>
