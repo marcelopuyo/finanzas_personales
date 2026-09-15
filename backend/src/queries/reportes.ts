@@ -7,7 +7,6 @@ import { getPrestamosNetoEnPredeterminada } from "../lib/prestamos";
 import { Cuenta } from "../entities/cuenta.entity";
 import { Gasto } from "../entities/gasto.entity";
 import { HistoricoCuenta } from "../entities/historico-cuenta.entity";
-import { Movimiento } from "../entities/movimiento.entity";
 import { PeriodoTrabajo } from "../entities/periodo-trabajo.entity";
 import { Prestamo } from "../entities/prestamo.entity";
 
@@ -90,37 +89,50 @@ export async function getBalanceActual(): Promise<number> {
 // 2) [ELIMINADA] Gastos del período — dependía de periodo_gasto.
 // 3) [ELIMINADA] Evolución de gastos por período — idem.
 // La evolución de Gastos se calcula en el cliente por fecha de pago
-// (app/(app)/dashboard/gastos-agrupacion.ts); la mensual por movimientos
-// está en la sección 4) siguiente.
+// (app/(app)/dashboard/gastos-agrupacion.ts) y en el backend por la sección 4).
 // ============================================================
 
 // ============================================================
-// 4) Evolución de gastos mensual — desde MOVIMIENTOS (moneda predeterminada)
+// 4) Evolución de gastos mensual — desde la tabla `gasto`, por FECHA DE PAGO
 // ============================================================
-export async function getEvolucionGastosMovimientos(): Promise<EvolucionItem[]> {
+/**
+ * Gastos agrupados por MES DE `fechaPago` (en la moneda predeterminada, que es
+ * como se guarda `gasto.monto`).
+ *
+ * Fuente de verdad: la tabla `gasto` — la MISMA que usan el Histórico de Gastos
+ * del dashboard y el CRUD de gastos. Los gastos PENDIENTES (sin `fechaPago`)
+ * quedan fuera, igual que en el Histórico.
+ *
+ * ⚠️ Antes se armaba desde los MOVIMIENTOS de pago (`movimiento.gastoId`), lo que
+ * traía dos problemas (fix 2026-09-15, decisión del usuario):
+ * 1. Todo gasto cargado como histórico SIN movimiento de cuenta (p. ej. los meses
+ *    completados de ago/2025 a mar/2026) era invisible en "Resultados".
+ * 2. El mismo mes mostraba cifras DISTINTAS entre "Resultados" y el Histórico de
+ *    Gastos, porque `movimiento.monto` se convierte a la fecha de PAGO y
+ *    `gasto.monto` a la fecha de CREACIÓN (diferencias chicas de cotización).
+ */
+export async function getEvolucionGastos(): Promise<EvolucionItem[]> {
   const userId = await requireUserId();
   const ds = await getDb();
-  const movs = await ds.getRepository(Movimiento).find({
-    where: { cuenta: { usuario: { id: userId } }, eliminado: false },
-    relations: { gasto: true },
+  const gastos = await ds.getRepository(Gasto).find({
+    where: { usuario: { id: userId }, eliminado: false },
   });
 
+  // Se agrupa por "YYYY-MM" (ordenable) y se convierte a etiqueta al final.
   const agrupado: Record<string, number> = {};
-  for (const m of movs) {
-    // Solo movimientos de gasto (Pago Gasto / Gasto Directo). `monto` ya está
-    // en la moneda predeterminada del usuario (se convierte al guardarse),
-    // aunque el movimiento se haya hecho en otra moneda.
-    if (!m.gasto) continue;
-    // Se agrupa por el MES DEL MOVIMIENTO (fecha de pago): el período del gasto
-    // se corresponde con la fecha de pago (decisión 2026-08-10).
-    const d = new Date(m.fecha);
+  for (const g of gastos) {
+    if (!g.fechaPago) continue; // pendientes: fuera (mismo criterio que el Histórico)
+    // Mediodía UTC: evita que una fecha a medianoche UTC se corra al mes anterior
+    // en zonas horarias con offset negativo (misma técnica que las jornadas).
+    const d = new Date(g.fechaPago);
     d.setUTCHours(12, 0, 0, 0);
-    const mes = d.toLocaleDateString("es-ES", { month: "short" });
-    const key = `${mes}-${d.getFullYear()}`;
-    agrupado[key] = (agrupado[key] || 0) + m.monto;
+    const ym = ymDeFecha(d);
+    agrupado[ym] = (agrupado[ym] || 0) + g.monto;
   }
 
-  return Object.entries(agrupado).map(([periodo, monto]) => ({ periodo, monto }));
+  return Object.keys(agrupado)
+    .sort()
+    .map((ym) => ({ periodo: etiquetaDesdeYM(ym), monto: agrupado[ym] }));
 }
 
 // ============================================================
@@ -138,6 +150,20 @@ function pad2(n: number): string {
 function ymDeFecha(v: Date | string): string {
   const d = v instanceof Date ? v : new Date(v);
   return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}`;
+}
+
+/**
+ * Etiqueta "mes-año" (es-ES corto, ej. "sep-2026") de una clave "YYYY-MM".
+ * La usan IGUAL ingresos y gastos: `getEvolucionResultados` resta ambas series
+ * POR ETIQUETA, así que un formato distinto duplicaría los meses en el gráfico.
+ */
+function etiquetaDesdeYM(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  const mes = new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString("es-ES", {
+    month: "short",
+    timeZone: "UTC",
+  });
+  return `${mes}-${y}`;
 }
 
 /** "YYYY-MM-DD" del último día del mes representado por "YYYY-MM". */
@@ -246,15 +272,7 @@ export async function getEvolucionIngresos(): Promise<EvolucionItem[]> {
 
   return Object.keys(agrupado)
     .sort()
-    .map((ym) => {
-      const [y, m] = ym.split("-").map(Number);
-      // Etiqueta con el MISMO formato que usaban las jornadas (es-ES corto).
-      const mes = new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString("es-ES", {
-        month: "short",
-        timeZone: "UTC",
-      });
-      return { periodo: `${mes}-${y}`, monto: agrupado[ym] };
-    });
+    .map((ym) => ({ periodo: etiquetaDesdeYM(ym), monto: agrupado[ym] }));
 }
 
 // ============================================================
@@ -263,12 +281,11 @@ export async function getEvolucionIngresos(): Promise<EvolucionItem[]> {
 export async function getEvolucionResultados(): Promise<EvolucionResultado[]> {
   const [ingresos, gastos] = await Promise.all([
     getEvolucionIngresos(),
-    getEvolucionGastosMovimientos(),
+    getEvolucionGastos(),
   ]);
 
-  // Ingresos (jornadas) y gastos (movimientos de gasto) ya están en la moneda
-  // predeterminada del usuario (decisión 2026-08-10): las jornadas se cargan en
-  // esa moneda y `movimiento.monto` se convierte al guardarse.
+  // Ingresos (jornadas, en la moneda predeterminada) y gastos (por fecha de
+  // pago, `gasto.monto` ya está en esa moneda): se restan por mes.
   const resultado: Record<string, number> = {};
 
   for (const item of ingresos) {
@@ -278,8 +295,8 @@ export async function getEvolucionResultados(): Promise<EvolucionResultado[]> {
     resultado[item.periodo] = (resultado[item.periodo] || 0) - item.monto;
   }
 
-  // Se muestran TODOS los meses con movimiento (ingresos y/o gastos): un mes
-  // puede tener solo ingresos (sin gastos cargados todavía) y su resultado
+  // Se muestran TODOS los meses con datos (ingresos y/o gastos): un mes puede
+  // tener solo ingresos (sin gastos cargados todavía) y su resultado
   // (ingresos − gastos) igual debe verse. Antes solo se mostraban los meses con
   // gastos y se descartaban los que solo reflejaban ingresos (fix 2026-09-06:
   // se mostró el mes en curso sin gastos y el usuario pidió aplicar a todos).
