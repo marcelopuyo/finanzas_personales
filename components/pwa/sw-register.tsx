@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { PWA_SW_URL, SW_MSG } from "@/lib/pwa";
+import { APP_BUILD_ID, APP_VERSION } from "@/lib/version";
 import { captureInstallPrompt } from "@/lib/pwa-install";
 
 /**
@@ -48,12 +49,26 @@ export function SwRegister() {
 
     let cancelled = false;
 
+    // Avisarle al SW qué build está corriendo la app: si es distinto al suyo,
+    // descarta los documentos cacheados de la versión anterior. Sin controller
+    // (primera carga) el mensaje no llega a nadie: el SW ya se enteró al
+    // instalarse leyendo `/version.json`.
+    const avisarBuild = () => {
+      navigator.serviceWorker.controller?.postMessage({
+        type: SW_MSG.build,
+        buildId: APP_BUILD_ID,
+      });
+    };
+    avisarBuild();
+    navigator.serviceWorker.addEventListener("controllerchange", avisarBuild);
+
     void (async () => {
       try {
         const registration = await navigator.serviceWorker.register(PWA_SW_URL, {
           scope: "/",
         });
         if (cancelled) return;
+        avisarBuild();
 
         if (registration.waiting && navigator.serviceWorker.controller) {
           showUpdateToast(registration);
@@ -79,6 +94,7 @@ export function SwRegister() {
 
     return () => {
       cancelled = true;
+      navigator.serviceWorker.removeEventListener("controllerchange", avisarBuild);
     };
   }, []);
 
@@ -88,7 +104,7 @@ export function SwRegister() {
 function showUpdateToast(registration: ServiceWorkerRegistration) {
   toast("Nueva versión disponible", {
     id: "pwa-update",
-    description: "Recargá para actualizar la app.",
+    description: `Recargá para actualizar la app · estás en la ${APP_VERSION}.`,
     // Queda en pantalla hasta que el usuario decida (no se autodestruye).
     duration: Infinity,
     action: {

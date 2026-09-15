@@ -8,9 +8,12 @@ import { useTheme } from "@/components/layout/theme-provider";
 import { Modal } from "@/components/ui/modal";
 import { Combobox } from "@/components/ui/combobox";
 import { InstallButton } from "@/components/pwa/install-button";
+import { PasskeysSection } from "./components/passkeys-section";
 import { cambiarPassword, actualizarMonedaPredeterminada } from "@/backend/src/actions/cuenta";
+import type { CredencialWebauthnOut } from "@/backend/src/queries/webauthn";
 import { NO_REMEMBER, PENDING_CLEAR } from "@/lib/session-flags";
 import { clearAllCaches } from "@/lib/pwa";
+import { versionLabel } from "@/lib/version";
 import { cn } from "@/lib/utils";
 
 const inputCls =
@@ -27,6 +30,7 @@ export default function PerfilClient({
   initials,
   monedas,
   monedaPredeterminadaId,
+  credenciales,
 }: {
   nombre: string;
   email: string;
@@ -34,6 +38,7 @@ export default function PerfilClient({
   initials: string;
   monedas: { id: number; nombre: string; codigoISO: string; codigoPais: string | null }[];
   monedaPredeterminadaId: number;
+  credenciales: CredencialWebauthnOut[];
 }) {
   const { theme, setTheme } = useTheme();
   const [passOpen, setPassOpen] = useState(false);
@@ -201,6 +206,9 @@ export default function PerfilClient({
           </div>
         </section>
 
+        {/* Acceso con biometría (passkeys) */}
+        <PasskeysSection credenciales={credenciales} />
+
         {/* Opciones */}
         <section className="rounded-xl border border-border bg-card p-2">
           <button
@@ -231,6 +239,12 @@ export default function PerfilClient({
           </button>
         </section>
       </div>
+
+      {/* Versión instalada (soporte / saber si la PWA quedó vieja).
+          "v1.0.0 · a3f1c08 · 15/09/2026" */}
+      <p className="mt-6 text-center text-[11px] text-subtitle" title="Versión instalada">
+        Versión {versionLabel()}
+      </p>
 
       {/* Modal: cambio de contraseña */}
       <Modal open={passOpen} onClose={() => setPassOpen(false)} title="Cambiar contraseña">

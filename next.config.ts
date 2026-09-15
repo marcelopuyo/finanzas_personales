@@ -1,7 +1,47 @@
 import type { NextConfig } from "next";
+import { execSync } from "node:child_process";
+import pkg from "./package.json";
+
+// ============================================================
+// Versionado de la aplicación (2026-09-15)
+// ------------------------------------------------------------
+// Fuente única: `version` de package.json (SemVer) + el commit del deploy.
+// Se inyectan como variables `env` de Next, que el bundler reemplaza por
+// LITERALES: quedan disponibles igual en servidor y en cliente sin importar
+// package.json al bundle. `lib/version.ts` las expone y `/version.json` las
+// publica (lo usa el service worker para saber a qué build pertenecen sus
+// cachés: ver `sincronizarBuild()` en public/sw.js).
+//
+// Al publicar un lote: subir `version` en package.json y taggear `vX.Y.Z` en git.
+// ============================================================
+
+/** Commit corto del deploy: en Vercel lo da el entorno; en local, git. */
+function commitCorto(): string {
+  const deVercel = process.env.VERCEL_GIT_COMMIT_SHA;
+  if (deVercel) return deVercel.slice(0, 7);
+  try {
+    return execSync("git rev-parse --short HEAD", {
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .toString()
+      .trim();
+  } catch {
+    return "local";
+  }
+}
+
+const APP_VERSION = `v${pkg.version}`;
+const APP_COMMIT = commitCorto();
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  env: {
+    NEXT_PUBLIC_APP_VERSION: APP_VERSION,
+    NEXT_PUBLIC_APP_COMMIT: APP_COMMIT,
+    /** Identifica al BUILD (versión + commit): lo usa el SW para invalidar caché. */
+    NEXT_PUBLIC_APP_BUILD_ID: `${APP_VERSION}-${APP_COMMIT}`,
+    NEXT_PUBLIC_APP_BUILT_AT: new Date().toISOString(),
+  },
   // Paquetes nativos de servidor que no deben empaquetarse en el bundle
   serverExternalPackages: ["pg", "typeorm", "nodemailer"],
   experimental: {

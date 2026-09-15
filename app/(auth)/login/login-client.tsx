@@ -1,15 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Fingerprint } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { NO_REMEMBER, PENDING_CLEAR } from "@/lib/session-flags";
+import { biometriaDisponible, entrarConBiometria } from "@/lib/webauthn-client";
 
 const inputCls =
   "w-full rounded-md border border-border bg-card px-3 py-2 text-[13px] text-card-foreground placeholder:text-subtitle focus:outline-none focus:ring-2 focus:ring-primary/40";
 
-export default function LoginClient() {
+/**
+ * `passkeyEnDispositivo` lo resuelve el servidor (cookie "pista"): el botón de
+ * biometría solo aparece en un dispositivo donde ya se activó una passkey. El
+ * primer login de un dispositivo es siempre con contraseña.
+ */
+export default function LoginClient({
+  passkeyEnDispositivo,
+}: {
+  passkeyEnDispositivo: boolean;
+}) {
   const router = useRouter();
   const params = useSearchParams();
   const verificado = params.get("verificado") === "1";
@@ -20,6 +31,47 @@ export default function LoginClient() {
   const [recordar, setRecordar] = useState(false);
   const [error, setError] = useState(errorParam === "token-invalido" ? "Token de verificación inválido o expirado" : "");
   const [loading, setLoading] = useState(false);
+
+  // Login con biometría (WebAuthn/passkeys).
+  const [biometria, setBiometria] = useState(false);
+  const [loadingBiometria, setLoadingBiometria] = useState(false);
+  const [errorBiometria, setErrorBiometria] = useState("");
+
+  // ¿Este dispositivo puede usar biometría? (API del navegador: no existe en el
+  // servidor). Si no puede, el botón no se muestra y queda el login normal.
+  useEffect(() => {
+    let cancelado = false;
+    void biometriaDisponible().then((ok) => {
+      if (!cancelado) setBiometria(ok);
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  async function handleBiometria() {
+    setErrorBiometria("");
+    setLoadingBiometria(true);
+    try {
+      const resultado = await entrarConBiometria(recordar);
+      if (!resultado.ok) {
+        setErrorBiometria(resultado.error ?? "No pudimos validar el acceso");
+        return;
+      }
+      // Misma sesión que el login con contraseña: los mismos flags por pestaña.
+      if (recordar) {
+        sessionStorage.removeItem(NO_REMEMBER);
+        sessionStorage.removeItem(PENDING_CLEAR);
+      } else {
+        sessionStorage.setItem(NO_REMEMBER, "1");
+        sessionStorage.removeItem(PENDING_CLEAR);
+      }
+      router.push("/dashboard");
+      router.refresh();
+    } finally {
+      setLoadingBiometria(false);
+    }
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -118,6 +170,34 @@ export default function LoginClient() {
             {loading ? "Ingresando..." : "Iniciar sesión"}
           </button>
         </form>
+
+        {/* Login con biometría (passkeys). Solo se muestra si ESTE dispositivo
+            ya tiene una passkey activada (`passkeyEnDispositivo`, que resuelve
+            el servidor) y si el equipo ofrece biometría: así el primer login de
+            un dispositivo nuevo es siempre con contraseña. */}
+        {passkeyEnDispositivo && biometria && (
+          <div className="mt-4">
+            <div className="flex items-center gap-3">
+              <span className="h-px flex-1 bg-border" />
+              <span className="text-[11px] text-subtitle">o</span>
+              <span className="h-px flex-1 bg-border" />
+            </div>
+            <button
+              type="button"
+              onClick={handleBiometria}
+              disabled={loadingBiometria || loading}
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-md border border-border bg-card py-2.5 text-[13px] font-medium text-card-foreground transition-colors hover:bg-muted disabled:opacity-50"
+            >
+              <Fingerprint className="h-4 w-4" />
+              {loadingBiometria ? "Esperando biometría..." : "Entrar con biometría"}
+            </button>
+            {errorBiometria && (
+              <p className="mt-2 text-center text-[11.5px] text-danger">
+                {errorBiometria}
+              </p>
+            )}
+          </div>
+        )}
 
         <p className="mt-4 text-center text-[13px] text-subtitle">
           ¿No tenés cuenta?{" "}

@@ -40,6 +40,35 @@ export async function verifyPassword(
 // --------------------------------------------------------------------- JWT
 export type TokenScope = "access" | "refresh" | "verify";
 
+/**
+ * Firma un JWT corto con datos arbitrarios.
+ *
+ * Lo usa WebAuthn para guardar el **desafío** en una cookie httpOnly firmada
+ * (así el cliente no puede elegirlo y no hay replay): ver `lib/webauthn.ts`.
+ */
+export async function signShortToken(
+  data: Record<string, unknown>,
+  expiresIn = "5m"
+): Promise<string> {
+  return new SignJWT(data)
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime(expiresIn)
+    .sign(getSecret());
+}
+
+/** Verifica un JWT corto y devuelve sus datos (o null si es inválido/venció). */
+export async function verifyShortToken<T = Record<string, unknown>>(
+  token: string
+): Promise<T | null> {
+  try {
+    const { payload } = await jwtVerify(token, getSecret());
+    return payload as T;
+  } catch {
+    return null;
+  }
+}
+
 /** Firma un JWT con el userId en el subject. */
 export async function signToken(
   userId: number,

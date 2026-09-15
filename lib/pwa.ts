@@ -2,32 +2,13 @@
 // worker (`public/sw.js`).
 //
 // ⚠️ `public/sw.js` se sirve tal cual (no pasa por el bundler), así que NO puede
-// importar este archivo: la versión y los nombres de caché están DUPLICADOS ahí
-// a propósito. Si cambiás algo acá, cambialo también en `public/sw.js`.
-
-/**
- * Versión del service worker y de sus cachés.
- *
- * Subirla (ej. "v2") INVALIDA todo lo cacheado: en `activate` el SW borra las
- * cachés `fp-*` que no sean las actuales, así que los documentos y los chunks
- * del build anterior se descartan. Hacerlo cuando cambie la estrategia.
- */
-export const PWA_VERSION = "v1";
-
-/** Prefijo común de todas las cachés de la app. */
-export const PWA_CACHE_PREFIX = "fp-";
-
-/** Caché de ESTÁTICOS: chunks hasheados de Next, fuentes e iconos. No tiene
- * datos del usuario, así que se CONSERVA en el logout. */
-export const PWA_ASSET_CACHE = `${PWA_CACHE_PREFIX}assets-${PWA_VERSION}`;
-
-/** Prefijo de las cachés de DOCUMENTOS (con montos y nombres del usuario). */
-export const PWA_DATA_CACHE_PREFIX = `${PWA_CACHE_PREFIX}data-`;
-
-/** Caché de DOCUMENTOS: el HTML de las pantallas visitadas. Se BORRA en el
- * logout (y al volver a `/login`) para no dejar datos financieros en el
- * dispositivo sin sesión. */
-export const PWA_DATA_CACHE = `${PWA_DATA_CACHE_PREFIX}${PWA_VERSION}`;
+// importar este archivo: los nombres de los mensajes están DUPLICADOS ahí a
+// propósito. Si cambiás uno, cambiá el otro.
+//
+// ℹ️ Desde el versionado (2026-09-15) el SW NO lleva una versión propia: sus
+// cachés tienen nombres FIJOS (`fp-assets` / `fp-data` / `fp-meta`) y la
+// invalidación la decide el `buildId` del deploy (`lib/version.ts` +
+// `/version.json`, ver `sincronizarBuild()` en `public/sw.js`).
 
 /** Ruta del service worker. Va en la raíz para poder controlar todo el sitio. */
 export const PWA_SW_URL = "/sw.js";
@@ -40,6 +21,8 @@ export const SW_MSG = {
   amIFromCache: "fp:am-i-from-cache",
   /** Pestaña → SW: guardá/refrescá el documento de esta ruta (cada ingreso). */
   cacheRoute: "fp:cache-route",
+  /** Pestaña → SW: el build que está corriendo la app (invalida caché si cambió). */
+  build: "fp:build",
   /** Pestaña → SW: borrar TODO el caché (logout explícito). */
   clearAllCaches: "fp:clear-all-caches",
   /** Pestaña → SW: el usuario aceptó la versión nueva (el SW deja de esperar). */

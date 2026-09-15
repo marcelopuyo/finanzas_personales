@@ -60,6 +60,6 @@ export const config = {
   // instalación falla de forma silenciosa. `/offline` también es público: se
   // muestra justamente cuando no hay red para validar la sesión.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon\\.svg|icon\\.png|apple-icon\\.png|manifest\\.webmanifest|sw\\.js|icons/|offline(?:$|/)).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon\\.svg|icon\\.png|apple-icon\\.png|manifest\\.webmanifest|sw\\.js|icons/|offline(?:$|/)|version\\.json).*)",
   ],
 };

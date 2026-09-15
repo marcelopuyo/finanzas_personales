@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/backend/src/lib/auth";
 import { getAllMonedas } from "@/backend/src/queries/maestros";
+import { getCredencialesWebauthn } from "@/backend/src/queries/webauthn";
 import PerfilClient from "./perfil-client";
 
 // Página de perfil del usuario (acceso vía item "Perfil" del sidebar).
@@ -9,6 +10,8 @@ export default async function PerfilPage() {
   if (!user) redirect("/login");
 
   const monedas = await getAllMonedas();
+  // Passkeys (biometría) del usuario: se listan en su Perfil.
+  const credenciales = await getCredencialesWebauthn();
   const monedaPredeterminadaId =
     user.monedaPredeterminada?.id ?? monedas[0]?.id ?? 0;
 
@@ -33,6 +36,7 @@ export default async function PerfilPage() {
         codigoPais: m.codigoPais,
       }))}
       monedaPredeterminadaId={monedaPredeterminadaId}
+      credenciales={credenciales}
     />
   );
 }

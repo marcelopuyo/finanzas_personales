@@ -3,8 +3,14 @@
  *
  * ⚠️ Este archivo se sirve TAL CUAL desde `/sw.js` (vive en `public/`): no pasa
  * por el bundler, no lo ve TypeScript y no lo lintea ESLint (ver
- * `eslint.config.mjs`). Por eso la versión y los nombres de caché están
- * DUPLICADOS respecto de `lib/pwa.ts` — si cambiás uno, cambiá el otro.
+ * `eslint.config.mjs`). Por eso los NOMBRES DE MENSAJE están duplicados respecto
+ * de `lib/pwa.ts` — si cambiás uno, cambiá el otro.
+ *
+ * ℹ️ Versionado (2026-09-15): este SW NO lleva una versión propia. Sus cachés
+ * tienen nombres FIJOS (`fp-assets` / `fp-data` / `fp-meta`) y la invalidación la
+ * decide el `buildId` del deploy (versión + commit, que la app publica en
+ * `/version.json` y avisa por mensaje): `sincronizarBuild()` descarta los
+ * DOCUMENTOS de la versión anterior cuando el build cambia.
  *
  * Estrategia (decisiones 2026-09-14):
  * - ESTÁTICOS (`/_next/static/**`, `/icons/**`) → cache-first. Los chunks llevan
@@ -22,12 +28,17 @@
  *   (la app muestra un toast con "Recargar"); al reabrir la app entra solo.
  */
 
-const VERSION = "v1";
-
 const CACHE_PREFIX = "fp-";
-const ASSET_CACHE = `${CACHE_PREFIX}assets-${VERSION}`;
-const DATA_CACHE = `${CACHE_PREFIX}data-${VERSION}`;
-const META_CACHE = `${CACHE_PREFIX}meta-${VERSION}`;
+// Nombres FIJOS: la invalidación ya no se hace renombrando cachés con una
+// versión manual (que había que duplicar en `lib/pwa.ts`), sino comparando el
+// `buildId` del deploy. Ver `sincronizarBuild()`.
+const ASSET_CACHE = `${CACHE_PREFIX}assets`;
+const DATA_CACHE = `${CACHE_PREFIX}data`;
+const META_CACHE = `${CACHE_PREFIX}meta`;
+/** Clave interna (dentro de META_CACHE) con el buildId ya sincronizado. */
+const BUILD_KEY = "/__fp-build__";
+/** BuildId que publica el deploy. */
+const VERSION_URL = "/version.json";
 
 /** Estáticos que se precachean al instalar (no tienen datos del usuario). */
 const PRECACHE = [
@@ -67,6 +78,7 @@ const OFFLINE_URL = "/offline";
 const MSG_SERVED_FROM_CACHE = "fp:served-from-cache";
 const MSG_AM_I_FROM_CACHE = "fp:am-i-from-cache";
 const MSG_CACHE_ROUTE = "fp:cache-route";
+const MSG_BUILD = "fp:build";
 const MSG_CLEAR_ALL_CACHES = "fp:clear-all-caches";
 const MSG_SKIP_WAITING = "fp:skip-waiting";
 
@@ -82,7 +94,12 @@ const servedFromCache = new Set();
 // ─────────────────────────────────────────────────────────────────────────────
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(precache());
+  event.waitUntil(
+    (async () => {
+      await sincronizarBuild(await buildIdDesplegado());
+      await precache();
+    })()
+  );
 });
 
 self.addEventListener("activate", (event) => {
@@ -100,6 +117,51 @@ self.addEventListener("activate", (event) => {
     })()
   );
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Versionado del build
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Sincroniza el build del deploy.
+ *
+ * Si el `buildId` cambió (deploy nuevo), los DOCUMENTOS cacheados son snapshots
+ * de la versión anterior: se descartan (`fp-data` + `fp-meta`) y se vuelve a
+ * precachear la base del modo offline. Los ESTÁTICOS se conservan a propósito:
+ * sus nombres llevan hash, así que nunca se sirven viejos y sirven de red de
+ * seguridad offline.
+ */
+async function sincronizarBuild(buildId) {
+  if (!buildId) return;
+
+  const meta = await caches.open(META_CACHE);
+  const guardado = await meta.match(BUILD_KEY);
+  const anterior = guardado ? await guardado.text() : null;
+  if (anterior === buildId) return;
+
+  await Promise.all([caches.delete(DATA_CACHE), caches.delete(META_CACHE)]);
+  const metaNueva = await caches.open(META_CACHE);
+  await metaNueva.put(BUILD_KEY, new Response(buildId));
+
+  // En una instalación nueva (`anterior === null`) el precache lo hace `install`.
+  if (anterior) await precache();
+}
+
+/** `buildId` publicado en `/version.json` ("sin-version" si no se pudo leer). */
+async function buildIdDesplegado() {
+  try {
+    const response = await fetch(VERSION_URL, { cache: "no-store" });
+    if (!response.ok) return "sin-version";
+    const data = await response.json();
+    return data && data.buildId ? String(data.buildId) : "sin-version";
+  } catch {
+    return "sin-version";
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Precarga
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function precache() {
   // 1) Estáticos: una falla puntual no debe abortar la instalación.
@@ -397,6 +459,13 @@ self.addEventListener("message", (event) => {
   // La app avisa qué pantalla está mostrando: se guarda/refresca su documento.
   if (data.type === MSG_CACHE_ROUTE) {
     event.waitUntil(cacheRoute(data.url));
+    return;
+  }
+
+  // La app avisa su BUILD (más fresco y confiable que `/version.json`: es el que
+  // realmente está corriendo). Si cambió, se descartan los documentos viejos.
+  if (data.type === MSG_BUILD) {
+    event.waitUntil(sincronizarBuild(data.buildId));
     return;
   }
 
