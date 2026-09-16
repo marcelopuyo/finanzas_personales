@@ -108,13 +108,17 @@ export default async function RootLayout({
       <body className="min-h-full bg-background font-sans">
         <ThemeProvider>
           <SessionGuard />
+          {/* Bloqueo de la app (mobile, con biometría activada): si el equipo
+              puede desbloquear, el candado se renderiza ACÁ (en el servidor) y
+              **antes del contenido a propósito**: así el primer paint al abrir la
+              app ya es la pantalla de bloqueo y no se ve ni un frame del
+              dashboard mientras llega el resto del HTML (streaming). Mientras la
+              app está desbloqueada no dibuja nada. */}
+          <AppLock habilitado={bloqueoBiometrico} />
           {/* PWA: registra el service worker (solo producción) y avisa cuando hay
               una versión nueva. No dibuja nada. */}
           <SwRegister />
           {children}
-          {/* Bloqueo al volver del segundo plano en mobile (no dibuja nada
-              mientras la app esté desbloqueada). */}
-          <AppLock habilitado={bloqueoBiometrico} />
           <ToasterProvider />
         </ThemeProvider>
       </body>

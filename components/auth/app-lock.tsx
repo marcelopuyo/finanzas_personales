@@ -37,6 +37,14 @@ import {
  * La **gracia** (cuánto puede estar en segundo plano sin bloquearse) es una
  * preferencia por dispositivo, configurable en Perfil: `lib/app-lock-prefs.ts`.
  *
+ * **Arranque en frío** (abrir la app que estaba cerrada, recargar, deep link): el
+ * candado viene PUESTO desde el servidor (`useState(habilitado)`, y el layout raíz
+ * renderiza este overlay ANTES del contenido) para que el primer paint ya sea el
+ * bloqueo y no se vea ni un frame de la pantalla: el bug reportado el 2026-09-15
+ * era justamente que el dashboard se veía 1-2 s hasta que el sistema avisaba el
+ * `visibilitychange`. Ojo: **el arranque bloquea siempre**; la gracia aplica solo
+ * al volver del segundo plano.
+ *
  * ⚠️ Si la sesión venció por **inactividad** (1 h, `lib/session-idle.ts`), el
  * desbloqueo recibe 401 y la app manda a `/login`: ahí la biometría ya no alcanza
  * (la barrera es del servidor, no de esta pantalla).
@@ -46,13 +54,15 @@ import {
  * sesión del servidor.
  */
 export function AppLock({ habilitado }: { habilitado: boolean }) {
-  const [bloqueado, setBloqueado] = useState(false);
+  // Arranque: si este equipo tiene passkey, el bloqueo arranca PUESTO (igual que
+  // en el HTML del servidor: mismo valor ⇒ no hay desajuste de hidratación).
+  const [bloqueado, setBloqueado] = useState(habilitado);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
 
   // Espejo de `bloqueado` para leerlo DENTRO del listener de visibilidad sin
   // depender del render (el estado puede cambiar en el mismo evento).
-  const bloqueadoRef = useRef(false);
+  const bloqueadoRef = useRef(habilitado);
   /** Cuándo pasó a `hidden` (null = nunca / ya procesado). */
   const ocultoEn = useRef<number | null>(null);
   /** Hay una ceremonia WebAuthn en curso (el prompt del SO dispara eventos). */
@@ -126,7 +136,6 @@ export function AppLock({ habilitado }: { habilitado: boolean }) {
       // Volvió a `visible`.
       const oculto = ocultoEn.current;
       ocultoEn.current = null;
-      if (oculto === null) return;
 
       // Sin red no se puede verificar la biometría contra el servidor: se deja
       // pasar en modo lectura offline (misma decisión que `SessionGuard`).
@@ -135,12 +144,15 @@ export function AppLock({ habilitado }: { habilitado: boolean }) {
         return;
       }
 
-      // Ya se había bloqueado al ocultar: solo falta pedir la biometría.
+      // El bloqueo YA está puesto (arranque en frío, o gracia 0 al ocultar):
+      // solo falta pedir la biometría. Va ANTES del chequeo de `oculto` porque
+      // en un arranque puede no haber habido ningún `hidden` en esta sesión.
       if (bloqueadoRef.current) {
         void desbloquear();
         return;
       }
 
+      if (oculto === null) return;
       if (ahora - oculto < gracia) return;
       bloquear();
       void desbloquear();
@@ -149,6 +161,32 @@ export function AppLock({ habilitado }: { habilitado: boolean }) {
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [habilitado, bloquear, soltar, desbloquear]);
+
+  // ARRANQUE EN FRÍO: el overlay ya viene del servidor; acá se resuelve si se
+  // puede desbloquear. Se espera un instante para que la pantalla se pinte y la
+  // app termine de hidratar antes de abrir el prompt del sistema.
+  useEffect(() => {
+    if (!habilitado) return;
+    const id = setTimeout(() => {
+      if (!bloqueadoRef.current) return;
+      // El candado dejó de aplicar (p.ej. revocaron la passkey en este equipo):
+      // no se puede quedar trabado en una pantalla sin salida.
+      if (!habilitado) {
+        soltar();
+        return;
+      }
+      // Sin red: modo lectura offline (§96).
+      if (!navigator.onLine) {
+        soltar();
+        return;
+      }
+      // Si el documento todavía no está visible, el intento lo hace el handler
+      // de visibilidad (no tiene sentido abrir un prompt en segundo plano).
+      if (document.visibilityState !== "visible") return;
+      void desbloquear();
+    }, ARRANQUE_MS);
+    return () => clearTimeout(id);
+  }, [habilitado, soltar, desbloquear]);
 
   // Con el overlay arriba, la pantalla de atrás no debe scrollear.
   useEffect(() => {
@@ -231,3 +269,9 @@ export function AppLock({ habilitado }: { habilitado: boolean }) {
  * Ventana en la que se ignoran eventos de visibilidad propios (prompt del SO).
  */
 const IGNORAR_MS = 2000;
+
+/**
+ * Espera antes de pedir la biometría en un arranque en frío: deja que se pinte la
+ * pantalla de bloqueo y que la app termine de hidratar.
+ */
+const ARRANQUE_MS = 250;
