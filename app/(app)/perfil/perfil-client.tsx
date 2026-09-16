@@ -9,6 +9,7 @@ import { Modal } from "@/components/ui/modal";
 import { Combobox } from "@/components/ui/combobox";
 import { InstallButton } from "@/components/pwa/install-button";
 import { PasskeysSection } from "./components/passkeys-section";
+import { AppLockSection } from "./components/app-lock-section";
 import { cambiarPassword, actualizarMonedaPredeterminada } from "@/backend/src/actions/cuenta";
 import type { CredencialWebauthnOut } from "@/backend/src/queries/webauthn";
 import { NO_REMEMBER, PENDING_CLEAR } from "@/lib/session-flags";
@@ -31,6 +32,7 @@ export default function PerfilClient({
   monedas,
   monedaPredeterminadaId,
   credenciales,
+  graciaBloqueo,
 }: {
   nombre: string;
   email: string;
@@ -39,6 +41,7 @@ export default function PerfilClient({
   monedas: { id: number; nombre: string; codigoISO: string; codigoPais: string | null }[];
   monedaPredeterminadaId: number;
   credenciales: CredencialWebauthnOut[];
+  graciaBloqueo: number;
 }) {
   const { theme, setTheme } = useTheme();
   const [passOpen, setPassOpen] = useState(false);
@@ -208,6 +211,9 @@ export default function PerfilClient({
 
         {/* Acceso con biometría (passkeys) */}
         <PasskeysSection credenciales={credenciales} />
+
+        {/* Bloqueo de la app (volver del segundo plano en el celular) */}
+        <AppLockSection graciaInicial={graciaBloqueo} />
 
         {/* Opciones */}
         <section className="rounded-xl border border-border bg-card p-2">

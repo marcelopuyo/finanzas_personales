@@ -13,6 +13,10 @@ import { startAuthentication, startRegistration } from "@simplewebauthn/browser"
 export interface ResultadoBiometria {
   ok: boolean;
   error?: string;
+  /** Nombre del error del navegador (`NotAllowedError`, …), si lo hubo. */
+  name?: string;
+  /** La sesión venció del lado del servidor: hay que volver a ingresar. */
+  sesionVencida?: boolean;
 }
 
 /** Por qué el dispositivo (no) puede usar biometría. */
@@ -191,6 +195,20 @@ export function nombreDeDispositivo(): string {
   return "Dispositivo";
 }
 
+/**
+ * ¿Es un dispositivo MÓVIL (iPhone/iPad/Android)?
+ *
+ * Gobierna el **bloqueo de la app** al volver del segundo plano: en mobile
+ * "cerrar" la app casi nunca la termina (queda viva en segundo plano y se
+ * reanuda sin pedir nada), mientras que en escritorio el cambio de ventana es
+ * lo normal. El usuario pidió explícitamente dejarlo fuera de alcance
+ * (2026-09-15).
+ */
+export function esDispositivoMovil(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+}
+
 /** Alta: registra ESTE dispositivo como passkey del usuario logueado. */
 export async function activarBiometria(): Promise<ResultadoBiometria> {
   try {
@@ -255,10 +273,16 @@ export async function entrarConBiometria(
  * `NotAllowedError`: el usuario canceló el prompt biométrico o pasó el tiempo
  * (también sale si no hay ninguna passkey para este sitio).
  */
-function mensajeDeError(error: unknown): string {
+function mensajeDeError(
+  error: unknown,
+  textos: { cancelado?: string; general?: string } = {}
+): string {
   const name = (error as { name?: string })?.name ?? "";
   if (name === "NotAllowedError") {
-    return "Cancelaste la operación, expiró el tiempo o este dispositivo no tiene una passkey guardada.";
+    return (
+      textos.cancelado ??
+      "Cancelaste la operación, expiró el tiempo o este dispositivo no tiene una passkey guardada."
+    );
   }
   if (name === "InvalidStateError") {
     return "Este dispositivo ya tiene una passkey registrada. Si perdiste el acceso con biometría, revocá esa credencial de la lista y volvé a activarla.";
@@ -269,5 +293,66 @@ function mensajeDeError(error: unknown): string {
   if (name === "SecurityError") {
     return "No se pudo usar biometría en este contexto (revisá que sea HTTPS).";
   }
-  return "No se pudo completar la operación con biometría.";
+  return textos.general ?? "No se pudo completar la operación con biometría.";
+}
+
+/**
+ * DESBLOQUEO de la app (bloqueo al volver del segundo plano).
+ *
+ * Reusa la passkey del dispositivo, pero con dos diferencias clave respecto del
+ * login: el servidor exige **verificación de usuario** (`userVerification:
+ * "required"`) y **no reemite la sesión** (la cookie `auth_token` queda igual).
+ * O sea: sirve para volver a mostrar la pantalla, no para volver a entrar.
+ */
+export async function desbloquearConBiometria(): Promise<ResultadoBiometria> {
+  try {
+    const resOpts = await fetch("/api/auth/webauthn/unlock/options", {
+      method: "POST",
+      cache: "no-store",
+    });
+    if (!resOpts.ok) {
+      // 401 = la sesión del servidor venció mientras la app estaba en segundo
+      // plano: no hay nada que desbloquear, hay que volver a ingresar.
+      if (resOpts.status === 401) {
+        return {
+          ok: false,
+          error: "Tu sesión venció. Volvé a ingresar.",
+          sesionVencida: true,
+        };
+      }
+      const data = await resOpts.json().catch(() => ({}));
+      return { ok: false, error: data.error ?? "No pudimos iniciar el desbloqueo" };
+    }
+    const optionsJSON = await resOpts.json();
+
+    const response = await startAuthentication({ optionsJSON });
+
+    const res = await fetch("/api/auth/webauthn/unlock/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ response }),
+    });
+    if (res.status === 401) {
+      return {
+        ok: false,
+        error: "Tu sesión venció. Volvé a ingresar.",
+        sesionVencida: true,
+      };
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, error: data.error ?? "No pudimos validar el desbloqueo" };
+    }
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: mensajeDeError(error, {
+        cancelado:
+          "No se completó la biometría. Tocá “Desbloquear” para intentar de nuevo.",
+        general: "No pudimos desbloquear con biometría.",
+      }),
+      name: (error as { name?: string })?.name,
+    };
+  }
 }

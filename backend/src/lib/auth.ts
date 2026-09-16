@@ -3,6 +3,13 @@ import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import { getDb } from "../db";
 import { Usuario } from "../entities/usuario.entity";
+// Import relativo a propósito: `backend/` se compila también fuera de Next (CLI de
+// migraciones con su propio tsconfig), donde el alias `@/` no está disponible.
+import {
+  IDLE_MAX_SEGUNDOS,
+  ahoraSegundos,
+  segundosSinActividad,
+} from "../../../lib/session-idle";
 
 /**
  * Helpers de autenticación multiusuario.
@@ -76,6 +83,9 @@ export async function verifyShortToken<T = Record<string, unknown>>(
  * morir con la pestaña (`false`) o sobrevivir al cierre de la app (`true`), y no
  * alcanza con mirar la cookie — iOS y las PWA conservan cookies "de sesión" entre
  * cierres (ver `getSessionKind`).
+ *
+ * `act` = ÚLTIMA ACTIVIDAD (epoch segundos). Lo usa el proxy para la ventana de
+ * inactividad (1 h) con renovación deslizante: ver `lib/session-idle.ts`.
  */
 export async function signToken(
   userId: number,
@@ -83,7 +93,7 @@ export async function signToken(
   expiresIn?: string,
   remember = false
 ): Promise<string> {
-  return new SignJWT({ scope, recordar: remember })
+  return new SignJWT({ scope, recordar: remember, act: ahoraSegundos() })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(String(userId))
     .setIssuedAt()
@@ -92,9 +102,13 @@ export async function signToken(
 }
 
 /** Verifica un JWT y devuelve el payload, o null si es inválido/expirado. */
-export async function verifyToken(
-  token: string
-): Promise<{ userId: number; scope: TokenScope; remember: boolean } | null> {
+export async function verifyToken(token: string): Promise<{
+  userId: number;
+  scope: TokenScope;
+  remember: boolean;
+  /** Última actividad (epoch segundos); 0 si el token es viejo y no trae el claim. */
+  actividad: number;
+} | null> {
   try {
     const { payload } = await jwtVerify(token, getSecret());
     const userId = Number(payload.sub);
@@ -102,20 +116,40 @@ export async function verifyToken(
     if (!Number.isFinite(userId)) return null;
     // Los tokens emitidos antes de este cambio no traen el claim: se asumen
     // persistentes, para no cerrar sesiones "recordar" al actualizar.
-    return { userId, scope, remember: payload.recordar !== false };
+    return {
+      userId,
+      scope,
+      remember: payload.recordar !== false,
+      // Fallback a `iat`: los tokens viejos tienen fecha de emisión, así que la
+      // ventana de inactividad empieza a contar desde que se emitieron.
+      actividad: Number(payload.act ?? payload.iat ?? 0),
+    };
   } catch {
     return null;
   }
 }
 
 // ---------------------------------------------------------------- sesión
-/** Lee el JWT de la cookie y devuelve el userId autenticado (o null). */
+/**
+ * Lee el JWT de la cookie y devuelve el userId autenticado (o null).
+ *
+ * Aplica la **ventana de inactividad** (1 h, `lib/session-idle.ts`). El proxy ya
+ * la aplica para todas las rutas, pero esto es defensa en profundidad: las rutas
+ * de `/api/auth/*` (p. ej. el desbloqueo con biometría) pasan por el proxy sin
+ * control, así que sin este chequeo una sesión vencida por inactividad podría
+ * seguir operando desde ahí.
+ */
 export async function getSessionUserId(): Promise<number | null> {
   const store = await cookies();
   const token = store.get(COOKIE_NAME)?.value;
   if (!token) return null;
   const payload = await verifyToken(token);
-  return payload?.scope === "access" ? payload.userId : null;
+  if (payload?.scope !== "access") return null;
+
+  const sinActividad = segundosSinActividad(payload.actividad);
+  if (sinActividad !== null && sinActividad > IDLE_MAX_SEGUNDOS) return null;
+
+  return payload.userId;
 }
 
 /** Para Server Components/Actions: lanza error si no hay sesión. */

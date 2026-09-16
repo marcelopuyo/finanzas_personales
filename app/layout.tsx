@@ -5,7 +5,9 @@ import "flag-icons/css/flag-icons.min.css";
 import ThemeProvider from "@/components/layout/theme-provider";
 import { ToasterProvider } from "@/components/layout/toaster";
 import { SessionGuard } from "@/components/auth/session-guard";
+import { AppLock } from "@/components/auth/app-lock";
 import { SwRegister } from "@/components/pwa/sw-register";
+import { biometriaParaBloqueo } from "@/backend/src/queries/webauthn";
 import { THEME_COOKIE } from "@/lib/theme";
 import "./globals.css";
 
@@ -69,6 +71,11 @@ export default async function RootLayout({
   const themeCookie = store.get(THEME_COOKIE)?.value;
   const isDark = themeCookie === "dark";
 
+  // ¿Este dispositivo puede desbloquear con biometría? Gobierna el bloqueo de la
+  // app al reanudar desde segundo plano (components/auth/app-lock.tsx): sin una
+  // passkey del usuario en ESTE equipo el bloqueo no se arma.
+  const bloqueoBiometrico = await biometriaParaBloqueo();
+
   return (
     <html
       lang="es"
@@ -105,6 +112,9 @@ export default async function RootLayout({
               una versión nueva. No dibuja nada. */}
           <SwRegister />
           {children}
+          {/* Bloqueo al volver del segundo plano en mobile (no dibuja nada
+              mientras la app esté desbloqueada). */}
+          <AppLock habilitado={bloqueoBiometrico} />
           <ToasterProvider />
         </ThemeProvider>
       </body>

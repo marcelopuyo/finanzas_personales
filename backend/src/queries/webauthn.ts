@@ -60,3 +60,47 @@ export async function passkeyEnEsteDispositivo(): Promise<boolean> {
   });
   return cred !== null;
 }
+
+/**
+ * ¿La sesión actual puede DESBLOQUEAR con biometría en ESTE dispositivo?
+ *
+ * Es el candado del bloqueo de app al reanudar desde segundo plano
+ * (`components/auth/app-lock.tsx`, 2026-09-15): si el equipo NO tiene una
+ * passkey propia del usuario logueado, bloquear sería dejarlo afuera (no
+ * tendría con qué desbloquear), así que en ese caso el bloqueo no se arma.
+ *
+ * Más estricto que `passkeyEnEsteDispositivo()`: además de la pista (cookie
+ * httpOnly que recuerda qué passkey usa este equipo) exige **sesión** y que la
+ * credencial sea **del usuario logueado** y siga activa.
+ *
+ * ⚠️ Se llama desde el **layout raíz** (se pasa como prop a `AppLock`), así que
+ * un fallo de la BD no puede tumbar el render de toda la app por una capa de
+ * seguridad OPCIONAL: se falla "abierto" (sin bloqueo) y se loguea el error.
+ * Sin sesión la consulta ni se hace (no hay riesgo para /login ni /register).
+ */
+export async function biometriaParaBloqueo(): Promise<boolean> {
+  const userId = await getSessionUserId();
+  if (!userId) return false;
+
+  const pista = await leerPistaCredencial();
+  if (!pista) return false;
+
+  try {
+    const ds = await getDb();
+    const cred = await ds.getRepository(WebauthnCredential).findOne({
+      where: {
+        credentialId: pista,
+        usuario: { id: userId },
+        eliminado: false,
+      },
+      select: { id: true },
+    });
+    return cred !== null;
+  } catch (error) {
+    console.error(
+      "[webauthn] No se pudo resolver la biometría para el bloqueo de app:",
+      (error as Error).message
+    );
+    return false;
+  }
+}
