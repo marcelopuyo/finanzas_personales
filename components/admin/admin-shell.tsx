@@ -77,7 +77,15 @@ export default function AdminShell({
       {/* PWA: guarda/refresca el documento de cada pantalla del panel admin para
           poder verla sin conexión (el SW hace el fetch con la cookie de sesión). */}
       <RouteCache />
-      <header className="sticky top-0 z-40 border-b border-border bg-sidebar">
+      <header
+        className="sticky top-0 z-40 border-b border-border bg-sidebar"
+        // PWA standalone: con `viewport-fit: cover` el contenido pasa por debajo de
+        // la barra de estado / notch, así que el header crece con el safe-area y
+        // conserva sus 3.5rem (h-14) de contenido. Mismo criterio que `TopBar`
+        // (`components/layout/top-bar.tsx`); al ser `sticky` (no `fixed`) el
+        // contenido de abajo ya fluye después, no hace falta compensar el scroll.
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
+      >
         <div className="flex h-14 items-center gap-3 px-4 lg:px-6">
           {/* Marca */}
           <Link href="/admin" className="flex shrink-0 items-center gap-2">

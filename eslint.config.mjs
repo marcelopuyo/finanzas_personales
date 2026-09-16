@@ -15,6 +15,9 @@ const eslintConfig = defineConfig([
     // Service worker (PWA): se sirve tal cual desde /sw.js, no pasa por el
     // bundler ni por TypeScript; sus globals (self, caches) no son de este lint.
     "public/sw.js",
+    // Código/archivos muertos ya retirados de la app (2026-09-16): no se
+    // compilan ni se lintean. Ver `archivo/README.md`.
+    "archivo/**",
   ]),
 ]);
 

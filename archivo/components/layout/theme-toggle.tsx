@@ -1,7 +1,9 @@
 "use client";
 
 import { Sun, Moon } from "lucide-react";
-import { useTheme } from "./theme-provider";
+// ARCHIVADO: ruta ajustada al alias @/ porque este archivo ya no vive junto
+// a theme-provider (ver archivo/README.md).
+import { useTheme } from "@/components/layout/theme-provider";
 
 export default function ThemeToggle() {
   const { theme, toggleTheme } = useTheme();

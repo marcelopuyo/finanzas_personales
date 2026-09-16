@@ -10,8 +10,10 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { ChartTooltip } from "./chart-tooltip";
-import { useHideTooltipOnTouch } from "./use-hide-tooltip-on-touch";
+// ARCHIVADO: rutas ajustadas al alias @/ porque este archivo ya no vive
+// junto a sus dependencias (ver archivo/README.md).
+import { ChartTooltip } from "@/app/(app)/dashboard/components/chart-tooltip";
+import { useHideTooltipOnTouch } from "@/app/(app)/dashboard/components/use-hide-tooltip-on-touch";
 
 interface BarChartProps {
   title: string;
