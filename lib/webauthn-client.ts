@@ -17,6 +17,13 @@ export interface ResultadoBiometria {
   name?: string;
   /** La sesión venció del lado del servidor: hay que volver a ingresar. */
   sesionVencida?: boolean;
+  /**
+   * No pudimos HABLAR con el servidor (red caída, o la app no responde detrás
+   * del proxy): no es un problema de la biometría ni de la sesión.
+   * El bloqueo de la app usa este dato para no dejar al usuario atrapado en el
+   * candado cuando hay red pero el servidor no contesta (2026-09-17).
+   */
+  sinServidor?: boolean;
 }
 
 /** Por qué el dispositivo (no) puede usar biometría. */
@@ -195,20 +202,6 @@ export function nombreDeDispositivo(): string {
   return "Dispositivo";
 }
 
-/**
- * ¿Es un dispositivo MÓVIL (iPhone/iPad/Android)?
- *
- * Gobierna el **bloqueo de la app** al volver del segundo plano: en mobile
- * "cerrar" la app casi nunca la termina (queda viva en segundo plano y se
- * reanuda sin pedir nada), mientras que en escritorio el cambio de ventana es
- * lo normal. El usuario pidió explícitamente dejarlo fuera de alcance
- * (2026-09-15).
- */
-export function esDispositivoMovil(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-}
-
 /** Alta: registra ESTE dispositivo como passkey del usuario logueado. */
 export async function activarBiometria(): Promise<ResultadoBiometria> {
   try {
@@ -320,6 +313,15 @@ export async function desbloquearConBiometria(): Promise<ResultadoBiometria> {
           sesionVencida: true,
         };
       }
+      // 5xx = el servidor está caído o la app no responde: NO es un problema
+      // de biometría (el candado no debe dejar al usuario atrapado).
+      if (resOpts.status >= 500) {
+        return {
+          ok: false,
+          error: "El servidor no responde. Estás en modo lectura.",
+          sinServidor: true,
+        };
+      }
       const data = await resOpts.json().catch(() => ({}));
       return { ok: false, error: data.error ?? "No pudimos iniciar el desbloqueo" };
     }
@@ -339,12 +341,29 @@ export async function desbloquearConBiometria(): Promise<ResultadoBiometria> {
         sesionVencida: true,
       };
     }
+    if (res.status >= 500) {
+      return {
+        ok: false,
+        error: "El servidor no responde. Estás en modo lectura.",
+        sinServidor: true,
+      };
+    }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       return { ok: false, error: data.error ?? "No pudimos validar el desbloqueo" };
     }
     return { ok: true };
   } catch (error) {
+    // Falla de RED (no hay respuesta del servidor): `fetch` tira TypeError
+    // ("Failed to fetch") o AbortError. Los errores de la ceremonia WebAuthn son
+    // DOMException con otros nombres (`NotAllowedError` = el usuario canceló).
+    if (esFallaDeRed(error)) {
+      return {
+        ok: false,
+        error: "El servidor no responde. Estás en modo lectura.",
+        sinServidor: true,
+      };
+    }
     return {
       ok: false,
       error: mensajeDeError(error, {
@@ -355,4 +374,13 @@ export async function desbloquearConBiometria(): Promise<ResultadoBiometria> {
       name: (error as { name?: string })?.name,
     };
   }
+}
+
+/**
+ * ¿El error es porque NO hubo respuesta del servidor? (y no un error de la
+ * ceremonia WebAuthn ni de la sesión).
+ */
+function esFallaDeRed(error: unknown): boolean {
+  const name = (error as { name?: string })?.name ?? "";
+  return error instanceof TypeError || name === "AbortError";
 }

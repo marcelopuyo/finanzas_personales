@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Banknote } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { CrudTable } from "@/components/crud/CrudTable";
+import { LinkNavStatus } from "@/components/ui/nav-progress";
 import {
   eliminarJornadaTrabajo,
   eliminarTareaTrabajo,
@@ -163,7 +164,6 @@ function ResumenPeriodo({
   /** El período está vigente hoy (empezó y todavía no cerró). */
   enCurso: boolean;
 }) {
-  const router = useRouter();
   const {
     trabajo,
     etiquetaItems,
@@ -192,18 +192,18 @@ function ResumenPeriodo({
           </p>
         </div>
         {cobrable && (
-          <button
-            type="button"
-            onClick={() =>
-              router.push(`/movimientos/nuevo/cobro?periodo=${periodo.id}`)
-            }
+          // `<Link>` (2026-09-17): Next prefetchea el wizard de cobro apenas el
+          // botón entra en pantalla.
+          <Link
+            href={`/movimientos/nuevo/cobro?periodo=${periodo.id}`}
             title="Cobrar período"
             aria-label={`Cobrar período de ${trabajo?.nombre ?? "trabajo"} (${desde} al ${hasta})`}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
           >
             <Banknote className="h-3.5 w-3.5" />
             Cobrar
-          </button>
+            <LinkNavStatus />
+          </Link>
         )}
       </div>
 

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { usePendingNav } from "@/components/ui/nav-progress";
+import Link from "next/link";
+import { LinkNavStatus } from "@/components/ui/nav-progress";
 import { Ellipsis, Tag } from "lucide-react";
 
 /**
@@ -11,7 +12,6 @@ import { Ellipsis, Tag } from "lucide-react";
  * ("Gestionar categorías").
  */
 export function GastosActionsMenu() {
-  const { go: navigate } = usePendingNav();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -34,12 +34,6 @@ export function GastosActionsMenu() {
     };
   }, [open]);
 
-  const go = (href: string) => {
-    setOpen(false);
-    // Feedback global mientras llega la página (barra de progreso, 2026-09-14).
-    navigate(href);
-  };
-
   return (
     <div className="relative shrink-0" ref={menuRef}>
       <button
@@ -59,15 +53,16 @@ export function GastosActionsMenu() {
           role="menu"
           className="absolute right-0 top-full z-20 mt-1 w-52 overflow-hidden rounded-lg border border-border bg-card shadow-lg"
         >
-          <button
-            type="button"
+          <Link
+            href="/cruds/categorias-gasto?origen=dashboard"
             role="menuitem"
-            onClick={() => go("/cruds/categorias-gasto?origen=dashboard")}
+            onClick={() => setOpen(false)}
             className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] font-medium text-card-foreground transition-colors hover:bg-muted"
           >
             <Tag className="h-4 w-4 text-subtitle" />
             Gestionar categorías
-          </button>
+            <LinkNavStatus />
+          </Link>
         </div>
       )}
     </div>

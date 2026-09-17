@@ -1,8 +1,9 @@
 "use client";
 import { useMemo } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { HandCoins } from "lucide-react";
 import { CrudTable } from "@/components/crud/CrudTable";
+import { LinkNavStatus } from "@/components/ui/nav-progress";
 import type { PrestamoOut } from "@/backend/src/queries/prestamos";
 import { eliminarPrestamo } from "@/backend/src/actions/prestamos";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -38,13 +39,13 @@ interface Props {
   origen?: string;
 }
 export function PrestamosListClient({ initialData, origen }: Props) {
-  const router = useRouter();
   const desdeDashboard = origen === "dashboard";
   const origenQ = desdeDashboard ? "?origen=dashboard" : "";
   // Botón "Pagar" por fila (última columna de la grilla): solo si el préstamo
   // está impago total o parcialmente (saldo > 0). Lanza el wizard de pago con
   // ese préstamo preseleccionado (mismo estilo que "Cobrar" en los períodos de
-  // trabajo cerrados del dashboard).
+  // trabajo cerrados del dashboard). Desde el 2026-09-17 es un `<Link>`: Next
+  // prefetchea el wizard cuando la fila entra en pantalla.
   const pagarColumn = useMemo<ColumnDef<PrestamoOut>[]>(
     () => [
       {
@@ -57,23 +58,20 @@ export function PrestamosListClient({ initialData, origen }: Props) {
             return <span className="text-subtitle">—</span>;
           }
           return (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                router.push(`/movimientos/nuevo/pago-prestamo?prestamo=${p.id}`);
-              }}
+            <Link
+              href={`/movimientos/nuevo/pago-prestamo?prestamo=${p.id}`}
               title="Pagar préstamo"
               aria-label={`Pagar préstamo ${p.detalle ?? ""}`.trim()}
               className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted text-primary transition-colors hover:bg-primary/15"
             >
               <HandCoins className="h-4 w-4" />
-            </button>
+              <LinkNavStatus />
+            </Link>
           );
         },
       } as ColumnDef<PrestamoOut>,
     ],
-    [router]
+    []
   );
   return (
     <CrudTable<PrestamoOut, string>

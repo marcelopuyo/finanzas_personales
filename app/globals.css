@@ -196,3 +196,21 @@ body {
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   CANDADO SIN CONEXIÓN (2026-09-17)
+
+   El candado de la app (components/auth/app-lock.tsx) viene renderizado en el
+   HTML del servidor para que el primer paint al abrir la app ya sea el bloqueo
+   (fix §104). El problema era el caso OFFLINE: el service worker sirve el
+   documento cacheado (con el candado adentro) aunque no haya red, así que se veía
+   el cerrojo y recién al montar se liberaba.
+
+   La clase `fp-sin-red` la agrega el script del <head> (app/layout.tsx) ANTES
+   del primer paint cuando `navigator.onLine === false`, y AppLock la mantiene
+   sincronizada. Sin conexión no hay verificación posible ⇒ modo lectura (§96) y
+   el candado no se pinta.
+   ───────────────────────────────────────────────────────────────────────── */
+html.fp-sin-red [data-app-lock] {
+  display: none;
+}
+

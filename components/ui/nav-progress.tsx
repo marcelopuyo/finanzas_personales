@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useLinkStatus } from "next/link";
 import { cn } from "@/lib/utils";
@@ -134,7 +134,8 @@ export function LinkNavStatus() {
   return null;
 }
 
-/** Spinner chico reutilizable para el feedback de navegación. */export function NavSpinner({ className }: { className?: string }) {
+/** Spinner chico reutilizable para el feedback de navegación. */
+export function NavSpinner({ className }: { className?: string }) {
   return (
     <span
       role="status"
@@ -144,5 +145,37 @@ export function LinkNavStatus() {
         className
       )}
     />
+  );
+}
+
+/**
+ * PREFETCH AL PRIMER CONTACTO (2026-09-17).
+ *
+ * Para los destinos que NO pueden ser `<Link>` —una fila de grilla que se
+ * resuelve por `data-row-id`, el ítem de un menú, un botón que arma la URL al
+ * vuelo— este hook prefetchea el RSC **cuando el usuario toca o pasa el mouse
+ * por el control**: la navegación se siente instantánea sin pagar el costo al
+ * montar la pantalla (que es lo que hace un `<Link>` en el viewport).
+ *
+ * Se devuelve un CALLBACK para poder usarlo dentro de listas:
+ *
+ * ```tsx
+ * const prefetch = usePrefetchNav();
+ * <tr onTouchStart={() => prefetch(href)} onMouseEnter={() => prefetch(href)} />
+ * ```
+ *
+ * Guarda los hrefs ya pedidos: repetir el prefetch en cada toque no aporta nada.
+ */
+export function usePrefetchNav() {
+  const router = useRouter();
+  const hechos = useRef(new Set<string>());
+
+  return useCallback(
+    (href: string | null | undefined) => {
+      if (!href || hechos.current.has(href)) return;
+      hechos.current.add(href);
+      router.prefetch(href);
+    },
+    [router]
   );
 }

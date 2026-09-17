@@ -25,6 +25,10 @@ export default function LoginClient({
   const params = useSearchParams();
   const verificado = params.get("verificado") === "1";
   const errorParam = params.get("error");
+  // `?expirada=1`: la sesión se cerró por INACTIVIDAD (ventana de 1 h del proxy)
+  // mientras el usuario tenía una pestaña abierta. Lo manda
+  // `SessionExpiredWatcher` cuando una Server Action quedó redirigida a /login.
+  const expirada = params.get("expirada") === "1";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -125,6 +129,12 @@ export default function LoginClient({
           {verificado && (
             <p className="mb-4 rounded-md border border-success/30 bg-success/10 px-3 py-2 text-[12px] text-success">
               Email verificado. Ya podés iniciar sesión.
+            </p>
+          )}
+          {expirada && (
+            <p className="mb-4 rounded-md border border-border bg-muted px-3 py-2 text-[12px] text-subtitle">
+              Tu sesión se cerró por inactividad. Volvé a ingresar para seguir
+              donde estabas.
             </p>
           )}
           {error && (

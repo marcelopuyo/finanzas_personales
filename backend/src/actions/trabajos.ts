@@ -74,8 +74,17 @@ async function actualizarMontoACobrarPeriodo(idPeriodo: number) {
   await repo.save(periodo);
 }
 
-/** ¿Tiene el trabajo un período EN CURSO (no cobrado y vigente hoy)? (§3.2) */
-async function periodoEnCursoDe(
+/**
+ * ¿Tiene el trabajo un período VIGENTE hoy? (guard de la conversión de modalidad, §3.2)
+ *
+ * Cambiar la modalidad cambia el **origen del monto a cobrar**, así que no se
+ * permite mientras haya un período abierto. ⚠️ Decisión del usuario
+ * (2026-09-17): un período vigente bloquea **aunque ya esté cobrado**. Antes se
+ * exigía `fechaDeCobro` nula y, con el **cobro adelantado** (§92) de
+ * `fijo`/`horas_fijas`, un período cobrado por adelantado seguía en curso pero el
+ * cambio pasaba igual.
+ */
+async function periodoVigenteDe(
   ds: Awaited<ReturnType<typeof getDb>>,
   trabajoId: number
 ): Promise<PeriodoTrabajo | null> {
@@ -85,8 +94,6 @@ async function periodoEnCursoDe(
     .createQueryBuilder("pt")
     .where("pt.trabajoId = :trabajoId", { trabajoId })
     .andWhere("pt.eliminado = :eliminado", { eliminado: false })
-    // No cobrado: fechaDeCobro null o centinela (1901-01-01).
-    .andWhere("(pt.fechaDeCobro IS NULL OR pt.fechaDeCobro < '1901-01-02')")
     .andWhere("pt.fechaDesde <= :hoy", { hoy: hoyKey })
     .andWhere("pt.fechaHasta >= :hoy", { hoy: hoyKey })
     .limit(1)
@@ -130,14 +137,20 @@ export async function actualizarTrabajo(
     throw new Error(`Trabajo con id ${id} no encontrado`);
   }
 
-  // Conversión de modalidad (§3.2): bloqueada si el trabajo tiene un período en
-  // curso (no cobrado y vigente hoy). La conversión solo afecta períodos futuros.
+  // Conversión de modalidad (§3.2): bloqueada si el trabajo tiene un período
+  // VIGENTE hoy —aunque ya esté cobrado, por el cobro adelantado (§92)—: la
+  // conversión solo afecta períodos futuros.
   const modalidadActual = existing.modalidadCobro ?? "horas_variables";
   if (data.modalidadCobro && data.modalidadCobro !== modalidadActual) {
-    const enCurso = await periodoEnCursoDe(ds, existing.id);
-    if (enCurso) {
+    const vigente = await periodoVigenteDe(ds, existing.id);
+    if (vigente) {
+      const rango = `${formatearFechaDMA(vigente.fechaDesde)} al ${formatearFechaDMA(vigente.fechaHasta)}`;
+      // Si ya se cobró (por adelantado) no tiene sentido pedir "cerrá o cobrá".
+      const salida = periodoCobrado(vigente)
+        ? ", aunque ya esté cobrado. Vas a poder cambiarla cuando termine."
+        : ". Cerrá o cobrá ese período primero.";
       throw new Error(
-        `No podés cambiar la modalidad de "${existing.nombre}" porque tiene un período en curso (${formatearFechaDMA(enCurso.fechaDesde)} al ${formatearFechaDMA(enCurso.fechaHasta)}). Cerrá o cobrá ese período primero.`
+        `No podés cambiar la modalidad de "${existing.nombre}" porque tiene un período en curso (${rango})${salida}`
       );
     }
   }

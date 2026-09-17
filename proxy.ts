@@ -169,8 +169,10 @@ export const config = {
   // la app es instalable, el navegador pide el manifest y los iconos (estos
   // últimos SIN credenciales), así que si el proxy los redirige a /login la
   // instalación falla de forma silenciosa. `/offline` también es público: se
-  // muestra justamente cuando no hay red para validar la sesión.
+  // muestra justamente cuando no hay red para validar la sesión. Y `api/ping`
+  // es la SONDA del servidor (2026-09-17): tiene que contestar 204 siempre,
+  // incluso sin sesión (se usa cuando la sesión no se puede validar).
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon\\.svg|icon\\.png|apple-icon\\.png|manifest\\.webmanifest|sw\\.js|icons/|offline(?:$|/)|version\\.json).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon\\.svg|icon\\.png|apple-icon\\.png|manifest\\.webmanifest|sw\\.js|icons/|offline(?:$|/)|version\\.json|api/ping(?:$|/)).*)",
   ],
 };

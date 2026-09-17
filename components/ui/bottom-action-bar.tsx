@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { NavSpinner } from "@/components/ui/nav-progress";
+import { LinkNavStatus, NavSpinner } from "@/components/ui/nav-progress";
 
 export interface BottomBarAction {
   /** Id único de la acción (usado como key). */
@@ -24,8 +25,15 @@ interface BottomActionBarProps {
   left?: BottomBarAction[];
   /** Acciones del lado derecho (típicamente Editar / Eliminar). */
   right?: BottomBarAction[];
-  /** FAB central flotante sobre la barra (típicamente "Nuevo"). */
-  fabAction?: { label?: string; onClick?: () => void; pending?: boolean };
+  /** FAB central flotante sobre la barra (típicamente "Nuevo"). Si se pasa
+      `href`, se renderiza como `<Link>` (prefetch + feedback de 2026-09-17);
+      si no, con `onClick` como antes. */
+  fabAction?: {
+    label?: string;
+    onClick?: () => void;
+    href?: string;
+    pending?: boolean;
+  };
 }
 
 /**
@@ -57,12 +65,28 @@ export function BottomActionBar({
   const hayAcciones = left.length + right.length > 0;
 
   if (!hayAcciones) {
-    if (!fabAction?.onClick) return null;
+    if (!fabAction?.onClick && !fabAction?.href) return null;
     return (
       <div
         className="fixed bottom-4 right-4 z-30 lg:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
+        {fabAction.href ? (
+          <Link
+            href={fabAction.href}
+            aria-label={fabAction.label ?? "Agregar"}
+            title={fabAction.label ?? "Nuevo"}
+            // Sin borde: el círculo va limpio (pedido del usuario 2026-09-13).
+            className="flex h-12 w-12 items-center justify-center rounded-full bg-header text-background shadow-lg transition-transform active:scale-95"
+          >
+            {fabAction.pending ? (
+              <NavSpinner className="h-5 w-5" />
+            ) : (
+              <Plus className="h-5 w-5" />
+            )}
+            <LinkNavStatus />
+          </Link>
+        ) : (
         <button
           type="button"
           onClick={fabAction.onClick}
@@ -77,6 +101,7 @@ export function BottomActionBar({
             <Plus className="h-5 w-5" />
           )}
         </button>
+        )}
       </div>
     );
   }
@@ -124,7 +149,22 @@ export function BottomActionBar({
             </div>
           </div>
           {/* FAB centrado flotando sobre la barra (sin borde: círculo limpio) */}
-          {fabAction?.onClick && (
+          {fabAction?.href ? (
+            <Link
+              href={fabAction.href}
+              aria-label={fabAction.label ?? "Agregar"}
+              title={fabAction.label ?? "Nuevo"}
+              className="absolute left-1/2 top-0 z-10 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-header text-background shadow-lg transition-transform active:scale-95"
+            >
+              {fabAction.pending ? (
+                <NavSpinner className="h-6 w-6" />
+              ) : (
+                <Plus className="h-6 w-6" />
+              )}
+              <LinkNavStatus />
+            </Link>
+          ) : (
+          fabAction?.onClick && (
             <button
               type="button"
               onClick={fabAction.onClick}
@@ -138,6 +178,7 @@ export function BottomActionBar({
                 <Plus className="h-6 w-6" />
               )}
             </button>
+          )
           )}
         </div>
       </div>

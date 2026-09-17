@@ -18,6 +18,7 @@ import {
   ChevronsUpDown,
   ChevronUp,
 } from "lucide-react";
+import { NavSpinner, usePrefetchNav } from "@/components/ui/nav-progress";
 import { cn } from "@/lib/utils";
 
 type Align = "left" | "center" | "right";
@@ -48,6 +49,13 @@ interface DataTableProps<TData, TValue> {
       montos no entraba por el padding lateral) y tipografía de 12px. Solo
       cambia el estilo, no el comportamiento. */
   dense?: boolean;
+  /** Destino propio de cada fila (p. ej. su detalle): se PREFETCHEA al primer
+      contacto (touch/mouse) para que el toque abra la pantalla casi al
+      instante. No navega por sí solo: el clic sigue siendo de `onRowClick`. */
+  rowHref?: (originalRow: TData) => string | null;
+  /** Id (`getRowId`) de la fila que está abriendo su detalle: se atenúa y se
+      muestra un spinner centrado sobre la grilla (feedback de 2026-09-17). */
+  pendingRowId?: string | null;
 }
 
 /**
@@ -64,9 +72,13 @@ export function DataTable<TData, TValue>({
   onRowClick,
   initialSorting,
   dense = false,
+  rowHref,
+  pendingRowId = null,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>(initialSorting ?? []);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize });
+  // Prefetch del destino de la fila al primer contacto (2026-09-17).
+  const prefetch = usePrefetchNav();
   // Padding lateral de las celdas: compacto en las grillas mobile.
   const cellPad = dense ? "px-1.5 py-2" : "px-3 py-2.5";
 
@@ -95,7 +107,7 @@ export function DataTable<TData, TValue>({
 
   return (
     <>
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table
           className={cn(
             "w-full border-collapse",
@@ -154,7 +166,12 @@ export function DataTable<TData, TValue>({
             ))}
           </thead>
           <tbody>
-            {table.getRowModel().rows.map((row) => (
+            {table.getRowModel().rows.map((row) => {
+              // Fila que está abriendo su detalle: se atenúa mientras llega la
+              // página nueva (el spinner va centrado sobre la grilla, abajo).
+              const enCurso = pendingRowId !== null && pendingRowId === row.id;
+              const href = rowHref?.(row.original) ?? null;
+              return (
               <tr
                 key={row.id}
                 // Id de la fila en el DOM: lo usa el menú deslizante
@@ -162,10 +179,15 @@ export function DataTable<TData, TValue>({
                 // fila que se está arrastrando.
                 data-row-id={row.id}
                 onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                // Prefetch al primer contacto con la fila (2026-09-17): al ser
+                // un toque, el destino se pide antes del clic.
+                onTouchStart={href ? () => prefetch(href) : undefined}
+                onMouseEnter={href ? () => prefetch(href) : undefined}
                 className={cn(
                   "border-b border-border last:border-0 transition-colors hover:bg-muted/40",
                   rowClassName?.(row.original),
-                  onRowClick && "cursor-pointer select-none"
+                  onRowClick && "cursor-pointer select-none",
+                  enCurso && "opacity-60"
                 )}
               >
                 {row.getVisibleCells().map((cell) => {
@@ -189,7 +211,8 @@ export function DataTable<TData, TValue>({
                   );
                 })}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
           {hasFooter &&
             table.getFooterGroups().map((footerGroup) => (
@@ -221,6 +244,14 @@ export function DataTable<TData, TValue>({
               </tfoot>
             ))}
         </table>
+
+        {/* Spinner de "abriendo el detalle": la fila atenuada indica CUÁL se
+            tocó y este indicador centrado confirma que la app está trabajando. */}
+        {pendingRowId !== null && (
+          <span className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border border-border bg-card px-3 py-1.5 shadow-sm">
+            <NavSpinner className="text-primary" />
+          </span>
+        )}
       </div>
 
       {/* Pagination */}

@@ -120,6 +120,11 @@ export function PeriodosModal({
             data={data}
             pageSize={8}
             onRowClick={(p) => abrirPeriodo(p.id)}
+            // La fila prefetchea su destino al primer contacto (2026-09-17):
+            // cuando el dedo la toca, la pantalla del período ya está en camino.
+            rowHref={(p) =>
+              `/cruds/periodos-trabajo/${p.id}?origen=dashboard&periodos=${tipo ?? ""}`
+            }
           />
         ) : (
           <div className="flex h-24 items-center justify-center text-[13px] text-subtitle">

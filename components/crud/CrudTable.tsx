@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ArrowLeft, FileDown, Pencil, Plus, Search, Trash2, type LucideIcon } from "lucide-react";
 import { BottomActionBar } from "@/components/ui/bottom-action-bar";
 import { DataTable } from "@/components/ui/data-table";
@@ -10,7 +10,11 @@ import {
   type SwipeRowAction,
 } from "@/components/crud/SwipeRowActions";
 import { Modal } from "@/components/ui/modal";
-import { usePendingNav } from "@/components/ui/nav-progress";
+import {
+  LinkNavStatus,
+  startNav,
+  usePendingNav,
+} from "@/components/ui/nav-progress";
 import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
@@ -101,12 +105,18 @@ interface CrudTableProps<T, TId = number> {
       acciones, junto a Editar/Eliminar (ícono con el label como título/tooltip).
       En mobile el equivalente va en la barra inferior
       (`mobilePrimaryAction`), que no suma columnas a la grilla.
-      Requiere `showActions` (la columna de acciones es la que la contiene). */
+      Requiere `showActions` (la columna de acciones es la que la contiene).
+      Si se pasa `href`, la acción se renderiza como `<Link>` (prefetch). */
   rowAction?: {
     label: string;
     icon: LucideIcon;
     onClick: (id: TId) => void;
+    href?: (id: TId) => string;
   };
+  /** Destino propio de una FILA (p. ej. su detalle). No navega por sí solo:
+      sirve para prefetchearlo al primer contacto (touch/mouse) en la grilla
+      mobile y para el spinner de "abriendo" (2026-09-17). */
+  rowHref?: (id: TId) => string;
   /** Contenido extra que se renderiza entre el título y la grilla (arriba del
       contenido). Útil para un resumen/header contextual (p. ej. el resumen de
       un período de trabajo con su monto a cobrar). */
@@ -157,16 +167,18 @@ export function CrudTable<T, TId = number>({
   extraAction,
   mobilePrimaryAction,
   rowAction,
+  rowHref,
   topContent,
   showActions = true,
   isSyntheticRow,
   rowClassName,
   emptyMessage = "Sin datos disponibles",
 }: CrudTableProps<T, TId>) {
-  const router = useRouter();
   // Navegaciones con feedback (2026-09-14): `nav(href, key)` enciende la barra
   // de progreso global y marca el control tocado (FAB "Nuevo", "Editar") con un
-  // spinner mientras llega la página nueva.
+  // spinner mientras llega la página nueva. Desde el 2026-09-17 los destinos
+  // FIJOS (Editar/Nuevo) son `<Link>` y el prefetch lo hace Next solo; `nav`
+  // sigue usándose para el resto (volver, barra inferior, menú deslizante).
   const { pendingKey, go: nav } = usePendingNav();
   const [items, setItems] = useState<T[]>(initialData ?? []);
   const [loading, setLoading] = useState(!initialData);
@@ -176,6 +188,10 @@ export function CrudTable<T, TId = number>({
   const [deleting, setDeleting] = useState(false);
   // Selección por fila (solo mobile con barra inferior): una a la vez.
   const [selectedId, setSelectedId] = useState<TId | null>(null);
+  // Fila cuya pantalla de detalle está abriéndose (`data-row-id`, solo mobile):
+  // se atenúa y muestra un spinner (2026-09-17). No hace falta limpiarla al
+  // terminar: la navegación desmonta este listado.
+  const [pendingRowId, setPendingRowId] = useState<string | null>(null);
 
   const load = () => {
     if (!fetchData) return;
@@ -236,25 +252,40 @@ export function CrudTable<T, TId = number>({
                   <span className="text-subtitle">—</span>
                 ) : (
                   <div className="flex items-center justify-center gap-1.5">
-                    {rowAction && (
-                      <button
-                        type="button"
-                        onClick={() => rowAction.onClick(getId(row.original))}
-                        className="rounded p-1 text-subtitle transition-colors hover:bg-muted hover:text-header"
-                        title={rowAction.label}
-                        aria-label={rowAction.label}
-                      >
-                        <rowAction.icon className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => nav(editHref(getId(row.original)), "edit")}
+                    {rowAction &&
+                      (rowAction.href ? (
+                        <Link
+                          href={rowAction.href(getId(row.original))}
+                          className="rounded p-1 text-subtitle transition-colors hover:bg-muted hover:text-header"
+                          title={rowAction.label}
+                          aria-label={rowAction.label}
+                        >
+                          <rowAction.icon className="h-3.5 w-3.5" />
+                          <LinkNavStatus />
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => rowAction.onClick(getId(row.original))}
+                          className="rounded p-1 text-subtitle transition-colors hover:bg-muted hover:text-header"
+                          title={rowAction.label}
+                          aria-label={rowAction.label}
+                        >
+                          <rowAction.icon className="h-3.5 w-3.5" />
+                        </button>
+                      ))}
+                    {/* Editar: `<Link>` (2026-09-17) para que Next prefetchee el
+                        formulario cuando la fila entra en pantalla y la
+                        navegación sea casi instantánea. */}
+                    <Link
+                      href={editHref(getId(row.original))}
                       className="rounded p-1 text-subtitle transition-colors hover:bg-muted hover:text-header"
+                      title="Editar"
                       aria-label="Editar"
                     >
                       <Pencil className="h-3.5 w-3.5" />
-                    </button>
+                      <LinkNavStatus />
+                    </Link>
                     <button
                       type="button"
                       onClick={() => setDeleteId(getId(row.original))}
@@ -272,7 +303,6 @@ export function CrudTable<T, TId = number>({
     ],
     [
       columns,
-      nav,
       editHref,
       getId,
       trailingColumns,
@@ -471,7 +501,13 @@ export function CrudTable<T, TId = number>({
   };
   const swipeRowTap = (rowId: string) => {
     const item = filtered.find((i) => String(getId(i)) === rowId);
-    if (item) mobileSwipe?.onRowTap?.(getId(item));
+    if (!item) return;
+    // Feedback de "abriendo el detalle" (2026-09-17): la fila queda atenuada con
+    // un spinner y se enciende la barra global. La navegación la hace la vista
+    // (`onRowTap`), que es quien conoce el destino.
+    setPendingRowId(rowId);
+    startNav();
+    mobileSwipe?.onRowTap?.(getId(item));
   };
 
   // Barra inferior fija (<lg): componente reutilizable BottomActionBar con
@@ -487,7 +523,7 @@ export function CrudTable<T, TId = number>({
       <BottomActionBar
         fabAction={{
           label: "Nuevo",
-          onClick: () => nav(createHref, "fab"),
+          href: createHref,
           pending: pendingKey === "fab",
         }}
       />
@@ -538,7 +574,7 @@ export function CrudTable<T, TId = number>({
       ]}
       fabAction={{
         label: "Nuevo",
-        onClick: () => nav(createHref, "fab"),
+        href: createHref,
         pending: pendingKey === "fab",
       }}
     />
@@ -590,18 +626,17 @@ export function CrudTable<T, TId = number>({
                 <FileDown className="h-3.5 w-3.5" />
                 Exportar
               </button>
-              <button
-                type="button"
-                onClick={() => nav(createHref, "nuevo")}
-                aria-busy={pendingKey === "nuevo" || undefined}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90",
-                  pendingKey === "nuevo" && "opacity-70"
-                )}
+              {/* Nuevo: `<Link>` (2026-09-17) ⇒ Next prefetchea el formulario
+                  cuando el botón entra en pantalla (y el botón está en todas
+                  las vistas de listado, así que la navegación ya viene lista). */}
+              <Link
+                href={createHref}
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Nuevo
-              </button>
+                <LinkNavStatus />
+              </Link>
             </>
           )}
         </div>
@@ -647,6 +682,15 @@ export function CrudTable<T, TId = number>({
                 rowClassName={(row) =>
                   cn(rowClassName?.(row), showActions ? selectedCls(row) : "")
                 }
+                // Destino propio de la fila (su detalle): se prefetchea al
+                // primer contacto con el dedo (2026-09-17).
+                rowHref={
+                  swipeMode && rowHref
+                    ? (row) => rowHref(getId(row))
+                    : undefined
+                }
+                // Spinner/atenuado de la fila que está abriendo su detalle.
+                pendingRowId={swipeMode ? pendingRowId : null}
                 // En modo swipe la fila no se selecciona: el toque lo maneja
                 // SwipeRowActions (`onRowTap`).
                 onRowClick={

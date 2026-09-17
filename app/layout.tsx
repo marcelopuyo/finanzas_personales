@@ -5,6 +5,7 @@ import "flag-icons/css/flag-icons.min.css";
 import ThemeProvider from "@/components/layout/theme-provider";
 import { ToasterProvider } from "@/components/layout/toaster";
 import { SessionGuard } from "@/components/auth/session-guard";
+import { SessionExpiredWatcher } from "@/components/auth/session-expired-watcher";
 import { AppLock } from "@/components/auth/app-lock";
 import { SwRegister } from "@/components/pwa/sw-register";
 import { biometriaParaBloqueo } from "@/backend/src/queries/webauthn";
@@ -99,6 +100,13 @@ export default async function RootLayout({
                   if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                     document.documentElement.classList.add('dark');
                   }
+                  // Sin conexión: se avisa ANTES del primer paint para que el
+                  // candado (que viene renderizado del servidor) no parpadee.
+                  // Con esta clase, el CSS lo oculta: la app arranca en modo
+                  // lectura (§96) sin ver ni un frame del cerrojo.
+                  if (navigator.onLine === false) {
+                    document.documentElement.classList.add('fp-sin-red');
+                  }
                 } catch(e) {}
               })();
             `,
@@ -108,6 +116,10 @@ export default async function RootLayout({
       <body className="min-h-full bg-background font-sans">
         <ThemeProvider>
           <SessionGuard />
+          {/* Sesión vencida en una Server Action: `Next` redirige al /login y la
+              acción nunca corre, así que el usuario veía un error genérico. Este
+              parche detecta el redirect y manda a /login con el aviso. */}
+          <SessionExpiredWatcher />
           {/* Bloqueo de la app (mobile, con biometría activada): si el equipo
               puede desbloquear, el candado se renderiza ACÁ (en el servidor) y
               **antes del contenido a propósito**: así el primer paint al abrir la

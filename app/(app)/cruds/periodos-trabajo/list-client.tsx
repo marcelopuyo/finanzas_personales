@@ -273,8 +273,11 @@ export function PeriodosTrabajoListClient({
   // Abre el detalle del período (sus jornadas/tareas): es el destino del
   // TOQUE simple sobre una fila en mobile (modo swipe) y de la acción por fila
   // del desktop.
-  const abrirDetalle = (id: number) =>
-    router.push(`/cruds/periodos-trabajo/${id}`);
+  // `detalleHref` es el MISMO destino como URL: se pasa a `CrudTable` para que
+  // la fila lo prefetchee al primer contacto y muestre el spinner de "abriendo"
+  // (2026-09-17).
+  const detalleHref = (id: number) => `/cruds/periodos-trabajo/${id}`;
+  const abrirDetalle = (id: number) => router.push(detalleHref(id));
   /** Acción EXTRA del menú deslizante de una fila (mobile). Dos casos:
       · **COBRAR** (decisión del usuario 2026-09-16): si el período YA se puede
         cobrar (`periodoCobrable`: cerró, o es `fijo`/`horas_fijas` y ya empezó),
@@ -404,11 +407,15 @@ export function PeriodosTrabajoListClient({
       }}
       // En desktop no hay swipe ni barra inferior, así que el acceso al detalle
       // va como acción por fila en la columna de acciones (ícono con tooltip).
+      // Va como `<Link>` (`href`) para que Next prefetchee el detalle.
       rowAction={{
         label: "Ver jornadas/tareas del período",
         icon: CalendarClock,
         onClick: abrirDetalle,
+        href: detalleHref,
       }}
+      // Destino propio de la fila (su detalle): se prefetchea al tocar la fila.
+      rowHref={detalleHref}
     />
   );
 }
