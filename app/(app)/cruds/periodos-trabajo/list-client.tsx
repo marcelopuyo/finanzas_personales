@@ -1,11 +1,11 @@
 "use client";
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarClock, CalendarPlus, ListPlus } from "lucide-react";
+import { Banknote, CalendarClock, CalendarPlus, ListPlus } from "lucide-react";
 import { CrudTable } from "@/components/crud/CrudTable";
 import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
 import { eliminarPeriodoTrabajo } from "@/backend/src/actions/trabajos";
-import { periodoCobrado } from "@/backend/src/lib/jornadas";
+import { periodoCobrable, periodoCobrado } from "@/backend/src/lib/jornadas";
 import { ActividadCell } from "@/app/(app)/dashboard/components/ingresos-detalle";
 import type { ColumnDef } from "@tanstack/react-table";
 import { dateTimeToString, numberToCurrency, todayLocalISODate } from "@/lib/utils";
@@ -275,14 +275,37 @@ export function PeriodosTrabajoListClient({
   // del desktop.
   const abrirDetalle = (id: number) =>
     router.push(`/cruds/periodos-trabajo/${id}`);
-  /** Acción de CARGA del menú deslizante, según la MODALIDAD del trabajo
-      (decisión 2026-09-13): `horas_variables` → **Nueva jornada** · `por_tarea`
-      → **Nueva tarea** · `fijo`/`horas_fijas` → **ninguna** (no cargan jornadas
-      ni tareas). Un período COBRADO es de solo lectura, así que tampoco ofrece
-      la acción. La clave de la acción es también el slug del wizard
-      (`/movimientos/nuevo/<slug>`). */
-  const accionesCarga = (p: PeriodoTrabajoOut) => {
+  /** Acción EXTRA del menú deslizante de una fila (mobile). Dos casos:
+      · **COBRAR** (decisión del usuario 2026-09-16): si el período YA se puede
+        cobrar (`periodoCobrable`: cerró, o es `fijo`/`horas_fijas` y ya empezó),
+        la acción es **Cobrar** —antes aparecía "Nueva jornada" y había que entrar
+        al detalle para cobrar— y REEMPLAZA a la carga de jornadas/tareas. Mismo
+        destino que el botón "Cobrar" del detalle del período: wizard de cobro de
+        sueldo con el período precargado (y su monto) y vuelta a ESTE listado.
+      · **CARGA** (si todavía no se puede cobrar), según la MODALIDAD del trabajo
+        (decisión 2026-09-13): `horas_variables` → **Nueva jornada** · `por_tarea`
+        → **Nueva tarea** · `fijo`/`horas_fijas` → **ninguna** (no cargan jornadas
+        ni tareas). Mismo destino que el "+" del detalle: wizard directo, con el
+        período precargado y vuelta a ESTE listado (Cancelar/guardar).
+      Un período COBRADO es de solo lectura: ninguna de las dos. La clave de la
+      acción es también el slug del wizard (`/movimientos/nuevo/<slug>`). */
+  const accionesFila = (p: PeriodoTrabajoOut) => {
     if (periodoCobrado(p)) return [];
+    if (periodoCobrable(p, todayLocalISODate())) {
+      return [
+        {
+          key: "cobrar",
+          label: "Cobrar",
+          icon: Banknote,
+          onClick: () =>
+            router.push(
+              `/movimientos/nuevo/cobro?periodo=${p.id}&volverA=${encodeURIComponent(
+                urlListado
+              )}`
+            ),
+        },
+      ];
+    }
     const modalidad = p.trabajo?.modalidadCobro ?? "horas_variables";
     const tipo =
       modalidad === "horas_variables"
@@ -291,8 +314,6 @@ export function PeriodosTrabajoListClient({
           ? { slug: "tarea", label: "Nueva tarea", icon: ListPlus }
           : null;
     if (!tipo) return [];
-    // Mismo destino que el "+" del detalle del período: wizard directo, con el
-    // período precargado y vuelta a ESTE listado (Cancelar/guardar).
     return [
       {
         key: tipo.slug,
@@ -366,7 +387,8 @@ export function PeriodosTrabajoListClient({
       // Modo swipe (decisión 2026-09-13): la fila NO se selecciona; un TOQUE
       // abre el detalle del período (jornadas/tareas) — el acceso que antes
       // estaba en el botón "Jornadas" de la barra inferior — y el menú
-      // deslizante revela la acción de carga según la MODALIDAD del trabajo
+      // deslizante revela **Cobrar** si el período ya se puede cobrar (decisión
+      // 2026-09-16) o, si no, la acción de carga según la MODALIDAD del trabajo
       // (Nueva jornada / Nueva tarea, o ninguna) + las acciones fijas Editar y
       // Eliminar. NO se propaga `origen=dashboard`: el detalle usa ese parámetro
       // para volver al dashboard, y acá tiene que volver a ESTE listado (sin
@@ -377,7 +399,7 @@ export function PeriodosTrabajoListClient({
         width: 192,
         extraActions: (id) => {
           const p = porId.get(id);
-          return p ? accionesCarga(p) : [];
+          return p ? accionesFila(p) : [];
         },
       }}
       // En desktop no hay swipe ni barra inferior, así que el acceso al detalle
