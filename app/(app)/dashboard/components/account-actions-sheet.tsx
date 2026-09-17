@@ -6,7 +6,6 @@ import {
   Banknote,
   Briefcase,
   CalendarPlus,
-  ChevronRight,
   ClipboardList,
   Receipt,
   Send,
@@ -19,19 +18,20 @@ export interface CuentaAcciones {
   /** Solo en cuentas reales; en tarjetas sintéticas (soloMovimiento) puede faltar. */
   id?: number;
   nombre: string;
-  /** Saldo ya formateado como moneda. */
-  saldo: string;
 }
 
 /** Acción(es) únicas para tarjetas sintéticas (sin cuenta real detrás). */
 export type AccionSintetica = "jornada" | "cobro" | "tarea" | "periodo";
 
 /**
- * Bottom sheet (mobile) / diálogo centrado (desktop) con las acciones de una
- * cuenta: registrar gasto, transferir y ajustar cuenta (las cuentas reales
- * abren su historial al hacer clic en la tarjeta). Con `soloMovimiento`
- * (tarjetas sintéticas como "Actuales"/"Por cobrar") muestra
- * únicamente esa opción. Reutiliza `Modal`.
+ * Popup de opciones de una cuenta (mobile y escritorio): registrar gasto,
+ * transferir y ajustar cuenta (las cuentas reales abren su historial al hacer
+ * clic en la tarjeta). Con `soloMovimiento` (tarjetas sintéticas como
+ * "Actuales"/"Por cobrar") muestra únicamente esa opción. Reutiliza `Modal`, que
+ * desde 2026-09-17 se puede pedir **centrado** (antes en mobile era un bottom
+ * sheet anclado abajo) y el popup quedó **compacto y sin encabezado**: sin
+ * título (⇒ sin botón ✕: se cierra tocando afuera o con Escape), sin el saldo de
+ * la cuenta, sin chevrons y con las opciones más juntas.
  */
 export function AccountActionsSheet({
   cuenta,
@@ -110,17 +110,20 @@ export function AccountActionsSheet({
     <Modal
       open={open}
       onClose={onClose}
-      title="Opciones de la cuenta"
-      className="sm:max-w-sm"
+      // Sin `title` (pedido del usuario 2026-09-17): el popup queda mínimo.
+      // ⚠️ Eso también quita el botón ✕ del encabezado: el popup se cierra
+      // tocando afuera o con Escape. Centrado en la MITAD de la pantalla (y no
+      // anclado abajo) + más angosto.
+      centrado
     >
-      <div className="space-y-3">
-        <div className="flex items-center justify-between rounded-lg border border-border bg-muted px-3 py-2">
-          <p className="text-[13px] font-medium text-header">{cuenta.nombre}</p>
-          <p className="text-[15px] font-semibold tracking-tight text-value">
-            {cuenta.saldo}
-          </p>
-        </div>
-        <div className="space-y-1">
+      <div className="space-y-2">
+        {/* Solo el nombre de la cuenta: el SALDO se quitó (pedido del usuario
+            2026-09-17) para que el popup sea más chico. */}
+        <p className="px-2 text-[13px] font-medium text-header">
+          {cuenta.nombre}
+        </p>
+        {/* Opciones juntas y sin chevron (el chevron se quitó para compactar). */}
+        <div className="space-y-0.5">
           {accionesTop.map((row) => (
             <button
               key={row.label}
@@ -128,15 +131,14 @@ export function AccountActionsSheet({
               onClick={() => go(row.href)}
               onTouchStart={() => prefetch(row.href)}
               onMouseEnter={() => prefetch(row.href)}
-              className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-muted"
+              className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-muted"
             >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-primary">
-                <row.icon className="h-4 w-4" />
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-primary">
+                <row.icon className="h-3.5 w-3.5" />
               </span>
-              <span className="flex-1 text-[14px] font-medium text-card-foreground">
+              <span className="flex-1 text-[13.5px] font-medium text-card-foreground">
                 {row.label}
               </span>
-              <ChevronRight className="h-4 w-4 text-subtitle" />
             </button>
           ))}
         </div>

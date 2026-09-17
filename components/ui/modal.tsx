@@ -12,12 +12,21 @@ interface ModalProps {
   children: ReactNode;
   footer?: ReactNode;
   className?: string;
+  /**
+   * Centra el diálogo **también en mobile**. Por defecto, en mobile el modal es
+   * un *bottom sheet* anclado abajo (patrón de la app) y recién en `sm+` se
+   * centra; con `centrado` se centra en todas las pantallas y queda más angosto
+   * (`max-w-sm`) con margen alrededor. Lo usa el popup de acciones de la cuenta
+   * (pedido del usuario, 2026-09-17).
+   */
+  centrado?: boolean;
 }
 
 /**
  * Modal reutilizable mobile-first: en móvil se comporta como bottom sheet
  * (ancho completo, esquinas superiores redondeadas) y en pantallas sm+
- * como diálogo centrado. Cierra con Escape o al tocar el backdrop.
+ * como diálogo centrado — o centrado en TODAS con `centrado`—. Cierra con
+ * Escape o al tocar el backdrop.
  */
 export function Modal({
   open,
@@ -26,6 +35,7 @@ export function Modal({
   children,
   footer,
   className,
+  centrado = false,
 }: ModalProps) {
   useEffect(() => {
     if (!open) return;
@@ -44,7 +54,12 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+    <div
+      className={cn(
+        "fixed inset-0 z-50 flex justify-center",
+        centrado ? "items-center p-4" : "items-end sm:items-center"
+      )}
+    >
       <div
         className="absolute inset-0 bg-black/50"
         onClick={onClose}
@@ -54,7 +69,10 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         className={cn(
-          "relative z-10 flex max-h-[90dvh] w-full flex-col rounded-t-2xl border border-border bg-card shadow-xl sm:max-w-md sm:rounded-2xl",
+          "relative z-10 flex max-h-[90dvh] w-full flex-col border border-border bg-card shadow-xl",
+          centrado
+            ? "max-w-sm rounded-2xl"
+            : "rounded-t-2xl sm:max-w-md sm:rounded-2xl",
           className
         )}
       >

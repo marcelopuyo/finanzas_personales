@@ -169,7 +169,7 @@ export function AccountCard({
           {menuButton}
         </div>
         <AccountActionsSheet
-          cuenta={{ id: id!, nombre: title, saldo: value }}
+          cuenta={{ id: id!, nombre: title }}
           open={sheetOpen}
           onClose={() => setSheetOpen(false)}
         />
@@ -220,7 +220,7 @@ export function AccountCard({
         </div>
         {conMenu && (
           <AccountActionsSheet
-            cuenta={{ nombre: title, saldo: value }}
+            cuenta={{ nombre: title }}
             open={sheetOpen}
             onClose={() => setSheetOpen(false)}
             soloMovimiento={menuAccion}
