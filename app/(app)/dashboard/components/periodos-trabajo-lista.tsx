@@ -1,10 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { CalendarCheck, CalendarClock } from "lucide-react";
 import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
 import { periodoCobrado } from "@/backend/src/lib/jornadas";
-import { LinkNavStatus } from "@/components/ui/nav-progress";
 import { cn, dateTimeToString, numberToCurrency } from "@/lib/utils";
 
 /** Suma el monto PENDIENTE de cobro del grupo: excluye los períodos YA COBRADOS
@@ -55,13 +53,6 @@ interface Props {
   enCurso: PeriodoTrabajoOut[];
   /** ISO 4217 de la moneda predeterminada del usuario. */
   currency: string;
-  /** Tocar CUALQUIER fila abre el CRUD de períodos completo (decisión
-      2026-09-13: antes abría la pantalla de jornadas/tareas del período). */
-  onOpen: () => void;
-  /** Destino de la fila. Se usa `<Link>` (y no el `onOpen`) para que Next haga
-      PREFETCH y la navegación sea instantánea (2026-09-14); `onOpen` queda como
-      fallback para quien no pase `href`. */
-  href?: string;
 }
 
 /**
@@ -70,17 +61,14 @@ interface Props {
  * único chip por grupo** (en el encabezado, junto al total) — primero los "Por
  * cobrar" (los que llevan más tiempo sin cobrarse) y después los "En curso"
  * (los que terminan antes). Se listan TODOS los períodos pendientes de cada
- * grupo, sin tope de filas (decisión 2026-09-13). Tocar cualquier fila abre el
- * CRUD de períodos completo (`/cruds/periodos-trabajo`), no el detalle del
- * período (decisión 2026-09-13).
+ * grupo, sin tope de filas (decisión 2026-09-13).
+ *
+ * ⚠️ **Las filas NO son clickeables** (decisión del usuario 2026-09-17): son
+ * `<div>` sin `hover`/`active`/cursor, es decir **sin ninguna señal visual de
+ * clic**. El clic que abre el CRUD de períodos lo maneja el PANEL COMPLETO
+ * (ver `dashboard-client.tsx`: cualquier punto del panel, salvo el menú ⋯).
  */
-export function PeriodosTrabajoLista({
-  porCobrar,
-  enCurso,
-  currency,
-  onOpen,
-  href,
-}: Props) {
+export function PeriodosTrabajoLista({ porCobrar, enCurso, currency }: Props) {
   const grupos = [
     {
       cobrar: true,
@@ -123,10 +111,15 @@ export function PeriodosTrabajoLista({
             // estar cobrado y seguir EN CURSO: sigue listado en este grupo y se
             // marca con el tag para no confundirlo con uno pendiente.
             const cobrado = periodoCobrado(p);
-            const filaCls =
-              "block w-full border-t border-border py-2.5 text-left transition-colors hover:bg-muted/40 active:bg-muted/60";
-            const contenido = (
-              <>
+            // Fila SIN señales de clic (pedido del usuario 2026-09-17): ni
+            // `hover`/`active`, ni `cursor: pointer`, ni `<Link>`/`<button>`
+            // (el `<a>` mostraría el cursor de mano). La navegación la dispara el
+            // panel completo desde `dashboard-client.tsx`.
+            return (
+              <div
+                key={p.id}
+                className="border-t border-border py-2.5 [-webkit-tap-highlight-color:transparent]"
+              >
                 {/* Fila 1: trabajo + monto. Fila 2: fechas (+ tag si ya se cobró). */}
                 <div className="flex items-center justify-between gap-3">
                   <p className="min-w-0 truncate text-[13.5px] font-medium text-header">
@@ -146,20 +139,7 @@ export function PeriodosTrabajoLista({
                     </span>
                   )}
                 </div>
-              </>
-            );
-            // `<Link>` en vez de `<button onClick>`: Next prefetchea el destino al
-            // entrar en viewport y la navegación deja de tener espera visible.
-            return href ? (
-              <Link key={p.id} href={href} className={filaCls}>
-                {/* Avisa a la barra de progreso global mientras llega el CRUD. */}
-                <LinkNavStatus />
-                {contenido}
-              </Link>
-            ) : (
-              <button key={p.id} type="button" onClick={onOpen} className={filaCls}>
-                {contenido}
-              </button>
+              </div>
             );
           })}
         </div>

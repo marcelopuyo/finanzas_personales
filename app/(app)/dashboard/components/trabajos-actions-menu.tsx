@@ -6,9 +6,11 @@ import { LinkNavStatus } from "@/components/ui/nav-progress";
 import { Briefcase, Ellipsis } from "lucide-react";
 
 /**
- * Menú desplegable (⋯) del panel "Trabajo" del dashboard (tarjetas sintéticas
- * de períodos), ubicado en la esquina superior derecha del panel con la misma
- * estética que el de Cuentas/Préstamos.
+ * Menú desplegable (⋯) del panel "Trabajo" del dashboard (períodos), ubicado en
+ * la esquina superior derecha del panel con la misma estética que el de
+ * Cuentas/Préstamos. Desde 2026-09-17 el panel completo abre el CRUD de períodos
+ * al hacer clic en cualquier punto, así que este menú **corta el `click`** para
+ * quedar excluido de esa acción.
  *
  * Solo gestiona TRABAJOS: los PERÍODOS se abren desde las propias tarjetas del
  * panel (Por cobrar / Actuales → popup del listado; Finalizados → CRUD filtrado
@@ -39,7 +41,14 @@ export function TrabajosActionsMenu() {
   }, [open]);
 
   return (
-    <div className="relative shrink-0" ref={menuRef}>
+    // El clic sobre el menú NO debe llegar al panel: desde 2026-09-17 el panel
+    // "Trabajo" entero navega al CRUD de períodos y el ⋯ (con su desplegable)
+    // queda afuera de esa acción.
+    <div
+      className="relative shrink-0"
+      ref={menuRef}
+      onClick={(e) => e.stopPropagation()}
+    >
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}

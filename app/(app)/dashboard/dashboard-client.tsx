@@ -1,7 +1,6 @@
 ﻿"use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { StatBadge } from "@/components/ui/stat-badge";
 import { Tabs } from "@/components/ui/tabs";
@@ -33,6 +32,7 @@ import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
 import { periodoCobrado } from "@/backend/src/lib/jornadas";
 import { cn, numberToCurrency, todayLocalISODate } from "@/lib/utils";
 import { useMontado } from "@/lib/use-cliente";
+import { usePendingNav, usePrefetchNav } from "@/components/ui/nav-progress";
 
 interface Props {
   data: DashboardData;
@@ -44,6 +44,9 @@ interface Props {
 
 const SIN_CATEGORIA = "Sin categoría";
 const SIN_CUENTA = "Sin cuenta";
+/** Destino del PANEL "Trabajo" completo (ver `dashboard-client`): cualquier clic
+    dentro del panel, salvo el menú ⋯, abre el CRUD de períodos. */
+const HREF_PERIODOS = "/cruds/periodos-trabajo?origen=dashboard";
 const SIN_TRABAJO = "Sin trabajo";
 
 function toDateKey(v: string | Date | null | undefined): string {
@@ -53,7 +56,12 @@ function toDateKey(v: string | Date | null | undefined): string {
 }
 
 export function DashboardClient({ data, periodosInicial }: Props) {
-  const router = useRouter();
+  // El panel "Trabajo" entero navega al CRUD de períodos (2026-09-17): `navGo`
+  // enciende la barra de progreso global (navegación programática) y `prefetch`
+  // pide el RSC al pasar el mouse o apoyar el dedo, así la llegada es inmediata.
+  const { go: navGo } = usePendingNav();
+  const prefetch = usePrefetchNav();
+  const abrirPeriodos = () => navGo(HREF_PERIODOS, "periodos");
   const [tabGastos, setTabGastos] = useState("resumen");
   const [tabIngresos, setTabIngresos] = useState("resumen");
   // Cuenta seleccionada para abrir su historial en popup
@@ -571,8 +579,34 @@ export function DashboardClient({ data, periodosInicial }: Props) {
           una sola lista con chip de estado por fila (por cobrar / en curso) en
           lugar de las tarjetas sintéticas. Los totales de cada grupo (arriba)
           abren el popup con la lista completa del grupo. SIEMPRE visible:
-          aunque no haya períodos, permite gestionar trabajos (⋯). */}
-      <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
+          aunque no haya períodos, permite gestionar trabajos (⋯).
+          ⚠️ **El PANEL ENTERO es el área de clic** (decisión del usuario
+          2026-09-17: antes solo navegaban las filas): cualquier punto —filas,
+          encabezados de grupo, márgenes— abre el CRUD completo de períodos. El
+          menú ⋯ queda EXCLUIDO (corta el `click` desde `TrabajosActionsMenu`) y
+          las filas ya no tienen ninguna señal visual de clic. El prefetch se
+          dispara al pasar el mouse o al apoyar el dedo, así la navegación sigue
+          siendo instantánea (2026-09-14). Con `origen=dashboard` la flecha
+          "Volver" regresa acá y el "+"/editar conservan el viaje. */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label="Ver todos los períodos de trabajo"
+        onClick={abrirPeriodos}
+        onKeyDown={(e) => {
+          // Solo cuando el panel tiene el foco (no cuando lo tiene el ⋯).
+          if (e.target !== e.currentTarget) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            abrirPeriodos();
+          }
+        }}
+        onPointerEnter={() => prefetch(HREF_PERIODOS)}
+        onTouchStart={() => prefetch(HREF_PERIODOS)}
+        // Sin destello del tap en mobile (iOS/Android pintan un flash gris en el
+        // elemento con el `onClick`): el panel navega sin NINGUNA señal visual.
+        className="rounded-lg border border-border bg-card p-4 [-webkit-tap-highlight-color:transparent] sm:p-5"
+      >
           {/* Encabezado: título a la izquierda y menú (⋯) anclado al ángulo
               superior derecho del panel (gestionar trabajos). */}
           <div className="relative mb-3 pr-8">
@@ -585,16 +619,6 @@ export function DashboardClient({ data, periodosInicial }: Props) {
             porCobrar={periodosCobrar}
             enCurso={periodosActuales}
             currency={data.monedaPredeterminadaISO}
-            // Tocar cualquier fila abre el CRUD COMPLETO de períodos (el server
-            // ya los devuelve ordenados por "Desde" DESC), no el detalle del
-            // período (decisión 2026-09-13). Con `origen=dashboard` la flecha
-            // "Volver" regresa acá y el "+"/editar conservan el viaje.
-            // 2026-09-14: se navega con `<Link href>` (prefetch ⇒ instantáneo) y
-            // `onOpen` queda como fallback.
-            href="/cruds/periodos-trabajo?origen=dashboard"
-            onOpen={() =>
-              router.push("/cruds/periodos-trabajo?origen=dashboard")
-            }
           />
       </div>
 
