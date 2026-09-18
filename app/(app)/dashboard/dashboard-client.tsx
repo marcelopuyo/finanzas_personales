@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { StatBadge } from "@/components/ui/stat-badge";
 import { Tabs } from "@/components/ui/tabs";
@@ -33,6 +33,7 @@ import { periodoCobrado } from "@/backend/src/lib/jornadas";
 import { cn, numberToCurrency, todayLocalISODate } from "@/lib/utils";
 import { useMontado } from "@/lib/use-cliente";
 import { usePendingNav, usePrefetchNav } from "@/components/ui/nav-progress";
+import { useTap } from "@/lib/tap";
 
 interface Props {
   data: DashboardData;
@@ -47,10 +48,6 @@ const SIN_CUENTA = "Sin cuenta";
 /** Destino del PANEL "Trabajo" completo (ver `DashboardClient`): cualquier toque
     dentro del panel, salvo el menú ⋯, abre el CRUD de períodos. */
 const HREF_PERIODOS = "/cruds/periodos-trabajo?origen=dashboard";
-/** Un toque cuenta como TAP (y navega) si el dedo no se movió más de esto (px) y
-    no duró más que `TAP_MS`. Un scroll o un long press quedan descartados. */
-const TAP_MOVE_PX = 10;
-const TAP_MS = 500;
 const SIN_TRABAJO = "Sin trabajo";
 
 function toDateKey(v: string | Date | null | undefined): string {
@@ -61,23 +58,14 @@ function toDateKey(v: string | Date | null | undefined): string {
 
 export function DashboardClient({ data, periodosInicial }: Props) {
   // ── Navegación del panel "Trabajo" (todo el panel, salvo el ⋯) ──────────
-  // ⚠️ Se dispara en `touchend` ADEMÁS del `click`: en el iPhone, un toque sobre
-  // una zona grande NO siempre genera `click` (el navegador lo clasifica como
-  // scroll y lo descarta) y la acción se perdía — había que tocar 2-3 veces. Los
-  // touch events sí llegan siempre, con el mismo criterio que el swipe del CRUD
-  // de períodos (§109): si el dedo se movió poco y el gesto fue corto, es un TAP.
+  // ⚠️ Se dispara con **`useTap`** (touch events + click), NO con `onClick`: en
+  // iOS un toque sobre una zona grande puede no generar `click` (el navegador lo
+  // clasifica como scroll y lo descarta) y la acción se perdía ⇒ había que tocar
+  // 2-3 veces. Ver `lib/tap.ts` y §118 de la bitácora.
   const { go: navGo } = usePendingNav();
   const prefetch = usePrefetchNav();
-  const tapRef = useRef<{ x: number; y: number; t: number } | null>(null);
-  /** Momento de la última navegación disparada por el panel (ms): descarta la
-      segunda (el `click` que el navegador emite después del `touchend`) dentro de
-      `TAP_MS`, pero deja reintentar si algo falló. */
-  const navAtRef = useRef(0);
-  const abrirPeriodos = () => {
-    if (Date.now() - navAtRef.current < TAP_MS) return;
-    navAtRef.current = Date.now();
-    navGo(HREF_PERIODOS, "periodos");
-  };
+  const abrirPeriodos = () => navGo(HREF_PERIODOS, "periodos");
+  const tap = useTap(abrirPeriodos);
   const [tabGastos, setTabGastos] = useState("resumen");
   const [tabIngresos, setTabIngresos] = useState("resumen");
   // Cuenta seleccionada para abrir su historial en popup
@@ -602,38 +590,22 @@ export function DashboardClient({ data, periodosInicial }: Props) {
           períodos. El menú ⋯ queda EXCLUIDO porque se monta FUERA del área
           clickeable (es un hermano que flota sobre la esquina) y las filas no
           tienen ninguna señal visual de clic.
-          ⚠️ **Navegación por TOQUE** (2026-09-18): se maneja `touchend` (tap) y
-          `click`, porque en el iPhone el primer toque de una zona grande puede
-          no generar `click` (el navegador lo toma como scroll) ⇒ había que
-          tocar 2-3 veces. `role="link"` + Enter mantienen el acceso por
-          teclado; `cursor-default`, `select-none` y
+          ⚠️ **Navegación por TOQUE** (2026-09-18): usa **`useTap`** (`lib/tap.ts`),
+          que dispara en `touchend` (tap) y en `click`, porque en iOS el primer
+          toque de una zona grande puede no generar `click` (el navegador lo toma
+          como scroll) ⇒ había que tocar 2-3 veces. `role="link"` + Enter
+          mantienen el acceso por teclado; `cursor-default`, `select-none` y
           `-webkit-tap-highlight-color: transparent` lo dejan sin señal visual. */}
       <div className="relative">
         <div
           role="link"
           tabIndex={0}
-          onTouchStart={(e) => {
-            const t = e.touches[0];
-            tapRef.current = t
-              ? { x: t.clientX, y: t.clientY, t: Date.now() }
-              : null;
-          }}
-          onTouchEnd={(e) => {
-            const s = tapRef.current;
-            tapRef.current = null;
-            const t = e.changedTouches[0];
-            if (!s || !t) return;
-            if (Date.now() - s.t > TAP_MS) return; // long press / selección
-            if (Math.hypot(t.clientX - s.x, t.clientY - s.y) > TAP_MOVE_PX) return; // scroll
-            abrirPeriodos();
-          }}
-          // Mouse/trackpad (y el `click` del toque, si el navegador lo emite).
-          onClick={() => abrirPeriodos()}
+          {...tap}
           onKeyDown={(e) => {
             if (e.key === "Enter") abrirPeriodos();
           }}
-          // Prefetch del destino al primer contacto (el `<Link>` de antes lo
-          // hacía solo): la llegada sigue siendo instantánea.
+          // Prefetch del destino al primer contacto: la llegada sigue siendo
+          // instantánea.
           onPointerEnter={() => prefetch(HREF_PERIODOS)}
           onTouchStartCapture={() => prefetch(HREF_PERIODOS)}
           className="rounded-lg border border-border bg-card p-4 cursor-default select-none [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] sm:p-5"

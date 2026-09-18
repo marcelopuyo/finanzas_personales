@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { LinkNavStatus } from "@/components/ui/nav-progress";
+import { useTap } from "@/lib/tap";
 import { Ellipsis, Tag } from "lucide-react";
 
 /**
@@ -14,6 +15,9 @@ import { Ellipsis, Tag } from "lucide-react";
 export function GastosActionsMenu() {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  // El botón va por **`useTap`** y no por `onClick`: en iOS el toque puede no
+  // generar `click` y el menú necesitaba 2-3 toques (2026-09-18, `lib/tap.ts`).
+  const tap = useTap(() => setOpen((o) => !o));
 
   // Cierra el dropdown al hacer clic fuera o con Escape.
   useEffect(() => {
@@ -38,7 +42,7 @@ export function GastosActionsMenu() {
     <div className="relative shrink-0" ref={menuRef}>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        {...tap}
         aria-label="Acciones de gastos"
         aria-haspopup="menu"
         aria-expanded={open}
