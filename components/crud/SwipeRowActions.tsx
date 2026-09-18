@@ -37,10 +37,6 @@ interface SwipeRowActionsProps {
   actionsFor?: (rowId: string) => SwipeRowAction[] | null;
   /** Toque simple sobre una fila (un swipe NO lo dispara). */
   onRowTap?: (rowId: string) => void;
-  /** Ancho TOTAL de la franja revelada, en px. Si se omite se calcula según la
-      cantidad de acciones (`ITEM_W` por acción), que es lo recomendado desde la
-      estética de círculos + etiqueta (2026-09-17). */
-  width?: number;
 }
 
 /** Recorrido mínimo antes de decidir si el gesto es horizontal (menú) o
@@ -62,14 +58,23 @@ const TAP_MS = 500;
     arrastre horizontal es SIEMPRE scroll de la grilla: el menú solo reacciona si
     el gesto arranca cerca del borde derecho (decisión del usuario 2026-09-13). */
 const EDGE_ZONE_PX = 72;
-/** Ancho (px) que ocupa CADA acción cuando no se pasa la prop `width`: el
-    círculo más su etiqueta. La proporción es la del swipe del Mail de iOS
-    (2026-09-17): el círculo ocupa ~55% del ancho de la acción y la etiqueta
-    10px entra en UNA línea hasta 13-14 caracteres. */
-const ITEM_W = 74;
-/** Alto MÍNIMO de la franja (px): si la fila es más baja, la franja se estira
-    (centrada) unos pocos px para que entren el círculo y la etiqueta. */
+/** Ancho MÍNIMO de una acción (px): el del círculo más corto. */
+const ITEM_MIN_W = 64;
+/** Ancho MÁXIMO de una acción (px): deja entrar ~20 caracteres en una línea; una
+    etiqueta más larga se parte en 2 y la franja crece (`stripHeight`). */
+const ITEM_MAX_W = 112;
+/** Ancho por acción de la ESTIMACIÓN inicial (px): se usa solo al empezar el
+    gesto, antes de montar la franja y medir el ancho real de las etiquetas. */
+const ITEM_EST_W = 74;
+/** Alto MÍNIMO de la franja (px): el que necesita el contenido cuando TODAS las
+    etiquetas entran en una línea (círculo + aire + etiqueta). */
 const STRIP_MIN_H = 56;
+/** Alto del círculo/píldora, en px (`h-10`). */
+const CIRCLE_H = 40;
+/** Separación entre el círculo/píldora y su etiqueta, en px (`gap-0.5`). */
+const LABEL_GAP = 2;
+/** Aire arriba y abajo del contenido dentro de la franja, en px (1px por lado). */
+const STRIP_PAD = 2;
 /** Fondo del círculo de cada acción (estética del swipe del Mail de iOS: un
     CÍRCULO de color con el ícono adentro y la etiqueta debajo, sobre el fondo de
     la tarjeta). */
@@ -89,9 +94,33 @@ function toneDe(key: string): SwipeTone {
   return "neutral";
 }
 
-/** Cuánto se estira la franja (px arriba y abajo) para alcanzar `STRIP_MIN_H`. */
+/** Estiraje AL ESTIMAR el alto de la franja (px arriba y abajo): la fila o, si
+    es más baja, `STRIP_MIN_H`. Al montarse, `stripHeight` ajusta el alto al
+    contenido REAL medido. */
 function stripExtra(rowHeight: number): number {
-  return Math.max(0, STRIP_MIN_H - rowHeight) / 2;
+  return (Math.max(rowHeight, STRIP_MIN_H) - rowHeight) / 2;
+}
+
+/**
+ * Alto REAL que necesita la franja (px), medido sobre la franja ya montada: el
+ * mayor entre la fila, `STRIP_MIN_H` y el contenido (círculo/píldora + etiqueta
+ * más alta).
+ *
+ * ⚠️ Se MIDE la etiqueta en vez de suponer una línea: en un celular real la
+ * fuente del sistema es más ancha y "Nueva jornada" cae en 2 líneas ⇒ con el
+ * alto fijo el contenido se recortaba/empujaba la píldora fuera de la fila
+ * (bug reportado por el usuario 2026-09-17).
+ */
+function stripHeight(strip: HTMLElement, rowHeight: number): number {
+  let maxLabel = 0;
+  strip.querySelectorAll<HTMLElement>("[data-swipe-label]").forEach((el) => {
+    maxLabel = Math.max(maxLabel, el.offsetHeight);
+  });
+  return Math.max(
+    rowHeight,
+    STRIP_MIN_H,
+    CIRCLE_H + LABEL_GAP + maxLabel + STRIP_PAD
+  );
 }
 
 /**
@@ -169,18 +198,24 @@ function findScrollerX(
  * iOS"*): cada acción es un **CÍRCULO de color con el ícono adentro y su
  * etiqueta debajo**, sobre el fondo de la tarjeta (`bg-card`) — ya NO la franja
  * maciza `bg-primary` con texto blanco del 2026-09-16 (histórico: `bg-danger`
- * del 2026-09-13). El color sale de `SwipeRowAction.tone`, con `toneDe(key)
- * como default: Editar gris (`bg-subtitle`) · Eliminar rojo · Cobrar verde ·
- * Nueva jornada/tarea azul.
- * - La franja se **centra verticalmente** sobre la fila y tiene un **alto
- *   MÍNIMO** (`STRIP_MIN_H`, el que necesita el círculo + la etiqueta): si la
- *   fila es más baja, la franja crece unos px arriba y abajo y **tapa con
- *   `bg-card` lo que quede detrás** (si no, se recortaría el círculo).
- * - El ancho de la franja es `width` si se pasa o, si no, `ITEM_W × acciones`
- *   (una acción por círculo/etiqueta, repartidas en partes iguales).
- * - Tamaños: círculo 40px + ícono 20px + etiqueta 10px (`leading-3`), que son
- *   las proporciones de la captura de referencia (el círculo ~55% del ancho de
- *   la acción, la etiqueta justo debajo con 2px de aire).
+ * del 2026-09-13). El color sale de `SwipeRowAction.tone`, con `toneDe(key)`
+ * como default: Eliminar rojo · Cobrar/pagar verde · el resto gris. En el CRUD
+ * de períodos la acción EXTRA (Cobrar / Nueva jornada / Nueva tarea) va **verde**
+ * y Editar **azul** (los fija la vista y `CrudTable`).
+ * - **Cada acción se ensancha según su ETIQUETA** (decisión del usuario
+ *   2026-09-17): el contenedor de acciones es `w-max` y cada acción es
+ *   `flex-none` con `minWidth`/`maxWidth` (`ITEM_MIN_W`/`ITEM_MAX_W`), así el
+ *   navegador le da a cada una el ancho de su etiqueta ("Nueva jornada" queda más
+ *   ancha que "Editar"/"Eliminar", como el botón verde de la captura) y **la
+ *   etiqueta nunca se parte**: la franja queda en `STRIP_MIN_H` = **56px**. El
+ *   ancho total (la suma) se MIDE al montar y se guarda en `widthRef` para el
+ *   umbral de apertura y el revelado (al empezar el gesto se usa `ITEM_EST_W`).
+ * - La franja se **centra verticalmente** sobre la fila y su alto también se
+ *   **MIDE** al montarse (`stripHeight`): si una etiqueta llegara a partirse en 2
+ *   líneas (solo con una etiqueta más larga que `ITEM_MAX_W`), la franja crece y
+ *   **tapa con `bg-card` lo que quede detrás**.
+ * - Tamaños: círculo 40px + ícono 20px + etiqueta 10px (`leading-3`), las
+ *   proporciones de la captura de referencia.
  * - La acción marcada con `wide` (la EXTRA de la fila: Cobrar / Nueva jornada /
  *   Nueva tarea) no es un círculo sino una **PÍLDORA** del mismo alto que ocupa
  *   todo el ancho de su acción, como el botón verde de la captura.
@@ -190,10 +225,11 @@ export function SwipeRowActions({
   children,
   actionsFor,
   onRowTap,
-  width,
 }: SwipeRowActionsProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
+  /** Contenedor de las acciones dentro de la franja (ancho intrínseco). */
+  const innerRef = useRef<HTMLDivElement>(null);
   /** Fila que se está arrastrando ahora mismo. */
   const rowRef = useRef<HTMLTableRowElement | null>(null);
   /** Fila con el menú ABIERTO (para poder cerrarla). */
@@ -201,8 +237,9 @@ export function SwipeRowActions({
   const openIdRef = useRef<string | null>(null);
   /** Último desplazamiento pintado (px). */
   const lastDRef = useRef(0);
-  /** Ancho TOTAL de la franja ACTIVA (px): lo fija `startDrag` con la prop
-      `width` o, si no se pasó, con `ITEM_W × acciones`. */
+  /** Ancho TOTAL de la franja ACTIVA (px): la ESTIMACIÓN al empezar el gesto y,
+      apenas se monta la franja, el ancho REAL medido de las acciones (suma de los
+      anchos que el navegador les da según sus etiquetas). */
   const widthRef = useRef(0);
   const startRef = useRef({
     x: 0,
@@ -221,10 +258,11 @@ export function SwipeRowActions({
   const [menu, setMenu] = useState<{
     id: string;
     actions: SwipeRowAction[];
-    top: number;
-    height: number;
+    /** Borde superior de la FILA, relativo al wrapper (px). */
+    rowTop: number;
+    /** Alto de la FILA (px). */
+    rowH: number;
     right: number;
-    width: number;
   } | null>(null);
   /** El gesto en curso empezó DENTRO de la franja de acciones. */
   const fromStripRef = useRef(false);
@@ -240,9 +278,9 @@ export function SwipeRowActions({
 
   // Callbacks/valor SIEMPRE frescos: los listeners nativos se registran una sola
   // vez (como en el pull-to-refresh) y leen de acá.
-  const cbRef = useRef({ actionsFor, onRowTap, width });
+  const cbRef = useRef({ actionsFor, onRowTap });
   useEffect(() => {
-    cbRef.current = { actionsFor, onRowTap, width };
+    cbRef.current = { actionsFor, onRowTap };
   });
 
   const paintStrip = useCallback((px: number) => {
@@ -300,9 +338,26 @@ export function SwipeRowActions({
   );
 
   // La franja se monta al empezar el gesto: acá se la deja en el ancho que
-  // corresponde (0 si la fila estaba cerrada, `width` si ya estaba abierta).
+  // corresponde (0 si la fila estaba cerrada, el ancho total si ya estaba
+  // abierta) y se la ancla sobre la fila con el ALTO que necesita el contenido ya
+  // renderizado. Además se MIDE el ancho REAL de las acciones (el navegador se lo
+  // da a cada una según su etiqueta) y se reemplaza la estimación de `startDrag`,
+  // así el umbral de apertura y el ancho revelado quedan exactos. Va en
+  // `useLayoutEffect` para que todo se aplique ANTES de pintar (sin saltos).
   useLayoutEffect(() => {
-    if (menu) paintStrip(startRef.current.base);
+    if (!menu) return;
+    paintStrip(startRef.current.base);
+    const strip = stripRef.current;
+    const inner = innerRef.current;
+    if (!strip || !inner) return;
+    if (inner.offsetWidth) widthRef.current = inner.offsetWidth;
+    // Alto: 56px si todas las etiquetas entran en una línea; si alguna se partió
+    // en 2 (etiqueta más larga que `ITEM_MAX_W`), la franja crece para no
+    // recortarla.
+    const h = stripHeight(strip, menu.rowH);
+    const extra = (h - menu.rowH) / 2;
+    strip.style.top = `${menu.rowTop - extra}px`;
+    strip.style.height = `${h}px`;
   }, [menu, paintStrip]);
 
   /** Empieza un gesto sobre `target` (touch o mouse). */
@@ -344,10 +399,13 @@ export function SwipeRowActions({
     tr.style.transition = "";
     if (stripRef.current) stripRef.current.style.transition = "";
     rowRef.current = tr;
-    // Ancho TOTAL de la franja: manda la prop `width`; si no se pasó, se calcula
-    // según la cantidad de acciones (cada una necesita `ITEM_W` px para el
-    // círculo y su etiqueta).
-    const w = cbRef.current.width ?? actions.length * ITEM_W;
+    // Ancho TOTAL de la franja: si la fila YA tenía el menú abierto se usa el que
+    // se MIDIÓ al montarlo; si no, una estimación que el `useLayoutEffect`
+    // reemplaza enseguida por el ancho real de las etiquetas.
+    const w =
+      openIdRef.current === id && widthRef.current
+        ? widthRef.current
+        : actions.length * ITEM_EST_W;
     widthRef.current = w;
     const base = openIdRef.current === id ? w : 0;
     lastDRef.current = base;
@@ -366,16 +424,14 @@ export function SwipeRowActions({
       moved: false,
       id,
     };
-    // Centrada verticalmente sobre la fila; si la fila es más baja que
-    // `STRIP_MIN_H`, crece hacia arriba y hacia abajo (el fondo opaco del render
-    // tapa lo que quede detrás) para que entren el círculo y la etiqueta.
-    const extra = stripExtra(rect.height);
+    // Se guarda la geometría de la FILA (no la de la franja): el `top`/alto de la
+    // franja se calculan en el render (estimación) y los corrige el
+    // `useLayoutEffect` midiendo el contenido ya renderizado.
     setMenu({
       id,
       actions,
-      width: w,
-      top: rect.top - wrapRect.top - extra,
-      height: rect.height + extra * 2,
+      rowTop: rect.top - wrapRect.top,
+      rowH: rect.height,
       // Anclada al borde DERECHO de la fila; si la grilla desbordara la tarjeta,
       // se la clava al borde VISIBLE para que las acciones nunca queden fuera.
       right: Math.max(0, wrapRect.right - rect.right),
@@ -448,9 +504,11 @@ export function SwipeRowActions({
         const wrapRect = wrapRef.current?.getBoundingClientRect();
         if (wrapRect) {
           const derechaReal = rect.right + lastDRef.current;
-          const extra = stripExtra(rect.height);
+          // Alto REAL del contenido (la etiqueta puede estar en 2 líneas).
+          const h = stripHeight(stripRef.current, rect.height);
+          const extra = (h - rect.height) / 2;
           stripRef.current.style.top = `${rect.top - wrapRect.top - extra}px`;
-          stripRef.current.style.height = `${rect.height + extra * 2}px`;
+          stripRef.current.style.height = `${h}px`;
           stripRef.current.style.right = `${Math.max(
             0,
             wrapRect.right - derechaReal
@@ -646,7 +704,13 @@ export function SwipeRowActions({
         <div
           key={menu.id}
           ref={stripRef}
-          style={{ top: menu.top, height: menu.height, right: menu.right }}
+          style={{
+            // Estimación: el alto definitivo lo fija el `useLayoutEffect`
+            // midiendo el contenido (etiquetas de 2 líneas).
+            top: menu.rowTop - stripExtra(menu.rowH),
+            height: menu.rowH + stripExtra(menu.rowH) * 2,
+            right: menu.right,
+          }}
           // `bg-card`: la franja se pinta con el mismo fondo que la tarjeta (las
           // filas son transparentes), así las acciones parecen estar "detrás" de
           // la fila que se corre —igual que el swipe del Mail de iOS— y, cuando
@@ -655,8 +719,10 @@ export function SwipeRowActions({
           className="absolute z-10 w-0 overflow-hidden bg-card"
         >
           <div
-            className="ml-auto flex h-full items-center"
-            style={{ width: menu.width }}
+            ref={innerRef}
+            // `w-max`: el contenedor mide lo que miden sus acciones, y cada
+            // acción lo que mide su etiqueta (`min-w-16 max-w-28`).
+            className="ml-auto flex h-full w-max items-center"
           >
             {menu.actions.map((a) => {
               const Icon = a.icon;
@@ -676,7 +742,11 @@ export function SwipeRowActions({
                     closeOpen();
                     a.onClick();
                   }}
-                  className="flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 text-center"
+                  // Ancho = el de la etiqueta (`ITEM_MIN_W` para las cortas,
+                  // `ITEM_MAX_W` para que no crezca sin límite). El padding es
+                  // chico (4px por lado) para que la PÍLDORA aproveche el ancho.
+                  style={{ minWidth: ITEM_MIN_W, maxWidth: ITEM_MAX_W }}
+                  className="flex h-full flex-none flex-col items-center justify-center gap-0.5 px-1 text-center"
                 >
                   {/* Círculo de color (o PÍLDORA ancha si `wide`) + ícono
                       blanco, con la etiqueta debajo (estética del swipe del Mail
@@ -690,7 +760,10 @@ export function SwipeRowActions({
                   >
                     <Icon className="h-5 w-5" />
                   </span>
-                  <span className="max-w-full text-[10px] leading-3 font-medium wrap-break-word text-card-foreground">
+                  <span
+                    data-swipe-label
+                    className="max-w-full text-[10px] leading-3 font-medium wrap-break-word text-card-foreground"
+                  >
                     {a.label}
                   </span>
                 </button>

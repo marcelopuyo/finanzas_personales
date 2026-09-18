@@ -419,9 +419,9 @@ export function PeriodosTrabajoListClient({
       // `origen`, el detalle vuelve a /cruds/periodos-trabajo).
       mobileSwipe={{
         onRowTap: abrirDetalle,
-        // El ancho de la franja NO se fija acá: se calcula solo según la
-        // cantidad de acciones (2026-09-17), porque cada acción ahora es un
-        // círculo con su etiqueta debajo (3 acciones ⇒ ~222px).
+        // El ancho de cada acción lo calcula el menú deslizante según el ancho de
+        // su etiqueta (2026-09-17): "Nueva jornada" queda más ancha que
+        // "Editar"/"Eliminar" y la franja se mantiene en 56px de alto.
         extraActions: (id) => {
           const p = porId.get(id);
           return p ? accionesFila(p) : [];

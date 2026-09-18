@@ -73,12 +73,10 @@ interface CrudTableProps<T, TId = number> {
     /** Acciones EXTRA por fila, que se agregan ANTES de Editar y Eliminar (esas
         dos siempre están: "Eliminar" necesita abrir el modal de confirmación
         que vive en `CrudTable`). Ej.: "Nueva jornada" en el CRUD de períodos.
-        Cada una puede elegir el color de su círculo con `tone`. */
+        Cada una puede elegir el color de su círculo con `tone` y pintarse como
+        píldora ancha con `wide`. El ancho de cada acción lo calcula el menú
+        según el ancho de su etiqueta (2026-09-17). */
     extraActions?: (id: TId) => SwipeRowAction[];
-    /** Ancho TOTAL de la franja revelada, en px. Si se omite se calcula según la
-        cantidad de acciones (`ITEM_W` = 74px por acción), que es lo recomendado
-        desde la estética de círculos + etiqueta (2026-09-17). */
-    width?: number;
   };
   /** Columnas extra que se agregan AL FINAL (después de Editar/Eliminar) en
       desktop y también en la grilla mobile (bottomNav). Útiles para acciones
@@ -693,7 +691,6 @@ export function CrudTable<T, TId = number>({
           <SwipeRowActions
             actionsFor={swipeMode ? swipeActionsFor : undefined}
             onRowTap={swipeMode ? swipeRowTap : undefined}
-            width={mobileSwipe?.width}
           >
             <div className="rounded-lg border border-border bg-card p-3">
               <DataTable
