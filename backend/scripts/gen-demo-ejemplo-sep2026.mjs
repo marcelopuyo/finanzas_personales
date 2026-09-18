@@ -114,7 +114,7 @@ const periodos = [
 // montoACobrar de cada período = Σ jornadas (en la moneda de la cuenta de cobro)
 periodos.forEach((p) => {
   const ph = precioHoraDe[p.trabajo];
-  p.montoACobrar = red(p.jornadas.reduce((s, [_, d, h]) => s + (h - d) * ph, 0));
+  p.montoACobrar = red(p.jornadas.reduce((s, [, d, h]) => s + (h - d) * ph, 0));
 });
 
 // Inflación de septiembre (el demo cargaba una por mes).

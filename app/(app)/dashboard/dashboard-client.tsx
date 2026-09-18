@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { StatBadge } from "@/components/ui/stat-badge";
@@ -32,6 +32,7 @@ import type { GastoOut } from "@/backend/src/queries/gastos";
 import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
 import { periodoCobrado } from "@/backend/src/lib/jornadas";
 import { cn, numberToCurrency, todayLocalISODate } from "@/lib/utils";
+import { useMontado } from "@/lib/use-cliente";
 
 interface Props {
   data: DashboardData;
@@ -158,41 +159,50 @@ export function DashboardClient({ data, periodosInicial }: Props) {
   // Badges "Mes actual" de Gastos, Ingresos y Resultados. El servidor (Vercel,
   // UTC) los calcula con `new Date()` y en el límite de mes puede quedar ±1
   // día/mes adelantado respecto al usuario (ej. GMT-3 de noche el 31 → el
-  // server ya está en el 1° → marca 0). Se inicializan con el valor del
-  // servidor (SSR, sin romper la hidratación) y se recalculan tras el montaje
-  // con la fecha LOCAL del navegador (primer día del mes → hoy), en el mismo
-  // desfase de zona horaria del servidor.
-  const [mesActualGastos, setMesActualGastos] = useState(data.gastosTotal);
-  const [mesActualIngresos, setMesActualIngresos] = useState(data.ingresosMesActual);
-  const [mesActualResultados, setMesActualResultados] = useState(data.resultadosMesActual);
-  useEffect(() => {
+  // server ya está en el 1° → marca 0). `montado` es false en el SSR y en la
+  // hidratación (se muestran los valores del servidor, sin desajuste) y true
+  // después: ahí se recalculan con la fecha LOCAL del navegador
+  // (primer día del mes → hoy).
+  const montado = useMontado();
+  const badges = useMemo(() => {
+    if (!montado) {
+      return {
+        gastos: data.gastosTotal,
+        ingresos: data.ingresosMesActual,
+        resultados: data.resultadosMesActual,
+      };
+    }
+
     // Badge "Mes actual" de Gastos: fechaPago en [primer día del mes, hoy].
-    const d = new Date();
-    const desde = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
     const hasta = todayLocalISODate();
+    const desde = `${hasta.slice(0, 7)}-01`;
     let totalG = 0;
     todosLosGastos.forEach((g) => {
       const f = toDateKey(g.fechaPago);
       if (f >= desde && f <= hasta) totalG += g.monto;
     });
-    setMesActualGastos(numberToCurrency(totalG, data.monedaPredeterminadaISO));
 
     // Badge "Mes actual" de Ingresos: jornadas/tareas del mes + prorrateo de
     // fijo/horas_fijas contra el mes calendario completo (§8).
-    const hoyI = todayLocalISODate();
-    const totalI = ingresosDelMesActual(todosLosIngresos, hoyI);
-    setMesActualIngresos(numberToCurrency(totalI, data.monedaPredeterminadaISO));
+    const totalI = ingresosDelMesActual(todosLosIngresos, hasta);
+    const iso = data.monedaPredeterminadaISO;
 
-    // Badge "Mes actual" de Resultados: ingresos del mes − gastos del mes
-    // (misma ventana [desde, hoy] que los badges anteriores, para que la resta
-    // sea coherente con los montos que muestran Ingresos y Gastos).
-    setMesActualResultados(
-      numberToCurrency(totalI - totalG, data.monedaPredeterminadaISO)
-    );
+    return {
+      gastos: numberToCurrency(totalG, iso),
+      ingresos: numberToCurrency(totalI, iso),
+      // Badge "Mes actual" de Resultados: ingresos del mes − gastos del mes
+      // (misma ventana [desde, hoy] que los badges anteriores, para que la
+      // resta sea coherente con los montos que muestran Ingresos y Gastos).
+      resultados: numberToCurrency(totalI - totalG, iso),
+    };
   }, [
-    data.monedaPredeterminadaISO,
+    montado,
     todosLosGastos,
     todosLosIngresos,
+    data.gastosTotal,
+    data.ingresosMesActual,
+    data.resultadosMesActual,
+    data.monedaPredeterminadaISO,
   ]);
 
   const filteredGastos = useMemo(() => {
@@ -593,7 +603,7 @@ export function DashboardClient({ data, periodosInicial }: Props) {
         <DonutChart
           title="Gastos"
           action={gastosHeaderActions()}
-          badge={<><StatBadge label="Mes actual" value={mesActualGastos} />{filterBtn("sm:hidden")}</>}
+          badge={<><StatBadge label="Mes actual" value={badges.gastos} />{filterBtn("sm:hidden")}</>}
           currency={data.monedaPredeterminadaISO}
           data={filteredResumen.map((g) => ({
             name: g.name,
@@ -616,7 +626,7 @@ export function DashboardClient({ data, periodosInicial }: Props) {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-[16px] font-semibold text-header">Gastos</h3>
-              <StatBadge label="Mes actual" value={mesActualGastos} />
+              <StatBadge label="Mes actual" value={badges.gastos} />
               {filterBtn("sm:hidden")}
             </div>
             {gastosHeaderActions(true)}
@@ -634,7 +644,7 @@ export function DashboardClient({ data, periodosInicial }: Props) {
         <EvolutionChart
           title="Gastos"
           action={gastosHeaderActions()}
-          badge={<><StatBadge label="Mes actual" value={mesActualGastos} />{filterBtn("sm:hidden")}</>}
+          badge={<><StatBadge label="Mes actual" value={badges.gastos} />{filterBtn("sm:hidden")}</>}
           currency={data.monedaPredeterminadaISO}
           data={filteredEvolucion}
           color="var(--primary)"
@@ -647,7 +657,7 @@ export function DashboardClient({ data, periodosInicial }: Props) {
         <DonutChart
           title="Ingresos"
           action={<div className="flex items-center gap-2">{ingFilterBtn("hidden sm:inline-flex")}{ingresosTabs}</div>}
-          badge={<><StatBadge label="Mes actual" value={mesActualIngresos} />{ingFilterBtn("sm:hidden")}</>}
+          badge={<><StatBadge label="Mes actual" value={badges.ingresos} />{ingFilterBtn("sm:hidden")}</>}
           currency={data.monedaPredeterminadaISO}
           data={filteredIngresosResumen.map((i) => ({ name: i.name, value: i.value }))}
           invertTrend
@@ -661,7 +671,7 @@ export function DashboardClient({ data, periodosInicial }: Props) {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-[16px] font-semibold text-header">Ingresos</h3>
-              <StatBadge label="Mes actual" value={mesActualIngresos} />
+              <StatBadge label="Mes actual" value={badges.ingresos} />
               {ingFilterBtn("sm:hidden")}
             </div>
             <div className="flex items-center gap-2">{ingFilterBtn("hidden sm:inline-flex")}{ingresosTabs}</div>
@@ -675,7 +685,7 @@ export function DashboardClient({ data, periodosInicial }: Props) {
         <EvolutionChart
           title="Ingresos"
           action={<div className="flex items-center gap-2">{ingFilterBtn("hidden sm:inline-flex")}{ingresosTabs}</div>}
-          badge={<><StatBadge label="Mes actual" value={mesActualIngresos} />{ingFilterBtn("sm:hidden")}</>}
+          badge={<><StatBadge label="Mes actual" value={badges.ingresos} />{ingFilterBtn("sm:hidden")}</>}
           data={filteredIngresosEvolucion}
           color="var(--primary)"
           area
@@ -686,7 +696,7 @@ export function DashboardClient({ data, periodosInicial }: Props) {
       {data.evolucionResultados.length > 0 && (
         <EvolutionChart
           title="Resultados"
-          badge={<StatBadge label="Mes actual" value={mesActualResultados} />}
+          badge={<StatBadge label="Mes actual" value={badges.resultados} />}
           data={data.evolucionResultados}
           color="var(--primary)"
           area

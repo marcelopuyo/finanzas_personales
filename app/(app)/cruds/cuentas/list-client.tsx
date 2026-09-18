@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { GripVertical } from "lucide-react";
 import { CrudTable } from "@/components/crud/CrudTable";
@@ -49,9 +49,17 @@ export function CuentasListClient({
   prestamosNeto = 0,
   incluirPrestamosEnBalance: incluirInicial = false,
 }: Props) {
-  // Estado local de las cuentas: CrudTable re-sincroniza `items` desde
-  // `initialData` cuando cambia, así el toggle de Balance se refleja al instante.
+  // Estado local de las cuentas: se re-sincroniza desde `initialData` cuando la
+  // página refresca, así el toggle de Balance se refleja al instante. La
+  // sincronización se hace DURANTE el render (patrón de React "ajustar estado
+  // cuando cambia una prop"): no necesita un efecto y no hay un render
+  // intermedio con los datos viejos.
   const [cuentas, setCuentas] = useState(initialData);
+  const [initialDataPrevia, setInitialDataPrevia] = useState(initialData);
+  if (initialDataPrevia !== initialData) {
+    setInitialDataPrevia(initialData);
+    setCuentas(initialData);
+  }
   const [pendingId, setPendingId] = useState<number | null>(null);
   // §13: si el saldo neto de los préstamos forma parte del Balance Actual.
   const [incluirPrestamos, setIncluirPrestamos] = useState(incluirInicial);
@@ -60,11 +68,6 @@ export function CuentasListClient({
   // Modo "reordenar": muestra la lista con arrastre (dedo/mouse) en lugar de la
   // grilla. El orden se persiste en la BD por cada arrastre.
   const [reorderMode, setReorderMode] = useState(false);
-
-  // Mantener el estado en sync si la página refresca (mismo comportamiento que CrudTable).
-  useEffect(() => {
-    setCuentas(initialData);
-  }, [initialData]);
 
   // Cambia `incluirEnBalance` en la BD directo desde el listado (optimista:
   // refleja el cambio al instante y revierte si la action falla).

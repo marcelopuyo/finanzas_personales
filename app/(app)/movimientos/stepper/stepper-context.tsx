@@ -3,11 +3,11 @@
 import {
   createContext,
   useContext,
-  useEffect,
   useState,
   type ReactNode,
 } from "react";
 import { todayLocalISODate } from "@/lib/utils";
+import { useMontado } from "@/lib/use-cliente";
 import type { CategoriaGastoOut } from "@/backend/src/queries/gastos";
 import {
   CONCEPTO_STEP,
@@ -126,11 +126,16 @@ export function MovimientoProvider({
   // La fecha "hoy" provista por el servidor puede quedar corrida ±1 día si el
   // servidor corre en otra zona horaria (ej. Vercel en UTC y el usuario en
   // GMT-3 de noche: 23:00 local ya son las 02:00 del día siguiente en UTC).
-  // Al montar se corrige con la fecha LOCAL del navegador (siempre la del
-  // usuario). No rompe la hidratación: el SSR y el primer render usan fechaHoy.
-  useEffect(() => {
+  // `montado` es false en el SSR y en la hidratación (se usa `fechaHoy`: el HTML
+  // del servidor y el primer render del cliente coinciden) y true después: ahí
+  // se corrige con la fecha LOCAL del navegador (siempre la del usuario),
+  // durante el render en lugar de un efecto con setState.
+  const montado = useMontado();
+  const [fechaCorregida, setFechaCorregida] = useState(false);
+  if (montado && !fechaCorregida) {
+    setFechaCorregida(true);
     setData((prev) => ({ ...prev, fecha: todayLocalISODate() }));
-  }, []);
+  }
 
   const handleSetData = (partial: Partial<MovimientoData>) =>
     setData((prev) => ({ ...prev, ...partial }));

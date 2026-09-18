@@ -82,6 +82,10 @@ export function DataTable<TData, TValue>({
   // Padding lateral de las celdas: compacto en las grillas mobile.
   const cellPad = dense ? "px-1.5 py-2" : "px-3 py-2.5";
 
+  // TanStack Table expone funciones que el React Compiler no puede memoizar sin
+  // dejar valores obsoletos, así que omite la memoización de este componente.
+  // Es el comportamiento esperado de la librería: se silencia el aviso.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data,
     columns,

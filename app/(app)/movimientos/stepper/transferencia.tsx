@@ -39,10 +39,9 @@ export function Transferencia() {
   const monedaDestinoISO = cuentaDestino?.moneda?.codigoISO ?? "ARS";
   const mismaMoneda = monedaOrigenISO === monedaDestinoISO;
 
-  // Si el usuario cambia de cuentas, se vuelve a sincronizar el destino.
-  useEffect(() => {
-    setDestinoEditado(false);
-  }, [data.cuentaOrigen, data.cuentaDestino]);
+  // Si el usuario cambia de cuentas, se vuelve a sincronizar el destino: el
+  // reset se hace en los handlers de los dos selects (antes vivía en un efecto,
+  // que provocaba un render en cascada).
 
   // Autocomputa el monto destino según las monedas de las cuentas mientras el
   // usuario no haya editado el destino manualmente (el destino sigue siendo
@@ -120,7 +119,10 @@ export function Transferencia() {
       <SelectField
         label="Cuenta origen"
         value={data.cuentaOrigen ? String(data.cuentaOrigen) : ""}
-        onChange={(v) => handleSetData({ cuentaOrigen: Number(v) })}
+        onChange={(v) => {
+          setDestinoEditado(false);
+          handleSetData({ cuentaOrigen: Number(v) });
+        }}
         options={cuentaOptions}
       />
 
@@ -133,7 +135,10 @@ export function Transferencia() {
       <SelectField
         label="Cuenta destino"
         value={data.cuentaDestino ? String(data.cuentaDestino) : ""}
-        onChange={(v) => handleSetData({ cuentaDestino: Number(v) })}
+        onChange={(v) => {
+          setDestinoEditado(false);
+          handleSetData({ cuentaDestino: Number(v) });
+        }}
         options={cuentaOptions}
       />
 

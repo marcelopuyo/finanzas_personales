@@ -33,28 +33,40 @@ export function HistorialModal({
 }) {
   const cuentaId = cuenta?.id;
   const router = useRouter();
-  const [rows, setRows] = useState<HistorialMovimientoOut[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+  // Estado de la carga: `cuentaId` es la cuenta a la que corresponden `rows`.
+  // Mientras no coincida con la cuenta abierta, la grilla está cargando (el
+  // "loading" se DERIVA, así el efecto sólo actualiza estado cuando el fetch
+  // responde — ver `react-hooks/set-state-in-effect`).
+  const [datos, setDatos] = useState<{
+    cuentaId: number | null;
+    rows: HistorialMovimientoOut[];
+    error: boolean;
+  }>({ cuentaId: null, rows: [], error: false });
+  const rows = datos.rows;
+  const loading = !!cuentaId && datos.cuentaId !== cuentaId;
+  const error = datos.error;
   /** Movimiento seleccionado para confirmar su anulación. */
   const [pendingAnular, setPendingAnular] =
     useState<HistorialMovimientoOut | null>(null);
   const [reverting, setReverting] = useState(false);
 
-  const load = useCallback(() => {
+  /** Trae el historial de la cuenta abierta (el estado se toca al responder). */
+  const traerHistorial = useCallback(() => {
     if (!cuentaId) return;
-    setLoading(true);
-    setError(false);
     getHistorialMovimientosCuentaAction(cuentaId)
-      .then((data) => setRows(data))
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+      .then((data) => setDatos({ cuentaId, rows: data, error: false }))
+      .catch(() => setDatos({ cuentaId, rows: [], error: true }));
   }, [cuentaId]);
 
   useEffect(() => {
-    setRows([]);
-    load();
-  }, [load]);
+    traerHistorial();
+  }, [traerHistorial]);
+
+  /** Recarga el historial mostrando el estado "Cargando…". */
+  const load = () => {
+    setDatos((prev) => ({ ...prev, cuentaId: null, error: false }));
+    traerHistorial();
+  };
 
   const handleAnular = async () => {
     if (!pendingAnular) return;

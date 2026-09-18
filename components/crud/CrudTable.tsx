@@ -193,23 +193,41 @@ export function CrudTable<T, TId = number>({
   // terminar: la navegación desmonta este listado.
   const [pendingRowId, setPendingRowId] = useState<string | null>(null);
 
-  const load = () => {
+  // Re-sincroniza la lista cuando el servidor manda un `initialData` nuevo
+  // (router.refresh). Se hace DURANTE el render —patrón de React "ajustar estado
+  // cuando cambia una prop"— en lugar de un efecto con setState, que provocaba
+  // un render en cascada.
+  const [initialDataPrevia, setInitialDataPrevia] = useState(initialData);
+  if (initialData !== undefined && initialData !== initialDataPrevia) {
+    setInitialDataPrevia(initialData);
+    setItems(initialData);
+    setLoading(false);
+  }
+
+  /** Trae la lista del servidor y actualiza el estado recién cuando responde
+      (nunca de forma sincrónica: ver la regla react-hooks/set-state-in-effect). */
+  const fetchItems = () => {
     if (!fetchData) return;
-    setLoading(true);
-    setError(null);
     fetchData()
       .then(setItems)
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
   };
 
+  /** Refresco manual (p. ej. después de eliminar): muestra el spinner mientras
+      recarga la lista. */
+  const load = () => {
+    setLoading(true);
+    setError(null);
+    fetchItems();
+  };
+
   useEffect(() => {
-    if (initialData !== undefined) {
-      setItems(initialData);
-      setLoading(false);
-      return;
-    }
-    load();
+    // Sin `initialData` la lista se trae por fetch al montar. En ese arranque
+    // `loading` ya es true y `error` null, así que el fetch no toca el estado
+    // antes de responder. La sincronización de la prop se hace arriba, durante
+    // el render.
+    if (initialData === undefined) fetchItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialData]);
 
