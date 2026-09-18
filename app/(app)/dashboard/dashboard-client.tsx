@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { StatBadge } from "@/components/ui/stat-badge";
 import { Tabs } from "@/components/ui/tabs";
@@ -32,7 +33,7 @@ import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
 import { periodoCobrado } from "@/backend/src/lib/jornadas";
 import { cn, numberToCurrency, todayLocalISODate } from "@/lib/utils";
 import { useMontado } from "@/lib/use-cliente";
-import { usePendingNav, usePrefetchNav } from "@/components/ui/nav-progress";
+import { LinkNavStatus } from "@/components/ui/nav-progress";
 
 interface Props {
   data: DashboardData;
@@ -56,12 +57,6 @@ function toDateKey(v: string | Date | null | undefined): string {
 }
 
 export function DashboardClient({ data, periodosInicial }: Props) {
-  // El panel "Trabajo" entero navega al CRUD de períodos (2026-09-17): `navGo`
-  // enciende la barra de progreso global (navegación programática) y `prefetch`
-  // pide el RSC al pasar el mouse o apoyar el dedo, así la llegada es inmediata.
-  const { go: navGo } = usePendingNav();
-  const prefetch = usePrefetchNav();
-  const abrirPeriodos = () => navGo(HREF_PERIODOS, "periodos");
   const [tabGastos, setTabGastos] = useState("resumen");
   const [tabIngresos, setTabIngresos] = useState("resumen");
   // Cuenta seleccionada para abrir su historial en popup
@@ -582,44 +577,42 @@ export function DashboardClient({ data, periodosInicial }: Props) {
           aunque no haya períodos, permite gestionar trabajos (⋯).
           ⚠️ **El PANEL ENTERO es el área de clic** (decisión del usuario
           2026-09-17: antes solo navegaban las filas): cualquier punto —filas,
-          encabezados de grupo, márgenes— abre el CRUD completo de períodos. El
-          menú ⋯ queda EXCLUIDO (corta el `click` desde `TrabajosActionsMenu`) y
-          las filas ya no tienen ninguna señal visual de clic. El prefetch se
-          dispara al pasar el mouse o al apoyar el dedo, así la navegación sigue
-          siendo instantánea (2026-09-14). Con `origen=dashboard` la flecha
-          "Volver" regresa acá y el "+"/editar conservan el viaje. */}
-      <div
-        role="button"
-        tabIndex={0}
-        aria-label="Ver todos los períodos de trabajo"
-        onClick={abrirPeriodos}
-        onKeyDown={(e) => {
-          // Solo cuando el panel tiene el foco (no cuando lo tiene el ⋯).
-          if (e.target !== e.currentTarget) return;
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            abrirPeriodos();
-          }
-        }}
-        onPointerEnter={() => prefetch(HREF_PERIODOS)}
-        onTouchStart={() => prefetch(HREF_PERIODOS)}
-        // Sin destello del tap en mobile (iOS/Android pintan un flash gris en el
-        // elemento con el `onClick`): el panel navega sin NINGUNA señal visual.
-        className="rounded-lg border border-border bg-card p-4 [-webkit-tap-highlight-color:transparent] sm:p-5"
-      >
-          {/* Encabezado: título a la izquierda y menú (⋯) anclado al ángulo
-              superior derecho del panel (gestionar trabajos). */}
-          <div className="relative mb-3 pr-8">
+          encabezados de grupo, título, márgenes— abre el CRUD completo de
+          períodos. El menú ⋯ queda EXCLUIDO porque se monta FUERA del Link (es
+          un hermano que flota sobre la esquina) y las filas no tienen ninguna
+          señal visual de clic.
+          ⚠️ Se navega con un **`<Link>` nativo** (y NO con `router.push` desde un
+          `onClick`, ni `usePendingNav`): con el `onClick` el primer toque en
+          mobile **no abría nada** y hacía falta un segundo toque (el navegador
+          no emite el `click` del primer tap cuando hubo un cambio en el DOM
+          durante el gesto). El `<a>` del `Link` navega aunque el `click` de React
+          se pierda, prefetchea el RSC al entrar en pantalla y `cursor-default` +
+          `-webkit-tap-highlight-color: transparent` lo dejan sin ninguna señal
+          visual. `LinkNavStatus` enciende la barra de progreso global. */}
+      <div className="relative">
+        <Link
+          href={HREF_PERIODOS}
+          className="block rounded-lg border border-border bg-card p-4 cursor-default [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] sm:p-5"
+        >
+          {/* Avisa a la barra de progreso global mientras llega el CRUD. */}
+          <LinkNavStatus />
+          {/* Encabezado: título a la izquierda (el ⋯ va FUERA del Link, ver
+              abajo, para no anidar interactivos dentro del `<a>`). */}
+          <div className="mb-3 pr-8">
             <h2 className="text-[16px] font-semibold text-header">Trabajo</h2>
-            <div className="absolute right-0 top-0 flex items-center">
-              <TrabajosActionsMenu />
-            </div>
           </div>
           <PeriodosTrabajoLista
             porCobrar={periodosCobrar}
             enCurso={periodosActuales}
             currency={data.monedaPredeterminadaISO}
           />
+        </Link>
+        {/* Menú ⋯ del panel: HERMANO del Link (no hijo) y flotando sobre su
+            esquina superior derecha, alineado con el padding del panel. Así el
+            clic del menú nunca forma parte de la navegación del panel. */}
+        <div className="absolute right-4 top-4 z-10 flex items-center sm:right-5 sm:top-5">
+          <TrabajosActionsMenu />
+        </div>
       </div>
 
       {/* Gastos Section — filtro compartido */}
