@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Preview — swipe estilo Mail de iOS (SwipeRowActions)</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; display: flex; gap: 24px; flex-wrap: wrap;
+    font-family: Inter, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: #111; color: #e8e8ea;
+  }
+  .panel { padding: 12px; border-radius: 14px; }
+  .panel.light { background: #f6f7f9; }
+  .panel.dark  { background: #151517; }
+  .panel.w320 { width: 320px; }
+  h2 { font-size: 12px; font-weight: 600; margin: 0 0 8px 2px; letter-spacing: .04em; text-transform: uppercase; opacity: .55; }
+  .card { border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: var(--card); }
+  .rowbox { position: relative; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+  thead th { text-align: left; font-weight: 500; color: var(--subtitle); padding: 8px 6px; border-bottom: 1px solid var(--border); }
+  thead th.r, td.r { text-align: right; }
+  td { padding: 8px 6px; color: var(--card-foreground); border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: 0; }
+  /* fila corrida a la izquierda el ancho de la franja (translateX(-w)) */
+  tr.slid    { transform: translateX(-222px); }
+  tr.slid2   { transform: translateX(-148px); }
+  tr.slidmid { transform: translateX(-111px); }
+  .p2 { line-height: 16px; white-space: nowrap; }
+  /* ── la franja (SwipeRowActions) ── */
+  .strip { position: absolute; z-index: 10; background: var(--card); overflow: hidden; top: -3.5px; height: 56px; right: 0; }
+  .strip-inner { margin-left: auto; display: flex; height: 100%; align-items: center; }
+  .act {
+    flex: 1; min-width: 0; height: 100%; padding: 0 2px; border: 0; background: none;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; text-align: center; font: inherit; cursor: pointer;
+  }
+  .circ { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #fff; }
+  .circ svg { width: 20px; height: 20px; }
+  /* PÍLDORA: en la app la marca el flag `wide` de la acción; hoy es la acción
+     EXTRA (la verde: Cobrar / Nueva jornada / Nueva tarea). */
+  .circ.wide, .circ.t-success { width: 100%; }
+  .act .lbl { max-width: 100%; font-size: 10px; line-height: 12px; font-weight: 500; word-break: break-word; color: var(--card-foreground); }
+  .t-neutral { background: var(--subtitle); }
+  .t-primary { background: var(--primary); }
+  .t-success { background: var(--success); }
+  .t-danger  { background: var(--danger); }
+  .light { --card: #fff; --card-foreground: #1e293b; --border: #e2e8f0; --subtitle: #7c8798; --primary: #2563eb; --success: #16a34a; --danger: #dc2626; }
+  .dark  { --card: #353638; --card-foreground: #e2e4f0; --border: #3e3f42; --subtitle: #808185; --primary: #4c6ef5; --success: #51cf66; --danger: #ff6b6b; }
+  .hint { font-size: 11px; margin: 10px 2px 0; color: var(--subtitle); line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ CLARO · 3 acciones (ABIERTO) ═══════════ -->
+<div class="panel light">
+  <h2>Claro · 3 acciones (abierto)</h2>
+  <div class="card">
+    <div class="rowbox">
+      <table>
+        <thead><tr><th>Trabajo</th><th>Período</th><th class="r">Monto</th></tr></thead>
+        <tbody>
+          <tr><td>Joe Fazer Fitness</td><td><span class="p2">06-09-26<br/>30-09-26</span></td><td class="r">1.850,00</td></tr>
+          <tr class="slid"><td>Industria Argentina</td><td><span class="p2">01-09-26<br/>15-09-26</span></td><td class="r">980,00</td></tr>
+          <tr><td>Pinturería Norte</td><td><span class="p2">20-08-26<br/>05-09-26</span></td><td class="r">1.240,00</td></tr>
+          <tr><td>Estudio Contable NE</td><td><span class="p2">01-08-26<br/>31-08-26</span></td><td class="r">2.100,00</td></tr>
+        </tbody>
+      </table>
+      <div class="strip" style="width:222px">
+        <div class="strip-inner" style="width:222px">
+          <button class="act"><span class="circ t-success"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M12 14v4M10 16h4"/></svg></span><span class="lbl">Nueva jornada</span></button>
+          <button class="act"><span class="circ t-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></span><span class="lbl">Editar</span></button>
+          <button class="act"><span class="circ t-danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></span><span class="lbl">Eliminar</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="hint">Franja 222px (74 por acción) sobre una fila de 49px: la franja (56px) se centra y se estira 3,5px arriba y abajo.<br/>Círculo 40px · ícono 20px · etiqueta 10px. La acción EXTRA va en verde y como <b>PÍLDORA ancha</b> (llena su acción), como el botón verde de la captura.</p>
+</div>
+
+<!-- ═══════════ CLARO · 2 acciones + arrastre a mitad de camino ═══════════ -->
+<div class="panel light">
+  <h2>Claro · 2 acciones + arrastre</h2>
+  <div class="card">
+    <div class="rowbox">
+      <table>
+        <thead><tr><th>Trabajo</th><th>Período</th><th class="r">Monto</th></tr></thead>
+        <tbody>
+          <tr><td>Joe Fazer Fitness</td><td><span class="p2">06-09-26<br/>30-09-26</span></td><td class="r">1.850,00</td></tr>
+          <tr class="slid2"><td>Pinturería Norte</td><td><span class="p2">20-08-26<br/>05-09-26</span></td><td class="r">1.240,00</td></tr>
+          <tr class="slidmid"><td>Estudio Contable NE</td><td><span class="p2">01-08-26<br/>31-08-26</span></td><td class="r">2.100,00</td></tr>
+        </tbody>
+      </table>
+      <!-- abierto: 2 acciones -->
+      <div class="strip" style="width:148px">
+        <div class="strip-inner" style="width:148px">
+          <button class="act"><span class="circ t-success"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg></span><span class="lbl">Cobrar</span></button>
+          <button class="act"><span class="circ t-danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></span><span class="lbl">Eliminar</span></button>
+        </div>
+      </div>
+      <!-- a mitad del gesto: revelado progresivo (111 de 148) -->
+      <div class="strip" style="width:111px">
+        <div class="strip-inner" style="width:148px">
+          <button class="act"><span class="circ t-success"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg></span><span class="lbl">Cobrar</span></button>
+          <button class="act"><span class="circ t-danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></span><span class="lbl">Eliminar</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="hint">Arriba: menú abierto (Cobrar = píldora verde). Abajo: 111 de 148px revelados — los botones quedan fijos en su lugar final y se van descubriendo desde el borde derecho.</p>
+</div>
+
+<!-- ═══════════ CLARO · 320px ═══════════ -->
+<div class="panel light w320">
+  <h2>Claro · 320px</h2>
+  <div class="card">
+    <div class="rowbox">
+      <table>
+        <thead><tr><th>Trabajo</th><th>Período</th><th class="r">Monto</th></tr></thead>
+        <tbody>
+          <tr><td>Joe Fazer</td><td><span class="p2">06-09-26<br/>30-09-26</span></td><td class="r">1.850</td></tr>
+          <tr class="slid"><td>Industria Arg.</td><td><span class="p2">01-09-26<br/>15-09-26</span></td><td class="r">980</td></tr>
+          <tr><td>Pinturería N.</td><td><span class="p2">20-08-26<br/>05-09-26</span></td><td class="r">1.240</td></tr>
+        </tbody>
+      </table>
+      <div class="strip" style="width:222px">
+        <div class="strip-inner" style="width:222px">
+          <button class="act"><span class="circ t-success"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M12 14v4M10 16h4"/></svg></span><span class="lbl">Nueva jornada</span></button>
+          <button class="act"><span class="circ t-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></span><span class="lbl">Editar</span></button>
+          <button class="act"><span class="circ t-danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></span><span class="lbl">Eliminar</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="hint">Peor caso de ancho. En la app la franja no puede ser más ancha que la tarjeta; si no entra, se ancla al borde visible.</p>
+</div>
+
+<!-- ═══════════ OSCURO ═══════════ -->
+<div class="panel dark">
+  <h2>Oscuro</h2>
+  <div class="card">
+    <div class="rowbox">
+      <table>
+        <thead><tr><th>Trabajo</th><th>Período</th><th class="r">Monto</th></tr></thead>
+        <tbody>
+          <tr><td>Joe Fazer Fitness</td><td><span class="p2">06-09-26<br/>30-09-26</span></td><td class="r">1.850,00</td></tr>
+          <tr class="slid"><td>Industria Argentina</td><td><span class="p2">01-09-26<br/>15-09-26</span></td><td class="r">980,00</td></tr>
+          <tr><td>Pinturería Norte</td><td><span class="p2">20-08-26<br/>05-09-26</span></td><td class="r">1.240,00</td></tr>
+        </tbody>
+      </table>
+      <div class="strip" style="width:222px">
+        <div class="strip-inner" style="width:222px">
+          <button class="act"><span class="circ t-success"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M12 14v4M10 16h4"/></svg></span><span class="lbl">Nueva jornada</span></button>
+          <button class="act"><span class="circ t-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></span><span class="lbl">Editar</span></button>
+          <button class="act"><span class="circ t-danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></span><span class="lbl">Eliminar</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="hint">El fondo de la franja usa <code>bg-card</code> (el mismo de la tarjeta) para que los círculos parezcan estar detrás de la fila.</p>
+</div>
+
+<script>
+// En la app el `top` de la franja sale del rect de la FILA que se arrastra. Acá
+// se la ancla a la fila que tiene el `translateX(-w)` que le corresponde.
+for (const strip of document.querySelectorAll('.strip')) {
+  const box = strip.closest('.rowbox');
+  const boxLeft = box.getBoundingClientRect().left;
+  const w = strip.getBoundingClientRect().width;
+  const row = [...box.querySelectorAll('tbody tr')].find(
+    (r) => Math.abs(r.getBoundingClientRect().left - (boxLeft - w)) < 1.5
+  );
+  if (row) strip.style.top = row.offsetTop - 3.5 + 'px';
+}
+</script>
+</body>
+</html>

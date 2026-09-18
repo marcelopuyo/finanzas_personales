@@ -10,12 +10,24 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+/** Color del círculo de una acción del menú deslizante (ver `TONE_BG`). */
+export type SwipeTone = "neutral" | "primary" | "success" | "danger" | "warning";
+
 /** Acción revelada por el menú deslizante de una fila. */
 export interface SwipeRowAction {
   key: string;
   label: string;
   icon: LucideIcon;
   onClick: () => void;
+  /** Color del círculo. Si se omite, se deduce de `key` (ver `toneDe`):
+      `delete` → rojo · `cobrar`/`pagar` → verde · cualquier otra → gris. */
+  tone?: SwipeTone;
+  /** Botón ANCHO en vez de círculo: una PÍLDORA que ocupa todo el ancho de su
+      acción (el ícono queda centrado). Lo usa la acción EXTRA/principal de la
+      fila —Cobrar, Nueva jornada, Nueva tarea— para destacarse del resto
+      (decisión del usuario 2026-09-17, como el botón verde de la captura de
+      referencia). El ALTO es el mismo que el del círculo. */
+  wide?: boolean;
 }
 
 interface SwipeRowActionsProps {
@@ -25,7 +37,9 @@ interface SwipeRowActionsProps {
   actionsFor?: (rowId: string) => SwipeRowAction[] | null;
   /** Toque simple sobre una fila (un swipe NO lo dispara). */
   onRowTap?: (rowId: string) => void;
-  /** Ancho de la franja revelada, en px (default 148). */
+  /** Ancho TOTAL de la franja revelada, en px. Si se omite se calcula según la
+      cantidad de acciones (`ITEM_W` por acción), que es lo recomendado desde la
+      estética de círculos + etiqueta (2026-09-17). */
   width?: number;
 }
 
@@ -48,6 +62,37 @@ const TAP_MS = 500;
     arrastre horizontal es SIEMPRE scroll de la grilla: el menú solo reacciona si
     el gesto arranca cerca del borde derecho (decisión del usuario 2026-09-13). */
 const EDGE_ZONE_PX = 72;
+/** Ancho (px) que ocupa CADA acción cuando no se pasa la prop `width`: el
+    círculo más su etiqueta. La proporción es la del swipe del Mail de iOS
+    (2026-09-17): el círculo ocupa ~55% del ancho de la acción y la etiqueta
+    10px entra en UNA línea hasta 13-14 caracteres. */
+const ITEM_W = 74;
+/** Alto MÍNIMO de la franja (px): si la fila es más baja, la franja se estira
+    (centrada) unos pocos px para que entren el círculo y la etiqueta. */
+const STRIP_MIN_H = 56;
+/** Fondo del círculo de cada acción (estética del swipe del Mail de iOS: un
+    CÍRCULO de color con el ícono adentro y la etiqueta debajo, sobre el fondo de
+    la tarjeta). */
+const TONE_BG: Record<SwipeTone, string> = {
+  neutral: "bg-subtitle",
+  primary: "bg-primary",
+  success: "bg-success",
+  danger: "bg-danger",
+  warning: "bg-amber-500",
+};
+
+/** Color por defecto de una acción según su `key` (una acción puede pisarlo con
+    `tone`). */
+function toneDe(key: string): SwipeTone {
+  if (key === "delete") return "danger";
+  if (key === "cobrar" || key === "pagar") return "success";
+  return "neutral";
+}
+
+/** Cuánto se estira la franja (px arriba y abajo) para alcanzar `STRIP_MIN_H`. */
+function stripExtra(rowHeight: number): number {
+  return Math.max(0, STRIP_MIN_H - rowHeight) / 2;
+}
 
 /**
  * Primer ancestro de `el` (sin pasar de `limite`) que pueda scrollear
@@ -120,16 +165,32 @@ function findScrollerX(
  * - El elemento arrastrado se ubica por `data-row-id` (atributo que agrega
  *   `DataTable` a cada `<tr>`); las acciones se piden con ese id.
  *
- * ⚠️ Colores: la franja usa **`bg-primary`** (el azul de la app: `#2563eb` en
- * claro / `#4c6ef5` en oscuro) con texto blanco — pedido del usuario
- * 2026-09-16 (antes `bg-danger`, el rojo provisional del 2026-09-13).
+ * ⚠️ Estética (pedido del usuario 2026-09-17: *"como el swipe del Mail de
+ * iOS"*): cada acción es un **CÍRCULO de color con el ícono adentro y su
+ * etiqueta debajo**, sobre el fondo de la tarjeta (`bg-card`) — ya NO la franja
+ * maciza `bg-primary` con texto blanco del 2026-09-16 (histórico: `bg-danger`
+ * del 2026-09-13). El color sale de `SwipeRowAction.tone`, con `toneDe(key)
+ * como default: Editar gris (`bg-subtitle`) · Eliminar rojo · Cobrar verde ·
+ * Nueva jornada/tarea azul.
+ * - La franja se **centra verticalmente** sobre la fila y tiene un **alto
+ *   MÍNIMO** (`STRIP_MIN_H`, el que necesita el círculo + la etiqueta): si la
+ *   fila es más baja, la franja crece unos px arriba y abajo y **tapa con
+ *   `bg-card` lo que quede detrás** (si no, se recortaría el círculo).
+ * - El ancho de la franja es `width` si se pasa o, si no, `ITEM_W × acciones`
+ *   (una acción por círculo/etiqueta, repartidas en partes iguales).
+ * - Tamaños: círculo 40px + ícono 20px + etiqueta 10px (`leading-3`), que son
+ *   las proporciones de la captura de referencia (el círculo ~55% del ancho de
+ *   la acción, la etiqueta justo debajo con 2px de aire).
+ * - La acción marcada con `wide` (la EXTRA de la fila: Cobrar / Nueva jornada /
+ *   Nueva tarea) no es un círculo sino una **PÍLDORA** del mismo alto que ocupa
+ *   todo el ancho de su acción, como el botón verde de la captura.
  */
 
 export function SwipeRowActions({
   children,
   actionsFor,
   onRowTap,
-  width = 148,
+  width,
 }: SwipeRowActionsProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
@@ -140,6 +201,9 @@ export function SwipeRowActions({
   const openIdRef = useRef<string | null>(null);
   /** Último desplazamiento pintado (px). */
   const lastDRef = useRef(0);
+  /** Ancho TOTAL de la franja ACTIVA (px): lo fija `startDrag` con la prop
+      `width` o, si no se pasó, con `ITEM_W × acciones`. */
+  const widthRef = useRef(0);
   const startRef = useRef({
     x: 0,
     y: 0,
@@ -160,6 +224,7 @@ export function SwipeRowActions({
     top: number;
     height: number;
     right: number;
+    width: number;
   } | null>(null);
   /** El gesto en curso empezó DENTRO de la franja de acciones. */
   const fromStripRef = useRef(false);
@@ -279,7 +344,12 @@ export function SwipeRowActions({
     tr.style.transition = "";
     if (stripRef.current) stripRef.current.style.transition = "";
     rowRef.current = tr;
-    const base = openIdRef.current === id ? cbRef.current.width : 0;
+    // Ancho TOTAL de la franja: manda la prop `width`; si no se pasó, se calcula
+    // según la cantidad de acciones (cada una necesita `ITEM_W` px para el
+    // círculo y su etiqueta).
+    const w = cbRef.current.width ?? actions.length * ITEM_W;
+    widthRef.current = w;
+    const base = openIdRef.current === id ? w : 0;
     lastDRef.current = base;
     startRef.current = {
       x: clientX,
@@ -296,11 +366,16 @@ export function SwipeRowActions({
       moved: false,
       id,
     };
+    // Centrada verticalmente sobre la fila; si la fila es más baja que
+    // `STRIP_MIN_H`, crece hacia arriba y hacia abajo (el fondo opaco del render
+    // tapa lo que quede detrás) para que entren el círculo y la etiqueta.
+    const extra = stripExtra(rect.height);
     setMenu({
       id,
       actions,
-      top: rect.top - wrapRect.top,
-      height: rect.height,
+      width: w,
+      top: rect.top - wrapRect.top - extra,
+      height: rect.height + extra * 2,
       // Anclada al borde DERECHO de la fila; si la grilla desbordara la tarjeta,
       // se la clava al borde VISIBLE para que las acciones nunca queden fuera.
       right: Math.max(0, wrapRect.right - rect.right),
@@ -373,8 +448,9 @@ export function SwipeRowActions({
         const wrapRect = wrapRef.current?.getBoundingClientRect();
         if (wrapRect) {
           const derechaReal = rect.right + lastDRef.current;
-          stripRef.current.style.top = `${rect.top - wrapRect.top}px`;
-          stripRef.current.style.height = `${rect.height}px`;
+          const extra = stripExtra(rect.height);
+          stripRef.current.style.top = `${rect.top - wrapRect.top - extra}px`;
+          stripRef.current.style.height = `${rect.height + extra * 2}px`;
           stripRef.current.style.right = `${Math.max(
             0,
             wrapRect.right - derechaReal
@@ -384,7 +460,7 @@ export function SwipeRowActions({
 
       // Zona de borde: MENÚ de la fila (reveal progresivo).
       st.moved = true;
-      const w = cbRef.current.width;
+      const w = widthRef.current;
       // dx < 0 al deslizar hacia la izquierda (el desplazamiento revelado crece).
       const d = Math.max(0, Math.min(st.base - dx, w + RUBBER));
       lastDRef.current = d;
@@ -418,12 +494,12 @@ export function SwipeRowActions({
         rowRef.current = openRow;
         openRow.style.transition = "";
         if (stripRef.current) stripRef.current.style.transition = "";
-        lastDRef.current = cbRef.current.width;
+        lastDRef.current = widthRef.current;
         startRef.current = {
           x: sd.x,
           y: sd.y,
           t: sd.t,
-          base: cbRef.current.width,
+          base: widthRef.current,
           scrollBase: 0,
           edge: true,
           axis: "x",
@@ -449,7 +525,7 @@ export function SwipeRowActions({
     rowRef.current = null;
     // El gesto no empezó en una fila con acciones.
     if (!st.id) return;
-    const w = cbRef.current.width;
+    const w = widthRef.current;
     // ¿La fila arrastrada era la del menú ABIERTO?
     const eraAbierta = openIdRef.current === st.id;
 
@@ -571,10 +647,18 @@ export function SwipeRowActions({
           key={menu.id}
           ref={stripRef}
           style={{ top: menu.top, height: menu.height, right: menu.right }}
-          className="absolute z-10 w-0 overflow-hidden"
+          // `bg-card`: la franja se pinta con el mismo fondo que la tarjeta (las
+          // filas son transparentes), así las acciones parecen estar "detrás" de
+          // la fila que se corre —igual que el swipe del Mail de iOS— y, cuando
+          // la franja se estira por encima del alto de la fila, tapa lo que
+          // quedaría a la vista de las filas vecinas.
+          className="absolute z-10 w-0 overflow-hidden bg-card"
         >
-          <div className="ml-auto flex h-full" style={{ width }}>
-            {menu.actions.map((a, i) => {
+          <div
+            className="ml-auto flex h-full items-center"
+            style={{ width: menu.width }}
+          >
+            {menu.actions.map((a) => {
               const Icon = a.icon;
               return (
                 <button
@@ -592,13 +676,23 @@ export function SwipeRowActions({
                     closeOpen();
                     a.onClick();
                   }}
-                  className={cn(
-                    "flex flex-1 flex-col items-center justify-center gap-0.5 bg-primary px-0.5 text-center text-[10.5px] leading-tight font-medium text-white",
-                    i > 0 && "border-l border-black/20"
-                  )}
+                  className="flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 text-center"
                 >
-                  <Icon className="h-5 w-5" />
-                  <span>{a.label}</span>
+                  {/* Círculo de color (o PÍLDORA ancha si `wide`) + ícono
+                      blanco, con la etiqueta debajo (estética del swipe del Mail
+                      de iOS, 2026-09-17). */}
+                  <span
+                    className={cn(
+                      "flex h-10 shrink-0 items-center justify-center rounded-full text-white transition-opacity active:opacity-80",
+                      a.wide ? "w-full" : "w-10",
+                      TONE_BG[a.tone ?? toneDe(a.key)]
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <span className="max-w-full text-[10px] leading-3 font-medium wrap-break-word text-card-foreground">
+                    {a.label}
+                  </span>
                 </button>
               );
             })}

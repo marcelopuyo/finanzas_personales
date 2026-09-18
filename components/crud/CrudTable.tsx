@@ -72,10 +72,12 @@ interface CrudTableProps<T, TId = number> {
     onRowTap?: (id: TId) => void;
     /** Acciones EXTRA por fila, que se agregan ANTES de Editar y Eliminar (esas
         dos siempre están: "Eliminar" necesita abrir el modal de confirmación
-        que vive en `CrudTable`). Ej.: "Nueva jornada" en el CRUD de períodos. */
+        que vive en `CrudTable`). Ej.: "Nueva jornada" en el CRUD de períodos.
+        Cada una puede elegir el color de su círculo con `tone`. */
     extraActions?: (id: TId) => SwipeRowAction[];
-    /** Ancho de la franja revelada, en px (default 148). Conviene subirlo cuando
-        hay 3+ acciones, para que las etiquetas entren. */
+    /** Ancho TOTAL de la franja revelada, en px. Si se omite se calcula según la
+        cantidad de acciones (`ITEM_W` = 74px por acción), que es lo recomendado
+        desde la estética de círculos + etiqueta (2026-09-17). */
     width?: number;
   };
   /** Columnas extra que se agregan AL FINAL (después de Editar/Eliminar) en
@@ -507,12 +509,17 @@ export function CrudTable<T, TId = number>({
         key: "edit",
         label: "Editar",
         icon: Pencil,
+        // Colores del menú deslizante (2026-09-17, ver `SwipeTone`): Editar azul
+        // (el acento de la app), Eliminar rojo y la acción EXTRA de cada vista
+        // verde (`tone` de `mobileSwipe.extraActions`).
+        tone: "primary",
         onClick: () => nav(editHref(id), "edit"),
       },
       {
         key: "delete",
         label: "Eliminar",
         icon: Trash2,
+        tone: "danger",
         onClick: () => setDeleteId(id),
       },
     ];

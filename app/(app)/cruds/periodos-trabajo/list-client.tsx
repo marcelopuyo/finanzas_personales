@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Banknote, CalendarClock, CalendarPlus, ListPlus } from "lucide-react";
 import { CrudTable } from "@/components/crud/CrudTable";
+import type { SwipeRowAction } from "@/components/crud/SwipeRowActions";
 import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
 import { eliminarPeriodoTrabajo } from "@/backend/src/actions/trabajos";
 import { periodoCobrable, periodoCobrado } from "@/backend/src/lib/jornadas";
@@ -291,8 +292,14 @@ export function PeriodosTrabajoListClient({
         ni tareas). Mismo destino que el "+" del detalle: wizard directo, con el
         período precargado y vuelta a ESTE listado (Cancelar/guardar).
       Un período COBRADO es de solo lectura: ninguna de las dos. La clave de la
-      acción es también el slug del wizard (`/movimientos/nuevo/<slug>`). */
-  const accionesFila = (p: PeriodoTrabajoOut) => {
+      acción es también el slug del wizard (`/movimientos/nuevo/<slug>`).
+      `tone` (2026-09-17) es el COLOR del círculo del menú deslizante: VERDE para
+      la acción extra (Cobrar o la carga de jornada/tarea) y, por los defaults de
+      `CrudTable`/`toneDe`, azul Editar y rojo Eliminar. `wide` (mismo día) hace
+      que ESA acción se pinte como PÍLDORA ancha en vez de círculo, para que se
+      distinga de Editar/Eliminar (como el botón verde de la captura que pasó el
+      usuario). */
+  const accionesFila = (p: PeriodoTrabajoOut): SwipeRowAction[] => {
     if (periodoCobrado(p)) return [];
     if (periodoCobrable(p, todayLocalISODate())) {
       return [
@@ -300,6 +307,8 @@ export function PeriodosTrabajoListClient({
           key: "cobrar",
           label: "Cobrar",
           icon: Banknote,
+          tone: "success",
+          wide: true,
           onClick: () =>
             router.push(
               `/movimientos/nuevo/cobro?periodo=${p.id}&volverA=${encodeURIComponent(
@@ -312,9 +321,19 @@ export function PeriodosTrabajoListClient({
     const modalidad = p.trabajo?.modalidadCobro ?? "horas_variables";
     const tipo =
       modalidad === "horas_variables"
-        ? { slug: "jornada", label: "Nueva jornada", icon: CalendarPlus }
+        ? {
+            slug: "jornada",
+            label: "Nueva jornada",
+            icon: CalendarPlus,
+            tone: "success" as const,
+          }
         : modalidad === "por_tarea"
-          ? { slug: "tarea", label: "Nueva tarea", icon: ListPlus }
+          ? {
+              slug: "tarea",
+              label: "Nueva tarea",
+              icon: ListPlus,
+              tone: "success" as const,
+            }
           : null;
     if (!tipo) return [];
     return [
@@ -322,6 +341,8 @@ export function PeriodosTrabajoListClient({
         key: tipo.slug,
         label: tipo.label,
         icon: tipo.icon,
+        tone: tipo.tone,
+        wide: true,
         onClick: () =>
           router.push(
             `/movimientos/nuevo/${tipo.slug}?periodo=${p.id}&volverA=${encodeURIComponent(
@@ -398,8 +419,9 @@ export function PeriodosTrabajoListClient({
       // `origen`, el detalle vuelve a /cruds/periodos-trabajo).
       mobileSwipe={{
         onRowTap: abrirDetalle,
-        // Más ancha que el default (148) para que entren 3 acciones.
-        width: 192,
+        // El ancho de la franja NO se fija acá: se calcula solo según la
+        // cantidad de acciones (2026-09-17), porque cada acción ahora es un
+        // círculo con su etiqueta debajo (3 acciones ⇒ ~222px).
         extraActions: (id) => {
           const p = porId.get(id);
           return p ? accionesFila(p) : [];
