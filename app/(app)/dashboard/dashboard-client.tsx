@@ -1,7 +1,6 @@
 ﻿"use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
+import { useMemo, useRef, useState } from "react";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { StatBadge } from "@/components/ui/stat-badge";
 import { Tabs } from "@/components/ui/tabs";
@@ -33,7 +32,7 @@ import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
 import { periodoCobrado } from "@/backend/src/lib/jornadas";
 import { cn, numberToCurrency, todayLocalISODate } from "@/lib/utils";
 import { useMontado } from "@/lib/use-cliente";
-import { LinkNavStatus } from "@/components/ui/nav-progress";
+import { usePendingNav, usePrefetchNav } from "@/components/ui/nav-progress";
 
 interface Props {
   data: DashboardData;
@@ -45,9 +44,13 @@ interface Props {
 
 const SIN_CATEGORIA = "Sin categoría";
 const SIN_CUENTA = "Sin cuenta";
-/** Destino del PANEL "Trabajo" completo (ver `dashboard-client`): cualquier clic
+/** Destino del PANEL "Trabajo" completo (ver `DashboardClient`): cualquier toque
     dentro del panel, salvo el menú ⋯, abre el CRUD de períodos. */
 const HREF_PERIODOS = "/cruds/periodos-trabajo?origen=dashboard";
+/** Un toque cuenta como TAP (y navega) si el dedo no se movió más de esto (px) y
+    no duró más que `TAP_MS`. Un scroll o un long press quedan descartados. */
+const TAP_MOVE_PX = 10;
+const TAP_MS = 500;
 const SIN_TRABAJO = "Sin trabajo";
 
 function toDateKey(v: string | Date | null | undefined): string {
@@ -57,6 +60,24 @@ function toDateKey(v: string | Date | null | undefined): string {
 }
 
 export function DashboardClient({ data, periodosInicial }: Props) {
+  // ── Navegación del panel "Trabajo" (todo el panel, salvo el ⋯) ──────────
+  // ⚠️ Se dispara en `touchend` ADEMÁS del `click`: en el iPhone, un toque sobre
+  // una zona grande NO siempre genera `click` (el navegador lo clasifica como
+  // scroll y lo descarta) y la acción se perdía — había que tocar 2-3 veces. Los
+  // touch events sí llegan siempre, con el mismo criterio que el swipe del CRUD
+  // de períodos (§109): si el dedo se movió poco y el gesto fue corto, es un TAP.
+  const { go: navGo } = usePendingNav();
+  const prefetch = usePrefetchNav();
+  const tapRef = useRef<{ x: number; y: number; t: number } | null>(null);
+  /** Momento de la última navegación disparada por el panel (ms): descarta la
+      segunda (el `click` que el navegador emite después del `touchend`) dentro de
+      `TAP_MS`, pero deja reintentar si algo falló. */
+  const navAtRef = useRef(0);
+  const abrirPeriodos = () => {
+    if (Date.now() - navAtRef.current < TAP_MS) return;
+    navAtRef.current = Date.now();
+    navGo(HREF_PERIODOS, "periodos");
+  };
   const [tabGastos, setTabGastos] = useState("resumen");
   const [tabIngresos, setTabIngresos] = useState("resumen");
   // Cuenta seleccionada para abrir su historial en popup
@@ -578,26 +599,47 @@ export function DashboardClient({ data, periodosInicial }: Props) {
           ⚠️ **El PANEL ENTERO es el área de clic** (decisión del usuario
           2026-09-17: antes solo navegaban las filas): cualquier punto —filas,
           encabezados de grupo, título, márgenes— abre el CRUD completo de
-          períodos. El menú ⋯ queda EXCLUIDO porque se monta FUERA del Link (es
-          un hermano que flota sobre la esquina) y las filas no tienen ninguna
-          señal visual de clic.
-          ⚠️ Se navega con un **`<Link>` nativo** (y NO con `router.push` desde un
-          `onClick`, ni `usePendingNav`): con el `onClick` el primer toque en
-          mobile **no abría nada** y hacía falta un segundo toque (el navegador
-          no emite el `click` del primer tap cuando hubo un cambio en el DOM
-          durante el gesto). El `<a>` del `Link` navega aunque el `click` de React
-          se pierda, prefetchea el RSC al entrar en pantalla y `cursor-default` +
-          `-webkit-tap-highlight-color: transparent` lo dejan sin ninguna señal
-          visual. `LinkNavStatus` enciende la barra de progreso global. */}
+          períodos. El menú ⋯ queda EXCLUIDO porque se monta FUERA del área
+          clickeable (es un hermano que flota sobre la esquina) y las filas no
+          tienen ninguna señal visual de clic.
+          ⚠️ **Navegación por TOQUE** (2026-09-18): se maneja `touchend` (tap) y
+          `click`, porque en el iPhone el primer toque de una zona grande puede
+          no generar `click` (el navegador lo toma como scroll) ⇒ había que
+          tocar 2-3 veces. `role="link"` + Enter mantienen el acceso por
+          teclado; `cursor-default`, `select-none` y
+          `-webkit-tap-highlight-color: transparent` lo dejan sin señal visual. */}
       <div className="relative">
-        <Link
-          href={HREF_PERIODOS}
-          className="block rounded-lg border border-border bg-card p-4 cursor-default [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] sm:p-5"
+        <div
+          role="link"
+          tabIndex={0}
+          onTouchStart={(e) => {
+            const t = e.touches[0];
+            tapRef.current = t
+              ? { x: t.clientX, y: t.clientY, t: Date.now() }
+              : null;
+          }}
+          onTouchEnd={(e) => {
+            const s = tapRef.current;
+            tapRef.current = null;
+            const t = e.changedTouches[0];
+            if (!s || !t) return;
+            if (Date.now() - s.t > TAP_MS) return; // long press / selección
+            if (Math.hypot(t.clientX - s.x, t.clientY - s.y) > TAP_MOVE_PX) return; // scroll
+            abrirPeriodos();
+          }}
+          // Mouse/trackpad (y el `click` del toque, si el navegador lo emite).
+          onClick={() => abrirPeriodos()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") abrirPeriodos();
+          }}
+          // Prefetch del destino al primer contacto (el `<Link>` de antes lo
+          // hacía solo): la llegada sigue siendo instantánea.
+          onPointerEnter={() => prefetch(HREF_PERIODOS)}
+          onTouchStartCapture={() => prefetch(HREF_PERIODOS)}
+          className="rounded-lg border border-border bg-card p-4 cursor-default select-none [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] sm:p-5"
         >
-          {/* Avisa a la barra de progreso global mientras llega el CRUD. */}
-          <LinkNavStatus />
-          {/* Encabezado: título a la izquierda (el ⋯ va FUERA del Link, ver
-              abajo, para no anidar interactivos dentro del `<a>`). */}
+          {/* Encabezado: título a la izquierda (el ⋯ va FUERA de esta caja, ver
+              abajo, para que su toque no dispare la navegación del panel). */}
           <div className="mb-3 pr-8">
             <h2 className="text-[16px] font-semibold text-header">Trabajo</h2>
           </div>
@@ -606,10 +648,10 @@ export function DashboardClient({ data, periodosInicial }: Props) {
             enCurso={periodosActuales}
             currency={data.monedaPredeterminadaISO}
           />
-        </Link>
-        {/* Menú ⋯ del panel: HERMANO del Link (no hijo) y flotando sobre su
-            esquina superior derecha, alineado con el padding del panel. Así el
-            clic del menú nunca forma parte de la navegación del panel. */}
+        </div>
+        {/* Menú ⋯ del panel: HERMANO de la caja clickeable (no hijo) y flotando
+            sobre su esquina superior derecha, alineado con el padding del panel.
+            Así el toque del menú nunca forma parte de la navegación del panel. */}
         <div className="absolute right-4 top-4 z-10 flex items-center sm:right-5 sm:top-5">
           <TrabajosActionsMenu />
         </div>
