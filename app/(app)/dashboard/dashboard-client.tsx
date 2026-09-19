@@ -357,14 +357,20 @@ export function DashboardClient({ data, periodosInicial }: Props) {
   // Botón de búsqueda de la tab "Detalle" de Gastos: solo el ícono, con el mismo
   // estilo pill del botón "Filtros" en tono gris. Alterna el input expandido.
   const toggleBusquedaGastos = () => {
-    // Al cerrar se limpia el texto para no dejar la grilla filtrada sin input.
+    // Al CERRAR se limpia el texto: la grilla vuelve a mostrar TODOS los gastos
+    // del panel (si no, quedaría filtrada sin que se vea el input de búsqueda).
     if (busquedaGastosOpen) setBusquedaGastos("");
     setBusquedaGastosOpen(!busquedaGastosOpen);
   };
+  // ⚠️ `useTap` (touch events + click), NO `onClick`: en iOS el toque de una zona
+  // chica puede no generar `click` y el botón "no responde" (lección §119).
+  // Además el mismo handler se comparte con las dos copias del botón (mobile y
+  // desktop), de las cuales sólo una está visible.
+  const tapBusquedaGastos = useTap(toggleBusquedaGastos);
   const gastoSearchBtn = (className?: string) => (
     <button
       type="button"
-      onClick={toggleBusquedaGastos}
+      {...tapBusquedaGastos}
       aria-label={
         busquedaGastosOpen ? "Cerrar búsqueda de gastos" : "Buscar gastos"
       }

@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import type { GastoOut } from "@/backend/src/queries/gastos";
 import { dateTimeToString, numberToCurrency } from "@/lib/utils";
+import { useTap } from "@/lib/tap";
 
 export function gastosDetalleColumns(currency = "ARS"): ColumnDef<GastoOut>[] {
   return [
@@ -90,20 +91,47 @@ export function GastosDetalle({
     });
   }, [data, search]);
 
+  const inputRef = useRef<HTMLInputElement>(null);
+  /** Vacía la búsqueda YA, sin cerrar el input (deja el foco listo para escribir
+      otra cosa). Se dispara con `useTap` para que funcione en mobile igual que
+      el resto de los controles del dashboard (en iOS el `click` puede no llegar). */
+  const limpiarBusqueda = () => {
+    onSearchChange("");
+    inputRef.current?.focus();
+  };
+  const tapLimpiar = useTap(limpiarBusqueda);
+
   return (
     <>
       {searchOpen && (
         <div className="relative mb-3">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtitle" />
           <input
+            ref={inputRef}
             autoFocus
             type="text"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && search) limpiarBusqueda();
+            }}
             placeholder="Buscar gasto..."
             aria-label="Buscar gasto"
-            className="w-full rounded-full border border-border bg-card py-2 pl-9 pr-3 text-[13px] text-card-foreground placeholder:text-subtitle focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="w-full rounded-full border border-border bg-card py-2 pl-9 pr-10 text-[13px] text-card-foreground placeholder:text-subtitle focus:outline-none focus:ring-2 focus:ring-primary/40"
           />
+          {/* Botón "limpiar" DENTRO del cuadro de búsqueda (a la derecha): vacía
+              el texto al instante sin cerrar el campo. */}
+          {search.length > 0 && (
+            <button
+              type="button"
+              {...tapLimpiar}
+              aria-label="Limpiar búsqueda"
+              title="Limpiar"
+              className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-subtitle transition-colors hover:bg-muted hover:text-header"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       )}
       <p className="mb-3 text-[12px] text-subtitle">
