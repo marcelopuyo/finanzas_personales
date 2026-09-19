@@ -12,7 +12,8 @@ import pkg from "./package.json";
 // publica (lo usa el service worker para saber a qué build pertenecen sus
 // cachés: ver `sincronizarBuild()` en public/sw.js).
 //
-// Al publicar un lote: subir `version` en package.json y taggear `vX.Y.Z` en git.
+// Al publicar un lote: subir `version` en package.json.
+// (Los tags de git `vX.Y.Z` quedaron EN PAUSA: decisión del usuario, 2026-09-18.)
 // ============================================================
 
 /** Commit corto del deploy: en Vercel lo da el entorno; en local, git. */

@@ -7,7 +7,8 @@
  *
  * Reglas de versionado (2026-09-15):
  * - Fuente única: `version` de `package.json` (SemVer) + el commit del deploy.
- * - Al publicar un lote: subir `version` en `package.json` y taggear `vX.Y.Z`.
+ * - Al publicar un lote: subir `version` en `package.json` (y listo: los tags de
+ *   git `vX.Y.Z` quedaron EN PAUSA por decisión del usuario, 2026-09-18).
  * - `APP_BUILD_ID` identifica al BUILD (versión + commit): lo usa el service
  *   worker para detectar que hay un deploy nuevo y descartar los documentos
  *   cacheados de la versión anterior (ver `sincronizarBuild()` en `public/sw.js`).

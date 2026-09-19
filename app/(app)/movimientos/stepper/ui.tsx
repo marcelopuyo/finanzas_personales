@@ -9,6 +9,7 @@
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useMovimientoStepper } from "./stepper-context";
+import { CONCEPTO_TITULO_PAGINA } from "./types";
 import {
   StepShell as StepShellBase,
   NavButtons as NavButtonsBase,
@@ -29,7 +30,9 @@ export {
 } from "@/components/wizard/ui";
 
 /** Contenedor del wizard de movimientos: conserva el encabezado "Movimientos"
- * y el indicador de pasos solo en modo stepper (no directo). */
+ * y el indicador de pasos solo en modo stepper (no directo). En modo DIRECTO el
+ * encabezado nombra la operación (ej. "Pago de préstamo"): el usuario entró a
+ * hacer eso, no a elegir un tipo de movimiento. */
 export function StepShell({
   title,
   step,
@@ -43,11 +46,18 @@ export function StepShell({
   children: ReactNode;
   footer: ReactNode;
 }) {
-  const { direct } = useMovimientoStepper();
+  const { direct, data } = useMovimientoStepper();
+  const tituloPagina = direct
+    ? data.concepto
+      ? CONCEPTO_TITULO_PAGINA[data.concepto]
+      : "Movimientos"
+    : "Movimientos";
   return (
     <StepShellBase
       encabezado={
-        <h1 className="mb-1 text-[18px] font-semibold text-header">Movimientos</h1>
+        <h1 className="mb-1 text-[18px] font-semibold text-header">
+          {tituloPagina}
+        </h1>
       }
       paso={direct ? undefined : step}
       total={direct ? undefined : total}

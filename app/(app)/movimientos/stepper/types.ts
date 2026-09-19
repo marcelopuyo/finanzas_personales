@@ -119,6 +119,23 @@ export const MOVIMIENTO_TIPO_PARAM: Record<MovimientoConcepto, string> = {
   CargarTarea: "tarea",
 };
 
+/**
+ * Título de PÁGINA (el `<h1>`) del wizard en **modo directo**
+ * (`/movimientos/nuevo/<tipo>`): describe la operación que se está haciendo.
+ * En modo stepper (`/movimientos`) sigue siendo "Movimientos", porque ahí el
+ * usuario todavía está eligiendo el tipo.
+ */
+export const CONCEPTO_TITULO_PAGINA: Record<MovimientoConcepto, string> = {
+  CobroSueldo: "Cobro de sueldo",
+  PagoPrestamo: "Pago de préstamo",
+  AjusteCuenta: "Ajuste de cuenta",
+  PagoGasto: "Pago de gasto",
+  GastoDirecto: "Gasto directo",
+  Transferencia: "Transferencia",
+  JornadaTrabajo: "Jornada de trabajo",
+  CargarTarea: "Carga de tarea",
+};
+
 /** Motivos posibles de transferencia (igual que el enum backend). */
 export const MOTIVOS_TRANSFERENCIA = [
   "Transferencia",

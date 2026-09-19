@@ -14,8 +14,9 @@ import { cn } from "@/lib/utils";
  * Ajuste del **bloqueo de la app** (Perfil): cuánto puede estar la app en segundo
  * plano antes de pedir biometría al volver.
  *
- * Solo aplica en el **celular** y en los equipos que tengan una passkey activada
- * (si no, bloquear sería dejar al usuario afuera): ver `components/auth/app-lock.tsx`.
+ * Aplica en **todos los dispositivos** (mobile y escritorio) que tengan una passkey
+ * activada del usuario logueado (si no, bloquear sería dejar al usuario afuera):
+ * ver `components/auth/app-lock.tsx`.
  *
  * La preferencia se guarda en una COOKIE (`lib/app-lock-prefs.ts`) y el propio
  * bloqueo la lee en el momento de bloquear, así que el cambio rige al instante.
@@ -40,9 +41,10 @@ export function AppLockSection({ graciaInicial }: { graciaInicial: number }) {
         <h2 className="text-[14px] font-medium text-header">Bloqueo de la app</h2>
       </div>
       <p className="mt-1 text-[12px] text-subtitle">
-        En el celular, volver a la app después de haberla dejado en segundo plano
-        pide biometría (no alcanza con volver sola, como pasa normalmente). Elegí
-        cuánto puede pasar antes de pedirla.
+        Cuando volvés a la app después de haberla dejado en segundo plano (o
+        cambiás de pestaña en la computadora) pide biometría, en vez de mostrarse
+        directamente como pasa normalmente. Elegí cuánto puede pasar antes de
+        pedirla.
       </p>
       <div className="mt-3 grid grid-cols-3 gap-1">
         {OPCIONES_GRACIA.map((opcion) => (
@@ -63,7 +65,8 @@ export function AppLockSection({ graciaInicial }: { graciaInicial: number }) {
       </div>
       <p className="mt-2 text-[11.5px] text-subtitle">
         Se aplica en los dispositivos con biometría activada (arriba). En la
-        computadora no se bloquea.
+        computadora bloquea al cambiar de pestaña y también todas las veces que
+        se abre o se recarga la página.
       </p>
     </section>
   );

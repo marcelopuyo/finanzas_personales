@@ -59,7 +59,9 @@ export function PrestamosListClient({ initialData, origen }: Props) {
           }
           return (
             <Link
-              href={`/movimientos/nuevo/pago-prestamo?prestamo=${p.id}`}
+              href={`/movimientos/nuevo/pago-prestamo?prestamo=${p.id}&volverA=${encodeURIComponent(
+                `/cruds/prestamos${origenQ}`
+              )}`}
               title="Pagar préstamo"
               aria-label={`Pagar préstamo ${p.detalle ?? ""}`.trim()}
               className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted text-primary transition-colors hover:bg-primary/15"
@@ -71,7 +73,7 @@ export function PrestamosListClient({ initialData, origen }: Props) {
         },
       } as ColumnDef<PrestamoOut>,
     ],
-    []
+    [origenQ]
   );
   return (
     <CrudTable<PrestamoOut, string>
