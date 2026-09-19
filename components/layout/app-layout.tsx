@@ -10,7 +10,8 @@ import { OfflineNotice } from "@/components/pwa/offline-notice";
  * el dashboard y el contenido deja 3.5rem (h-14) arriba en todos los tamaños.
  *
  * El contenido va dentro de `PullToRefresh`, que es quien renderiza el `<main>`
- * que scrollea: ahí vive el gesto de "tirar para actualizar" (mobile).
+ * que scrollea: ahí vive el gesto de "tirar para actualizar" (con el dedo en
+ * mobile, y en desktop con la rueda/trackpad o arrastrando con el mouse).
  */
 export default function AppLayout({
   children,

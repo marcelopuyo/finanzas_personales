@@ -26,6 +26,19 @@ import { cn } from "@/lib/utils";
  * - No se activa si: el scroll no está arriba, hay un modal abierto
  *   (`[role="dialog"]`, que vive dentro del scroll y burbujearía hasta acá) o
  *   el gesto es más horizontal que vertical (stepper/wizard).
+ *
+ * **Desktop (2026-09-18).** El gesto táctil no existe con mouse, así que el
+ * mismo pull se puede disparar de DOS formas más (mismo indicador, mismo
+ * umbral y mismo `trigger()`):
+ * - **Rueda/trackpad**: estando ARRIBA de todo, seguir scrolleando hacia
+ *   arriba acumula el pull con la misma resistencia; el gesto se cierra a los
+ *   `WHEEL_IDLE_MS` sin eventos y ahí recién se dispara ("soltar").
+ *   ⚠️ Para no dispararse por **inercia** (un flick fuerte hacia arriba desde
+ *   más abajo llega al tope con momentum), si hubo scroll real hace menos de
+ *   `WHEEL_LLEGADA_MS` NO se cuenta como pull: hay que quedarse en el tope.
+ * - **Arrastrar con el mouse** (pointer events, `pointerType === "mouse"`):
+ *   mantener el botón y tirar hacia abajo. Durante el arrastre se bloquea la
+ *   selección de texto y el drag nativo.
  */
 
 /** Distancia (px, ya amortiguada) necesaria para disparar el refresco. */
@@ -40,6 +53,14 @@ const MIN_SPIN_MS = 400;
 const MAX_SPIN_MS = 8000;
 /** Recorrido del gesto antes de decidir que es un pull vertical. */
 const DECIDE_PX = 4;
+/** Ventana sin eventos de rueda que cierra el gesto de pull con la rueda (ms). */
+const WHEEL_IDLE_MS = 200;
+/**
+ * Si hubo scroll real hace menos que esto, un "tirón hacia arriba" en el tope se
+ * considera INERCIA (el flick que acaba de llegar del medio de la página) y no
+ * se cuenta como pull. Hay que quedarse quieto en el tope para tirar.
+ */
+const WHEEL_LLEGADA_MS = 350;
 
 /**
  * Estilo del indicador:
@@ -161,13 +182,30 @@ export function PullToRefresh({
 
   // Gesto. El efecto se re-registra al terminar un refresh para no capturar
   // estado viejo (`spinning`, `paint`) en los listeners.
+  //
+  // TRES entradas al MISMO gesto (comparten `paint()`, el umbral y `trigger()`):
+  //  · TOUCH   → mobile, con el dedo.
+  //  · WHEEL   → desktop, rueda o trackpad (seguir tirando hacia arriba en el tope).
+  //  · POINTER → desktop, arrastrando hacia abajo con el mouse.
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || spinning) return;
 
+    /** ¿Se puede empezar un pull? (arriba de todo y sin modales abiertos) */
+    const puedeEmpezar = () =>
+      el.scrollTop <= 0 && !document.querySelector('[role="dialog"]');
+
+    /** Suelta el pull: dispara si pasó el umbral, o vuelve animado. */
+    const soltar = (habiaPull: boolean) => {
+      if (!habiaPull) return;
+      if (pulled.current >= THRESHOLD) trigger();
+      else paint(0, true);
+    };
+
+    // ---------------- 1) TOUCH (mobile) ----------------
     const onStart = (e: TouchEvent) => {
       // Solo desde el tope y sin modales abiertos.
-      if (el.scrollTop > 0 || document.querySelector('[role="dialog"]')) {
+      if (!puedeEmpezar()) {
         start.current = null;
         pulling.current = null;
         return;
@@ -205,20 +243,128 @@ export function PullToRefresh({
       const wasPulling = pulling.current === true;
       start.current = null;
       pulling.current = null;
-      if (!wasPulling) return;
-      if (pulled.current >= THRESHOLD) trigger();
-      else paint(0, true);
+      soltar(wasPulling);
+    };
+
+    // ---------------- 2) WHEEL (desktop: rueda / trackpad) ----------------
+    /** DeltaY acumulado del pull en curso (sin amortiguar). */
+    let wheelRaw = 0;
+    let wheelActivo = false;
+    let wheelIdle: number | undefined;
+    /** Momento del último evento de rueda con la página REALMENTE scrolleada. */
+    let ultimoScrollReal = 0;
+
+    const cerrarWheel = () => {
+      if (wheelIdle !== undefined) {
+        window.clearTimeout(wheelIdle);
+        wheelIdle = undefined;
+      }
+      const habia = wheelActivo;
+      wheelActivo = false;
+      wheelRaw = 0;
+      soltar(habia);
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      // Scrolleando la página (hacia abajo, o estando más abajo del tope): no es pull.
+      if (e.deltaY > 0 || el.scrollTop > 0) {
+        if (el.scrollTop > 0) ultimoScrollReal = Date.now();
+        if (wheelActivo) cerrarWheel();
+        return;
+      }
+      // En el tope, tirando hacia arriba: ¿se puede?
+      if (document.querySelector('[role="dialog"]')) return;
+      // Inercia: viene de un flick que llegó al tope recién.
+      if (Date.now() - ultimoScrollReal < WHEEL_LLEGADA_MS) return;
+
+      wheelActivo = true;
+      wheelRaw += -e.deltaY;
+      paint(Math.min(MAX_PULL, wheelRaw * RESISTANCE));
+      if (wheelIdle !== undefined) window.clearTimeout(wheelIdle);
+      // Se dispara al "soltar" (quedarse sin eventos): igual que levantar el dedo.
+      wheelIdle = window.setTimeout(cerrarWheel, WHEEL_IDLE_MS);
+    };
+
+    // ---------------- 3) POINTER (desktop: arrastrar con el mouse) ----------------
+    // ⚠️ Solo `pointerType === "mouse"`: en mobile TAMBIÉN llegan pointer events
+    // (`touch`) y duplicarían el gesto táctil de arriba.
+    let mouseDesde: { x: number; y: number } | null = null;
+    let mousePulling = false;
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.pointerType !== "mouse" || e.button !== 0) return;
+      if (!puedeEmpezar()) {
+        mouseDesde = null;
+        return;
+      }
+      mouseDesde = { x: e.clientX, y: e.clientY };
+      mousePulling = false;
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (e.pointerType !== "mouse" || !mouseDesde) return;
+      const dy = e.clientY - mouseDesde.y;
+      const dx = e.clientX - mouseDesde.x;
+
+      if (!mousePulling) {
+        // Gesto horizontal: no es un pull (se deja pasar el evento).
+        if (Math.abs(dx) > Math.abs(dy)) {
+          mouseDesde = null;
+          return;
+        }
+        if (dy < DECIDE_PX) return;
+        mousePulling = true;
+        // Mientras dura el arrastre no se selecciona texto ni se arrastran
+        // imágenes/links (el `dragstart` también se frena, ver abajo).
+        el.style.userSelect = "none";
+        el.setPointerCapture(e.pointerId);
+      }
+
+      e.preventDefault();
+      if (dy <= 0) {
+        paint(0);
+        return;
+      }
+      paint(Math.min(MAX_PULL, dy * RESISTANCE));
+    };
+
+    const onPointerEnd = (e: PointerEvent) => {
+      if (e.pointerType !== "mouse" || !mouseDesde) return;
+      const habia = mousePulling;
+      mouseDesde = null;
+      mousePulling = false;
+      el.style.userSelect = "";
+      if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+      soltar(habia);
+    };
+
+    const onDragStart = (e: DragEvent) => {
+      if (mousePulling) e.preventDefault();
     };
 
     el.addEventListener("touchstart", onStart, { passive: true });
     el.addEventListener("touchmove", onMove, { passive: false });
     el.addEventListener("touchend", onEnd);
     el.addEventListener("touchcancel", onEnd);
+    el.addEventListener("wheel", onWheel, { passive: true });
+    el.addEventListener("pointerdown", onPointerDown);
+    el.addEventListener("pointermove", onPointerMove);
+    el.addEventListener("pointerup", onPointerEnd);
+    el.addEventListener("pointercancel", onPointerEnd);
+    el.addEventListener("dragstart", onDragStart);
     return () => {
       el.removeEventListener("touchstart", onStart);
       el.removeEventListener("touchmove", onMove);
       el.removeEventListener("touchend", onEnd);
       el.removeEventListener("touchcancel", onEnd);
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("pointerdown", onPointerDown);
+      el.removeEventListener("pointermove", onPointerMove);
+      el.removeEventListener("pointerup", onPointerEnd);
+      el.removeEventListener("pointercancel", onPointerEnd);
+      el.removeEventListener("dragstart", onDragStart);
+      if (wheelIdle !== undefined) window.clearTimeout(wheelIdle);
+      el.style.userSelect = "";
     };
   }, [spinning, paint, trigger]);
 
