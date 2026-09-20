@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Banknote } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { CrudTable } from "@/components/crud/CrudTable";
-import { LinkNavStatus } from "@/components/ui/nav-progress";
+import { LinkNavStatus, usePendingNav } from "@/components/ui/nav-progress";
 import {
   eliminarJornadaTrabajo,
   eliminarTareaTrabajo,
@@ -56,6 +56,50 @@ function horasATexto(horas: number): string {
     2,
     "0"
   )}`;
+}
+
+/**
+ * TARJETA de una jornada en la grilla mobile del detalle del período
+ * (2026-09-19, mismo patrón que trabajos/cuentas/préstamos/categorías).
+ *
+ * **fecha** arriba a la izquierda y el **monto de la jornada** a la derecha como
+ * protagonista; debajo, en gris chico, el **rango horario + duración**
+ * (`17:00 - 21:00 · 4 h`) y, si la hay, la **propina**. El rango y las horas
+ * salen de `decimalToTime`/`horasDeJornada` (las MISMAS funciones que usa el
+ * resumen de arriba y la cabecera del PDF), así que la tarjeta no puede
+ * desincronizarse de los totales.
+ */
+function JornadaCard({
+  j,
+  currency,
+}: {
+  j: JornadaTrabajoOut;
+  currency: string;
+}) {
+  const propina = j.montoPropina || 0;
+  return (
+    <>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="truncate text-[14px] font-semibold text-header">
+          {dateTimeToString(j.fechaJornada)}
+        </span>
+        <span className="shrink-0 text-[14px] font-semibold text-value">
+          {numberToCurrency(j.montoJornada ?? 0, currency)}
+        </span>
+      </div>
+      <div className="mt-0.5 flex items-baseline justify-between gap-2 text-[11.5px] text-subtitle">
+        <span className="truncate">
+          {decimalToTime(j.horaDesde)} - {decimalToTime(j.horaHasta)}
+          {` · ${horasATexto(horasDeJornada(j))} h`}
+        </span>
+        {propina > 0 && (
+          <span className="shrink-0">
+            Propina {numberToCurrency(propina, currency)}
+          </span>
+        )}
+      </div>
+    </>
+  );
 }
 
 /** Datos derivados del período. Los usan el resumen en pantalla y la cabecera
@@ -313,6 +357,8 @@ export function PeriodoTrabajoDetalleClient({
   const fc = periodo.fechaDeCobro ? new Date(periodo.fechaDeCobro) : null;
   const cobrado = !!fc && fc.getFullYear() >= 1901;
   const editable = !cobrado;
+  // Navegación con feedback (barra de progreso global) para el toque de tarjeta.
+  const { go: nav } = usePendingNav();
   // COBRO ADELANTADO (decisión del usuario 2026-09-14): se puede cobrar apenas
   // el período EMPEZÓ (no hace falta esperar al cierre) — pensado para los
   // trabajos `fijo` / `horas_fijas`, que no cargan jornadas ni tareas. El
@@ -338,6 +384,14 @@ export function PeriodoTrabajoDetalleClient({
   const backHref = desdeDashboard
     ? `/dashboard${periodos ? `?periodos=${periodos}` : ""}`
     : "/cruds/periodos-trabajo";
+
+  // Destino de la edición de una jornada: lo comparten la tabla de escritorio, el
+  // menú deslizante del mobile y el toque de la tarjeta (mantiene el
+  // `periodoFijo=1` y el `volverA` a este detalle).
+  const jornadaEditHref = (id: string) =>
+    `/cruds/jornadas-trabajo/${id}/editar?periodoFijo=1&volverA=${encodeURIComponent(
+      selfUrl
+    )}`;
 
   const summary = (
     <ResumenPeriodo
@@ -468,9 +522,7 @@ export function PeriodoTrabajoDetalleClient({
         currency={currency}
         deleteItem={eliminarJornadaTrabajo}
         createHref={`/movimientos/nuevo/jornada?periodo=${periodo.id}&volverA=${encodeURIComponent(selfUrl)}`}
-        editHref={(id) =>
-          `/cruds/jornadas-trabajo/${id}/editar?periodoFijo=1&volverA=${encodeURIComponent(selfUrl)}`
-        }
+        editHref={jornadaEditHref}
         getId={(i) => i.id}
         searchPredicate={(i, q) =>
           dateTimeToString(i.fechaJornada).includes(q) ||
@@ -483,7 +535,17 @@ export function PeriodoTrabajoDetalleClient({
         topContent={summary}
         exportInfo={exportInfo}
         emptyMessage="No hay jornadas en este período todavía."
-        mobileHint={editable ? "Tocá una jornada para seleccionarla" : undefined}
+        // Mobile (§131): cada jornada es una TARJETA; el toque abre la edición y
+        // el swipe revela Editar/Eliminar (los aporta `CrudTable`). En SOLO
+        // LECTURA (período ya cobrado) no se pasa `mobileSwipe`: las tarjetas se
+        // muestran sin ninguna acción. Con swipe la fila no se selecciona, así
+        // que se quitó el `mobileHint` ("Tocá una jornada para seleccionarla").
+        mobileRow={(j) => <JornadaCard j={j} currency={currency} />}
+        mobileSwipe={
+          editable
+            ? { onRowTap: (id) => nav(jornadaEditHref(id), "row") }
+            : undefined
+        }
       />
     );
   }
