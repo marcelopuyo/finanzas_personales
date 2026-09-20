@@ -53,6 +53,15 @@ const ANIM_MS = 200;
 const ANIM_EASE = "cubic-bezier(0.22, 0.61, 0.36, 1)";
 /** Duración máxima de un gesto para considerarlo un TOQUE (ms). */
 const TAP_MS = 500;
+/**
+ * Elementos INTERACTIVOS: un gesto que arranca sobre uno de ellos es del
+ * CONTROL, no de la fila — si no, el toque del switch de una tarjeta abriría el
+ * detalle/edición de la fila. Se resuelve por semántica (no por coordenadas), así
+ * el control sigue funcionando con su propio `click`. `[data-row-ignore]` queda
+ * como escotilla para marcar cualquier otro elemento a mano.
+ */
+const SELECTOR_INTERACTIVO =
+  "button, a, input, select, textarea, [role='switch'], [data-row-ignore]";
 /** Zona de inicio del gesto, medida desde el BORDE DERECHO VISIBLE de la grilla
     (el de la tarjeta/wrapper), en px. Si el dedo empieza más a la izquierda, el
     arrastre horizontal es SIEMPRE scroll de la grilla: el menú solo reacciona si
@@ -377,6 +386,12 @@ export function SwipeRowActions({
     fromStripRef.current = !!stripRef.current?.contains(target);
     if (fromStripRef.current) {
       stripStartRef.current = { x: clientX, y: clientY, t: Date.now() };
+      return;
+    }
+    // Un toque sobre un control interactivo (switch, botón, link) es del CONTROL:
+    // el gesto de fila no se inicia (ni swipe ni navegación por toque).
+    if (target.closest(SELECTOR_INTERACTIVO)) {
+      stripStartRef.current = null;
       return;
     }
     // Hasta que se confirme que la fila tiene acciones, el gesto no es de nadie

@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { GripVertical } from "lucide-react";
 import { CrudTable } from "@/components/crud/CrudTable";
+import { usePendingNav } from "@/components/ui/nav-progress";
 import type { CuentaOut } from "@/backend/src/queries/maestros";
 import {
   actualizarCuenta,
@@ -41,6 +42,79 @@ const ID_PRESTAMOS = -1;
 
 type CuentaConSaldo = CuentaOut & { saldoEnMonedaPredeterminada: number };
 
+/**
+ * TARJETA de una cuenta en la grilla mobile (2026-09-19, mismo criterio que el
+ * CRUD de trabajos): **nombre + saldo** arriba y, debajo, **tipo · moneda** (con
+ * la bandera) más el **switch de Balance**.
+ *
+ * El **número de orden actual** va como chip discreto en el ángulo superior
+ * derecho (junto al saldo): es la POSICIÓN en la lista (la que se cambia con
+ * "Ordenar"), no el campo `orden` de la BD —ese puede venir en 0 en cuentas
+ * creadas después del backfill y quedarían sin número—.
+ *
+ * ⚠️ El switch es un control interactivo dentro de la fila: `SwipeRowActions` no
+ * inicia el gesto de fila cuando el toque arranca sobre un control, así el switch
+ * no dispara la edición.
+ */
+function CuentaCard({
+  cuenta: c,
+  orden,
+  pending,
+  onToggleBalance,
+}: {
+  cuenta: CuentaOut;
+  /** Posición 1-based en la lista (`undefined` = fila sintética, sin número). */
+  orden?: number;
+  /** Deshabilitado mientras la actualización optimista está en vuelo. */
+  pending: boolean;
+  onToggleBalance: (valor: boolean) => void;
+}) {
+  const tipo = c.tipo?.nombre ?? "";
+  const moneda = c.moneda?.nombre ?? "";
+  return (
+    <>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="truncate text-[14px] font-semibold text-header">
+          {c.nombre}
+        </span>
+        <span className="flex shrink-0 items-center gap-1.5">
+          <span className="text-[14px] font-semibold text-value">
+            {numberToCurrency(c.saldo, c.moneda?.codigoISO ?? "ARS")}
+          </span>
+          {orden != null && (
+            <span
+              title={`Orden ${orden}`}
+              aria-label={`Orden ${orden}`}
+              className="rounded-full border border-border bg-card px-1.5 text-[10px] leading-4 font-medium text-subtitle"
+            >
+              {orden}
+            </span>
+          )}
+        </span>
+      </div>
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <span className="flex min-w-0 items-center gap-1.5 text-[11.5px] text-subtitle">
+          <CurrencyFlag pais={c.moneda?.codigoPais ?? null} />
+          <span className="truncate">
+            {tipo}
+            {moneda ? ` · ${moneda}` : ""}
+          </span>
+        </span>
+        <Switch
+          checked={!!c.incluirEnBalance}
+          disabled={pending}
+          ariaLabel={
+            c.incluirEnBalance
+              ? "Incluida en el balance"
+              : "No incluida en el balance"
+          }
+          onChange={onToggleBalance}
+        />
+      </div>
+    </>
+  );
+}
+
 export function CuentasListClient({
   initialData,
   origen,
@@ -65,6 +139,8 @@ export function CuentasListClient({
   const [incluirPrestamos, setIncluirPrestamos] = useState(incluirInicial);
   const [pendingPrestamos, setPendingPrestamos] = useState(false);
   const router = useRouter();
+  // Navegación con feedback (barra de progreso global) para el toque de fila.
+  const { go: nav } = usePendingNav();
   // Modo "reordenar": muestra la lista con arrastre (dedo/mouse) en lugar de la
   // grilla. El orden se persiste en la BD por cada arrastre.
   const [reorderMode, setReorderMode] = useState(false);
@@ -189,6 +265,16 @@ export function CuentasListClient({
     [prestamosNeto, incluirPrestamos, monedaPredeterminada]
   );
 
+  // Posición (1-based) de cada cuenta en la lista: es el "orden actual" que se
+  // muestra en la tarjeta. Se calcula sobre `cuentas` (el orden real que devuelve
+  // el server: `orden, id`) y NO sobre la grilla filtrada, así al buscar los
+  // números no se renumeran. La fila sintética no entra.
+  const posicionPorId = useMemo(() => {
+    const m = new Map<number, number>();
+    cuentas.forEach((c, i) => m.set(c.id, i + 1));
+    return m;
+  }, [cuentas]);
+
   // Datos de la grilla: cuentas reales + la fila sintética (memoizado para no
   // re-disparar el re-sync de `CrudTable` en cada render).
   const dataGrilla = useMemo(
@@ -232,6 +318,20 @@ export function CuentasListClient({
     <CrudTable<CuentaOut>
       title="Cuentas"
       columns={columns}
+      mobileRow={(c) => (
+        <CuentaCard
+          cuenta={c}
+          orden={posicionPorId.get(c.id)}
+          pending={
+            c.id === ID_PRESTAMOS
+              ? pendingPrestamos
+              : pendingId === c.id
+          }
+          onToggleBalance={(v) =>
+            c.id === ID_PRESTAMOS ? togglePrestamos(v) : toggleBalance(c.id, v)
+          }
+        />
+      )}
       initialData={dataGrilla}
       currency={currency}
       deleteItem={eliminarCuenta}
@@ -245,6 +345,25 @@ export function CuentasListClient({
       isSyntheticRow={(i) => i.id === ID_PRESTAMOS}
       backHref={desdeDashboard ? "/dashboard" : undefined}
       mobileBottomNav
+      // Mobile: swipe por fila (Editar / Eliminar vienen de `CrudTable`) con
+      // **Ordenar** como acción propia; el toque abre la edición.
+      mobileSwipe={{
+        onRowTap: (id) => nav(`/cruds/cuentas/${id}/editar${origenQ}`, "row"),
+        extraActions: (id) =>
+          id === ID_PRESTAMOS
+            ? []
+            : [
+                {
+                  key: "ordenar",
+                  label: "Ordenar",
+                  icon: GripVertical,
+                  tone: "neutral",
+                  onClick: () => setReorderMode(true),
+                },
+              ],
+      }}
+      // Desktop: "Ordenar" sigue en la barra de herramientas (en mobile el botón
+      // de la barra inferior ya no existe: la acción vive en el swipe).
       extraAction={{
         label: "Ordenar",
         icon: GripVertical,
