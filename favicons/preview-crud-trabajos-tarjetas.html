@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Preview — CRUD de Trabajos en tarjetas (en vez de grilla)</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; display: flex; flex-direction: column; gap: 28px;
+    font-family: Inter, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: #111; color: #e8e8ea;
+  }
+  h1 { font-size: 15px; margin: 0; }
+  .lead { font-size: 12px; line-height: 1.6; opacity: .7; max-width: 900px; margin: 6px 0 0; }
+  .opt { display: flex; flex-direction: column; gap: 10px; }
+  .opt > h2 { font-size: 13px; margin: 0; letter-spacing: .02em; }
+  .opt > h2 span { opacity: .55; font-weight: 400; }
+  .row { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+  /* El panel = la pantalla del celular (320 / 390). Los 32px de margen lateral
+     del `.list` son los DOS `px-4` anidados de la app (el `main` y el wrapper del
+     CRUD), así las tarjetas se ven al ancho útil REAL: 320 → 232 · 390 → 302. */
+  .panel { border-radius: 14px; overflow: hidden; }
+  .panel.light { background: #f6f7f9; }
+  .panel.dark  { background: #151517; }
+  .panel.w320 { width: 320px; }
+  .panel.w390 { width: 390px; }
+  .lbl { font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; margin: 12px 32px 6px; }
+  .panel.light .lbl, .panel.light .nota { color: #64748b; }
+  .panel.dark  .lbl, .panel.dark  .nota { color: #9a9b9e; }
+
+  /* ── Tokens (copiados de app/globals.css) ── */
+  .light {
+    --background:#f6f7f9; --foreground:#1e293b; --primary:#2563eb; --muted:#eef1f5;
+    --border:#e2e8f0; --card:#ffffff; --card-foreground:#1e293b;
+    --success:#16a34a; --danger:#dc2626;
+    --label:#64748b; --value:#0f172a; --subtitle:#7c8798; --header:#0f172a;
+  }
+  .dark {
+    --background:#151517; --foreground:#e2e4f0; --primary:#4c6ef5; --muted:#1e1e20;
+    --border:#3e3f42; --card:#353638; --card-foreground:#e2e4f0;
+    --success:#51cf66; --danger:#ff6b6b;
+    --label:#9a9b9e; --value:#ffffff; --subtitle:#808185; --header:#ffffff;
+  }
+
+  /* El contenedor real del CRUD: `rounded-lg border border-border bg-card p-3` */
+  .list {
+    border: 1px solid var(--border); border-radius: 10px; background: var(--card);
+    padding: 12px; margin: 0 32px 14px; display: flex; flex-direction: column; gap: 8px;
+  }
+  /* Tarjeta: mismo lenguaje que las tarjetas del dashboard (bg-muted sobre el panel) */
+  .tc { border-radius: 10px; background: var(--muted); padding: 10px 12px; }
+  /* Estado SELECCIONADO (mobileBottomNav): `bg-primary/10` + franja izquierda */
+  .tc.sel { background: color-mix(in srgb, var(--primary) 12%, var(--muted)); box-shadow: inset 2px 0 0 0 var(--primary); }
+
+  .nombre { font-size: 14px; font-weight: 600; color: var(--header); }
+  .precio { font-size: 14px; font-weight: 600; color: var(--value); }
+  .sub { font-size: 11.5px; color: var(--subtitle); }
+  .chip {
+    display: inline-block; border-radius: 999px;
+    background: color-mix(in srgb, var(--subtitle) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--subtitle) 28%, transparent);
+    padding: 2px 8px; font-size: 10px; font-weight: 500; color: var(--subtitle);
+  }
+  .l2 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── A: nombre + chip + precio (2 líneas) ── */
+  .a-l1 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .a-l2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 5px; }
+
+  /* ── B: ficha con etiquetas ── */
+  .b-head { font-size: 14px; font-weight: 600; color: var(--header); margin-bottom: 6px; }
+  .b-fila { display: flex; gap: 8px; font-size: 12px; line-height: 18px; }
+  .b-fila .k { flex: 0 0 86px; color: var(--label); }
+  .b-fila .v { flex: 1 1 auto; color: var(--card-foreground); }
+
+  /* ── C: compacta (nombre + precio / subtexto) ── */
+  .c-sub { margin-top: 3px; }
+
+  /* Referencia: la grilla actual (para comparar) */
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead th { text-align: left; font-weight: 500; color: var(--subtitle); padding: 8px 6px; border-bottom: 1px solid var(--border); }
+  thead th.r, td.r { text-align: right; }
+  td { padding: 8px 6px; color: var(--card-foreground); border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: 0; }
+  .nota { font-size: 11px; line-height: 1.6; margin: 8px 32px 12px; }
+  .nota code { background: #ffffff14; padding: 1px 4px; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<h1>CRUD de Trabajos — la fila como TARJETA (3 alternativas)</h1>
+<p class="lead">
+  Datos reales de la grilla: Publix · Duffys · QA Test - Horas Fijas · QA Test - Fijo · QA Test - Por Tarea.
+  Cada panel es una <b>pantalla de celular</b> (320 o 390 px) con los márgenes reales de la app, así que las
+  tarjetas se ven al ancho útil de verdad (232 y 294 px). El contenedor es el panel real del CRUD
+  (<code>border border-border bg-card p-3</code>) y las tarjetas usan <code>bg-muted</code>, el mismo lenguaje que las
+  tarjetas del dashboard. En cada panel, la 2ª tarjeta está en estado <b>seleccionado</b> (es lo que hoy hace el
+  tap en la fila: resalta y habilita Editar/Eliminar en la barra inferior).
+</p>
+
+<!-- ══════════════════════════ OPCIÓN A ══════════════════════════ -->
+<div class="opt">
+  <h2>A · Tarjeta con chip <span>— 2 líneas: nombre + precio arriba, chip de modalidad abajo (sin Inicio)</span></h2>
+  <div class="row">
+
+    <div class="panel light w320">
+      <p class="lbl">320 px · claro</p>
+      <div class="list">
+        <div class="tc">
+          <div class="a-l1"><span class="nombre trunc">Publix</span><span class="precio">$ 17,00</span></div>
+          <div class="a-l2"><span class="chip">Por hora (horas variables)</span><span class="sub">16/08/2025</span></div>
+        </div>
+        <div class="tc sel">
+          <div class="a-l1"><span class="nombre trunc">QA Test - Fijo</span><span class="precio">$ 0,00</span></div>
+          <div class="a-l2"><span class="chip">Monto fijo por período</span><span class="sub">01/09/2026</span></div>
+        </div>
+        <div class="tc">
+          <div class="a-l1"><span class="nombre trunc">QA Test - Por Tarea</span><span class="precio">$ 0,00</span></div>
+          <div class="a-l2"><span class="chip">Por tarea</span><span class="sub">05/09/2026</span></div>
+        </div>
+      </div>
+      <p class="nota">La fecha de inicio queda como dato secundario, alineada a la derecha del chip (por eso se ve en formato corto).</p>
+    </div>
+
+    <div class="panel dark w320">
+      <p class="lbl">320 px · oscuro</p>
+      <div class="list">
+        <div class="tc">
+          <div class="a-l1"><span class="nombre trunc">Publix</span><span class="precio">$ 17,00</span></div>
+          <div class="a-l2"><span class="chip">Por hora (horas variables)</span><span class="sub">16/08/2025</span></div>
+        </div>
+        <div class="tc sel">
+          <div class="a-l1"><span class="nombre trunc">QA Test - Fijo</span><span class="precio">$ 0,00</span></div>
+          <div class="a-l2"><span class="chip">Monto fijo por período</span><span class="sub">01/09/2026</span></div>
+        </div>
+        <div class="tc">
+          <div class="a-l1"><span class="nombre trunc">QA Test - Por Tarea</span><span class="precio">$ 0,00</span></div>
+          <div class="a-l2"><span class="chip">Por tarea</span><span class="sub">05/09/2026</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel light w390">
+      <p class="lbl">390 px · claro</p>
+      <div class="list">
+        <div class="tc">
+          <div class="a-l1"><span class="nombre trunc">Movimiento Hotel</span><span class="precio">$ 80,00</span></div>
+          <div class="a-l2"><span class="chip">Por hora (horas variables)</span><span class="sub">20/10/2025</span></div>
+        </div>
+        <div class="tc">
+          <div class="a-l1"><span class="nombre trunc">QA Test - Horas Fijas</span><span class="precio">$ 15,50</span></div>
+          <div class="a-l2"><span class="chip">Por hora (horas fijas)</span><span class="sub">01/09/2026</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ OPCIÓN B ══════════════════════════ -->
+<div class="opt">
+  <h2>B · Ficha con etiquetas <span>— el nombre arriba y los 3 datos en filas «etiqueta · valor» (incluye Inicio)</span></h2>
+  <div class="row">
+
+    <div class="panel light w320">
+      <p class="lbl">320 px · claro</p>
+      <div class="list">
+        <div class="tc">
+          <div class="b-head trunc">Publix</div>
+          <div class="b-fila"><span class="k">Modalidad</span><span class="v">Por hora (horas variables)</span></div>
+          <div class="b-fila"><span class="k">Inicio</span><span class="v">16/08/2025</span></div>
+          <div class="b-fila"><span class="k">Precio hora</span><span class="v">$ 17,00</span></div>
+        </div>
+        <div class="tc sel">
+          <div class="b-head trunc">QA Test - Fijo</div>
+          <div class="b-fila"><span class="k">Modalidad</span><span class="v">Monto fijo por período</span></div>
+          <div class="b-fila"><span class="k">Inicio</span><span class="v">01/09/2026</span></div>
+          <div class="b-fila"><span class="k">Precio hora</span><span class="v">$ 0,00</span></div>
+        </div>
+        <div class="tc">
+          <div class="b-head trunc">QA Test - Por Tarea</div>
+          <div class="b-fila"><span class="k">Modalidad</span><span class="v">Por tarea</span></div>
+          <div class="b-fila"><span class="k">Inicio</span><span class="v">05/09/2026</span></div>
+          <div class="b-fila"><span class="k">Precio hora</span><span class="v">$ 0,00</span></div>
+        </div>
+      </div>
+      <p class="nota">Es la que <b>no pierde ningún dato</b>: entra el Inicio que hoy no cabe en la grilla. Ocupa más alto (≈3 filas por trabajo).</p>
+    </div>
+
+    <div class="panel dark w320">
+      <p class="lbl">320 px · oscuro</p>
+      <div class="list">
+        <div class="tc">
+          <div class="b-head trunc">Publix</div>
+          <div class="b-fila"><span class="k">Modalidad</span><span class="v">Por hora (horas variables)</span></div>
+          <div class="b-fila"><span class="k">Inicio</span><span class="v">16/08/2025</span></div>
+          <div class="b-fila"><span class="k">Precio hora</span><span class="v">$ 17,00</span></div>
+        </div>
+        <div class="tc sel">
+          <div class="b-head trunc">QA Test - Fijo</div>
+          <div class="b-fila"><span class="k">Modalidad</span><span class="v">Monto fijo por período</span></div>
+          <div class="b-fila"><span class="k">Inicio</span><span class="v">01/09/2026</span></div>
+          <div class="b-fila"><span class="k">Precio hora</span><span class="v">$ 0,00</span></div>
+        </div>
+        <div class="tc">
+          <div class="b-head trunc">QA Test - Por Tarea</div>
+          <div class="b-fila"><span class="k">Modalidad</span><span class="v">Por tarea</span></div>
+          <div class="b-fila"><span class="k">Inicio</span><span class="v">05/09/2026</span></div>
+          <div class="b-fila"><span class="k">Precio hora</span><span class="v">$ 0,00</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ OPCIÓN C ══════════════════════════ -->
+<div class="opt">
+  <h2>C · Compacta <span>— 2 líneas por trabajo: nombre + precio, y abajo «modalidad · inicio» en gris chico</span></h2>
+  <div class="row">
+
+    <div class="panel light w320">
+      <p class="lbl">320 px · claro</p>
+      <div class="list">
+        <div class="tc">
+          <div class="l2"><span class="nombre trunc">Publix</span><span class="precio">$ 17,00</span></div>
+          <div class="sub c-sub trunc">Por hora (horas variables) · 16/08/2025</div>
+        </div>
+        <div class="tc sel">
+          <div class="l2"><span class="nombre trunc">QA Test - Fijo</span><span class="precio">$ 0,00</span></div>
+          <div class="sub c-sub trunc">Monto fijo por período · 01/09/2026</div>
+        </div>
+        <div class="tc">
+          <div class="l2"><span class="nombre trunc">QA Test - Por Tarea</span><span class="precio">$ 0,00</span></div>
+          <div class="sub c-sub trunc">Por tarea · 05/09/2026</div>
+        </div>
+      </div>
+      <p class="nota">La más densa: entran ~6 trabajos en la pantalla de un celular. Mismo patrón que la lista del panel «Trabajo» del dashboard.</p>
+    </div>
+
+    <div class="panel dark w320">
+      <p class="lbl">320 px · oscuro</p>
+      <div class="list">
+        <div class="tc">
+          <div class="l2"><span class="nombre trunc">Publix</span><span class="precio">$ 17,00</span></div>
+          <div class="sub c-sub trunc">Por hora (horas variables) · 16/08/2025</div>
+        </div>
+        <div class="tc sel">
+          <div class="l2"><span class="nombre trunc">QA Test - Fijo</span><span class="precio">$ 0,00</span></div>
+          <div class="sub c-sub trunc">Monto fijo por período · 01/09/2026</div>
+        </div>
+        <div class="tc">
+          <div class="l2"><span class="nombre trunc">QA Test - Por Tarea</span><span class="precio">$ 0,00</span></div>
+          <div class="sub c-sub trunc">Por tarea · 05/09/2026</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel light w390">
+      <p class="lbl">390 px · claro</p>
+      <div class="list">
+        <div class="tc">
+          <div class="l2"><span class="nombre trunc">Movimiento Hotel</span><span class="precio">$ 80,00</span></div>
+          <div class="sub c-sub trunc">Por hora (horas variables) · 20/10/2025</div>
+        </div>
+        <div class="tc">
+          <div class="l2"><span class="nombre trunc">QA Test - Horas Fijas</span><span class="precio">$ 15,50</span></div>
+          <div class="sub c-sub trunc">Por hora (horas fijas) · 01/09/2026</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ REFERENCIA ══════════════════════════ -->
+<div class="opt">
+  <h2>Referencia <span>— la grilla de hoy SIN la columna Inicio: entra en 360/390 y queda 10 px al límite en un celular de 320</span></h2>
+  <div class="row">
+    <div class="panel light w320">
+      <p class="lbl">320 px · claro</p>
+      <div class="list">
+        <table>
+          <thead><tr><th>Nombre</th><th>Modalidad</th><th class="r">Precio Hora</th></tr></thead>
+          <tbody>
+            <tr><td>Publix</td><td>Por hora (horas variables)</td><td class="r">$ 17,00</td></tr>
+            <tr><td>Duffys</td><td>Por hora (horas variables)</td><td class="r">$ 14,00</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="nota">Medido en la app: la tabla sin Inicio mide <b>242 px</b> y el ancho útil de un celular de 320 es <b>232 px</b> (10 px de más); en 360/390 entra sin scroll.</p>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

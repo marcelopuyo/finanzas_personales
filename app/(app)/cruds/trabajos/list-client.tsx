@@ -1,5 +1,6 @@
 "use client";
 import { CrudTable } from "@/components/crud/CrudTable";
+import { usePendingNav } from "@/components/ui/nav-progress";
 import type { TrabajoOut } from "@/backend/src/queries/trabajos";
 import { eliminarTrabajo } from "@/backend/src/actions/trabajos";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -18,6 +19,38 @@ const columns: ColumnDef<TrabajoOut>[] = [
   },
   { accessorKey: "precioHora", header: "Precio Hora", meta: { align: "right" as const, isCurrency: true }, cell: ({ getValue }) => numberToCurrency(getValue<number>() ?? 0) },
 ];
+
+/**
+ * TARJETA de un trabajo en la grilla mobile (elegida por el usuario el
+ * 2026-09-19 sobre 3 alternativas; ver `favicons/preview-crud-trabajos-tarjetas.html`):
+ * **nombre + precio** arriba y, debajo en gris chico, **modalidad · inicio**.
+ *
+ * Con esto la tabla de 4 columnas no hace falta en el celular: la grilla de
+ * escritorio sigue igual y en mobile cada fila es una tarjeta que aprovecha todo
+ * el ancho (la fecha de inicio vuelve como dato secundario, que es lo que no
+ * entraba en la grilla).
+ */
+function TrabajoCard({ t }: { t: TrabajoOut }) {
+  const modalidad =
+    MODALIDAD_LABEL[t.modalidadCobro ?? "horas_variables"] ?? t.modalidadCobro ?? "";
+  const inicio = dateTimeToString(t.fechaInicio);
+  return (
+    <>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="truncate text-[14px] font-semibold text-header">
+          {t.nombre}
+        </span>
+        <span className="shrink-0 text-[14px] font-semibold text-value">
+          {numberToCurrency(t.precioHora ?? 0)}
+        </span>
+      </div>
+      <p className="mt-0.5 truncate text-[11.5px] text-subtitle">
+        {modalidad}
+        {inicio ? ` · ${inicio}` : ""}
+      </p>
+    </>
+  );
+}
 interface Props {
   initialData: TrabajoOut[];
   /** Origen de navegación (?origen=...). Si es "dashboard" se propaga al
@@ -31,5 +64,7 @@ export function TrabajosListClient({ initialData, origen }: Props) {
   // (?origen=dashboard) se propaga el origen al "+" (wizard) y al editar.
   const desdeDashboard = origen === "dashboard";
   const origenQ = desdeDashboard ? "?origen=dashboard" : "";
-  return <CrudTable<TrabajoOut> title="Trabajos" columns={columns} initialData={initialData} deleteItem={eliminarTrabajo} searchPlaceholder="Buscar trabajo..." createHref={`/cruds/trabajos/nuevo${origenQ}`} editHref={(id) => `/cruds/trabajos/${id}/editar${origenQ}`} getId={(i) => i.id} searchPredicate={(i, q) => i.nombre.toLowerCase().includes(q)} mobileBottomNav backHref="/dashboard" />;
+  // Navegación con feedback (barra de progreso global) para el toque de fila.
+  const { go: nav } = usePendingNav();
+  return <CrudTable<TrabajoOut> title="Trabajos" columns={columns} mobileRow={(t) => <TrabajoCard t={t} />} initialData={initialData} deleteItem={eliminarTrabajo} searchPlaceholder="Buscar trabajo..." createHref={`/cruds/trabajos/nuevo${origenQ}`} editHref={(id) => `/cruds/trabajos/${id}/editar${origenQ}`} getId={(i) => i.id} searchPredicate={(i, q) => i.nombre.toLowerCase().includes(q)} mobileBottomNav mobileSwipe={{ onRowTap: (id) => nav(`/cruds/trabajos/${id}/editar${origenQ}`, "row") }} backHref="/dashboard" />;
 }

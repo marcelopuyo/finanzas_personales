@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, FileDown, Pencil, Plus, Search, Trash2, type LucideIcon } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, FileDown, Pencil, Plus, Search, Trash2, type LucideIcon } from "lucide-react";
 import { BottomActionBar } from "@/components/ui/bottom-action-bar";
 import { DataTable } from "@/components/ui/data-table";
 import {
@@ -134,6 +134,19 @@ interface CrudTableProps<T, TId = number> {
       tabla desktop; en mobile el resaltado de la fila SELECCIONADA tiene
       prioridad sobre el tinte. */
   rowClassName?: (item: T) => string;
+  /** Modo "tarjetas" mobile (`<lg`): en vez de la grilla, cada registro se
+      dibuja con esta función —una TARJETA— dentro del mismo panel. Requiere
+      `mobileBottomNav`.
+
+      Cada tarjeta se marca con `data-row-id`, así el **swipe** (`mobileSwipe`),
+      la **selección por fila** y el resaltado siguen funcionando igual que en la
+      grilla. La paginación es propia (misma estética que la de `DataTable`) con
+      `rowsPerPage`. Las tarjetas usan `bg-muted` (el lenguaje de las tarjetas
+      del dashboard) y la franja del swipe se pinta con ese mismo fondo.
+
+      ⚠️ Es una alternativa a `mobileColumns`: si se pasa `mobileRow`, la grilla
+      mobile NO se renderiza (sí la tabla de desktop). */
+  mobileRow?: (item: T) => ReactNode;
   /** Mensaje de la grilla cuando no hay datos (default "Sin datos disponibles"). */
   emptyMessage?: string;
 }
@@ -147,6 +160,7 @@ export function CrudTable<T, TId = number>({
   title,
   columns,
   mobileColumns: mobileColumnsProp,
+  mobileRow,
   fetchData,
   initialData,
   deleteItem,
@@ -188,6 +202,9 @@ export function CrudTable<T, TId = number>({
   const [deleting, setDeleting] = useState(false);
   // Selección por fila (solo mobile con barra inferior): una a la vez.
   const [selectedId, setSelectedId] = useState<TId | null>(null);
+  // Página del modo "tarjetas" mobile (`mobileRow`): la paginación propia, ya
+  // que ahí no hay `DataTable`. Se recorta a la última página válida al filtrar.
+  const [mobilePage, setMobilePage] = useState(0);
   // Fila cuya pantalla de detalle está abriéndose (`data-row-id`, solo mobile):
   // se atenúa y muestra un spinner (2026-09-17). No hace falta limpiarla al
   // terminar: la navegación desmonta este listado.
@@ -522,16 +539,32 @@ export function CrudTable<T, TId = number>({
       },
     ];
   };
-  const swipeRowTap = (rowId: string) => {
-    const item = filtered.find((i) => String(getId(i)) === rowId);
-    if (!item) return;
-    // Feedback de "abriendo el detalle" (2026-09-17): la fila queda atenuada con
-    // un spinner y se enciende la barra global. La navegación la hace la vista
-    // (`onRowTap`), que es quien conoce el destino.
-    setPendingRowId(rowId);
-    startNav();
-    mobileSwipe?.onRowTap?.(getId(item));
-  };
+  // Toque simple en la fila: SOLO si la vista definió un destino (`onRowTap`).
+  // Sin destino no se hace nada (evita atenuar la fila y encender la barra de
+  // progreso para una navegación que no va a ocurrir).
+  const swipeRowTap = mobileSwipe?.onRowTap
+    ? (rowId: string) => {
+        const item = filtered.find((i) => String(getId(i)) === rowId);
+        if (!item) return;
+        // Feedback de "abriendo el detalle" (2026-09-17): la fila queda atenuada
+        // con un spinner y se enciende la barra global. La navegación la hace la
+        // vista (`onRowTap`), que es quien conoce el destino.
+        setPendingRowId(rowId);
+        startNav();
+        mobileSwipe.onRowTap?.(getId(item));
+      }
+    : undefined;
+
+  // ── Modo "tarjetas" (mobile): una tarjeta por registro en vez de la grilla ──
+  // La paginación la maneja este componente (`DataTable` no participa). El
+  // `rowId` de cada tarjeta es el puente con `SwipeRowActions` (swipe) y con la
+  // selección por fila.
+  const cardMode = mobileBottomNav && !!mobileRow;
+  const totalPaginas = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
+  const pagina = Math.min(mobilePage, totalPaginas - 1);
+  const itemsPagina = mobileRow
+    ? filtered.slice(pagina * rowsPerPage, pagina * rowsPerPage + rowsPerPage)
+    : [];
 
   // Barra inferior fija (<lg): componente reutilizable BottomActionBar con
   // Exportar (más `mobilePrimaryAction`/`extraAction` opcionales) a la
@@ -691,9 +724,79 @@ export function CrudTable<T, TId = number>({
           <SwipeRowActions
             actionsFor={swipeMode ? swipeActionsFor : undefined}
             onRowTap={swipeMode ? swipeRowTap : undefined}
+            // En modo tarjetas las filas son `bg-muted` (no transparentes sobre
+            // la tarjeta blanca), así que la franja usa ese mismo fondo.
+            stripClassName={cardMode ? "bg-muted" : undefined}
           >
             <div className="rounded-lg border border-border bg-card p-3">
-              <DataTable
+              {cardMode ? (
+                <>
+                  {filtered.length === 0 ? (
+                    <p className="py-8 text-center text-[12px] text-subtitle">
+                      {emptyMessage}
+                    </p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {itemsPagina.map((item) => {
+                        const id = String(getId(item));
+                        return (
+                          <div
+                            key={id}
+                            data-row-id={id}
+                            onClick={
+                              swipeMode || !showActions
+                                ? undefined
+                                : () => toggleRow(item)
+                            }
+                            className={cn(
+                              "rounded-lg bg-muted px-3 py-2.5",
+                              // Sin selección en modo swipe (el toque lo maneja
+                              // `SwipeRowActions`) ni en solo lectura.
+                              !swipeMode && showActions && "cursor-pointer",
+                              rowClassName?.(item),
+                              showActions ? selectedCls(item) : "",
+                              swipeMode &&
+                                pendingRowId === id &&
+                                "pointer-events-none opacity-60"
+                            )}
+                          >
+                            {mobileRow?.(item)}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {/* Paginación: mismo markup que la de `DataTable`. */}
+                  <div className="mt-3 flex items-center justify-between border-t border-border pt-2 text-[12px] text-subtitle">
+                    <span>
+                      Página {pagina + 1} de {totalPaginas}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setMobilePage(Math.max(0, pagina - 1))}
+                        disabled={pagina === 0}
+                        aria-label="Página anterior"
+                        className="rounded p-1 text-card-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMobilePage(Math.min(totalPaginas - 1, pagina + 1))
+                        }
+                        disabled={pagina >= totalPaginas - 1}
+                        aria-label="Página siguiente"
+                        className="rounded p-1 text-card-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <DataTable
                 columns={mobileColumns}
                 data={filtered}
                 pageSize={rowsPerPage}
@@ -720,6 +823,7 @@ export function CrudTable<T, TId = number>({
                 }
                 emptyMessage={emptyMessage}
               />
+              )}
             </div>
           </SwipeRowActions>
         </div>

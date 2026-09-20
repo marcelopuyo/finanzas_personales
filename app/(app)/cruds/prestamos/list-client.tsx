@@ -32,6 +32,19 @@ const columns: ColumnDef<PrestamoOut>[] = [
     ),
   },
 ];
+/**
+ * Color de FUENTE de la fila: ROJO cuando el préstamo tiene **saldo pendiente**
+ * (impago total o parcialmente); los ya saldados quedan con el color normal.
+ * Se pinta el TEXTO, no el fondo de la fila (mismo criterio que el CRUD de
+ * períodos de trabajo, §87).
+ * ⚠️ `[&>td]:text-inherit` es necesario porque `DataTable` pinta cada `<td>` con
+ * `text-card-foreground` (propio); sin eso el color del `<tr>` no llega a las
+ * celdas.
+ */
+function filaSaldoCls(p: PrestamoOut): string {
+  return (p.saldo ?? 0) > 0 ? "text-danger [&>td]:text-inherit" : "";
+}
+
 interface Props {
   initialData: PrestamoOut[];
   /** Origen de navegación (?origen=...). Si es "dashboard" se muestra el botón
@@ -87,6 +100,7 @@ export function PrestamosListClient({ initialData, origen }: Props) {
       editHref={(id) => `/cruds/prestamos/${id}/editar${origenQ}`}
       getId={(i) => i.id}
       searchPredicate={(i, q) => (i.detalle ?? "").toLowerCase().includes(q)}
+      rowClassName={filaSaldoCls}
       backHref={desdeDashboard ? "/dashboard" : undefined}
       mobileBottomNav
     />

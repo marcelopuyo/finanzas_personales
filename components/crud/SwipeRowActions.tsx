@@ -37,6 +37,12 @@ interface SwipeRowActionsProps {
   actionsFor?: (rowId: string) => SwipeRowAction[] | null;
   /** Toque simple sobre una fila (un swipe NO lo dispara). */
   onRowTap?: (rowId: string) => void;
+  /** Fondo de la franja. Default `bg-card` (las filas de la grilla son
+      transparentes sobre la tarjeta, así las acciones parecen estar "detrás"
+      de la fila). En el modo TARJETAS (`CrudTable.mobileRow`) las tarjetas son
+      `bg-muted` y la franja tiene que usar ese mismo fondo para no cortar el
+      efecto. */
+  stripClassName?: string;
 }
 
 /** Recorrido mínimo antes de decidir si el gesto es horizontal (menú) o
@@ -191,8 +197,10 @@ function findScrollerX(
  *   veía cortado en seco.
  * - **Mover la fila de forma IMPERATIVA** (`ref` + `style.transform` /
  *   `style.width` en cada move, sin re-render), igual que el pull-to-refresh.
- * - El elemento arrastrado se ubica por `data-row-id` (atributo que agrega
- *   `DataTable` a cada `<tr>`); las acciones se piden con ese id.
+ * - El elemento arrastrado se ubica por `data-row-id`: lo agrega `DataTable` a
+ *   cada `<tr>` y, en el **modo TARJETAS**, `CrudTable` a cada tarjeta (por eso
+ *   el selector es `[data-row-id]` y no `tr[data-row-id]`); las acciones se piden
+ *   con ese id.
  *
  * ⚠️ Estética (pedido del usuario 2026-09-17: *"como el swipe del Mail de
  * iOS"*): cada acción es un **CÍRCULO de color con el ícono adentro y su
@@ -225,15 +233,16 @@ export function SwipeRowActions({
   children,
   actionsFor,
   onRowTap,
+  stripClassName = "bg-card",
 }: SwipeRowActionsProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
   /** Contenedor de las acciones dentro de la franja (ancho intrínseco). */
   const innerRef = useRef<HTMLDivElement>(null);
   /** Fila que se está arrastrando ahora mismo. */
-  const rowRef = useRef<HTMLTableRowElement | null>(null);
+  const rowRef = useRef<HTMLElement | null>(null);
   /** Fila con el menú ABIERTO (para poder cerrarla). */
-  const openRowRef = useRef<HTMLTableRowElement | null>(null);
+  const openRowRef = useRef<HTMLElement | null>(null);
   const openIdRef = useRef<string | null>(null);
   /** Último desplazamiento pintado (px). */
   const lastDRef = useRef(0);
@@ -301,7 +310,7 @@ export function SwipeRowActions({
    * entretanto).
    */
   const animateClose = useCallback(
-    (row: HTMLTableRowElement, id: string) => {
+    (row: HTMLElement, id: string) => {
       row.style.transition = `transform ${ANIM_MS}ms ${ANIM_EASE}`;
       row.style.transform = "";
       if (stripRef.current) {
@@ -379,13 +388,16 @@ export function SwipeRowActions({
     // (así un toque en otra parte no dispara la navegación de la fila anterior).
     startRef.current.id = "";
     scrollerXRef.current = findScrollerX(target, wrapRef.current);
-    const tr = target.closest<HTMLTableRowElement>("tr[data-row-id]");
+    // ⚠️ Cualquier elemento con `data-row-id`, no solo `<tr>`: la grilla mobile
+    // puede ser una lista de TARJETAS (`CrudTable.mobileRow`), que marca cada
+    // tarjeta con el mismo atributo.
+    const fila = target.closest<HTMLElement>("[data-row-id]");
     // Toque fuera de las filas (padding del card, franja abierta, etc.).
-    if (!tr) {
+    if (!fila) {
       closeOpen();
       return;
     }
-    const id = tr.getAttribute("data-row-id") ?? "";
+    const id = fila.getAttribute("data-row-id") ?? "";
     const actions = cbRef.current.actionsFor?.(id);
     const wrapRect = wrapRef.current?.getBoundingClientRect();
     if (!actions || actions.length === 0 || !wrapRect) {
@@ -395,10 +407,10 @@ export function SwipeRowActions({
     // Otra fila abierta: se cierra AL INSTANTE (la nueva toma su lugar).
     if (openIdRef.current && openIdRef.current !== id) closeOpen(true);
 
-    const rect = tr.getBoundingClientRect();
-    tr.style.transition = "";
+    const rect = fila.getBoundingClientRect();
+    fila.style.transition = "";
     if (stripRef.current) stripRef.current.style.transition = "";
-    rowRef.current = tr;
+    rowRef.current = fila;
     // Ancho TOTAL de la franja: si la fila YA tenía el menú abierto se usa el que
     // se MIDIÓ al montarlo; si no, una estimación que el `useLayoutEffect`
     // reemplaza enseguida por el ancho real de las etiquetas.
@@ -711,12 +723,13 @@ export function SwipeRowActions({
             height: menu.rowH + stripExtra(menu.rowH) * 2,
             right: menu.right,
           }}
-          // `bg-card`: la franja se pinta con el mismo fondo que la tarjeta (las
-          // filas son transparentes), así las acciones parecen estar "detrás" de
-          // la fila que se corre —igual que el swipe del Mail de iOS— y, cuando
-          // la franja se estira por encima del alto de la fila, tapa lo que
+          // `bg-card` (o el fondo que indique `stripClassName`): la franja se
+          // pinta con el mismo fondo que la tarjeta (las filas son
+          // transparentes), así las acciones parecen estar "detrás" de la fila
+          // que se corre —igual que el swipe del Mail de iOS— y, cuando la
+          // franja se estira por encima del alto de la fila, tapa lo que
           // quedaría a la vista de las filas vecinas.
-          className="absolute z-10 w-0 overflow-hidden bg-card"
+          className={cn("absolute z-10 w-0 overflow-hidden", stripClassName)}
         >
           <div
             ref={innerRef}
