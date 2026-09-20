@@ -17,6 +17,21 @@ export function fraseContraparte(sentido: string): string {
   return sentido === "obtenido" ? "le debés" : "te debe";
 }
 
+/**
+ * Verbo de la ACCIÓN sobre un préstamo con saldo pendiente, según quién debe:
+ *  - `otorgado` (yo presté ⇒ **me deben**) → **Cobrar**;
+ *  - `obtenido` (me prestaron ⇒ **yo debo**) → **Pagar**.
+ *
+ * Ojo: el **destino es el mismo** para los dos (`/movimientos/nuevo/pago-prestamo`,
+ * o sea el concepto `PagoPrestamo`): el backend decide después si el movimiento
+ * es un "Cobro Prestamo" o un "Pago Prestamo" según el `sentido`. Lo que cambia
+ * acá es solo el rótulo, para que el usuario lea lo que realmente va a hacer.
+ * Lo usan el swipe de las tarjetas mobile y el rótulo del botón de la grilla.
+ */
+export function verboPrestamo(sentido: string): "Cobrar" | "Pagar" {
+  return sentido === "obtenido" ? "Pagar" : "Cobrar";
+}
+
 /** Rótulo del campo de contraparte según el sentido (label dinámico). */
 export function labelContraparte(sentido: string): string {
   return sentido === "obtenido"

@@ -8,7 +8,7 @@ import type { PrestamoOut } from "@/backend/src/queries/prestamos";
 import { eliminarPrestamo } from "@/backend/src/actions/prestamos";
 import type { ColumnDef } from "@tanstack/react-table";
 import { cn, dateTimeToString, numberToCurrency } from "@/lib/utils";
-import { fraseContraparte } from "@/lib/prestamos";
+import { fraseContraparte, verboPrestamo } from "@/lib/prestamos";
 import { useTap } from "@/lib/tap";
 const columns: ColumnDef<PrestamoOut>[] = [
   { accessorKey: "detalle", header: "Detalle", cell: ({ getValue }) => getValue<string|null>() ?? "—" },
@@ -49,7 +49,9 @@ function filaSaldoCls(p: PrestamoOut): string {
 /**
  * Destino del pago de un préstamo: abre el wizard con el préstamo preseleccionado
  * y `volverA` al CRUD (así Cancelar/guardar vuelven acá, conservando el `origen`).
- * Lo usan la columna "Pagar" (desktop) y la acción "Pagar" del swipe (mobile).
+ * Es la **misma acción para los dos sentidos** (el backend arma "Cobro Prestamo" o
+ * "Pago Prestamo" según el `sentido`): lo único que cambia es el rótulo, que sale
+ * de `verboPrestamo`. Lo usan el botón de la grilla (desktop) y el swipe (mobile).
  */
 function pagarHref(id: string, origenQ: string): string {
   return `/movimientos/nuevo/pago-prestamo?prestamo=${id}&volverA=${encodeURIComponent(
@@ -144,11 +146,15 @@ export function PrestamosListClient({ initialData, origen }: Props) {
   const saldados = initialData.length - conSaldo;
   // El conmutador responde al toque (en iOS el `click` puede no llegar: §119).
   const tapFiltro = useTap(() => setSoloPendientes((v) => !v));
-  // Botón "Pagar" por fila (última columna de la grilla): solo si el préstamo
-  // está impago total o parcialmente (saldo > 0). Lanza el wizard de pago con
-  // ese préstamo preseleccionado (mismo estilo que "Cobrar" en los períodos de
-  // trabajo cerrados del dashboard). Desde el 2026-09-17 es un `<Link>`: Next
-  // prefetchea el wizard cuando la fila entra en pantalla.
+  // Botón por fila (última columna de la grilla): solo si el préstamo está impago
+  // total o parcialmente (saldo > 0). Abre el wizard con ese préstamo
+  // preseleccionado (mismo estilo que "Cobrar" en los períodos de trabajo
+  // cerrados del dashboard). Desde el 2026-09-17 es un `<Link>`: Next prefetchea
+  // el wizard cuando la fila entra en pantalla.
+  // El rótulo del botón (título/aria, que es lo que anuncia el lector de pantalla)
+  // depende de quién debe: **Cobrar** si me deben, **Pagar** si yo debo
+  // (`verboPrestamo`). El encabezado de la columna queda genérico porque abarca los
+  // dos casos.
   const pagarColumn = useMemo<ColumnDef<PrestamoOut>[]>(
     () => [
       {
@@ -160,11 +166,12 @@ export function PrestamosListClient({ initialData, origen }: Props) {
           if ((p.saldo ?? 0) <= 0) {
             return <span className="text-subtitle">—</span>;
           }
+          const verbo = verboPrestamo(p.sentido);
           return (
             <Link
               href={pagarHref(p.id, origenQ)}
-              title="Pagar préstamo"
-              aria-label={`Pagar préstamo ${p.detalle ?? ""}`.trim()}
+              title={`${verbo} préstamo`}
+              aria-label={`${verbo} préstamo ${p.detalle ?? ""}`.trim()}
               className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted text-primary transition-colors hover:bg-primary/15"
             >
               <HandCoins className="h-4 w-4" />
@@ -212,17 +219,19 @@ export function PrestamosListClient({ initialData, origen }: Props) {
           />
         </button>
       }
-      // Swipe: "Pagar" (solo si queda saldo) + Editar/Eliminar (los agrega
-      // `CrudTable`). El toque en la tarjeta abre la edición.
+      // Swipe: "Cobrar"/"Pagar" (solo si queda saldo) + Editar/Eliminar (los agrega
+      // `CrudTable`). El toque en la tarjeta abre la edición. El verbo depende de
+      // quién debe: me deben ⇒ **Cobrar** · yo debo ⇒ **Pagar** (`verboPrestamo`).
       mobileSwipe={{
         onRowTap: (id) => nav(`/cruds/prestamos/${id}/editar${origenQ}`, "row"),
         extraActions: (id) => {
           const p = initialData.find((x) => x.id === id);
           if (!p || (p.saldo ?? 0) <= 0) return [];
+          const verbo = verboPrestamo(p.sentido);
           return [
             {
-              key: "pagar",
-              label: "Pagar",
+              key: verbo === "Cobrar" ? "cobrar" : "pagar",
+              label: verbo,
               icon: HandCoins,
               tone: "success",
               onClick: () => nav(pagarHref(p.id, origenQ), "pagar"),
