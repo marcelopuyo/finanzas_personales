@@ -37,12 +37,6 @@ interface SwipeRowActionsProps {
   actionsFor?: (rowId: string) => SwipeRowAction[] | null;
   /** Toque simple sobre una fila (un swipe NO lo dispara). */
   onRowTap?: (rowId: string) => void;
-  /** Fondo de la franja. Default `bg-card` (las filas de la grilla son
-      transparentes sobre la tarjeta, así las acciones parecen estar "detrás"
-      de la fila). En el modo TARJETAS (`CrudTable.mobileRow`) las tarjetas son
-      `bg-muted` y la franja tiene que usar ese mismo fondo para no cortar el
-      efecto. */
-  stripClassName?: string;
 }
 
 /** Recorrido mínimo antes de decidir si el gesto es horizontal (menú) o
@@ -204,7 +198,9 @@ function findScrollerX(
  *
  * ⚠️ Estética (pedido del usuario 2026-09-17: *"como el swipe del Mail de
  * iOS"*): cada acción es un **CÍRCULO de color con el ícono adentro y su
- * etiqueta debajo**, sobre el fondo de la tarjeta (`bg-card`) — ya NO la franja
+ * etiqueta debajo**, **sobre fondo TRANSPARENTE** (2026-09-19: se quitó el fondo
+ * que tenía la franja —`bg-card` y, en el modo tarjetas, `bg-muted`: en oscuro se
+ * leía como un rectángulo oscuro detrás de las acciones). Ya NO es la franja
  * maciza `bg-primary` con texto blanco del 2026-09-16 (histórico: `bg-danger`
  * del 2026-09-13). El color sale de `SwipeRowAction.tone`, con `toneDe(key)`
  * como default: Eliminar rojo · Cobrar/pagar verde · el resto gris. En el CRUD
@@ -220,8 +216,8 @@ function findScrollerX(
  *   umbral de apertura y el revelado (al empezar el gesto se usa `ITEM_EST_W`).
  * - La franja se **centra verticalmente** sobre la fila y su alto también se
  *   **MIDE** al montarse (`stripHeight`): si una etiqueta llegara a partirse en 2
- *   líneas (solo con una etiqueta más larga que `ITEM_MAX_W`), la franja crece y
- *   **tapa con `bg-card` lo que quede detrás**.
+ *   líneas (solo con una etiqueta más larga que `ITEM_MAX_W`), la franja crece
+ *   para que el contenido entre.
  * - Tamaños: círculo 40px + ícono 20px + etiqueta 10px (`leading-3`), las
  *   proporciones de la captura de referencia.
  * - La acción marcada con `wide` (la EXTRA de la fila: Cobrar / Nueva jornada /
@@ -233,7 +229,6 @@ export function SwipeRowActions({
   children,
   actionsFor,
   onRowTap,
-  stripClassName = "bg-card",
 }: SwipeRowActionsProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
@@ -723,13 +718,11 @@ export function SwipeRowActions({
             height: menu.rowH + stripExtra(menu.rowH) * 2,
             right: menu.right,
           }}
-          // `bg-card` (o el fondo que indique `stripClassName`): la franja se
-          // pinta con el mismo fondo que la tarjeta (las filas son
-          // transparentes), así las acciones parecen estar "detrás" de la fila
-          // que se corre —igual que el swipe del Mail de iOS— y, cuando la
-          // franja se estira por encima del alto de la fila, tapa lo que
-          // quedaría a la vista de las filas vecinas.
-          className={cn("absolute z-10 w-0 overflow-hidden", stripClassName)}
+          // SIN fondo: la franja es transparente y solo se ven los círculos con
+          // su etiqueta (decisión del usuario 2026-09-19: antes tenía el fondo de
+          // la tarjeta —`bg-card`— y en el modo tarjetas su `bg-muted`, que se
+          // leía como un rectángulo oscuro detrás de las acciones).
+          className="absolute z-10 w-0 overflow-hidden"
         >
           <div
             ref={innerRef}

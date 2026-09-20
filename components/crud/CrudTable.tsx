@@ -724,9 +724,6 @@ export function CrudTable<T, TId = number>({
           <SwipeRowActions
             actionsFor={swipeMode ? swipeActionsFor : undefined}
             onRowTap={swipeMode ? swipeRowTap : undefined}
-            // En modo tarjetas las filas son `bg-muted` (no transparentes sobre
-            // la tarjeta blanca), así que la franja usa ese mismo fondo.
-            stripClassName={cardMode ? "bg-muted" : undefined}
           >
             <div className="rounded-lg border border-border bg-card p-3">
               {cardMode ? (
