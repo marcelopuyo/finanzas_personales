@@ -59,18 +59,32 @@ function pagarHref(id: string, origenQ: string): string {
 
 /**
  * TARJETA de un préstamo en la grilla mobile (2026-09-19, mismo criterio que
- * trabajos y cuentas): **detalle + SALDO** arriba y, debajo en gris chico, la
- * **contraparte · relación · fecha**.
+ * trabajos y cuentas): **detalle** arriba, debajo la **contraparte · relación ·
+ * fecha** en gris chico y, separadas por una línea, las **dos cifras**:
  *
- * El saldo va en **rojo cuando queda pendiente** (y neutro si ya está saldado):
- * la grilla muestrea por defecto solo los pendientes, así que el color sigue
- * siendo informativo en la vista "todos".
+ * ```
+ * Prestamo Psicologo
+ * Federica · te debe · 19-06-2026
+ * ──────────────────────────────────
+ * MONTO                 SALDO
+ * $ 42.000,00           $ 0,00
+ * ```
  *
- * Debajo del saldo, en gris chico, va el **MONTO ORIGINAL** del préstamo
- * ("de $X") **solo cuando aporta información**: si el préstamo está impago el
- * saldo ES el monto original, así que repetirlo sería ruido. En cuanto hay pagos
- * parciales (o el préstamo quedó saldado, saldo 0) la tarjeta muestra de cuánto
- * era el préstamo.
+ * - **MONTO ORIGINAL** a la izquierda, en secundario (gris): de cuánto era el
+ *   préstamo.
+ * - **SALDO ACTUAL** a la derecha y como **protagonista**: `16px` semibold,
+ *   **rojo** mientras quede algo por pagar y neutro si ya está saldado (la
+ *   grilla muestrea por defecto solo los pendientes, así que el color sigue
+ *   siendo informativo en la vista "todos").
+ *
+ * Se muestran **siempre las dos** cifras (aunque coincidan en un préstamo
+ * impago): el usuario pidió que se lean claramente las dos, con el saldo
+ * destacado. Micro-etiquetas en mayúsculas como en el donut y los chips de
+ * períodos (`text-[10px] tracking-wide uppercase text-subtitle`).
+ *
+ * El **detalle** va en su propia línea y **sin truncar**: si es largo hace
+ * varias líneas (el título se lee completo). Antes compartía línea con el saldo
+ * y se cortaba con puntos suspensivos.
  */
 function PrestamoCard({ p }: { p: PrestamoOut }) {
   const saldo = p.saldo ?? 0;
@@ -78,34 +92,36 @@ function PrestamoCard({ p }: { p: PrestamoOut }) {
   const moneda = p.monedaISO ?? "ARS";
   return (
     <>
-      <div className="flex items-start justify-between gap-2">
-        <span className="truncate text-[14px] font-semibold text-header">
-          {p.detalle ?? "—"}
+      <span className="block text-[14px] leading-snug font-semibold break-words text-header">
+        {p.detalle ?? "—"}
+      </span>
+      <p className="mt-0.5 truncate text-[11.5px] text-subtitle">
+        {p.personaContraparte?.nombre ?? "—"} · {fraseContraparte(p.sentido)}
+        {p.fecha ? ` · ${dateTimeToString(p.fecha)}` : ""}
+      </p>
+      <div className="mt-1.5 flex items-end justify-between gap-3 border-t border-border/60 pt-1.5">
+        <span className="flex min-w-0 flex-col">
+          <span className="text-[10px] tracking-wide text-subtitle uppercase">
+            Monto
+          </span>
+          <span className="truncate text-[12.5px] text-card-foreground">
+            {numberToCurrency(montoOriginal, moneda)}
+          </span>
         </span>
-        {/* Columna derecha: saldo (protagonista) y, si corresponde, el monto
-            original debajo. El renglón de abajo a la izquierda ya viene cargado
-            (nombre · relación · fecha): por eso el monto va acá y la tarjeta
-            sigue en 2 líneas. */}
-        <span className="flex shrink-0 flex-col items-end leading-tight">
+        <span className="flex shrink-0 flex-col items-end">
+          <span className="text-[10px] tracking-wide text-subtitle uppercase">
+            Saldo
+          </span>
           <span
             className={cn(
-              "text-[14px] font-semibold",
+              "text-[16px] leading-tight font-semibold",
               saldo > 0 ? "text-danger" : "text-value"
             )}
           >
             {numberToCurrency(saldo, moneda)}
           </span>
-          {montoOriginal !== saldo && (
-            <span className="text-[10.5px] text-subtitle">
-              de {numberToCurrency(montoOriginal, moneda)}
-            </span>
-          )}
         </span>
       </div>
-      <p className="mt-0.5 truncate text-[11.5px] text-subtitle">
-        {p.personaContraparte?.nombre ?? "—"} · {fraseContraparte(p.sentido)}
-        {p.fecha ? ` · ${dateTimeToString(p.fecha)}` : ""}
-      </p>
     </>
   );
 }
