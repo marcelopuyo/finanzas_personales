@@ -1,14 +1,15 @@
 "use client";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { HandCoins } from "lucide-react";
+import { ChevronDown, HandCoins } from "lucide-react";
 import { CrudTable } from "@/components/crud/CrudTable";
-import { LinkNavStatus } from "@/components/ui/nav-progress";
+import { LinkNavStatus, usePendingNav } from "@/components/ui/nav-progress";
 import type { PrestamoOut } from "@/backend/src/queries/prestamos";
 import { eliminarPrestamo } from "@/backend/src/actions/prestamos";
 import type { ColumnDef } from "@tanstack/react-table";
-import { dateTimeToString, numberToCurrency } from "@/lib/utils";
+import { cn, dateTimeToString, numberToCurrency } from "@/lib/utils";
 import { fraseContraparte } from "@/lib/prestamos";
+import { useTap } from "@/lib/tap";
 const columns: ColumnDef<PrestamoOut>[] = [
   { accessorKey: "detalle", header: "Detalle", cell: ({ getValue }) => getValue<string|null>() ?? "—" },
   { accessorKey: "fecha", header: "Fecha", cell: ({ getValue }) => dateTimeToString(getValue<Date>()), meta: { align: "center" as const } },
@@ -45,6 +46,70 @@ function filaSaldoCls(p: PrestamoOut): string {
   return (p.saldo ?? 0) > 0 ? "text-danger [&>td]:text-inherit" : "";
 }
 
+/**
+ * Destino del pago de un préstamo: abre el wizard con el préstamo preseleccionado
+ * y `volverA` al CRUD (así Cancelar/guardar vuelven acá, conservando el `origen`).
+ * Lo usan la columna "Pagar" (desktop) y la acción "Pagar" del swipe (mobile).
+ */
+function pagarHref(id: string, origenQ: string): string {
+  return `/movimientos/nuevo/pago-prestamo?prestamo=${id}&volverA=${encodeURIComponent(
+    `/cruds/prestamos${origenQ}`
+  )}`;
+}
+
+/**
+ * TARJETA de un préstamo en la grilla mobile (2026-09-19, mismo criterio que
+ * trabajos y cuentas): **detalle + SALDO** arriba y, debajo en gris chico, la
+ * **contraparte · relación · fecha**.
+ *
+ * El saldo va en **rojo cuando queda pendiente** (y neutro si ya está saldado):
+ * la grilla muestrea por defecto solo los pendientes, así que el color sigue
+ * siendo informativo en la vista "todos".
+ *
+ * Debajo del saldo, en gris chico, va el **MONTO ORIGINAL** del préstamo
+ * ("de $X") **solo cuando aporta información**: si el préstamo está impago el
+ * saldo ES el monto original, así que repetirlo sería ruido. En cuanto hay pagos
+ * parciales (o el préstamo quedó saldado, saldo 0) la tarjeta muestra de cuánto
+ * era el préstamo.
+ */
+function PrestamoCard({ p }: { p: PrestamoOut }) {
+  const saldo = p.saldo ?? 0;
+  const montoOriginal = p.monto ?? 0;
+  const moneda = p.monedaISO ?? "ARS";
+  return (
+    <>
+      <div className="flex items-start justify-between gap-2">
+        <span className="truncate text-[14px] font-semibold text-header">
+          {p.detalle ?? "—"}
+        </span>
+        {/* Columna derecha: saldo (protagonista) y, si corresponde, el monto
+            original debajo. El renglón de abajo a la izquierda ya viene cargado
+            (nombre · relación · fecha): por eso el monto va acá y la tarjeta
+            sigue en 2 líneas. */}
+        <span className="flex shrink-0 flex-col items-end leading-tight">
+          <span
+            className={cn(
+              "text-[14px] font-semibold",
+              saldo > 0 ? "text-danger" : "text-value"
+            )}
+          >
+            {numberToCurrency(saldo, moneda)}
+          </span>
+          {montoOriginal !== saldo && (
+            <span className="text-[10.5px] text-subtitle">
+              de {numberToCurrency(montoOriginal, moneda)}
+            </span>
+          )}
+        </span>
+      </div>
+      <p className="mt-0.5 truncate text-[11.5px] text-subtitle">
+        {p.personaContraparte?.nombre ?? "—"} · {fraseContraparte(p.sentido)}
+        {p.fecha ? ` · ${dateTimeToString(p.fecha)}` : ""}
+      </p>
+    </>
+  );
+}
+
 interface Props {
   initialData: PrestamoOut[];
   /** Origen de navegación (?origen=...). Si es "dashboard" se muestra el botón
@@ -54,6 +119,15 @@ interface Props {
 export function PrestamosListClient({ initialData, origen }: Props) {
   const desdeDashboard = origen === "dashboard";
   const origenQ = desdeDashboard ? "?origen=dashboard" : "";
+  // Navegación con feedback (barra de progreso global).
+  const { go: nav } = usePendingNav();
+  // Mobile: por defecto solo las tarjetas de los préstamos con SALDO pendiente;
+  // el botón del pie muestra/oculta los ya saldados.
+  const [soloPendientes, setSoloPendientes] = useState(true);
+  const conSaldo = initialData.filter((p) => (p.saldo ?? 0) > 0).length;
+  const saldados = initialData.length - conSaldo;
+  // El conmutador responde al toque (en iOS el `click` puede no llegar: §119).
+  const tapFiltro = useTap(() => setSoloPendientes((v) => !v));
   // Botón "Pagar" por fila (última columna de la grilla): solo si el préstamo
   // está impago total o parcialmente (saldo > 0). Lanza el wizard de pago con
   // ese préstamo preseleccionado (mismo estilo que "Cobrar" en los períodos de
@@ -72,9 +146,7 @@ export function PrestamosListClient({ initialData, origen }: Props) {
           }
           return (
             <Link
-              href={`/movimientos/nuevo/pago-prestamo?prestamo=${p.id}&volverA=${encodeURIComponent(
-                `/cruds/prestamos${origenQ}`
-              )}`}
+              href={pagarHref(p.id, origenQ)}
               title="Pagar préstamo"
               aria-label={`Pagar préstamo ${p.detalle ?? ""}`.trim()}
               className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted text-primary transition-colors hover:bg-primary/15"
@@ -103,6 +175,45 @@ export function PrestamosListClient({ initialData, origen }: Props) {
       rowClassName={filaSaldoCls}
       backHref={desdeDashboard ? "/dashboard" : undefined}
       mobileBottomNav
+      // Mobile: cada préstamo es una TARJETA y se listan solo los que tienen
+      // saldo; el pie permite ver también los saldados.
+      mobileRow={(p) => <PrestamoCard p={p} />}
+      mobileRowFilter={(p) => !soloPendientes || (p.saldo ?? 0) > 0}
+      mobileRowFooter={
+        <button
+          type="button"
+          {...tapFiltro}
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-border py-2 text-[12px] font-medium text-subtitle transition-colors hover:bg-muted"
+        >
+          {soloPendientes
+            ? `Ver todos los préstamos (${saldados} saldados)`
+            : "Ver solo los pendientes"}
+          <ChevronDown
+            className={cn(
+              "h-3.5 w-3.5 transition-transform",
+              !soloPendientes && "rotate-180"
+            )}
+          />
+        </button>
+      }
+      // Swipe: "Pagar" (solo si queda saldo) + Editar/Eliminar (los agrega
+      // `CrudTable`). El toque en la tarjeta abre la edición.
+      mobileSwipe={{
+        onRowTap: (id) => nav(`/cruds/prestamos/${id}/editar${origenQ}`, "row"),
+        extraActions: (id) => {
+          const p = initialData.find((x) => x.id === id);
+          if (!p || (p.saldo ?? 0) <= 0) return [];
+          return [
+            {
+              key: "pagar",
+              label: "Pagar",
+              icon: HandCoins,
+              tone: "success",
+              onClick: () => nav(pagarHref(p.id, origenQ), "pagar"),
+            },
+          ];
+        },
+      }}
     />
   );
 }

@@ -130,9 +130,13 @@ interface CrudTableProps<T, TId = number> {
       acción (se muestra "—") y la fila no se puede seleccionar en mobile. */
   isSyntheticRow?: (item: T) => boolean;
   /** Clases extra por fila según el registro (p. ej. un tinte verde/rojo según
-      el estado del período). Se aplican tanto a la grilla mobile como a la
-      tabla desktop; en mobile el resaltado de la fila SELECCIONADA tiene
-      prioridad sobre el tinte. */
+      el estado del período). Se aplican a la grilla mobile y a la tabla desktop;
+      en mobile el resaltado de la fila SELECCIONADA tiene prioridad sobre el
+      tinte.
+
+      ⚠️ En modo **tarjetas** (`mobileRow`) NO se aplica: el tinte por fila no
+      tiene sentido sobre una tarjeta (el color se pinta dentro de la tarjeta,
+      como en préstamos). La tabla de escritorio sí lo sigue usando. */
   rowClassName?: (item: T) => string;
   /** Modo "tarjetas" mobile (`<lg`): en vez de la grilla, cada registro se
       dibuja con esta función —una TARJETA— dentro del mismo panel. Requiere
@@ -142,11 +146,22 @@ interface CrudTableProps<T, TId = number> {
       la **selección por fila** y el resaltado siguen funcionando igual que en la
       grilla. La paginación es propia (misma estética que la de `DataTable`) con
       `rowsPerPage`. Las tarjetas usan `bg-muted` (el lenguaje de las tarjetas
-      del dashboard) y la franja del swipe se pinta con ese mismo fondo.
+      del dashboard) y la franja del swipe es TRANSPARENTE (§127): lo único
+      visible son los círculos de color con su etiqueta.
 
       ⚠️ Es una alternativa a `mobileColumns`: si se pasa `mobileRow`, la grilla
       mobile NO se renderiza (sí la tabla de desktop). */
   mobileRow?: (item: T) => ReactNode;
+  /** Filtro EXTRA para la lista de TARJETAS mobile (`mobileRow`): los registros
+      que no pasan no se listan (ni cuentan en la paginación). Sirve para mostrar
+      un subconjunto por defecto con un conmutador propio de la vista — p. ej. en
+      préstamos: solo los que tienen saldo pendiente (ver `mobileRowFooter`).
+      No afecta a la grilla de escritorio ni a la búsqueda. */
+  mobileRowFilter?: (item: T) => boolean;
+  /** Contenido propio de la vista DEBAJO de la lista de tarjetas (dentro del
+      panel y después de la paginación). Pensado para el conmutador del filtro
+      mobile (p. ej. "Ver todos los préstamos"). */
+  mobileRowFooter?: ReactNode;
   /** Mensaje de la grilla cuando no hay datos (default "Sin datos disponibles"). */
   emptyMessage?: string;
 }
@@ -161,6 +176,8 @@ export function CrudTable<T, TId = number>({
   columns,
   mobileColumns: mobileColumnsProp,
   mobileRow,
+  mobileRowFilter,
+  mobileRowFooter,
   fetchData,
   initialData,
   deleteItem,
@@ -483,6 +500,28 @@ export function CrudTable<T, TId = number>({
     setSelectedId((prev) => (prev === id ? null : id));
   };
 
+  // ── Modo "tarjetas" (mobile): una tarjeta por registro en vez de la grilla ──
+  // La paginación la maneja este componente (`DataTable` no participa). El
+  // `rowId` de cada tarjeta es el puente con `SwipeRowActions` (swipe) y con la
+  // selección por fila. `mobileRowFilter` deja que la vista esconda registros
+  // (p. ej. los préstamos ya pagados) sin tocar la grilla de escritorio.
+  const cardMode = mobileBottomNav && !!mobileRow;
+  const itemsTarjetas = useMemo(
+    () => (mobileRowFilter ? filtered.filter(mobileRowFilter) : filtered),
+    [filtered, mobileRowFilter]
+  );
+  const totalPaginas = Math.max(
+    1,
+    Math.ceil(itemsTarjetas.length / rowsPerPage)
+  );
+  const pagina = Math.min(mobilePage, totalPaginas - 1);
+  const itemsPagina = mobileRow
+    ? itemsTarjetas.slice(
+        pagina * rowsPerPage,
+        pagina * rowsPerPage + rowsPerPage
+      )
+    : [];
+
   // Encabezado mobile: título (+ contador de filas visibles).
   const titleMobileEl = (
     <div className="mb-4 flex items-center justify-between gap-3">
@@ -502,7 +541,7 @@ export function CrudTable<T, TId = number>({
       </div>
       <div className="flex items-center gap-2">
         <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-muted px-2 text-[12px] font-semibold text-subtitle">
-          {filtered.length}
+          {cardMode ? itemsTarjetas.length : filtered.length}
         </span>
       </div>
     </div>
@@ -555,16 +594,9 @@ export function CrudTable<T, TId = number>({
       }
     : undefined;
 
-  // ── Modo "tarjetas" (mobile): una tarjeta por registro en vez de la grilla ──
-  // La paginación la maneja este componente (`DataTable` no participa). El
-  // `rowId` de cada tarjeta es el puente con `SwipeRowActions` (swipe) y con la
-  // selección por fila.
-  const cardMode = mobileBottomNav && !!mobileRow;
-  const totalPaginas = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
-  const pagina = Math.min(mobilePage, totalPaginas - 1);
-  const itemsPagina = mobileRow
-    ? filtered.slice(pagina * rowsPerPage, pagina * rowsPerPage + rowsPerPage)
-    : [];
+  // ── Modo "tarjetas" (mobile) ──────────────────────────────────────────────
+  // `cardMode`, el filtro de tarjetas (`mobileRowFilter`) y su paginación se
+  // calculan arriba, junto al encabezado mobile (el contador del título los usa).
 
   // Barra inferior fija (<lg): componente reutilizable BottomActionBar con
   // Exportar (más `mobilePrimaryAction`/`extraAction` opcionales) a la
@@ -728,7 +760,7 @@ export function CrudTable<T, TId = number>({
             <div className="rounded-lg border border-border bg-card p-3">
               {cardMode ? (
                 <>
-                  {filtered.length === 0 ? (
+                  {itemsTarjetas.length === 0 ? (
                     <p className="py-8 text-center text-[12px] text-subtitle">
                       {emptyMessage}
                     </p>
@@ -750,7 +782,13 @@ export function CrudTable<T, TId = number>({
                               // Sin selección en modo swipe (el toque lo maneja
                               // `SwipeRowActions`) ni en solo lectura.
                               !swipeMode && showActions && "cursor-pointer",
-                              rowClassName?.(item),
+                              // ⚠️ `rowClassName` NO se aplica acá: es el tinte de
+                              // FILA de una grilla (verde/rojo por estado). En
+                              // tarjetas, si el filtro por defecto ya muestra solo
+                              // los registros "en rojo" (préstamos con saldo), el
+                              // tinte pintaría TODAS las tarjetas y perdería
+                              // sentido; la tarjeta destaca lo suyo (p. ej. el
+                              // saldo en rojo). Sigue vigente en la tabla desktop.
                               showActions ? selectedCls(item) : "",
                               swipeMode &&
                                 pendingRowId === id &&
@@ -791,6 +829,9 @@ export function CrudTable<T, TId = number>({
                       </button>
                     </div>
                   </div>
+                  {/* Contenido propio de la vista debajo de la lista (p. ej. el
+                      conmutador "Ver todos los préstamos"). */}
+                  {mobileRowFooter}
                 </>
               ) : (
                 <DataTable
