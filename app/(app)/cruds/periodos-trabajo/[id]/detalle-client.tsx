@@ -102,6 +102,43 @@ function JornadaCard({
   );
 }
 
+/**
+ * TARJETA de una tarea en la grilla mobile del detalle del período (2026-09-19,
+ * espejo de `JornadaCard`: el usuario pidió que "Tareas del período" quede igual
+ * que "Jornadas del período").
+ *
+ * **fecha/hora** arriba a la izquierda y el **monto de la tarea** a la derecha
+ * como protagonista; debajo, en gris chico, la **descripción** y —si está
+ * cargada— las **horas** de la tarea. La fecha/hora se muestra en formato LOCAL
+ * (`fechaHoraLocal`), igual que la grilla de escritorio, para no mostrar la
+ * conversión a UTC.
+ */
+function TareaCard({
+  t,
+  currency,
+}: {
+  t: TareaTrabajoOut;
+  currency: string;
+}) {
+  const horas = t.horasTarea;
+  return (
+    <>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="truncate text-[14px] font-semibold text-header">
+          {fechaHoraLocal(t.fechaHoraTarea)}
+        </span>
+        <span className="shrink-0 text-[14px] font-semibold text-value">
+          {numberToCurrency(t.montoTarea ?? 0, currency)}
+        </span>
+      </div>
+      <div className="mt-0.5 flex items-baseline justify-between gap-2 text-[11.5px] text-subtitle">
+        <span className="truncate">{t.descripcion ?? "—"}</span>
+        {horas != null && <span className="shrink-0">{horas} h</span>}
+      </div>
+    </>
+  );
+}
+
 /** Datos derivados del período. Los usan el resumen en pantalla y la cabecera
     del PDF, para no duplicar los cálculos ni poder desincronizarse. */
 function datosPeriodo(periodo: PeriodoTrabajoOut) {
@@ -392,6 +429,11 @@ export function PeriodoTrabajoDetalleClient({
     `/cruds/jornadas-trabajo/${id}/editar?periodoFijo=1&volverA=${encodeURIComponent(
       selfUrl
     )}`;
+  // Ídem para las tareas (misma idea: la usan la tabla, el swipe y el toque).
+  const tareaEditHref = (id: string) =>
+    `/cruds/tareas-trabajo/${id}/editar?periodoFijo=1&volverA=${encodeURIComponent(
+      selfUrl
+    )}`;
 
   const summary = (
     <ResumenPeriodo
@@ -559,9 +601,7 @@ export function PeriodoTrabajoDetalleClient({
         currency={currency}
         deleteItem={eliminarTareaTrabajo}
         createHref={`/movimientos/nuevo/tarea?periodo=${periodo.id}&volverA=${encodeURIComponent(selfUrl)}`}
-        editHref={(id) =>
-          `/cruds/tareas-trabajo/${id}/editar?periodoFijo=1&volverA=${encodeURIComponent(selfUrl)}`
-        }
+        editHref={tareaEditHref}
         getId={(i) => i.id}
         searchPredicate={(i, q) => {
           const texto = `${i.descripcion ?? ""} ${fechaHoraLocal(i.fechaHoraTarea)}`.toLowerCase();
@@ -574,7 +614,16 @@ export function PeriodoTrabajoDetalleClient({
         topContent={summary}
         exportInfo={exportInfo}
         emptyMessage="No hay tareas en este período todavía."
-        mobileHint={editable ? "Tocá una tarea para seleccionarla" : undefined}
+        // Mobile (§132): espejo de las jornadas → cada tarea es una TARJETA, el
+        // toque abre la edición y el swipe revela Editar/Eliminar. En SOLO
+        // LECTURA (período cobrado) no se pasa `mobileSwipe`, así que las
+        // tarjetas quedan sin ninguna acción; tampoco hace falta el `mobileHint`.
+        mobileRow={(t) => <TareaCard t={t} currency={currency} />}
+        mobileSwipe={
+          editable
+            ? { onRowTap: (id) => nav(tareaEditHref(id), "row") }
+            : undefined
+        }
       />
     );
   }

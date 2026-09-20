@@ -29,20 +29,33 @@ const columns: ColumnDef<TrabajoOut>[] = [
  * escritorio sigue igual y en mobile cada fila es una tarjeta que aprovecha todo
  * el ancho (la fecha de inicio vuelve como dato secundario, que es lo que no
  * entraba en la grilla).
+ *
+ * ⚠️ **`por_tarea` y `fijo` NO muestran precio por hora** (2026-09-19, pedido del
+ * usuario): ninguna de las dos modalidades "sin horas" lo usa. `por_tarea` se
+ * cobra con el **monto de cada tarea** y `fijo` con el **monto cargado en cada
+ * período** (backend: `crearPeriodoTrabajo` → `data.montoACobrar`; el precio por
+ * hora solo se copia como snapshot en `horas_fijas`). En los dos casos
+ * `precioHora` queda en 0 y mostrarlo era ruido. La tarjeta muestra solo el
+ * nombre y el renglón de modalidad · inicio.
  */
 function TrabajoCard({ t }: { t: TrabajoOut }) {
   const modalidad =
     MODALIDAD_LABEL[t.modalidadCobro ?? "horas_variables"] ?? t.modalidadCobro ?? "";
   const inicio = dateTimeToString(t.fechaInicio);
+  // El precio por hora solo tiene sentido en las modalidades por hora.
+  const mostraPrecio =
+    t.modalidadCobro !== "por_tarea" && t.modalidadCobro !== "fijo";
   return (
     <>
       <div className="flex items-baseline justify-between gap-2">
         <span className="truncate text-[14px] font-semibold text-header">
           {t.nombre}
         </span>
-        <span className="shrink-0 text-[14px] font-semibold text-value">
-          {numberToCurrency(t.precioHora ?? 0)}
-        </span>
+        {mostraPrecio && (
+          <span className="shrink-0 text-[14px] font-semibold text-value">
+            {numberToCurrency(t.precioHora ?? 0)}
+          </span>
+        )}
       </div>
       <p className="mt-0.5 truncate text-[11.5px] text-subtitle">
         {modalidad}
