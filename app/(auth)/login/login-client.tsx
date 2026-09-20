@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Fingerprint } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { NO_REMEMBER, PENDING_CLEAR } from "@/lib/session-flags";
+import { guardarUltimoEmail } from "@/lib/ultimo-email";
+import { useUltimoEmail } from "@/lib/use-cliente";
 import { entrarConBiometria, estadoBiometria } from "@/lib/webauthn-client";
 
 const inputCls =
@@ -30,8 +32,18 @@ export default function LoginClient({
   // `SessionExpiredWatcher` cuando una Server Action quedó redirigida a /login.
   const expirada = params.get("expirada") === "1";
 
-  const [email, setEmail] = useState("");
+  // Último email con el que se entró en ESTE dispositivo (`lib/ultimo-email.ts`).
+  // Es el valor del campo hasta que el usuario lo toque: `email === null` significa
+  // "todavía no escribió nada" ⇒ se muestra el email guardado. En cuanto escribe
+  // (o lo borra) manda lo suyo, incluido un campo vacío. El valor llega vacío en el
+  // servidor y en el render de hidratación, y se completa apenas hidrata (ver
+  // `useUltimoEmail` en `lib/use-cliente.ts`: sin `setState` en un efecto).
+  const ultimoEmail = useUltimoEmail();
+  const [email, setEmail] = useState<string | null>(null);
+  const emailCampo = email ?? ultimoEmail;
   const [password, setPassword] = useState("");
+  /** Campo Contraseña: recibe el foco cuando el email ya viene precargado. */
+  const passwordRef = useRef<HTMLInputElement>(null);
   const [recordar, setRecordar] = useState(false);
   const [error, setError] = useState(errorParam === "token-invalido" ? "Token de verificación inválido o expirado" : "");
   const [loading, setLoading] = useState(false);
@@ -55,6 +67,19 @@ export default function LoginClient({
       cancelado = true;
     };
   }, []);
+
+  // Si el email vino PRECARGADO (hay último login en este dispositivo), el foco
+  // arranca directo en la contraseña: el usuario no tiene que tocar el primer
+  // campo. El efecto se dispara cuando el valor real aparece (en el servidor y en
+  // la hidratación llega vacío) y **no le roba el foco** a lo que el usuario ya
+  // haya tocado a mano. `preventScroll` evita un salto de scroll en pantallas
+  // bajas (el teclado puede abrirse solo en Android).
+  useEffect(() => {
+    if (!ultimoEmail) return;
+    const activo = document.activeElement;
+    if (activo && activo !== document.body) return;
+    passwordRef.current?.focus({ preventScroll: true });
+  }, [ultimoEmail]);
 
   async function handleBiometria() {
     setErrorBiometria("");
@@ -88,13 +113,16 @@ export default function LoginClient({
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, recordar }),
+        body: JSON.stringify({ email: emailCampo, password, recordar }),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Error al iniciar sesión");
         return;
       }
+      // Login exitoso: se recuerda el email en el dispositivo para precargarlo la
+      // próxima vez (solo acá: un intento fallido no se guarda).
+      guardarUltimoEmail(emailCampo);
       // Sesión "no recordar": la guardia por pestaña solo actúa si está este flag.
       if (recordar) {
         sessionStorage.removeItem(NO_REMEMBER);
@@ -148,7 +176,7 @@ export default function LoginClient({
           </label>
           <input
             type="email"
-            value={email}
+            value={emailCampo}
             onChange={(e) => setEmail(e.target.value)}
             required
             placeholder="tu@email.com"
@@ -159,6 +187,7 @@ export default function LoginClient({
             Contraseña
           </label>
           <input
+            ref={passwordRef}
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}

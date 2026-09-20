@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { leerUltimoEmail } from "./ultimo-email";
 
 /**
  * Suscripción vacía: los valores de estos hooks no cambian mientras la página
@@ -20,4 +21,16 @@ const suscribirNada = () => () => {};
  */
 export function useMontado(): boolean {
   return useSyncExternalStore(suscribirNada, () => true, () => false);
+}
+
+/**
+ * Último email con el que se inició sesión en este dispositivo (ver
+ * `lib/ultimo-email.ts`), para **prefijar el campo Email del login**.
+ *
+ * Devuelve `""` en el servidor y en el render de hidratación, y el valor real
+ * apenas hidrata: el campo se completa sin romper la hidratación y sin
+ * `setState` dentro de un efecto.
+ */
+export function useUltimoEmail(): string {
+  return useSyncExternalStore(suscribirNada, leerUltimoEmail, () => "");
 }
