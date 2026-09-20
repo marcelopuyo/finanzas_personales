@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronLeft, ChevronRight, FileDown, Pencil, Plus, Search, Trash2, type LucideIcon } from "lucide-react";
+import { ArrowLeft, FileDown, Pencil, Plus, Search, Trash2, type LucideIcon } from "lucide-react";
 import { BottomActionBar } from "@/components/ui/bottom-action-bar";
 import { DataTable } from "@/components/ui/data-table";
+import { TablePagination } from "@/components/ui/table-pagination";
 import {
   SwipeRowActions,
   type SwipeRowAction,
@@ -801,34 +802,16 @@ export function CrudTable<T, TId = number>({
                       })}
                     </div>
                   )}
-                  {/* Paginación: mismo markup que la de `DataTable`. */}
-                  <div className="mt-3 flex items-center justify-between border-t border-border pt-2 text-[12px] text-subtitle">
-                    <span>
-                      Página {pagina + 1} de {totalPaginas}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setMobilePage(Math.max(0, pagina - 1))}
-                        disabled={pagina === 0}
-                        aria-label="Página anterior"
-                        className="rounded p-1 text-card-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setMobilePage(Math.min(totalPaginas - 1, pagina + 1))
-                        }
-                        disabled={pagina >= totalPaginas - 1}
-                        aria-label="Página siguiente"
-                        className="rounded p-1 text-card-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
+                  {/* Paginación: mismo componente que la grilla de escritorio. */}
+                  <TablePagination
+                    pageIndex={pagina}
+                    pageCount={totalPaginas}
+                    onPrev={() => setMobilePage(Math.max(0, pagina - 1))}
+                    onNext={() =>
+                      setMobilePage(Math.min(totalPaginas - 1, pagina + 1))
+                    }
+                    className="mt-3 pt-2"
+                  />
                   {/* Contenido propio de la vista debajo de la lista (p. ej. el
                       conmutador "Ver todos los préstamos"). */}
                   {mobileRowFooter}

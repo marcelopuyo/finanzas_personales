@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Historial de cuenta · diseño elegido (tema oscuro)</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; display: flex; flex-direction: column; gap: 26px;
+    font-family: "SF Pro Display", Inter, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #111; color: #e8e8ea;
+  }
+  h1 { font-size: 15px; margin: 0; }
+  h1 small { display: block; font-weight: 400; font-size: 12px; opacity: .6; margin-top: 6px; line-height: 1.7; max-width: 1180px; }
+  h1 b { color: #fff; }
+  .rowwrap { display: flex; flex-wrap: wrap; gap: 26px; align-items: flex-start; }
+
+  .panel {
+    padding: 14px; border-radius: 16px; width: 420px; background: #151517;
+    border: 1px solid #2a2a2d;
+    --background: #151517; --card: #353638; --card-foreground: #e2e4f0;
+    --border: #3e3f42; --subtitle: #808185; --header: #ffffff; --muted: #1e1e20;
+    --primary: #4c6ef5; --success: #51cf66; --danger: #ff6b6b;
+  }
+  .panel.narrow { width: 350px; }
+  .panel > .cap { margin: 0 0 10px 2px; font-size: 12px; color: #b9babd; }
+  .panel > .cap b { color: #fff; }
+  .notas { font-size: 11.5px; line-height: 1.65; color: #9a9b9e; margin: 10px 2px 0; }
+  .notas b { color: #d6d7da; }
+  .notas code { background: #26262a; padding: 1px 4px; border-radius: 4px; font-size: 10.5px; }
+  /* Reglas del diseño, en un cuadro aparte */
+  .reglas {
+    background: #17171a; border: 1px solid #2a2a2d; border-radius: 14px;
+    padding: 14px 18px; max-width: 640px; font-size: 12px; line-height: 1.75; color: #b9babd;
+  }
+  .reglas h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #fff; margin: 0 0 8px; opacity: .7; }
+  .reglas b { color: #fff; }
+  .reglas code { background: #26262a; padding: 1px 4px; border-radius: 4px; font-size: 11px; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ── teléfono + bottom sheet (lo que hace `Modal` en mobile) ── */
+  .phone {
+    position: relative; height: 460px; border-radius: 26px; overflow: hidden;
+    background: var(--background); border: 1px solid var(--border); color: var(--card-foreground);
+  }
+  .phone.w320 { width: 320px; }
+  .phone.w390 { width: 390px; }
+  .ph-bg { position: absolute; inset: 0; padding: 14px 12px; opacity: .3; font-size: 12px; }
+  .ph-bg b { display: block; font-size: 13px; margin-bottom: 8px; }
+  .ph-skel { height: 46px; border-radius: 10px; margin-bottom: 8px; background: var(--card); border: 1px solid var(--border); }
+  .backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.5); }
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; max-height: 94%;
+    display: flex; flex-direction: column; background: var(--card);
+    border-top-left-radius: 18px; border-top-right-radius: 18px;
+    border-top: 1px solid var(--border); border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+  }
+  .sheet-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+  }
+  .sheet-head span { font-size: 15px; font-weight: 600; color: var(--header); }
+  .sheet-head .x { color: var(--subtitle); font-size: 14px; }
+  .sheet-body { padding: 12px 16px 16px; overflow: hidden; }
+  .sum {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: var(--muted); border: 1px solid var(--border); border-radius: 10px;
+    padding: 8px 12px; margin-bottom: 10px;
+  }
+  .sum-n { font-size: 13px; font-weight: 500; color: var(--header); }
+  .sum-v { font-size: 16px; font-weight: 600; letter-spacing: -.01em; color: var(--header); }
+
+  /* ── LISTA: columna de dinero a la derecha, SIEMPRE 2 líneas ── */
+  .list { list-style: none; margin: 0; padding: 0; }
+  .rw { position: relative; overflow: hidden; border-bottom: 1px solid var(--border); }
+  .rw:last-child { border-bottom: 0; }
+  .rw-c {
+    position: relative; z-index: 2; background: var(--card);
+    display: flex; align-items: flex-start; gap: 10px; padding: 10px 2px;
+  }
+  /* Bloque de texto: puede encogerse, así el motivo se recorta con … */
+  .grow { flex: 1 1 auto; min-width: 0; }
+  .mot {
+    font-size: 13px; font-weight: 500; line-height: 17px; color: var(--card-foreground);
+    /* 1 sola línea: si no entra, se recorta con …  (regla de la opción A) */
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .sub {
+    font-size: 11px; line-height: 14px; color: var(--subtitle); font-variant-numeric: tabular-nums;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .amtcol { flex: 0 0 auto; text-align: right; }
+  /* El monto manda: 15 px, en su propia columna (filosofía de la opción C) */
+  .amt { font-size: 15px; line-height: 19px; font-weight: 600; letter-spacing: -.01em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .saldo { font-size: 11px; line-height: 14px; color: var(--subtitle); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pos { color: var(--success); }
+  .neg { color: var(--danger); }
+
+  /* ── franja del swipe (SwipeRowActions): círculo rojo + etiqueta ── */
+  .strip {
+    position: absolute; z-index: 1; right: 0; top: 0; height: 56px;
+    background: var(--card); overflow: hidden; transform: translateX(100%);
+  }
+  .strip-inner { margin-left: auto; display: flex; height: 100%; align-items: center; width: max-content; }
+  .act {
+    flex: none; min-width: 64px; max-width: 112px; height: 100%; padding: 0 4px; border: 0; background: none;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    text-align: center; font: inherit; color: inherit;
+  }
+  .circ { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #fff; background: var(--danger); }
+  .circ svg { width: 20px; height: 20px; }
+  .act .lbl { font-size: 10px; line-height: 12px; font-weight: 500; color: var(--card-foreground); }
+</style>
+</head>
+<body>
+
+<h1>Historial de cuenta · diseño elegido
+  <small>Tema oscuro · mobile (<b>&lt;640 px</b>; de 640 px en adelante queda la tabla de hoy). Combina la <b>filosofía de C</b> (el monto manda: 15 px, en su propia columna a la derecha, con el saldo debajo) con la <b>prolijidad de A</b> (siempre 2 líneas y el motivo se recorta con <code>…</code> si no entra en una). Arrastrá una fila para probar el swipe.</small>
+</h1>
+
+<div class="reglas">
+  <h2>Reglas del diseño</h2>
+  <div><b>Línea 1</b> — a la izquierda el <b>motivo</b> (1 línea, recortado con <code>…</code>) · a la derecha el <b>monto</b> en 15 px, verde ingreso / rojo egreso.</div>
+  <div><b>Línea 2</b> — a la izquierda la <b>fecha</b> · a la derecha el <b>saldo posterior</b>.</div>
+  <div><b>Alto fijo</b>: la fila siempre mide lo mismo, el motivo nunca la estira.</div>
+  <div><b>“En tu moneda”</b> (solo si la moneda de la cuenta ≠ predeterminada) va en la línea 2, después de la fecha, con <code>≈</code>.</div>
+  <div><b>Eliminar</b> — sin columna de acciones: se hace con el swipe (círculo rojo + papelera), igual que en el resto de la app.</div>
+</div>
+
+<div class="rowwrap">
+
+  <!-- ══════ 390 px · moneda igual ══════ -->
+  <div class="panel">
+    <div class="cap"><b>390 px</b> · cuenta en $ (igual que tu moneda)</div>
+    <div class="phone w390"><div class="ph-bg"><b>Cuentas</b><div class="ph-skel"></div><div class="ph-skel"></div></div><div class="backdrop"></div>
+      <div class="sheet">
+        <div class="sheet-head"><span>Movimientos</span><span class="x">✕</span></div>
+        <div class="sheet-body">
+          <div class="sum"><span class="sum-n">Efectivo</span><span class="sum-v">$ 24.310,00</span></div>
+          <ul class="list">
+            <li class="rw"><div class="rw-c">
+              <div class="grow"><div class="mot">Kiosco doña Rosa</div><div class="sub">12-09-2026</div></div>
+              <div class="amtcol"><div class="amt neg">− $ 1.850,00</div><div class="saldo">Saldo $ 24.310,00</div></div>
+            </div><div class="strip"><div class="strip-inner"><button class="act"><span class="circ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></span><span class="lbl">Eliminar</span></button></div></div></li>
+            <li class="rw"><div class="rw-c">
+              <div class="grow"><div class="mot">Sueldo septiembre</div><div class="sub">10-09-2026</div></div>
+              <div class="amtcol"><div class="amt pos">+ $ 185.000,00</div><div class="saldo">Saldo $ 26.160,00</div></div>
+            </div><div class="strip"><div class="strip-inner"><button class="act"><span class="circ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></span><span class="lbl">Eliminar</span></button></div></div></li>
+            <li class="rw"><div class="rw-c">
+              <div class="grow"><div class="mot">Alquiler septiembre</div><div class="sub">05-09-2026</div></div>
+              <div class="amtcol"><div class="amt neg">− $ 120.000,00</div><div class="saldo">Saldo − $ 158.840,00</div></div>
+            </div><div class="strip"><div class="strip-inner"><button class="act"><span class="circ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></span><span class="lbl">Eliminar</span></button></div></div></li>
+            <li class="rw"><div class="rw-c">
+              <div class="grow"><div class="mot">Venta de bicicleta usada (Mercado Libre)</div><div class="sub">01-09-2026</div></div>
+              <div class="amtcol"><div class="amt pos">+ $ 85.000,00</div><div class="saldo">Saldo − $ 38.840,00</div></div>
+            </div><div class="strip"><div class="strip-inner"><button class="act"><span class="circ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></span><span class="lbl">Eliminar</span></button></div></div></li>
+            <li class="rw"><div class="rw-c">
+              <div class="grow"><div class="mot">Supermercado Coto</div><div class="sub">28-08-2026</div></div>
+              <div class="amtcol"><div class="amt neg">− $ 39.480,00</div><div class="saldo">Saldo − $ 123.840,00</div></div>
+            </div><div class="strip"><div class="strip-inner"><button class="act"><span class="circ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></span><span class="lbl">Eliminar</span></button></div></div></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <p class="notas">Fila de <b>55 px</b> constante. Fijate en la 4ª: el motivo largo se corta con <code>…</code> y <b>no</b> agranda la fila.</p>
+  </div>
+
+  <!-- ══════ 320 px · peor caso ══════ -->
+  <div class="panel narrow">
+    <div class="cap"><b>320 px</b> · peor caso (el motivo se recorta más)</div>
+    <div class="phone w320"><div class="ph-bg"><b>Cuentas</b><div class="ph-skel"></div></div><div class="backdrop"></div>
+      <div class="sheet">
+        <div class="sheet-head"><span>Movimientos</span><span class="x">✕</span></div>
+        <div class="sheet-body">
+          <div class="sum"><span class="sum-n">Efectivo</span><span class="sum-v">$ 24.310,00</span></div>
+          <ul class="list">
+            <li class="rw"><div class="rw-c">
+              <div class="grow"><div class="mot">Kiosco doña Rosa</div><div class="sub">12-09-2026</div></div>
+              <div class="amtcol"><div class="amt neg">− $ 1.850,00</div><div class="saldo">Saldo $ 24.310,00</div></div>
+            </div><div class="strip"><div class="strip-inner"><button class="act"><span class="circ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></span><span class="lbl">Eliminar</span></button></div></div></li>
+            <li class="rw"><div class="rw-c">
+              <div class="grow"><div class="mot">Sueldo septiembre</div><div class="sub">10-09-2026</div></div>
+              <div class="amtcol"><div class="amt pos">+ $ 185.000,00</div><div class="saldo">Saldo $ 26.160,00</div></div>
+            </div><div class="strip"><div class="strip-inner"><button class="act"><span class="circ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></span><span class="lbl">Eliminar</span></button></div></div></li>
+            <li class="rw"><div class="rw-c">
+              <div class="grow"><div class="mot">Alquiler septiembre</div><div class="sub">05-09-2026</div></div>
+              <div class="amtcol"><div class="amt neg">− $ 120.000,00</div><div class="saldo">Saldo − $ 158.840,00</div></div>
+            </div><div class="strip"><div class="strip-inner"><button class="act"><span class="circ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></span><span class="lbl">Eliminar</span></button></div></div></li>
+            <li class="rw"><div class="rw-c">
+              <div class="grow"><div class="mot">Venta de bicicleta usada (Mercado Libre)</div><div class="sub">01-09-2026</div></div>
+              <div class="amtcol"><div class="amt pos">+ $ 85.000,00</div><div class="saldo">Saldo − $ 38.840,00</div></div>
+            </div><div class="strip"><div class="strip-inner"><button class="act"><span class="circ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></span><span class="lbl">Eliminar</span></button></div></div></li>
+            <li class="rw"><div class="rw-c">
+              <div class="grow"><div class="mot">Supermercado Coto</div><div class="sub">28-08-2026</div></div>
+              <div class="amtcol"><div class="amt neg">− $ 39.480,00</div><div class="saldo">Saldo − $ 123.840,00</div></div>
+            </div><div class="strip"><div class="strip-inner"><button class="act"><span class="circ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></span><span class="lbl">Eliminar</span></button></div></div></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <p class="notas">A 320 px el motivo queda con menos letras, pero <b>el monto y el saldo nunca se recortan</b> y la fila sigue midiendo <b>55 px</b>.</p>
+  </div>
+
+  <!-- ══════ 390 px · moneda distinta ══════ -->
+  <div class="panel">
+    <div class="cap"><b>390 px</b> · cuenta en US$ (moneda distinta)</div>
+    <div class="phone w390"><div class="ph-bg"><b>Cuentas</b><div class="ph-skel"></div><div class="ph-skel"></div></div><div class="backdrop"></div>
+      <div class="sheet">
+        <div class="sheet-head"><span>Movimientos</span><span class="x">✕</span></div>
+        <div class="sheet-body">
+          <div class="sum"><span class="sum-n">Ahorro USD</span><span class="sum-v">US$ 842,15</span></div>
+          <ul class="list">
+            <li class="rw"><div class="rw-c">
+              <div class="grow"><div class="mot">Compra Steam</div><div class="sub">12-09-2026 · ≈ $ 15.588,00</div></div>
+              <div class="amtcol"><div class="amt neg">− US$ 12,99</div><div class="saldo">Saldo US$ 842,15</div></div>
+            </div><div class="strip"><div class="strip-inner"><button class="act"><span class="circ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></span><span class="lbl">Eliminar</span></button></div></div></li>
+            <li class="rw"><div class="rw-c">
+              <div class="grow"><div class="mot">Transferencia desde Efectivo</div><div class="sub">08-09-2026 · ≈ $ 600.000,00</div></div>
+              <div class="amtcol"><div class="amt pos">+ US$ 500,00</div><div class="saldo">Saldo US$ 855,14</div></div>
+            </div><div class="strip"><div class="strip-inner"><button class="act"><span class="circ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></span><span class="lbl">Eliminar</span></button></div></div></li>
+            <li class="rw"><div class="rw-c">
+              <div class="grow"><div class="mot">Suscripción GitHub</div><div class="sub">01-09-2026 · ≈ $ 4.800,00</div></div>
+              <div class="amtcol"><div class="amt neg">− US$ 4,00</div><div class="saldo">Saldo US$ 355,14</div></div>
+            </div><div class="strip"><div class="strip-inner"><button class="act"><span class="circ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></span><span class="lbl">Eliminar</span></button></div></div></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <p class="notas">Con moneda distinta, <b>“En tu moneda”</b> entra en la <b>línea 2</b> después de la fecha (con <code>≈</code>) y el saldo sigue en su columna: la fila <b>no</b> crece a una 3ª línea. Si la fecha + el equivalente no entran, se recorta el conjunto con <code>…</code>.</p>
+  </div>
+
+</div>
+
+<script>
+// ── Swipe de previsualización: replica el gesto de `SwipeRowActions` ──
+function initSwipe() {
+  const DECIDE_PX = 8, OPEN_RATIO = 0.4, ANIM = 'transform .2s cubic-bezier(0.22,0.61,0.36,1)';
+
+  document.querySelectorAll('.rw').forEach((rw) => {
+    const content = rw.querySelector('.rw-c');
+    const strip = rw.querySelector('.strip');
+    const inner = strip.querySelector('.strip-inner');
+    if (!content || !strip) return;
+
+    const fit = () => {
+      const h = Math.max(rw.offsetHeight, 56);
+      strip.style.height = h + 'px';
+      strip.style.top = ((rw.offsetHeight - h) / 2) + 'px';
+    };
+    fit(); window.addEventListener('load', fit);
+
+    let open = false, dragging = false, decided = false, horizontal = false;
+    let startX = 0, startY = 0, startT = 0, w = 0, x = 0;
+
+    const apply = (px) => { content.style.transform = `translateX(${px}px)`; };
+    const snapTo = (isOpen) => {
+      open = isOpen;
+      fit();
+      strip.style.transform = 'translateX(100%)';
+      content.style.transition = ANIM;
+      apply(open ? -w : 0);
+    };
+    const begin = (clientX, clientY) => {
+      w = inner.offsetWidth;
+      startX = clientX; startY = clientY; startT = Date.now();
+      x = open ? -w : 0;
+      dragging = true; decided = false; horizontal = false;
+      content.style.transition = 'none';
+      fit();
+    };
+    const move = (clientX, clientY, ev) => {
+      if (!dragging) return;
+      const dx = clientX - startX, dy = clientY - startY;
+      if (!decided) {
+        if (Math.abs(dx) < DECIDE_PX && Math.abs(dy) < DECIDE_PX) return;
+        decided = true;
+        horizontal = Math.abs(dx) > Math.abs(dy);
+        if (!horizontal) { dragging = false; return; }
+      }
+      if (!horizontal) return;
+      if (ev && ev.cancelable) ev.preventDefault();
+      const px = Math.min(0, Math.max(-w - 24, x + dx));
+      apply(px);
+      strip.style.transform = `translateX(${Math.min(100, 100 - (Math.abs(px) / w) * 100)}%)`;
+    };
+    const end = () => {
+      if (!dragging || !horizontal) { dragging = false; snapTo(open); return; }
+      const cur = Math.abs(parseFloat((content.style.transform.match(/-?[\d.]+/) || [0])[0]));
+      const tap = Date.now() - startT < 500 && cur < 4;
+      dragging = false;
+      snapTo(tap ? false : cur > w * OPEN_RATIO);
+    };
+
+    rw.addEventListener('touchstart', (e) => begin(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+    rw.addEventListener('touchmove', (e) => move(e.touches[0].clientX, e.touches[0].clientY, e), { passive: false });
+    rw.addEventListener('touchend', end);
+    rw.addEventListener('touchcancel', end);
+    rw.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse') begin(e.clientX, e.clientY); });
+    rw.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse') move(e.clientX, e.clientY, null); });
+    window.addEventListener('pointerup', end);
+  });
+}
+initSwipe();
+</script>
+</body>
+</html>

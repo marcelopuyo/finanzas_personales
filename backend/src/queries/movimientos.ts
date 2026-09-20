@@ -159,3 +159,47 @@ export async function getHistorialMovimientosCuenta(
   // Salida en orden cronológico DESC por fecha-hora (más reciente primero)
   return result.reverse();
 }
+
+/** Una "tanda" del historial (scroll infinito de `/cuentas/[id]`). */
+export interface HistorialPagina {
+  rows: HistorialMovimientoOut[];
+  /** Total de movimientos de la cuenta (sin recortar). */
+  total: number;
+  /** Quedan movimientos MÁS VIEJOS que el último de `rows`. */
+  hayMas: boolean;
+}
+
+/** Tope de filas por pedido: el tamaño de página lo propone el cliente. */
+const MAX_HISTORIAL_LIMIT = 100;
+
+/**
+ * Ventana del historial de una cuenta, para el **scroll infinito** de la pantalla
+ * de movimientos (`/cuentas/[id]`).
+ *
+ * ⚠️ **Por qué se calcula la lista completa y se recorta acá**: el
+ * `saldoPosterior` es un **saldo corrido** que se arma desde el movimiento MÁS
+ * VIEJO hacia adelante (ver `getHistorialMovimientosCuenta`), así que el saldo de
+ * cada fila depende de TODAS las anteriores: no se puede resolver una página
+ * suelta sin conocer ese arrastre. Hacerlo en una sola consulta exigiría una
+ * *window function* sobre el orden `(fecha, fechaDesde, id)` —queda como mejora
+ * futura si alguna cuenta acumula miles de movimientos—. Lo que sí resuelve esto
+ * es el problema real: el cliente recibe **solo `limit` filas** por pedido (antes
+ * el popup se traía el historial entero de una).
+ */
+export async function getHistorialMovimientosCuentaPaginado(
+  cuentaId: number,
+  { offset = 0, limit = 20 }: { offset?: number; limit?: number } = {}
+): Promise<HistorialPagina> {
+  const todos = await getHistorialMovimientosCuenta(cuentaId);
+  const desde = Math.max(0, Math.floor(offset));
+  const cuantas = Math.min(
+    Math.max(1, Math.floor(limit)),
+    MAX_HISTORIAL_LIMIT
+  );
+  const rows = todos.slice(desde, desde + cuantas);
+  return {
+    rows,
+    total: todos.length,
+    hayMas: desde + rows.length < todos.length,
+  };
+}

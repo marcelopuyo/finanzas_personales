@@ -13,12 +13,11 @@ import {
 import { useState } from "react";
 import {
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   ChevronsUpDown,
   ChevronUp,
 } from "lucide-react";
 import { NavSpinner, usePrefetchNav } from "@/components/ui/nav-progress";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { cn } from "@/lib/utils";
 
 type Align = "left" | "center" | "right";
@@ -258,33 +257,14 @@ export function DataTable<TData, TValue>({
         )}
       </div>
 
-      {/* Pagination */}
-      <div className="flex items-center justify-between border-t border-border px-3 py-2 text-[12px] text-subtitle">
-        <span>
-          Página {table.getState().pagination.pageIndex + 1} de{" "}
-          {Math.max(table.getPageCount(), 1)}
-        </span>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-            aria-label="Página anterior"
-            className="rounded p-1 text-card-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-            aria-label="Página siguiente"
-            className="rounded p-1 text-card-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
+      {/* Paginación (componente compartido con las demás grillas) */}
+      <TablePagination
+        pageIndex={table.getState().pagination.pageIndex}
+        pageCount={table.getPageCount()}
+        onPrev={() => table.previousPage()}
+        onNext={() => table.nextPage()}
+        className="px-3 py-2"
+      />
     </>
   );
 }

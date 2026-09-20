@@ -16,6 +16,7 @@ import {
   type AccionSintetica,
 } from "./account-actions-sheet";
 import { useLongPress } from "@/lib/long-press";
+import { useTap } from "@/lib/tap";
 import { cn } from "@/lib/utils";
 
 // Icono por tipo de cuenta para la esquina superior izquierda de la tarjeta.
@@ -39,7 +40,8 @@ interface AccountCardProps {
   /** Nombre del tipo de cuenta (para el icono de la esquina superior izquierda). */
   tipo?: string;
   className?: string;
-  /** Se invoca al hacer click en una tarjeta de cuenta real (abre el historial). */
+  /** Se invoca al tocar una tarjeta de cuenta real (abre su pantalla de
+      movimientos, `/cuentas/[id]`). */
   onOpen?: () => void;
   /** Tarjeta sintética con menú de acción(es) (ej. Actuales → jornada/tarea). */
   menuAccion?: AccionSintetica[];
@@ -73,6 +75,18 @@ export function AccountCard({
     () => setSheetOpen(true),
     { habilitado: tieneAcciones }
   );
+  // NAVEGACIÓN POR TOQUE (regla de la app, ver `lib/tap.ts` y §118/§119 de la
+  // bitácora): el toque que abre los movimientos se resuelve con **`useTap`**
+  // (touchend + guard del `click`), porque en iOS el `click` puede no llegar en
+  // zonas grandes y la acción se perdía.
+  // ⚠️ `useLongPress` y `useTap` escuchan LOS DOS touch events del MISMO elemento
+  // y React no fusiona handlers spredados con la misma clave: se componen a mano
+  // en `onTouchStart`/`onTouchEnd` (el resto se sigue spredeando).
+  const tap = useTap(() => {
+    // El gesto que abrió el sheet fue un long press: su `click` no navega.
+    if (consumirClick()) return;
+    onOpen?.();
+  });
   // Icono del tipo de cuenta (Landmark como fallback para tipos desconocidos).
   const Icon = ICONOS_POR_TIPO[tipo ?? ""] ?? Landmark;
 
@@ -127,6 +141,11 @@ export function AccountCard({
         e.stopPropagation();
         setSheetOpen(true);
       }}
+      // Los touch events TAMBIÉN burbujean hasta la tarjeta: sin esto, tocar el ⋯
+      // con el dedo (pantallas híbridas, donde el botón sigue visible) abriría
+      // además la pantalla de movimientos.
+      onTouchStart={(e) => e.stopPropagation()}
+      onTouchEnd={(e) => e.stopPropagation()}
       className="absolute right-2 top-2 rounded p-1 text-subtitle transition-colors pointer-coarse:hidden hover:bg-muted hover:text-header"
       aria-label={`Opciones de ${title}`}
       title="Opciones"
@@ -135,9 +154,10 @@ export function AccountCard({
     </button>
   );
 
-  // Tarjeta de cuenta real: clicable (abre historial) + botón de opciones (⋮)
-  // con el bottom sheet de acciones completo. Se usa un <div> con role="button"
-  // (no un <button>) para no anidar botones (el menú es un <button> real).
+  // Tarjeta de cuenta real: clicable (NAVEGA a la pantalla de movimientos de la
+  // cuenta, ver `app/(app)/cuentas/[id]`) + botón de opciones (⋮) con el bottom
+  // sheet de acciones completo. Se usa un <div> con role="button" (no un <button>)
+  // para no anidar botones (el menú es un <button> real).
   if (esCuentaReal) {
     return (
       <>
@@ -145,12 +165,15 @@ export function AccountCard({
           role="button"
           tabIndex={0}
           {...longPressProps}
-          onClick={() => {
-            // El `click` posterior a un long press se descarta acá: si no, se
-            // abriría el historial ENCIMA del sheet de acciones.
-            if (consumirClick()) return;
-            onOpen();
+          onTouchStart={(e) => {
+            longPressProps.onTouchStart(e);
+            tap.onTouchStart(e);
           }}
+          onTouchEnd={(e) => {
+            longPressProps.onTouchEnd();
+            tap.onTouchEnd(e);
+          }}
+          onClick={tap.onClick}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();

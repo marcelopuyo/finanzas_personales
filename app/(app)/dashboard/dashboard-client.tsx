@@ -17,7 +17,6 @@ import { PrestamosActionsMenu } from "./components/prestamos-actions-menu";
 import { GastosActionsMenu } from "./components/gastos-actions-menu";
 import { GastosDetalle } from "./components/gastos-detalle";
 import { IngresosDetalle } from "./components/ingresos-detalle";
-import { HistorialModal, type CuentaHistorial } from "./components/historial-modal";
 import { PeriodosModal, type TipoPeriodos } from "./components/periodos-modal";
 import { PeriodosTrabajoLista } from "./components/periodos-trabajo-lista";
 import type { DashboardData } from "./dashboard-data";
@@ -68,8 +67,6 @@ export function DashboardClient({ data, periodosInicial }: Props) {
   const tap = useTap(abrirPeriodos);
   const [tabGastos, setTabGastos] = useState("resumen");
   const [tabIngresos, setTabIngresos] = useState("resumen");
-  // Cuenta seleccionada para abrir su historial en popup
-  const [cuentaHist, setCuentaHist] = useState<CuentaHistorial | null>(null);
   // Popup de las tarjetas sintéticas de períodos (a cobrar / actuales). Si se
   // volvió desde la pantalla de un período (periodosInicial) se abre directo.
   const [periodosModal, setPeriodosModal] = useState<TipoPeriodos | null>(
@@ -553,8 +550,9 @@ export function DashboardClient({ data, periodosInicial }: Props) {
         </p>
       </div>
 
-      {/* Panel Cuentas — solo cuentas reales (clic abre el historial). El panel
-          usa bg-card como el resto; las tarjetas internas van en bg-muted. */}
+      {/* Panel Cuentas — solo cuentas reales (el toque abre la pantalla de sus
+          movimientos, `/cuentas/[id]`). El panel usa bg-card como el resto; las
+          tarjetas internas van en bg-muted. */}
       <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
         {/* Encabezado: título a la izquierda y menú (⋮) anclado al ángulo
             superior derecho del panel (accede al CRUD de cuentas). */}
@@ -569,17 +567,15 @@ export function DashboardClient({ data, periodosInicial }: Props) {
             <AccountCard
               key={i}
               {...cuenta}
-              onOpen={() => {
-                if (cuenta.id != null) {
-                  setCuentaHist({
-                    id: cuenta.id,
-                    nombre: cuenta.title,
-                    saldo: cuenta.value,
-                    monedaISO: cuenta.monedaISO ?? "ARS",
-                    monedaPredeterminadaISO: data.monedaPredeterminadaISO,
-                  });
-                }
-              }}
+              // Navega a la pantalla de movimientos de la cuenta (2026-09-20:
+              // antes abría un popup —una lista de contenido se navega—). El id
+              // solo existe en las cuentas reales: las sintéticas quedan sin
+              // acción (no son clickeables).
+              onOpen={
+                cuenta.id != null
+                  ? () => navGo(`/cuentas/${cuenta.id}`, "cuenta")
+                  : undefined
+              }
             />
           ))}
         </div>
@@ -844,12 +840,6 @@ export function DashboardClient({ data, periodosInicial }: Props) {
           onChangeHasta={setDFhIng}
         />
       </Modal>
-
-      {/* Popup de historial de cuenta */}
-      <HistorialModal
-        cuenta={cuentaHist}
-        onClose={() => setCuentaHist(null)}
-      />
 
       {/* Popup de las tarjetas sintéticas de períodos */}
       <PeriodosModal

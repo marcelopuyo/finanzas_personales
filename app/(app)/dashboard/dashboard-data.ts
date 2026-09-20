@@ -25,7 +25,7 @@ export interface DashboardData {
     value: string;
     labels: string[];
     values: number[];
-    /** Código ISO de la moneda de la cuenta (para el historial). */
+    /** Código ISO de la moneda de la cuenta (formatea los montos de la tarjeta). */
     monedaISO?: string;
     /** Nombre del tipo de cuenta (para el icono de la tarjeta). */
     tipo?: string;
@@ -100,7 +100,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     value: string;
     labels: string[];
     values: number[];
-    /** Código ISO de la moneda de la cuenta (para el historial). */
+    /** Código ISO de la moneda de la cuenta (formatea los montos de la tarjeta). */
     monedaISO?: string;
     /** Nombre del tipo de cuenta (para el icono de la tarjeta). */
     tipo?: string;
