@@ -19,8 +19,14 @@ export const MAX_DICTADO_MS = 10_000;
 /** Si en este tiempo (ms) no se escuchó nada, se corta con "no te escuché". */
 export const ESPERA_HABLA_MS = 8_000;
 
-/** Cantidad máxima de reinicios de la sesión (iOS sin `continuous`) antes de abortar. */
-export const MAX_REINICIOS = 25;
+/** Cantidad máxima de reinicios de la sesión antes de abortar. */
+export const MAX_REINICIOS = 3;
+
+/**
+ * Espera (ms) antes de reabrir una sesión cortada sola. iOS necesita que el
+ * micrófono se libere; reabrir enseguida deja la sesión muda.
+ */
+export const REINICIO_MS = 300;
 
 /** Puntaje mínimo (0..1) para aceptar un match difuso contra una opción. */
 export const UMBRAL_OPCION = 0.62;

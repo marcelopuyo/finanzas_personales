@@ -13,12 +13,17 @@
  *   `ESPERA_HABLA_MS` si nunca se escuchó nada, o al tope de `MAX_DICTADO_MS`.
  * - **Sin red no hay dictado**: Chrome transcribe en los servidores de Google y
  *   Safari en los de Apple. El error se informa, nunca queda un spinner eterno.
+ * - ⚠️ **Cierre y reinicio pensados para iOS** (fix 2026-09-20): el cierre va con
+ *   **`stop()`** y no con `abort()`, el reinicio usa una **instancia nueva** y
+ *   solo se reintenta si el corte fue **sin pausa real**. Con `abort()` + reinicio
+ *   inmediato, en iOS la sesión siguiente **arrancaba pero no capturaba nada**.
  */
 
 import {
   ESPERA_HABLA_MS,
   MAX_DICTADO_MS,
   MAX_REINICIOS,
+  REINICIO_MS,
   SILENCIO_MS,
   VOZ_LANG,
 } from "./config";
@@ -111,6 +116,8 @@ export interface OpcionesDictado {
   onParcial?: (texto: string) => void;
   onEstado?: (estado: EstadoDictado) => void;
   onError?: (error: ErrorVoz, detalle?: string) => void;
+  /** Traza de lo que hace el reconocedor (para el laboratorio y para depurar iOS). */
+  onEvento?: (evento: string, detalle?: string) => void;
   lang?: string;
   /** Tope de duración del dictado en ms. */
   maxMs?: number;
@@ -151,12 +158,10 @@ export function iniciarDictado(o: OpcionesDictado): SesionDictado | null {
   let parcial = "";
   let estado: EstadoDictado = "iniciando";
   let entregado = false;
+  let rec: ReconocimientoVoz | null = null;
+  let reintento: ReturnType<typeof setTimeout> | null = null;
 
-  const rec = new Ctor();
-  rec.lang = o.lang ?? VOZ_LANG;
-  rec.continuous = true;
-  rec.interimResults = true;
-  rec.maxAlternatives = 1;
+  const registrar = (evento: string, detalle = "") => o.onEvento?.(evento, detalle);
 
   const setEstado = (e: EstadoDictado) => {
     if (estado === e) return;
@@ -164,94 +169,143 @@ export function iniciarDictado(o: OpcionesDictado): SesionDictado | null {
     o.onEstado?.(e);
   };
 
-  const finalizar = (error?: ErrorVoz, detalle?: string) => {
+  /** Entrega lo reconocido (una sola vez). */
+  const entregar = () => {
+    if (entregado) return;
+    entregado = true;
+    const texto = acumulado.trim();
+    if (texto) o.onTexto(texto);
+  };
+
+  /**
+   * Cierra la sesión.
+   *
+   * ⚠️ **Siempre con `stop()`, nunca con `abort()`** (fix 2026-09-20): en iOS
+   * `abort()` deja el micrófono tomado por un «reconocedor zombie» y la sesión
+   * siguiente **arranca pero no captura nada**. `stop()` cierra ordenadamente,
+   * deja entrar el último resultado y suelta el audio.
+   */
+  const cerrar = (error?: ErrorVoz, detalle?: string) => {
     if (!activo) return;
     activo = false;
     clearInterval(vigia);
-    try {
-      rec.abort();
-    } catch {
-      // Ya estaba cortado.
-    }
+    if (reintento) clearTimeout(reintento);
     setEstado("listo");
     if (error) o.onError?.(error, detalle);
-    if (!entregado) {
-      entregado = true;
-      const texto = acumulado.trim();
-      if (texto) o.onTexto(texto);
+    registrar("cerrar", detalle ?? "");
+    try {
+      rec?.stop();
+    } catch {
+      // Ya estaba cerrado.
     }
+    // Se entrega al llegar `onend` (así entra el último resultado); si el
+    // navegador no lo emite, el respaldo entrega igual.
+    setTimeout(entregar, 400);
   };
 
-  rec.onstart = () => setEstado("escuchando");
+  /**
+   * Crea una instancia NUEVA del reconocedor con sus handlers.
+   * En iOS reusar la misma instancia hace que la segunda sesión no capture.
+   */
+  const crear = (): ReconocimientoVoz => {
+    const r = new Ctor();
+    r.lang = o.lang ?? VOZ_LANG;
+    r.continuous = true;
+    r.interimResults = true;
+    r.maxAlternatives = 1;
 
-  rec.onresult = (e) => {
-    let final = "";
-    let interino = "";
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const r = e.results[i];
-      const txt = r?.[0]?.transcript ?? "";
-      if (r.isFinal) final += txt;
-      else interino += txt;
-    }
-    if (final.trim()) {
-      acumulado = `${acumulado} ${final.trim()}`.trim();
-      ultimaActividad = Date.now();
-    }
-    if (interino.trim()) {
+    r.onstart = () => {
+      registrar("start");
+      setEstado("escuchando");
+    };
+
+    r.onresult = (e) => {
+      let final = "";
+      let interino = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const res = e.results[i];
+        const txt = res?.[0]?.transcript ?? "";
+        if (res.isFinal) final += txt;
+        else interino += txt;
+      }
+      if (final.trim()) {
+        acumulado = `${acumulado} ${final.trim()}`.trim();
+        ultimaActividad = Date.now();
+        registrar("texto", final.trim());
+      }
+      if (interino.trim()) {
+        hablo = true;
+        ultimaActividad = Date.now();
+      }
+      parcial = interino.trim();
+      o.onParcial?.(`${acumulado} ${parcial}`.trim());
+    };
+
+    const marcarHabla = () => {
       hablo = true;
       ultimaActividad = Date.now();
-    }
-    parcial = interino.trim();
-    o.onParcial?.(`${acumulado} ${parcial}`.trim());
-  };
+      registrar("habla");
+    };
+    r.onsoundstart = marcarHabla;
+    r.onspeechstart = marcarHabla;
 
-  const marcarHabla = () => {
-    hablo = true;
-    ultimaActividad = Date.now();
-  };
-  rec.onsoundstart = marcarHabla;
-  rec.onspeechstart = marcarHabla;
+    r.onerror = (e) => {
+      registrar("error", e.error);
+      switch (e.error) {
+        case "aborted":
+          return; // Lo pedimos nosotros.
+        case "no-speech":
+          // En iOS es lo normal al dejar de hablar: si ya hay texto, se entrega.
+          if (acumulado.trim()) cerrar();
+          else cerrar("sin-habla", e.error);
+          return;
+        case "not-allowed":
+        case "service-not-allowed":
+        case "audio-capture":
+          cerrar("permiso", e.error);
+          return;
+        case "network":
+          cerrar("sin-red", e.error);
+          return;
+        default:
+          cerrar("desconocido", e.error);
+      }
+    };
 
-  rec.onerror = (e) => {
-    switch (e.error) {
-      case "aborted":
-        return; // Lo pedimos nosotros.
-      case "no-speech":
-        // En iOS es lo normal al dejar de hablar: si ya hay texto, se entrega.
-        if (acumulado.trim()) finalizar();
-        else finalizar("sin-habla", e.error);
+    r.onend = () => {
+      registrar("end", `reiniciar=${reiniciar}`);
+      if (!activo) {
+        // Es el `end` del cierre ordenado que pedimos nosotros.
+        entregar();
         return;
-      case "not-allowed":
-      case "service-not-allowed":
-      case "audio-capture":
-        finalizar("permiso", e.error);
+      }
+      // La sesión terminó sola. Se reabre SOLO si puede que el usuario siga
+      // hablando (corte sin pausa real): cada reinicio implica un stop/start y
+      // el churn es justamente lo que rompe el audio en iOS.
+      const quieto = Date.now() - ultimaActividad;
+      if (acumulado.trim() && quieto >= SILENCIO_MS) {
+        cerrar();
         return;
-      case "network":
-        finalizar("sin-red", e.error);
+      }
+      if (reiniciar >= MAX_REINICIOS || Date.now() - inicio >= maxMs) {
+        cerrar();
         return;
-      default:
-        finalizar("desconocido", e.error);
-    }
-  };
+      }
+      reiniciar++;
+      registrar("reinicio", String(reiniciar));
+      reintento = setTimeout(() => {
+        if (!activo) return;
+        const r = crear();
+        try {
+          r.start();
+        } catch {
+          cerrar("desconocido", "no se pudo reiniciar");
+        }
+      }, REINICIO_MS);
+    };
 
-  rec.onend = () => {
-    if (!activo) return;
-    if (Date.now() - inicio >= maxMs) {
-      finalizar();
-      return;
-    }
-    // iOS corta la sesión sola: se reabre mientras el usuario no haya terminado.
-    if (reiniciar >= MAX_REINICIOS) {
-      finalizar("desconocido", "demasiados reinicios");
-      return;
-    }
-    reiniciar++;
-    try {
-      rec.start();
-    } catch {
-      // `start()` tira si ya está corriendo: se deja morir la sesión.
-      finalizar();
-    }
+    rec = r;
+    return r;
   };
 
   /** Vigilante: silencio, falta de habla y tope de duración. */
@@ -259,27 +313,28 @@ export function iniciarDictado(o: OpcionesDictado): SesionDictado | null {
     if (!activo) return;
     const ahora = Date.now();
     if (ahora - inicio >= maxMs) {
-      finalizar();
+      cerrar();
       return;
     }
     if (hablo && ahora - ultimaActividad >= SILENCIO_MS) {
-      finalizar();
+      cerrar();
       return;
     }
     if (!hablo && ahora - inicio >= ESPERA_HABLA_MS) {
-      finalizar("sin-habla");
+      cerrar("sin-habla");
     }
   }, 200);
 
+  const primera = crear();
   try {
-    rec.start();
+    primera.start();
   } catch {
-    finalizar("desconocido", "no se pudo iniciar");
+    cerrar("desconocido", "no se pudo iniciar");
     return null;
   }
 
   return {
-    detener: () => finalizar(),
+    detener: () => cerrar(),
     estado: () => estado,
     reinicios: () => reiniciar,
     transcurrido: () => Date.now() - inicio,

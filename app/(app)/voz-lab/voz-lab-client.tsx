@@ -58,6 +58,7 @@ export function VozLabClient({
   const [error, setError] = useState<ErrorVoz | null>(null);
   const [detalle, setDetalle] = useState("");
   const [resumen, setResumen] = useState<{ reinicios: number; ms: number } | null>(null);
+  const [eventos, setEventos] = useState<string[]>([]);
   const [permiso, setPermiso] = useState("");
   const sesion = useRef<SesionDictado | null>(null);
 
@@ -96,6 +97,7 @@ export function VozLabClient({
     setError(null);
     setDetalle("");
     setResumen(null);
+    setEventos([]);
 
     // Holder mutable: evita leer `s` antes de que termine la asignación.
     const holder: { s: SesionDictado | null } = { s: null };
@@ -104,12 +106,14 @@ export function VozLabClient({
       if (s) setResumen({ reinicios: s.reinicios(), ms: s.transcurrido() });
     };
     let termino = false;
+    const t0 = Date.now();
 
     const s = iniciarDictado({
       lang: VOZ_LANG,
       onParcial: setParcial,
       onEstado: (e) => {
         setEstado(e);
+        capturar();
         if (e === "listo") {
           termino = true;
           sesion.current = null;
@@ -125,6 +129,12 @@ export function VozLabClient({
         setTexto(t);
         setParcial("");
       },
+      // Traza de lo que hace el reconocedor: es lo que permite ver por qué una
+      // segunda sesión no captura (iOS).
+      onEvento: (ev, d) =>
+        setEventos((prev) =>
+          [...prev, `${Date.now() - t0} ms · ${ev}${d ? ` · ${d}` : ""}`].slice(-40)
+        ),
     });
 
     holder.s = s;
@@ -321,6 +331,24 @@ export function VozLabClient({
               </pre>
             </div>
           </div>
+        )}
+      </section>
+
+      {/* ── Traza del reconocedor ──────────────────────────────────────────── */}
+      <section className="rounded-lg border border-border bg-card p-4">
+        <h2 className="mb-2 text-[13px] font-semibold text-header">
+          5 · Eventos del último dictado
+        </h2>
+        {eventos.length === 0 ? (
+          <p className="text-[12px] text-subtitle">—</p>
+        ) : (
+          <ol className="space-y-0.5">
+            {eventos.map((e, i) => (
+              <li key={`${i}-${e}`} className="font-mono text-[11px] text-muted-foreground">
+                {e}
+              </li>
+            ))}
+          </ol>
         )}
       </section>
     </div>
