@@ -48,16 +48,19 @@ export function crearDictadoGasto({
       {
         campo: "montoOrigen",
         tipo: "monto",
+        etiqueta: "Monto",
         disparadores: ["monto", "importe", "total"],
       },
       {
         campo: "fecha",
         tipo: "fecha",
+        etiqueta: "Fecha",
         disparadores: ["fecha", "el dia"],
       },
       {
         campo: "cuentaOrigen",
         tipo: "opcion",
+        etiqueta: "Cuenta",
         numerico: true,
         disparadores: ["cuenta", "de la cuenta", "con la cuenta"],
         opciones: () =>
@@ -66,6 +69,7 @@ export function crearDictadoGasto({
       {
         campo: "idCategoriaGasto",
         tipo: "opcion",
+        etiqueta: "Categoría",
         numerico: true,
         disparadores: ["categoria", "rubro"],
         opciones: () =>
@@ -78,6 +82,7 @@ export function crearDictadoGasto({
       {
         campo: "descripcion",
         tipo: "texto",
+        etiqueta: "Descripción",
         disparadores: ["descripcion", "concepto", "detalle"],
       },
     ],

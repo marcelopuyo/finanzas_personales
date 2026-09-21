@@ -171,6 +171,7 @@ export function iniciarDictado(o: OpcionesDictado): SesionDictado | null {
   let reiniciar = 0;
   let acumulado = "";
   let parcial = "";
+  let ultimoTrozo = "";
   let estado: EstadoDictado = "iniciando";
   let entregado = false;
   let rec: ReconocimientoVoz | null = null;
@@ -245,10 +246,16 @@ export function iniciarDictado(o: OpcionesDictado): SesionDictado | null {
         if (res.isFinal) final += txt;
         else interino += txt;
       }
-      if (final.trim()) {
-        acumulado = `${acumulado} ${final.trim()}`.trim();
+      const trozo = final.trim();
+      if (trozo) {
+        // iOS puede reemitir el MISMO resultado final al reabrir la sesión: sin
+        // este guard la transcripción queda repetida 2 o 3 veces.
+        if (trozo !== ultimoTrozo) {
+          acumulado = `${acumulado} ${trozo}`.trim();
+          ultimoTrozo = trozo;
+        }
         ultimaActividad = Date.now();
-        registrar("texto", final.trim());
+        registrar("texto", trozo);
       }
       if (interino.trim()) {
         hablo = true;

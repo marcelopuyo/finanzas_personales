@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useMovimientoStepper } from "./stepper-context";
@@ -18,7 +18,8 @@ import { STEP_CONFIRMACION, type MovimientoData } from "./types";
 import { QuickCreateModal } from "@/components/ui/quick-create-modal";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { crearCategoriaGasto } from "@/backend/src/actions/gastos";
-import { parsearCampos } from "@/lib/voz/parse-campos";
+import type { ResultadoDictado } from "@/lib/voz/tipos";
+import { DictadoCampos } from "@/components/voz/dictado-campos";
 import { crearDictadoGasto } from "./dictado-gasto";
 
 export function GastoDirecto() {
@@ -31,24 +32,39 @@ export function GastoDirecto() {
   const [buscandoUltimo, setBuscandoUltimo] = useState(false);
 
   /**
-   * Dictado venido **por URL** (`?dicho=`): lo deja la entrada `/voz`, que usan
-   * el botón flotante y el **Atajo de Apple**. Se aplica **una sola vez**
-   * (guardado con ref) y solo escribe los campos que el parser entendió: el
-   * usuario sigue revisando y confirmando a mano.
+   * Dictado: se recuerda **qué** se aplicó (para los chips) y **qué había
+   * antes** (para deshacer, 1 nivel). Las dos entradas —el panel de la pantalla
+   * y el texto que llega por URL (`?dicho=`) desde `/voz`— terminan llamando a
+   * `aplicarDictado`, así que los chips y el deshacer funcionan igual.
+   */
+  const [dictadoAplicado, setDictadoAplicado] = useState<ResultadoDictado | null>(null);
+  const antesDelDictado = useRef<Partial<MovimientoData> | null>(null);
+
+  const aplicarDictado = (resultado: ResultadoDictado) => {
+    const antes: Record<string, unknown> = {};
+    for (const campo of Object.keys(resultado.valores)) {
+      antes[campo] = (data as unknown as Record<string, unknown>)[campo];
+    }
+    antesDelDictado.current = antes as Partial<MovimientoData>;
+    // `valores` ya trae los nombres de campo de `MovimientoData`
+    // (idCategoriaGasto/cuentaOrigen numéricos, fecha yyyy-mm-dd).
+    handleSetData(resultado.valores as unknown as Partial<MovimientoData>);
+    setDictadoAplicado(resultado);
+  };
+
+  const deshacerDictado = () => {
+    if (antesDelDictado.current) handleSetData(antesDelDictado.current);
+    antesDelDictado.current = null;
+    setDictadoAplicado(null);
+  };
+
+  /**
+   * Texto que llega **por URL** (`?dicho=`), de la entrada `/voz` (Atajo de
+   * Apple). No se aplica solo: **precarga el campo de dictado** para que el
+   * usuario vea qué se dictó y confirme con «Interpretar».
    */
   const searchParams = useSearchParams();
   const dicho = searchParams.get("dicho") ?? "";
-  const dictadoAplicado = useRef(false);
-  useEffect(() => {
-    if (!dicho || dictadoAplicado.current) return;
-    dictadoAplicado.current = true;
-    const resultado = parsearCampos(dicho, crearDictadoGasto(options));
-    if (Object.keys(resultado.valores).length > 0) {
-      // `valores` ya trae los nombres de campo de `MovimientoData`
-      // (idCategoriaGasto/cuentaOrigen numéricos, fecha yyyy-mm-dd).
-      handleSetData(resultado.valores as unknown as Partial<MovimientoData>);
-    }
-  }, [dicho, options, handleSetData]);
 
   /**
    * Al ELEGIR una sugerencia de descripción (no al tipear): completa Categoría y
@@ -107,6 +123,14 @@ export function GastoDirecto() {
         />
       }
     >
+      <DictadoCampos
+        config={crearDictadoGasto(options)}
+        textoInicial={dicho}
+        onInterpretar={aplicarDictado}
+        aplicado={dictadoAplicado}
+        onDeshacer={deshacerDictado}
+      />
+
       <AutoCompleteField
         label="Descripción"
         value={data.descripcion}

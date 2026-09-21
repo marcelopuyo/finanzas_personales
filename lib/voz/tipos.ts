@@ -21,6 +21,8 @@ export interface CampoDictable {
   /** Nombre del campo en el formulario (ej. `montoOrigen`). */
   campo: string;
   tipo: TipoCampoVoz;
+  /** Rótulo visible del campo (para los chips de "lo que entendí"). */
+  etiqueta?: string;
   /**
    * Palabras que introducen el campo ("monto", "importe", "descripción"…).
    * Si aparecen, lo que sigue se asigna a ese campo **sin heurística**.
