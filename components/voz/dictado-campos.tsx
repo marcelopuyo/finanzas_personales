@@ -133,6 +133,7 @@ export function DictadoCampos({
               key={a.campo}
               etiqueta={campoDe(a.campo)?.etiqueta ?? a.campo}
               valor={valorVisible(a)}
+              nota={a.origen === "historial" ? "del último gasto" : undefined}
             />
           ))}
           <button

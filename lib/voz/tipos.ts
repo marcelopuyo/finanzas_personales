@@ -59,7 +59,9 @@ export type OrigenAsignacion =
   | "fecha"
   | "opcion"
   | "sinonimo"
-  | "resto";
+  | "resto"
+  /** Completado con el último gasto que tenía esa misma descripción. */
+  | "historial";
 
 /** Un campo que el dictado logró completar. */
 export interface Asignacion {

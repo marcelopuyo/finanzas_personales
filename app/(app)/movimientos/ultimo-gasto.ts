@@ -25,10 +25,12 @@ export interface UltimoGastoUI {
 export async function ultimoGastoPorDescripcionAction(input: {
   descripcion: string;
   idCuenta?: number;
+  /** Comparar sin distinguir mayúsculas (lo usa el dictado por voz). */
+  sinMayusculas?: boolean;
 }): Promise<UltimoGastoUI | null> {
   const descripcion = input.descripcion?.trim();
   if (!descripcion) return null;
-  const gasto = await getUltimoGastoPorDescripcion(descripcion);
+  const gasto = await getUltimoGastoPorDescripcion(descripcion, input.sinMayusculas);
   if (!gasto) return null;
   const monto = input.idCuenta
     ? await montoPredeterminadaEnMonedaCuenta(
