@@ -25,7 +25,6 @@ import {
   MAX_REINICIOS,
   REINICIO_MS,
   SILENCIO_MS,
-  VOZ_LANG,
 } from "./config";
 
 /**
@@ -121,6 +120,22 @@ export interface OpcionesDictado {
   lang?: string;
   /** Tope de duración del dictado en ms. */
   maxMs?: number;
+  /**
+   * `SpeechRecognition.continuous` (default `true`).
+   * ⚠️ MDN: Safari iOS lo soporta recién desde **iOS 17**. Probarlo en `false`
+   * es parte de la matriz del laboratorio.
+   */
+  continuous?: boolean;
+  /** `SpeechRecognition.interimResults` (default `true`). */
+  interimResults?: boolean;
+  /**
+   * Reabrir la sesión cuando el navegador la corta sola (default **`false`**).
+   *
+   * Por defecto es **una sola sesión por tap**: en iOS el ciclo cortar/reabrir es
+   * lo que deja el micrófono tomado y las sesiones siguientes mudas, así que el
+   * reinicio se activa solo para experimentar.
+   */
+  permitirReinicio?: boolean;
 }
 
 export interface SesionDictado {
@@ -209,13 +224,15 @@ export function iniciarDictado(o: OpcionesDictado): SesionDictado | null {
    */
   const crear = (): ReconocimientoVoz => {
     const r = new Ctor();
-    r.lang = o.lang ?? VOZ_LANG;
-    r.continuous = true;
-    r.interimResults = true;
+    // Solo se asigna si viene: en iOS un `lang` no soportado por el dictado del
+    // sistema puede hacer que la sesión arranque y no devuelva NADA.
+    if (o.lang) r.lang = o.lang;
+    r.continuous = o.continuous ?? true;
+    r.interimResults = o.interimResults ?? true;
     r.maxAlternatives = 1;
 
     r.onstart = () => {
-      registrar("start");
+      registrar("start", `lang=${r.lang || "(auto)"} cont=${r.continuous}`);
       setEstado("escuchando");
     };
 
@@ -279,15 +296,16 @@ export function iniciarDictado(o: OpcionesDictado): SesionDictado | null {
         entregar();
         return;
       }
-      // La sesión terminó sola. Se reabre SOLO si puede que el usuario siga
-      // hablando (corte sin pausa real): cada reinicio implica un stop/start y
-      // el churn es justamente lo que rompe el audio en iOS.
+      // La sesión terminó sola. Se reabre SOLO si está permitido, si el corte
+      // fue sin pausa real y quedan reintentos: el ciclo cortar/reabrir es lo
+      // que deja el micrófono tomado en iOS.
       const quieto = Date.now() - ultimaActividad;
-      if (acumulado.trim() && quieto >= SILENCIO_MS) {
-        cerrar();
-        return;
-      }
-      if (reiniciar >= MAX_REINICIOS || Date.now() - inicio >= maxMs) {
+      const puedeReabrir =
+        (o.permitirReinicio ?? false) &&
+        quieto < SILENCIO_MS &&
+        reiniciar < MAX_REINICIOS &&
+        Date.now() - inicio < maxMs;
+      if (!puedeReabrir) {
         cerrar();
         return;
       }

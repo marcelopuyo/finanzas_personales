@@ -41,7 +41,15 @@ function leerDiagnostico() {
     window.matchMedia("(display-mode: standalone)").matches ||
     Boolean((navigator as unknown as { standalone?: boolean }).standalone);
   const iOS = /iPad|iPhone|iPod/.test(ua);
-  return { ua, ...soporte, standalone, iOS };
+  const vIOS = ua.match(/OS (\d+)[._](\d+)/);
+  return {
+    ua,
+    ...soporte,
+    standalone,
+    iOS,
+    versionIOS: vIOS ? `${vIOS[1]}.${vIOS[2]}` : "",
+    idiomaDispositivo: navigator.language,
+  };
 }
 
 export function VozLabClient({
@@ -59,6 +67,10 @@ export function VozLabClient({
   const [detalle, setDetalle] = useState("");
   const [resumen, setResumen] = useState<{ reinicios: number; ms: number } | null>(null);
   const [eventos, setEventos] = useState<string[]>([]);
+  const [reintentar, setReintentar] = useState(false);
+  const [lang, setLang] = useState(VOZ_LANG);
+  const [continuo, setContinuo] = useState(true);
+  const [interino, setInterino] = useState(true);
   const [permiso, setPermiso] = useState("");
   const sesion = useRef<SesionDictado | null>(null);
 
@@ -85,8 +97,22 @@ export function VozLabClient({
     };
   }, []);
 
-  // Al salir de la página, cortar cualquier dictado en curso.
-  useEffect(() => () => sesion.current?.detener(), []);
+  // Al ABANDONAR la página (refrescar, navegar o entrar al bfcache de iOS) hay
+  // que cerrar el dictado: una sesión viva deja el micrófono tomado, hace que la
+  // carga siguiente vuelva a pedir permiso y que no capture nada (bug 2026-09-20).
+  // ⚠️ No se usa `visibilitychange`: el permiso de iOS puede dispararlo y
+  // cortaría la sesión recién empezada.
+  useEffect(() => {
+    const soltar = () => {
+      sesion.current?.detener();
+      sesion.current = null;
+    };
+    window.addEventListener("pagehide", soltar);
+    return () => {
+      window.removeEventListener("pagehide", soltar);
+      soltar();
+    };
+  }, []);
 
   const dictar = () => {
     if (sesion.current) {
@@ -109,7 +135,13 @@ export function VozLabClient({
     const t0 = Date.now();
 
     const s = iniciarDictado({
-      lang: VOZ_LANG,
+      // "(auto)" deja el idioma del dispositivo (no se asigna `lang`).
+      lang: lang === "(auto)" ? undefined : lang,
+      continuous: continuo,
+      interimResults: interino,
+      // Por defecto, UNA sesión por tap (sin reiniciar): es la ruta más estable
+      // en iOS. El reinicio queda como experimento opt-in.
+      permitirReinicio: reintentar,
       onParcial: setParcial,
       onEstado: (e) => {
         setEstado(e);
@@ -177,7 +209,11 @@ export function VozLabClient({
             <dt className="text-subtitle">Permiso de micrófono</dt>
             <dd className="text-header">{permiso || "—"}</dd>
             <dt className="text-subtitle">¿iOS?</dt>
-            <dd className="text-header">{diag.iOS ? "sí" : "no"}</dd>
+            <dd className="text-header">
+              {diag.iOS ? `sí${diag.versionIOS ? ` (iOS ${diag.versionIOS})` : ""}` : "no"}
+            </dd>
+            <dt className="text-subtitle">Idioma del dispositivo</dt>
+            <dd className="text-header">{diag.idiomaDispositivo}</dd>
             <dt className="text-subtitle">¿Instalada (PWA)?</dt>
             <dd className="text-header">{diag.standalone ? "sí (standalone)" : "no"}</dd>
             <dt className="text-subtitle">User agent</dt>
@@ -226,6 +262,53 @@ export function VozLabClient({
             estado: {estado}
             {resumen ? ` · ${resumen.ms} ms · ${resumen.reinicios} reinicios` : ""}
           </span>
+        </div>
+
+        <label className="mt-2 flex items-center gap-2 text-[12px] text-subtitle">
+          <input
+            type="checkbox"
+            checked={reintentar}
+            onChange={(e) => setReintentar(e.target.checked)}
+          />
+          Reabrir la sesión si el navegador la corta sola (experimental)
+        </label>
+
+        {/* Matriz de prueba: en iOS el dictado puede no soportar el idioma o el
+            modo continuo, y falla devolviendo cero resultados. */}
+        <div className="mt-3 space-y-2 rounded-md border border-border p-3">
+          <p className="text-[12px] font-medium text-header">
+            Configuración del reconocedor (para probar combinaciones)
+          </p>
+          <label className="flex items-center gap-2 text-[12px] text-subtitle">
+            Idioma
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value)}
+              className="rounded-md border border-border bg-background px-2 py-1 text-[12px] text-card-foreground"
+            >
+              {["(auto)", "es-AR", "es-ES", "es-MX", "es-US", "en-US"].map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-[12px] text-subtitle">
+            <input
+              type="checkbox"
+              checked={continuo}
+              onChange={(e) => setContinuo(e.target.checked)}
+            />
+            continuous
+          </label>
+          <label className="flex items-center gap-2 text-[12px] text-subtitle">
+            <input
+              type="checkbox"
+              checked={interino}
+              onChange={(e) => setInterino(e.target.checked)}
+            />
+            interimResults
+          </label>
         </div>
 
         {(parcial || escuchando) && (
