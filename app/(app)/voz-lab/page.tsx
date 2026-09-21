@@ -21,10 +21,10 @@ export default async function VozLabPage() {
 
   return (
     <VozLabClient
-      cuentas={options.cuentas.map((c) => ({ value: String(c.id), label: c.nombre }))}
+      cuentas={options.cuentas.map((c) => ({ id: c.id, nombre: c.nombre }))}
       categorias={options.categoriasGasto.map((c) => ({
-        value: String(c.id),
-        label: c.nombre,
+        id: c.id,
+        nombre: c.nombre,
       }))}
     />
   );

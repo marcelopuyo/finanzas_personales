@@ -12,8 +12,10 @@ import {
   type EstadoDictado,
   type SesionDictado,
 } from "@/lib/voz/speech";
-import type { OpcionVoz } from "@/lib/voz/tipos";
-import { crearDictadoPrueba } from "./dictado-prueba";
+import {
+  crearDictadoGasto,
+  type OpcionesDictadoGasto,
+} from "@/app/(app)/movimientos/stepper/dictado-gasto";
 
 /** Frases del §7.3 del plan: definen la expectativa real del parser. */
 const EJEMPLOS = [
@@ -56,8 +58,8 @@ export function VozLabClient({
   cuentas,
   categorias,
 }: {
-  cuentas: OpcionVoz[];
-  categorias: OpcionVoz[];
+  cuentas: OpcionesDictadoGasto["cuentas"];
+  categorias: OpcionesDictadoGasto["categoriasGasto"];
 }) {
   const montado = useMontado();
   const [texto, setTexto] = useState("");
@@ -76,7 +78,8 @@ export function VozLabClient({
 
   const diag = montado ? leerDiagnostico() : null;
   // El parser es puro: se recalcula en cada render, sin estado intermedio.
-  const config = crearDictadoPrueba({ cuentas, categorias });
+  // Se usa la MISMA config que el paso "Gasto directo" del wizard.
+  const config = crearDictadoGasto({ cuentas, categoriasGasto: categorias });
   const intencion = texto ? parsearIntencion(texto) : null;
   const campos = texto ? parsearCampos(texto, config) : null;
 

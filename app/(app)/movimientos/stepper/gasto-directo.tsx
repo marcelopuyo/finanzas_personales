@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useMovimientoStepper } from "./stepper-context";
 import {
@@ -17,6 +18,8 @@ import { STEP_CONFIRMACION, type MovimientoData } from "./types";
 import { QuickCreateModal } from "@/components/ui/quick-create-modal";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { crearCategoriaGasto } from "@/backend/src/actions/gastos";
+import { parsearCampos } from "@/lib/voz/parse-campos";
+import { crearDictadoGasto } from "./dictado-gasto";
 
 export function GastoDirecto() {
   const { data, handleSetData, navigateTo, options, addCategoriaGasto } =
@@ -26,6 +29,26 @@ export function GastoDirecto() {
   const [nuevaCategoria, setNuevaCategoria] = useState<string | null>(null);
   // Overlay que BLOQUEA la pantalla mientras se trae el último gasto.
   const [buscandoUltimo, setBuscandoUltimo] = useState(false);
+
+  /**
+   * Dictado venido **por URL** (`?dicho=`): lo deja la entrada `/voz`, que usan
+   * el botón flotante y el **Atajo de Apple**. Se aplica **una sola vez**
+   * (guardado con ref) y solo escribe los campos que el parser entendió: el
+   * usuario sigue revisando y confirmando a mano.
+   */
+  const searchParams = useSearchParams();
+  const dicho = searchParams.get("dicho") ?? "";
+  const dictadoAplicado = useRef(false);
+  useEffect(() => {
+    if (!dicho || dictadoAplicado.current) return;
+    dictadoAplicado.current = true;
+    const resultado = parsearCampos(dicho, crearDictadoGasto(options));
+    if (Object.keys(resultado.valores).length > 0) {
+      // `valores` ya trae los nombres de campo de `MovimientoData`
+      // (idCategoriaGasto/cuentaOrigen numéricos, fecha yyyy-mm-dd).
+      handleSetData(resultado.valores as unknown as Partial<MovimientoData>);
+    }
+  }, [dicho, options, handleSetData]);
 
   /**
    * Al ELEGIR una sugerencia de descripción (no al tipear): completa Categoría y
