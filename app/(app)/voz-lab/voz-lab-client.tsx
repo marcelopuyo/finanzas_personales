@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useMontado } from "@/lib/use-cliente";
 import { VOZ_LANG } from "@/lib/voz/config";
@@ -189,6 +190,28 @@ export function VozLabClient({
           interpreta texto. Se borra al cerrar el experimento.
         </p>
       </header>
+
+      {/* ── Piloto del motor offline (experimento aparte) ───────────────────── */}
+      {/* Es HTML/JS plano a propósito: el motor sherpa-onnx es WASM con `Module`
+          global y el piloto solo tiene que medir (carga, memoria, precisión)
+          antes de integrarlo a la app. Ver `DeepSeek/plan-voz-offline-sherpa.md`. */}
+      <section className="rounded-lg border border-border bg-card p-4">
+        <h2 className="mb-1 text-[13px] font-semibold text-header">
+          🧪 Piloto · voz offline en el dispositivo (sherpa-onnx WASM)
+        </h2>
+        <p className="text-[12px] text-subtitle">
+          Whisper corriendo <strong>en el navegador</strong>, sin backend. Está en
+          una página propia; mide el tiempo de carga del motor (~103 MB la primera
+          vez), la memoria y la precisión en español. Necesita HTTPS (o{" "}
+          <code>localhost</code>).
+        </p>
+        <Link
+          href="/voz-lab/piloto.html"
+          className="mt-3 inline-block rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground"
+        >
+          Abrir el piloto offline →
+        </Link>
+      </section>
 
       {/* ── Diagnóstico del entorno ─────────────────────────────────────────── */}
       <section className="rounded-lg border border-border bg-card p-4">

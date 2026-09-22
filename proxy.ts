@@ -172,7 +172,15 @@ export const config = {
   // muestra justamente cuando no hay red para validar la sesión. Y `api/ping`
   // es la SONDA del servidor (2026-09-17): tiene que contestar 204 siempre,
   // incluso sin sesión (se usa cuando la sesión no se puede validar).
+  //
+  // `voz-lab/sherpa/` (motor WASM de sherpa-onnx) y `voz-lab/modelo/` (pesos)
+  // también quedan fuera (2026-09-22): son binarios inertes de ~103 MB que se
+  // piden por fetch/XHR desde el runtime de Emscripten y por rangos; si el
+  // guard los desviara a /login devolvería HTML en vez de bytes y quedaría un
+  // 200 con contenido basura escrito en el FS del WASM. **La página del lab
+  // (`/voz-lab` y `/voz-lab/piloto.html`) NO está excluida: sigue pidiendo
+  // sesión.**
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon\\.svg|icon\\.png|apple-icon\\.png|manifest\\.webmanifest|sw\\.js|icons/|offline(?:$|/)|version\\.json|api/ping(?:$|/)).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon\\.svg|icon\\.png|apple-icon\\.png|manifest\\.webmanifest|sw\\.js|icons/|offline(?:$|/)|version\\.json|api/ping(?:$|/)|voz-lab/sherpa/|voz-lab/modelo/).*)",
   ],
 };

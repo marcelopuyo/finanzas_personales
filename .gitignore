@@ -42,3 +42,8 @@ next-env.d.ts
 
 deepseek/
 
+# Lab de voz offline (sherpa-onnx): los pesos NO van al repo (89 MB).
+# Los artefactos originales quedan en deepseek/tmp-sherpa/ y se bajan de
+# GitHub Actions (ver DeepSeek/plan-voz-offline-sherpa.md).
+/public/voz-lab/modelo/
+
