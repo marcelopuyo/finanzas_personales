@@ -177,10 +177,17 @@ export const config = {
   // también quedan fuera (2026-09-22): son binarios inertes de ~103 MB que se
   // piden por fetch/XHR desde el runtime de Emscripten y por rangos; si el
   // guard los desviara a /login devolvería HTML en vez de bytes y quedaría un
-  // 200 con contenido basura escrito en el FS del WASM. **La página del lab
-  // (`/voz-lab` y `/voz-lab/piloto.html`) NO está excluida: sigue pidiendo
-  // sesión.**
+  // 200 con contenido basura escrito en el FS del WASM.
+  //
+  // `voz-lab/piloto.html` + `.js` quedan fuera por decisión del usuario
+  // (2026-09-22): es el piloto del motor offline y hay que poder abrirlo en el
+  // celular sin pasar por el login del preview. **El resto del lab /voz-lab y
+  // la página React del laboratorio SIGUEN pidiendo sesión.**
+  //
+  // El piloto es inofensivo sin sesión: no toca la BD ni el backend (todo corre
+  // en el dispositivo) y NO baja los 103 MB del modelo hasta que se toca
+  // «Cargar motor» ⇒ no consume egress de Supabase por una visita suelta.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon\\.svg|icon\\.png|apple-icon\\.png|manifest\\.webmanifest|sw\\.js|icons/|offline(?:$|/)|version\\.json|api/ping(?:$|/)|voz-lab/sherpa/|voz-lab/modelo/).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon\\.svg|icon\\.png|apple-icon\\.png|manifest\\.webmanifest|sw\\.js|icons/|offline(?:$|/)|version\\.json|api/ping(?:$|/)|voz-lab/sherpa/|voz-lab/modelo/|voz-lab/piloto\\.html|voz-lab/piloto\\.js).*)",
   ],
 };

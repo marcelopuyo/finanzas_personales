@@ -319,12 +319,18 @@ async function cargarMotor() {
       print: (texto) => log(`motor: ${texto}`),
       printErr: (texto) => log(`motor(err): ${texto}`, "err"),
       onRuntimeInitialized: async () => {
+        // ⚠️ ORDEN CRÍTICO: el runtime ya está listo, así que hay que guardarlo
+        // en `modulo` ANTES de tocar el FS. Este callback corre antes de que se
+        // resuelva `listo` (y por lo tanto antes de `modulo = await listo`), así
+        // que si se usa la variable acá adentro todavía vale `null` — fue un bug
+        // real: «Cannot read properties of null (reading 'FS_createDataFile')».
+        modulo = window.Module;
         // El runtime ya está listo: es el momento de inyectar el modelo ANTES
         // de crear el reconocedor (si no, no encuentra `whisper-encoder.onnx`).
         try {
           await bajarModelo(base, verificar);
           crearMotor();
-          resolverListo(window.Module);
+          resolverListo(modulo);
         } catch (e) {
           rechazarListo(e);
         }
