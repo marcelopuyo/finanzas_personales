@@ -12,7 +12,6 @@ import { INTENCIONES } from "@/lib/voz/intenciones";
 import { parsearIntencion } from "@/lib/voz/parse-intencion";
 import {
   iniciarDictado,
-  prepararAudioDictado,
   soporteVoz,
   type ErrorVoz,
   type EstadoDictado,
@@ -61,12 +60,6 @@ const SIN_TEXTO: Aviso = {
   texto: "No te escuché. Probá de nuevo hablando un poco más fuerte.",
 };
 
-/**
- * `true` cuando el permiso del micrófono ya se pidió en **esta carga** de página.
- * Es de módulo a propósito: el pedido se hace una sola vez por documento.
- */
-let permisoPreparado = false;
-
 export function VozFab() {
   const { go } = usePendingNav();
   const ruta = usePathname();
@@ -80,15 +73,6 @@ export function VozFab() {
   const sesion = useRef<SesionDictado | null>(null);
   /** El motor ya avisó un error más específico: no lo pisa el "no te escuché". */
   const huboError = useRef(false);
-  /** Hay un pedido de permiso en curso (evita arrancar dos sesiones). */
-  const arrancando = useRef(false);
-  /**
-   * El arranque en curso es el PRIMERO despuÉs de preparar el audio. Si falla,
-   * se reintenta una vez: preparar el audio espera (`await`) y en algunos
-   * navegadores eso consume la activación del gesto, asi que el `start()` puede
-   * ser rechazado aunque el permiso ya esté dado.
-   */
-  const primerArranque = useRef(false);
 
   // Al cambiar de ruta el FAB vuelve a mostrarse YA (ajuste DURANTE el render,
   // sin `setState` en un efecto): la página nueva no tiene por qué heredar el
@@ -125,62 +109,48 @@ export function VozFab() {
       lang: VOZ_LANG,
       onEstado: (e) => {
         setEstado(e);
-        if (e === "escuchando") primerArranque.current = false;
         if (e === "listo") sesion.current = null;
       },
       onError: (e) => {
         huboError.current = true;
         setAviso({ texto: MENSAJE_ERROR[e] });
-        // Seguro del primer toque: se prepara el audio con `await` y, si el
-        // navegador dio por consumido el gesto, el `start()` falla. Se
-        // reintenta UNA vez (permiso y AudioContext ya estan listos).
-        if (e === "desconocido" && primerArranque.current) {
-          primerArranque.current = false;
-          setTimeout(() => {
-            if (!sesion.current) iniciar();
-          }, 250);
-        }
       },
+      // Texto reconocido: se resuelve (navega o burbuja con lo escuchado).
+      onTexto: interpretar,
       // La sesión terminó sin reconocer nada: sin este aviso el usuario no veía
       // NADA (ni burbuja ni error) y parecía que el FAB no hacía nada.
       onSinTexto: () => {
         if (huboError.current) return;
         setAviso(SIN_TEXTO);
       },
-      onTexto: interpretar,
     });
   };
 
-  const alTocar = async () => {
+  /**
+   * Un solo toque hace todo: arranca, y si ya estaba escuchando **corta**.
+   *
+   * ⚠️ Acá **no** se toca el micrófono antes de arrancar (`getUserMedia`,
+   * `AudioContext`…): se probó el 2026-09-23 y en iOS deja la sesión **peor**
+   * (pasó a no captar en ninguna pulsación; ver bitácora §151-§152). El motor ya
+   * hace su propia preparación dentro del gesto, sin `await`.
+   *
+   * ℹ️ **Consecuencia aceptada**: en Safari/iOS el **primer** dictado después de
+   * cargar la página puede quedar mudo (bug de la *audio session* de WebKit,
+   * §143); a partir del segundo funciona. Se decidió **no** seguir peleando con
+   * eso: es tolerable.
+   */
+  const alTocar = () => {
     // Segundo toque mientras escucha: corta y entrega lo reconocido hasta ahí.
     if (sesion.current) {
       sesion.current.detener();
       return;
     }
-    if (arrancando.current) return;
-    arrancando.current = true;
-    try {
-      setAviso(null);
-      if (!soporteVoz().disponible) {
-        setAviso({ texto: MENSAJE_ERROR["no-soportado"] });
-        return;
-      }
-      // Primer toque de la carga: se pide el permiso y se deja la sesión de
-      // audio LISTA (con `await`) antes de arrancar el reconocedor. Si lo hace el
-      // propio reconocedor, la primera sesión queda MUDA en iOS (ver
-      // `prepararAudioDictado`).
-      if (!permisoPreparado) {
-        permisoPreparado = true;
-        primerArranque.current = true;
-        if (!(await prepararAudioDictado())) {
-          setAviso({ texto: MENSAJE_ERROR.permiso });
-          return;
-        }
-      }
-      iniciar();
-    } finally {
-      arrancando.current = false;
+    setAviso(null);
+    if (!soporteVoz().disponible) {
+      setAviso({ texto: MENSAJE_ERROR["no-soportado"] });
+      return;
     }
+    iniciar();
   };
 
   const tap = useTap(alTocar);
