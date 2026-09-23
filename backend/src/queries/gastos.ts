@@ -179,7 +179,14 @@ export interface UltimoGastoOut {
  * Lo usa el autocompletar del Gasto Directo al elegir una sugerencia.
  */
 export async function getUltimoGastoPorDescripcion(
-  descripcion: string
+  descripcion: string,
+  /**
+   * Comparar sin distinguir mayúsculas. Se usa desde el dictado por voz: el
+   * texto llega en minúsculas pero la descripción guardada suele estar
+   * capitalizada ("supermercado" vs "Supermercado"). Sigue siendo una
+   * comparación **exacta**, solo que insensible a mayúsculas.
+   */
+  sinMayusculas = false
 ): Promise<UltimoGastoOut | null> {
   const userId = await requireUserId();
   const ds = await getDb();
@@ -187,7 +194,12 @@ export async function getUltimoGastoPorDescripcion(
     .getRepository(Gasto)
     .createQueryBuilder("g")
     .leftJoinAndSelect("g.categoria", "categoria")
-    .where("g.descripcion = :descripcion", { descripcion })
+    .where(
+      sinMayusculas
+        ? "LOWER(g.descripcion) = LOWER(:descripcion)"
+        : "g.descripcion = :descripcion",
+      { descripcion }
+    )
     .andWhere("g.eliminado = :eliminado", { eliminado: false })
     .andWhere('g."usuarioId" = :userId', { userId })
     .orderBy("g.fechaPago", "DESC", "NULLS LAST")

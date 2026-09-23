@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // `DeepSeek/` es la carpeta de trabajo del proyecto (plan/bitácora, y está
+    // en .gitignore): nunca se compila ni se sirve.
+    "DeepSeek/**",
     // Service worker (PWA): se sirve tal cual desde /sw.js, no pasa por el
     // bundler ni por TypeScript; sus globals (self, caches) no son de este lint.
     "public/sw.js",
