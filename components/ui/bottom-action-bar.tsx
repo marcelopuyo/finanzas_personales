@@ -68,6 +68,9 @@ export function BottomActionBar({
     if (!fabAction?.onClick && !fabAction?.href) return null;
     return (
       <div
+        // Marca para el FAB de voz: `globals.css` lo apila arriba cuando esta
+        // zona inferior existe (R4 del replanteo de voz).
+        data-barra-inferior=""
         className="fixed bottom-4 right-4 z-30 lg:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
@@ -132,6 +135,8 @@ export function BottomActionBar({
 
   return (
     <div
+      // Ídem FAB suelto: el FAB de voz se apila arriba de la barra.
+      data-barra-inferior=""
       className="fixed inset-x-0 bottom-0 z-30 lg:hidden"
       style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
     >

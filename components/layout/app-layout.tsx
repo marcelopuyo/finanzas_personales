@@ -2,6 +2,7 @@ import TopBar from "./top-bar";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { NavProgress } from "@/components/ui/nav-progress";
 import { OfflineNotice } from "@/components/pwa/offline-notice";
+import { VozFab } from "@/components/voz/voz-fab";
 
 /**
  * Layout del área protegida de la app: una ÚNICA top bar fija (logo a la
@@ -34,13 +35,23 @@ export default function AppLayout({
         // standalone (PWA) la top bar es `fixed` y crece con
         // `env(safe-area-inset-top)` para no quedar bajo el notch / la barra de
         // estado (viewport-fit: cover).
-        className="px-4 pt-[var(--app-top)] pb-4 lg:px-6 lg:pb-6"
+        //
+        // El inferior reserva la franja del **FAB de voz** (`pb-[4.5rem]`): como el
+        // FAB es `fixed` y el pie de los formularios va en el flujo (botones
+        // "Siguiente"/"Guardar"), sin esta reserva el botón quedaría tapado por el
+        // FAB al llegar al final. Es la implementación de "apilado sobre la acción
+        // primaria" (R4) cuando la acción no es flotante.
+        className="px-4 pt-[var(--app-top)] pb-[4.5rem] lg:px-6"
       >
         {/* Aviso "sin conexión": es `sticky`, así que empuja el contenido solo
             cuando está visible. */}
         <OfflineNotice />
         {children}
       </PullToRefresh>
+      {/* FAB 🎤 global (2026-09-23, fase G1 del replanteo de la voz). Va FUERA de
+          PullToRefresh porque maneja sus propios touch events y no debe disparar
+          el gesto de "tirar para actualizar". */}
+      <VozFab />
     </div>
   );
 }

@@ -101,6 +101,14 @@ export interface Intencion {
   href: () => string;
   /** Si el destino necesita que el usuario elija una cuenta. */
   requiereCuenta?: boolean;
+  /**
+   * La intención **deja el texto sobrante** para que la pantalla destino lo
+   * parsee contra sus campos (hoy solo `cargar-gasto`, vía `lib/voz/handoff`).
+   * Las de navegación no tienen campos que llenar ⇒ no se guarda nada.
+   */
+  llevaTexto?: boolean;
+  /** Frase de ejemplo: es el **atajo tocable** que ofrece la burbuja del FAB. */
+  ejemplo?: string;
 }
 
 export interface ResultadoIntencion {

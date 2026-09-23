@@ -214,3 +214,45 @@ html.fp-sin-red [data-app-lock] {
   display: none;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   FAB DE VOZ (2026-09-23 · fase G1 del replanteo de la voz, plan §14)
+
+   Un solo botón global (R1), abajo a la derecha (R4) y **apilado** sobre la acción
+   primaria de la pantalla: `BottomActionBar` marca `data-barra-inferior` cuando
+   está presente (la barra completa o el FAB suelto del modo swipe) y el FAB de voz
+   sube para no taparlo. Se resuelve con `:has()` ⇒ sin estado compartido ni JS.
+
+   ⚠️ La regla del apilado va dentro de un media query porque esa barra es
+   `lg:hidden`: en escritorio sigue en el DOM (oculta) y si no, subiría el FAB al
+   pedo. En mobile la posición es la misma en todas las pantallas (nunca salta).
+   ───────────────────────────────────────────────────────────────────────── */
+.fp-voz-fab {
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+@media (max-width: 1023.98px) {
+  html:has([data-barra-inferior]) .fp-voz-fab {
+    bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* Indicador de "escuchando" (R6: solo visual, sin texto). */
+@keyframes voz-pulso {
+  from {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  to {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+.fp-voz-pulso {
+  animation: voz-pulso 1.4s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fp-voz-pulso {
+    animation: none;
+    opacity: 0.45;
+  }
+}
+
