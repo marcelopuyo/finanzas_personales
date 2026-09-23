@@ -339,8 +339,9 @@ export function CrudForm({
             </div>
           ))}
 
-          {/* Footer acciones */}
-          <div className="flex items-center justify-end gap-2 pt-2">
+          {/* Footer acciones. `data-pie-accion`: el FAB de voz se hace a un lado
+              cuando este pie entra en su franja (no tapa Guardar/Cancelar). */}
+          <div className="flex items-center justify-end gap-2 pt-2" data-pie-accion="">
             <button
               type="button"
               onClick={() => router.push(cancelHref)}

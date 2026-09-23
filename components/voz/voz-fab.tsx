@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Mic } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTap } from "@/lib/tap";
@@ -11,6 +12,7 @@ import { INTENCIONES } from "@/lib/voz/intenciones";
 import { parsearIntencion } from "@/lib/voz/parse-intencion";
 import {
   iniciarDictado,
+  prepararAudioDictado,
   soporteVoz,
   type ErrorVoz,
   type EstadoDictado,
@@ -67,13 +69,35 @@ let permisoPreparado = false;
 
 export function VozFab() {
   const { go } = usePendingNav();
+  const ruta = usePathname();
   const [estado, setEstado] = useState<EstadoDictado>("listo");
   const [aviso, setAviso] = useState<Aviso>(null);
+  /**
+   * `true` mientras hay una **acción primaria a la vista** (el pie de un
+   * formulario dentro de la franja del FAB): el FAB se corre para no taparla.
+   */
+  const [ceder, setCeder] = useState(false);
   const sesion = useRef<SesionDictado | null>(null);
   /** El motor ya avisó un error más específico: no lo pisa el "no te escuché". */
   const huboError = useRef(false);
   /** Hay un pedido de permiso en curso (evita arrancar dos sesiones). */
   const arrancando = useRef(false);
+  /**
+   * El arranque en curso es el PRIMERO despuÉs de preparar el audio. Si falla,
+   * se reintenta una vez: preparar el audio espera (`await`) y en algunos
+   * navegadores eso consume la activación del gesto, asi que el `start()` puede
+   * ser rechazado aunque el permiso ya esté dado.
+   */
+  const primerArranque = useRef(false);
+
+  // Al cambiar de ruta el FAB vuelve a mostrarse YA (ajuste DURANTE el render,
+  // sin `setState` en un efecto): la página nueva no tiene por qué heredar el
+  // "hacerse a un lado" de la anterior.
+  const [rutaDelCeder, setRutaDelCeder] = useState(ruta);
+  if (rutaDelCeder !== ruta) {
+    setRutaDelCeder(ruta);
+    setCeder(false);
+  }
 
   const escuchando = estado === "iniciando" || estado === "escuchando";
 
@@ -101,11 +125,21 @@ export function VozFab() {
       lang: VOZ_LANG,
       onEstado: (e) => {
         setEstado(e);
+        if (e === "escuchando") primerArranque.current = false;
         if (e === "listo") sesion.current = null;
       },
       onError: (e) => {
         huboError.current = true;
         setAviso({ texto: MENSAJE_ERROR[e] });
+        // Seguro del primer toque: se prepara el audio con `await` y, si el
+        // navegador dio por consumido el gesto, el `start()` falla. Se
+        // reintenta UNA vez (permiso y AudioContext ya estan listos).
+        if (e === "desconocido" && primerArranque.current) {
+          primerArranque.current = false;
+          setTimeout(() => {
+            if (!sesion.current) iniciar();
+          }, 250);
+        }
       },
       // La sesión terminó sin reconocer nada: sin este aviso el usuario no veía
       // NADA (ni burbuja ni error) y parecía que el FAB no hacía nada.
@@ -131,12 +165,14 @@ export function VozFab() {
         setAviso({ texto: MENSAJE_ERROR["no-soportado"] });
         return;
       }
-      // Primer toque de la carga: el permiso se pide ACÁ, con el gesto fresco y
-      // antes de arrancar el reconocedor (si lo pide el reconocedor, la primera
-      // sesión se pierde: ver `pedirPermiso`).
+      // Primer toque de la carga: se pide el permiso y se deja la sesión de
+      // audio LISTA (con `await`) antes de arrancar el reconocedor. Si lo hace el
+      // propio reconocedor, la primera sesión queda MUDA en iOS (ver
+      // `prepararAudioDictado`).
       if (!permisoPreparado) {
         permisoPreparado = true;
-        if (!(await pedirPermiso())) {
+        primerArranque.current = true;
+        if (!(await prepararAudioDictado())) {
           setAviso({ texto: MENSAJE_ERROR.permiso });
           return;
         }
@@ -163,10 +199,48 @@ export function VozFab() {
     };
   }, []);
 
+  /**
+   * **El FAB se hace a un lado cuando puede tapar la acción primaria.**
+   *
+   * El `rootMargin` inferior recorta el viewport en la franja del FAB (7rem),
+   * así que un pie marcado con `data-pie-accion` (el de los wizards y el de los
+   * `CrudForm`) "interseca" exactamente mientras estaría debajo del FAB ―sea
+   * scrolleando o al llegar al final―. Reemplaza la reserva de espacio, que no
+   * alcanzaba cuando el pie pasa por la franja a mitad del scroll.
+   */
+  useEffect(() => {
+    let io: IntersectionObserver | null = null;
+    const conectar = () => {
+      io?.disconnect();
+      const pies = document.querySelectorAll("[data-pie-accion]");
+      if (!pies.length) return;
+      io = new IntersectionObserver(
+        (entradas) => setCeder(entradas.some((e) => e.isIntersecting)),
+        { rootMargin: "0px 0px -112px 0px" }
+      );
+      pies.forEach((p) => io?.observe(p));
+    };
+    conectar();
+    // Los pies pueden montarse después del cambio de ruta (pasos del wizard).
+    const t = setTimeout(conectar, 700);
+    return () => {
+      clearTimeout(t);
+      io?.disconnect();
+    };
+  }, [ruta]);
+
   const ejemplos = INTENCIONES.filter((i) => i.ejemplo);
 
   return (
-    <div className="fp-voz-fab fixed right-4 z-40 flex flex-col items-end gap-2">
+    <div
+      className={cn(
+        "fp-voz-fab fixed right-4 z-40 flex flex-col items-end gap-2",
+        "transition-opacity duration-200",
+        // Se corre mientras hay una acción primaria debajo (ver el observer).
+        ceder && "pointer-events-none opacity-0"
+      )}
+      aria-hidden={ceder || undefined}
+    >
       {/* Burbuja pegada al FAB (R8) */}
       {aviso && (
         <div
@@ -228,30 +302,6 @@ export function VozFab() {
       </button>
     </div>
   );
-}
-
-/**
- * Pide el permiso del micrófono **dentro del gesto** y **antes** de arrancar el
- * reconocedor. Devuelve `false` solo si el usuario lo rechazó.
- *
- * 🔑 **Por qué** (bug reportado el 2026-09-23: *«el micrófono la primera vez que
- * se activa no emite sonido, las veces sucesivas sí»*): si el permiso lo pide el
- * propio reconocedor, la **primera** sesión arranca mientras el diálogo del
- * sistema está abierto ⇒ no capta nada y no suena el tono del micrófono. Las
- * siguientes ya tienen el permiso concedido y funcionan. Pidiéndolo antes, el
- * reconocedor arranca con el permiso listo.
- */
-async function pedirPermiso(): Promise<boolean> {
-  // Sin API (o en un navegador que no la expone) se sigue: el motor reporta el
-  // error real si el permiso falta.
-  if (!navigator.mediaDevices?.getUserMedia) return true;
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    stream.getTracks().forEach((t) => t.stop());
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 /**

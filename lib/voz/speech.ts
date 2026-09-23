@@ -247,6 +247,42 @@ export interface SesionDictado {
 let ctxAudio: AudioContext | null = null;
 
 /**
+ * Deja la sesión de audio **lista y esperada** antes de arrancar el reconocedor.
+ *
+ * 🔑 **Por qué existe** (bug reportado el 2026-09-23: *«el micrófono la primera
+ * vez que se activa no emite sonido, las veces sucesivas sí»*): `prepararAudio()`
+ * —el parche del bug de WebKit— se llama **sin `await`** porque `start()` tiene
+ * que quedar dentro del gesto del usuario. En la **primera** sesión el
+ * `AudioContext` recién creado todavía **no está `running`** cuando arranca el
+ * reconocedor ⇒ esa sesión queda **muda** (y no suena el tono del micrófono). A
+ * partir de la segunda el contexto ya corre.
+ *
+ * Esto se llama **desde el primer toque del FAB**, con el gesto fresco, y **sí**
+ * espera: pide el permiso del micrófono y deja el `AudioContext` en `running`.
+ * Después el `start()` del motor encuentra todo listo.
+ *
+ * Devuelve `false` solo si el usuario **rechazó** el permiso.
+ */
+export async function prepararAudioDictado(): Promise<boolean> {
+  // 1) Permiso + "despertar" del micrófono (acá aparece el diálogo la 1ª vez).
+  try {
+    if (!navigator.mediaDevices?.getUserMedia) return true;
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach((t) => t.stop());
+  } catch {
+    return false;
+  }
+  // 2) El `AudioContext` COMPARTIDO ya en `running` (el parche del bug, awaitado).
+  try {
+    if (!ctxAudio || ctxAudio.state === "closed") ctxAudio = new AudioContext();
+    if (ctxAudio.state !== "running") await ctxAudio.resume();
+  } catch {
+    // Si el AudioContext falla se sigue igual: el motor registra el error real.
+  }
+  return true;
+}
+
+/**
  * Arranca un dictado. Devuelve `null` si el navegador no soporta la API
  * (Firefox) — en ese caso ya llamó a `onError("no-soportado")`.
  *

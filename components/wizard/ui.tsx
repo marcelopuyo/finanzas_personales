@@ -85,7 +85,13 @@ export function StepShell({
         )}
         <div className="space-y-4">{children}</div>
       </div>
-      {footer && <div className="mt-4">{footer}</div>}
+      {footer && (
+        // `data-pie-accion`: el FAB de voz se hace a un lado cuando este pie entra
+        // en su franja (así nunca tapa "Siguiente"/"Guardar").
+        <div className="mt-4" data-pie-accion="">
+          {footer}
+        </div>
+      )}
     </div>
   );
 }
