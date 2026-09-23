@@ -58,9 +58,12 @@ function leerDiagnostico() {
 export function VozLabClient({
   cuentas,
   categorias,
+  conSesion,
 }: {
   cuentas: OpcionesDictadoGasto["cuentas"];
   categorias: OpcionesDictadoGasto["categoriasGasto"];
+  /** `false` = se abrió sin login: no se consultó la BD y las opciones van vacías. */
+  conSesion: boolean;
 }) {
   const montado = useMontado();
   const [texto, setTexto] = useState("");
@@ -189,6 +192,13 @@ export function VozLabClient({
           Página <strong>temporal de desarrollo</strong> (F0). No guarda nada: solo
           interpreta texto. Se borra al cerrar el experimento.
         </p>
+        {!conSesion && (
+          <p className="rounded-md border border-border bg-muted px-3 py-2 text-[12px] text-subtitle">
+            Abierta <strong>sin sesión</strong>: el dictado y el diagnóstico funcionan
+            igual, pero <strong>no se cargan</strong> las cuentas ni las categorías
+            reales ⇒ el parser solo resolverá lo que la frase diga explícitamente.
+          </p>
+        )}
       </header>
 
       {/* ── Piloto del motor offline (experimento aparte) ───────────────────── */}
