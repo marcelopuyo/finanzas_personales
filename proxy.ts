@@ -172,21 +172,7 @@ export const config = {
   // muestra justamente cuando no hay red para validar la sesión. Y `api/ping`
   // es la SONDA del servidor (2026-09-17): tiene que contestar 204 siempre,
   // incluso sin sesión (se usa cuando la sesión no se puede validar).
-  //
-  // **TODO `voz-lab/` queda fuera (2026-09-22, decisión del usuario)**: el
-  // laboratorio de voz hay que poder abrirlo en el celular sin pasar por el
-  // login del preview. Son tres cosas distintas:
-  // - Los binarios del motor (`voz-lab/sherpa/`) y los pesos
-  //   (`voz-lab/modelo/`): ~103 MB que el runtime de Emscripten pide por
-  //   fetch/XHR y por rangos; si el guard los desviara a /login devolvería HTML
-  //   en vez de bytes y quedaría un 200 con basura escrita en el FS del WASM.
-  // - El piloto plano (`voz-lab/piloto.html` + `.js`): no toca la BD ni el
-  //   backend (todo corre en el dispositivo) y NO baja los 103 MB hasta que se
-  //   toca «Cargar motor» ⇒ una visita suelta no consume egress de Supabase.
-  // - La página React `/voz-lab`: vive FUERA del grupo `(app)` a propósito (ese
-  //   layout redirige a /login por su cuenta) y **sin sesión no consulta la
-  //   BD**: se le pasan las opciones vacías ⇒ no expone cuentas ni categorías.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon\\.svg|icon\\.png|apple-icon\\.png|manifest\\.webmanifest|sw\\.js|icons/|offline(?:$|/)|version\\.json|api/ping(?:$|/)|voz-lab(?:$|/)).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon\\.svg|icon\\.png|apple-icon\\.png|manifest\\.webmanifest|sw\\.js|icons/|offline(?:$|/)|version\\.json|api/ping(?:$|/)).*)",
   ],
 };

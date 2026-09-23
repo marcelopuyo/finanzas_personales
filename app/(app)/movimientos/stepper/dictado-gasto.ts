@@ -3,7 +3,7 @@
  *
  * Es el único archivo específico de la pantalla: declara **qué campos** se pueden
  * llenar por voz y **de dónde salen las opciones**. El parser (`lib/voz/*`) es
- * genérico; este archivo se reusó tal cual en el laboratorio `/voz-lab`.
+ * genérico y se reusa tal cual desde otros pasos del wizard.
  *
  * Los nombres de campo son los de `MovimientoData` y los valores son los **id**
  * (por eso `numerico: true`), porque el wizard selecciona cuentas y categorías
