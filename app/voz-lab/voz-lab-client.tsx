@@ -74,9 +74,11 @@ export function VozLabClient({
   const [detalle, setDetalle] = useState("");
   const [resumen, setResumen] = useState<{ reinicios: number; ms: number } | null>(null);
   const [eventos, setEventos] = useState<string[]>([]);
-  const [reintentar, setReintentar] = useState(false);
+  // El lab arranca con la **receta probada en iOS** (2026-09-23, §144 de la
+  // bitácora): así el primer intento ya es el que funciona.
+  const [reintentar, setReintentar] = useState(true);
   const [lang, setLang] = useState(VOZ_LANG);
-  const [continuo, setContinuo] = useState(true);
+  const [continuo, setContinuo] = useState(false);
   const [interino, setInterino] = useState(true);
   const [permiso, setPermiso] = useState("");
   // Parche del bug de WebKit (sesión de audio de iOS). Arranca con la combinación
@@ -154,8 +156,8 @@ export function VozLabClient({
       lang: lang === "(auto)" ? undefined : lang,
       continuous: continuo,
       interimResults: interino,
-      // Por defecto, UNA sesión por tap (sin reiniciar): es la ruta más estable
-      // en iOS. El reinicio queda como experimento opt-in.
+      // Receta probada en iOS: UNA sesión por tap con `continuous` apagado y
+      // reapertura en `onend` (ver §144 de la bitácora).
       permitirReinicio: reintentar,
       preparacionAudio: preparacion,
       mantenerPreparacionMs: mantenerPrep,
@@ -318,7 +320,7 @@ export function VozLabClient({
             checked={reintentar}
             onChange={(e) => setReintentar(e.target.checked)}
           />
-          Reabrir la sesión si el navegador la corta sola (experimental)
+          Reabrir la sesión si el navegador la corta sola (receta iOS)
         </label>
 
         {/* Matriz de prueba: en iOS el dictado puede no soportar el idioma o el

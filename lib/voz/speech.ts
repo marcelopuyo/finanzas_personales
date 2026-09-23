@@ -5,10 +5,11 @@
  * - **Detección con prefijo**: en iOS/Safari la API solo existe como
  *   `webkitSpeechRecognition`. Con `window.SpeechRecognition` a secas el botón
  *   nunca aparecería en el iPhone.
- * - **`continuous = true` + bucle de reinicio**: se pide modo continuo (Safari lo
- *   soporta desde iOS 17) **y** se reinicia la sesión en `onend` mientras el
- *   usuario no haya terminado. Así el mismo código sirve en Chrome, en iOS 14-16
- *   (donde cada sesión se corta sola) y en iOS 17+.
+ * - **Defaults = receta probada** (`dictadoRecomendado()`, 2026-09-23): en **iOS**
+ *   `continuous = false` + reapertura en `onend` + `preparacionAudio = "ambas"`;
+ *   en Chrome/Edge/Android `continuous = true` y `preparacionAudio = "ninguna"`
+ *   (ahí el modo continuo **sí** es estable y da mejor experiencia). La receta de
+ *   iOS está **validada en un iPhone real**: sin ella la 2ª sesión arranca muda.
  * - **Auto-parada**: se corta tras `SILENCIO_MS` de silencio, o a los
  *   `ESPERA_HABLA_MS` si nunca se escuchó nada, o al tope de `MAX_DICTADO_MS`.
  * - **Sin red no hay dictado**: Chrome transcribe en los servidores de Google y
@@ -115,6 +116,44 @@ export function soporteVoz(): {
 }
 
 /**
+ * ¿Es un navegador **WebKit en iOS** (Safari, o cualquier navegador del iPhone,
+ * que por dentro es WebKit)? Ahí rigen los parches de `dictadoRecomendado()`.
+ *
+ * Se detecta por *user agent* porque no hay otra forma: `SpeechRecognition` no
+ * expone la plataforma.
+ */
+export function esWebKitIOS(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  return (
+    /iPad|iPhone|iPod/.test(ua) ||
+    // iPad con iPadOS 13+ se anuncia como "Macintosh" pero con pantalla táctil.
+    (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)
+  );
+}
+
+/**
+ * Valores por defecto **recomendados**, por plataforma.
+ *
+ * En iOS es la **receta probada en un iPhone real (2026-09-23)**: con `continuous`
+ * apagado + reapertura en `onend` + preparación `"ambas"` el dictado **funciona en
+ * sesiones sucesivas**. Sin esa combinación la 2ª sesión arranca **muda** por el
+ * bug de WebKit (ver la cabecera del archivo).
+ *
+ * En Chrome/Edge/Android el modo continuo **sí** es estable y da mejor experiencia,
+ * así que ahí se mantiene encendido y no hace falta preparar el audio.
+ */
+export function dictadoRecomendado(): {
+  continuous: boolean;
+  permitirReinicio: boolean;
+  preparacionAudio: PreparacionAudio;
+} {
+  return esWebKitIOS()
+    ? { continuous: false, permitirReinicio: true, preparacionAudio: "ambas" }
+    : { continuous: true, permitirReinicio: true, preparacionAudio: "ninguna" };
+}
+
+/**
  * Cómo se prepara la sesión de audio antes de cada `start()` (parche del bug de
  * WebKit en iOS; ver la cabecera del archivo).
  * - `ninguna`: comportamiento histórico (así se reprodujo el fallo).
@@ -146,25 +185,26 @@ export interface OpcionesDictado {
   /** Tope de duración del dictado en ms. */
   maxMs?: number;
   /**
-   * `SpeechRecognition.continuous` (default `true`).
-   * ⚠️ MDN: Safari iOS lo soporta recién desde **iOS 17**. Probarlo en `false`
-   * es parte de la matriz del laboratorio.
+   * `SpeechRecognition.continuous` — default: **la receta de la plataforma**
+   * (`dictadoRecomendado()`): `false` en iOS (el modo continuo de WebKit es
+   * inestable), `true` en Chrome/Edge/Android.
    */
   continuous?: boolean;
   /** `SpeechRecognition.interimResults` (default `true`). */
   interimResults?: boolean;
   /**
-   * Reabrir la sesión cuando el navegador la corta sola (default **`false`**).
+   * Reabrir la sesión cuando el navegador la corta sola — default: **la receta de
+   * la plataforma** (`dictadoRecomendado()`), hoy **`true`** en las dos.
    *
-   * Por defecto es **una sola sesión por tap**: en iOS el ciclo cortar/reabrir es
-   * lo que deja el micrófono tomado y las sesiones siguientes mudas, así que el
-   * reinicio se activa solo para experimentar.
+   * Es la pieza que **reemplaza al modo continuo en iOS**: con `continuous = false`
+   * la sesión se corta en cada pausa y hay que rearmarla. Solo se reabre si el
+   * corte fue **sin pausa real** y quedan reintentos (`MAX_REINICIOS`).
    */
   permitirReinicio?: boolean;
   /**
-   * Preparación de la sesión de audio antes de cada `start()` (default
-   * **`"ninguna"`** ⇒ comportamiento histórico). Es el parche del bug de WebKit:
-   * ver la cabecera del archivo y `PreparacionAudio`.
+   * Preparación de la sesión de audio antes de cada `start()` — default: **la
+   * receta de la plataforma** (`dictadoRecomendado()`): `"ambas"` en iOS,
+   * `"ninguna"` en el resto. Es el parche del bug de WebKit (ver la cabecera).
    */
   preparacionAudio?: PreparacionAudio;
   /**
@@ -215,7 +255,11 @@ export function iniciarDictado(o: OpcionesDictado): SesionDictado | null {
 
   const maxMs = o.maxMs ?? MAX_DICTADO_MS;
   const inicio = Date.now();
-  const preparacion = o.preparacionAudio ?? "ninguna";
+  // Defaults por plataforma: es la **receta probada en iOS** (2026-09-23).
+  const recomendado = dictadoRecomendado();
+  const preparacion = o.preparacionAudio ?? recomendado.preparacionAudio;
+  const continuo = o.continuous ?? recomendado.continuous;
+  const permitirReinicio = o.permitirReinicio ?? recomendado.permitirReinicio;
   const mantenerPrepMs = o.mantenerPreparacionMs ?? REINICIO_MS;
   const pausaReaperturaMs = o.pausaReaperturaMs ?? REINICIO_MS;
 
@@ -364,7 +408,7 @@ export function iniciarDictado(o: OpcionesDictado): SesionDictado | null {
     // Solo se asigna si viene: en iOS un `lang` no soportado por el dictado del
     // sistema puede hacer que la sesión arranque y no devuelva NADA.
     if (o.lang) r.lang = o.lang;
-    r.continuous = o.continuous ?? true;
+    r.continuous = continuo;
     r.interimResults = o.interimResults ?? true;
     r.maxAlternatives = 1;
 
@@ -445,7 +489,7 @@ export function iniciarDictado(o: OpcionesDictado): SesionDictado | null {
       // que deja el micrófono tomado en iOS.
       const quieto = Date.now() - ultimaActividad;
       const puedeReabrir =
-        (o.permitirReinicio ?? false) &&
+        permitirReinicio &&
         quieto < SILENCIO_MS &&
         reiniciar < MAX_REINICIOS &&
         Date.now() - inicio < maxMs;
