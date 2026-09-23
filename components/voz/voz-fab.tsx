@@ -54,11 +54,26 @@ const MENSAJE_ERROR: Record<ErrorVoz, string> = {
 /** Aviso de la burbuja (R8: pegada al FAB). `escuchado` solo cuando no entendió. */
 type Aviso = { texto: string; escuchado?: string } | null;
 
+/** La sesión terminó y no se reconoció nada (feedback garantizado, 2026-09-23). */
+const SIN_TEXTO: Aviso = {
+  texto: "No te escuché. Probá de nuevo hablando un poco más fuerte.",
+};
+
+/**
+ * `true` cuando el permiso del micrófono ya se pidió en **esta carga** de página.
+ * Es de módulo a propósito: el pedido se hace una sola vez por documento.
+ */
+let permisoPreparado = false;
+
 export function VozFab() {
   const { go } = usePendingNav();
   const [estado, setEstado] = useState<EstadoDictado>("listo");
   const [aviso, setAviso] = useState<Aviso>(null);
   const sesion = useRef<SesionDictado | null>(null);
+  /** El motor ya avisó un error más específico: no lo pisa el "no te escuché". */
+  const huboError = useRef(false);
+  /** Hay un pedido de permiso en curso (evita arrancar dos sesiones). */
+  const arrancando = useRef(false);
 
   const escuchando = estado === "iniciando" || estado === "escuchando";
 
@@ -79,26 +94,57 @@ export function VozFab() {
     go(intencion.href(), `voz-${intencion.id}`);
   };
 
-  const alTocar = () => {
-    // Segundo toque mientras escucha: corta y entrega lo reconocido hasta ahí.
-    if (sesion.current) {
-      sesion.current.detener();
-      return;
-    }
-    setAviso(null);
-    if (!soporteVoz().disponible) {
-      setAviso({ texto: MENSAJE_ERROR["no-soportado"] });
-      return;
-    }
+  /** Arranca una sesión de dictado nueva. */
+  const iniciar = () => {
+    huboError.current = false;
     sesion.current = iniciarDictado({
       lang: VOZ_LANG,
       onEstado: (e) => {
         setEstado(e);
         if (e === "listo") sesion.current = null;
       },
-      onError: (e) => setAviso({ texto: MENSAJE_ERROR[e] }),
+      onError: (e) => {
+        huboError.current = true;
+        setAviso({ texto: MENSAJE_ERROR[e] });
+      },
+      // La sesión terminó sin reconocer nada: sin este aviso el usuario no veía
+      // NADA (ni burbuja ni error) y parecía que el FAB no hacía nada.
+      onSinTexto: () => {
+        if (huboError.current) return;
+        setAviso(SIN_TEXTO);
+      },
       onTexto: interpretar,
     });
+  };
+
+  const alTocar = async () => {
+    // Segundo toque mientras escucha: corta y entrega lo reconocido hasta ahí.
+    if (sesion.current) {
+      sesion.current.detener();
+      return;
+    }
+    if (arrancando.current) return;
+    arrancando.current = true;
+    try {
+      setAviso(null);
+      if (!soporteVoz().disponible) {
+        setAviso({ texto: MENSAJE_ERROR["no-soportado"] });
+        return;
+      }
+      // Primer toque de la carga: el permiso se pide ACÁ, con el gesto fresco y
+      // antes de arrancar el reconocedor (si lo pide el reconocedor, la primera
+      // sesión se pierde: ver `pedirPermiso`).
+      if (!permisoPreparado) {
+        permisoPreparado = true;
+        if (!(await pedirPermiso())) {
+          setAviso({ texto: MENSAJE_ERROR.permiso });
+          return;
+        }
+      }
+      iniciar();
+    } finally {
+      arrancando.current = false;
+    }
   };
 
   const tap = useTap(alTocar);
@@ -182,6 +228,30 @@ export function VozFab() {
       </button>
     </div>
   );
+}
+
+/**
+ * Pide el permiso del micrófono **dentro del gesto** y **antes** de arrancar el
+ * reconocedor. Devuelve `false` solo si el usuario lo rechazó.
+ *
+ * 🔑 **Por qué** (bug reportado el 2026-09-23: *«el micrófono la primera vez que
+ * se activa no emite sonido, las veces sucesivas sí»*): si el permiso lo pide el
+ * propio reconocedor, la **primera** sesión arranca mientras el diálogo del
+ * sistema está abierto ⇒ no capta nada y no suena el tono del micrófono. Las
+ * siguientes ya tienen el permiso concedido y funcionan. Pidiéndolo antes, el
+ * reconocedor arranca con el permiso listo.
+ */
+async function pedirPermiso(): Promise<boolean> {
+  // Sin API (o en un navegador que no la expone) se sigue: el motor reporta el
+  // error real si el permiso falta.
+  if (!navigator.mediaDevices?.getUserMedia) return true;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach((t) => t.stop());
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

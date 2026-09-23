@@ -36,17 +36,25 @@ export default function AppLayout({
         // `env(safe-area-inset-top)` para no quedar bajo el notch / la barra de
         // estado (viewport-fit: cover).
         //
-        // El inferior reserva la franja del **FAB de voz** (`pb-[4.5rem]`): como el
-        // FAB es `fixed` y el pie de los formularios va en el flujo (botones
-        // "Siguiente"/"Guardar"), sin esta reserva el botón quedaría tapado por el
-        // FAB al llegar al final. Es la implementación de "apilado sobre la acción
-        // primaria" (R4) cuando la acción no es flotante.
-        className="px-4 pt-[var(--app-top)] pb-[4.5rem] lg:px-6"
+        // El inferior vuelve a 4/6 y la reserva del FAB se hace con el
+        // espaciador `h-20` de abajo (más confiable en iOS).
+        className="px-4 pt-[var(--app-top)] pb-4 lg:px-6 lg:pb-6"
       >
         {/* Aviso "sin conexión": es `sticky`, así que empuja el contenido solo
             cuando está visible. */}
         <OfflineNotice />
         {children}
+        {/* Espaciador del FAB de voz: reserva la franja inferior para que el
+            último elemento del contenido (típicamente los botones "Siguiente"
+            /"Guardar" de los formularios, que van EN EL FLUJO) nunca quede
+            debajo del FAB. Va como elemento y no como `padding-bottom` del
+            contenedor de scroll porque el padding de un `overflow: auto` no es
+            confiable en iOS. La altura suma el safe-area porque el FAB también
+            sube con él (PWA standalone en iPhone con home indicator). */}
+        <div
+          aria-hidden="true"
+          style={{ height: "calc(5rem + env(safe-area-inset-bottom))" }}
+        />
       </PullToRefresh>
       {/* FAB 🎤 global (2026-09-23, fase G1 del replanteo de la voz). Va FUERA de
           PullToRefresh porque maneja sus propios touch events y no debe disparar

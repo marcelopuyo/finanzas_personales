@@ -16,8 +16,14 @@ export const SILENCIO_MS = 1500;
 /** Tope duro (ms) de una sesión de dictado, aunque el usuario siga hablando. */
 export const MAX_DICTADO_MS = 10_000;
 
-/** Si en este tiempo (ms) no se escuchó nada, se corta con "no te escuché". */
-export const ESPERA_HABLA_MS = 8_000;
+/**
+ * Si en este tiempo (ms) no se escuchó nada, se corta con "no te escuché".
+ *
+ * ⚠️ Bajado de 8 s a 5 s el 2026-09-23: con el FAB global, una sesión que no
+ * reconoce nada se sentía "muerta" (el usuario no sabía si estaba escuchando).
+ * Con 5 s alcanza para arrancar a hablar sin quedar esperando de más.
+ */
+export const ESPERA_HABLA_MS = 5_000;
 
 /** Cantidad máxima de reinicios de la sesión antes de abortar. */
 export const MAX_REINICIOS = 3;

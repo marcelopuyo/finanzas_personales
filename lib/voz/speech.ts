@@ -175,6 +175,13 @@ export type ErrorVoz =
 export interface OpcionesDictado {
   /** Se llama **una vez** al terminar, con todo lo reconocido. */
   onTexto: (texto: string) => void;
+  /**
+   * Se llama cuando la sesión terminó **sin reconocer nada** (equivale a un
+   * `onTexto` vacío). Es lo que permite dar feedback en TODOS los caminos: sin
+   * esto, una sesión que no reconoce nada termina en silencio (bug reportado
+   * 2026-09-23: «digo una frase sin sentido y no pasa nada»).
+   */
+  onSinTexto?: () => void;
   /** Transcripción en vivo (incluye texto provisorio). */
   onParcial?: (texto: string) => void;
   onEstado?: (estado: EstadoDictado) => void;
@@ -356,6 +363,8 @@ export function iniciarDictado(o: OpcionesDictado): SesionDictado | null {
     entregado = true;
     const texto = acumulado.trim();
     if (texto) o.onTexto(texto);
+    // Sin texto también se avisa: el consumidor decide qué mostrar.
+    else o.onSinTexto?.();
   };
 
   /**
