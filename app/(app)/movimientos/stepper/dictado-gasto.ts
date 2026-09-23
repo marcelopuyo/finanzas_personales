@@ -5,6 +5,11 @@
  * llenar por voz y **de dónde salen las opciones**. El parser (`lib/voz/*`) es
  * genérico y se reusa tal cual desde otros pasos del wizard.
  *
+ * ⚠️ **Hoy sin consumidores** (2026-09-23): el panel "Cargar por voz" se **retiró**
+ * con el replanteo de la voz (§14 del plan: **sin campo de texto ni panel**, un
+ * **FAB 🎤** que llena la pantalla actual). Se conserva a propósito: es la config
+ * que va a usar ese FAB (fase G3).
+ *
  * Los nombres de campo son los de `MovimientoData` y los valores son los **id**
  * (por eso `numerico: true`), porque el wizard selecciona cuentas y categorías
  * por id.

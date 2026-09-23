@@ -1,7 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { toast } from "sonner";
 import { useMovimientoStepper } from "./stepper-context";
 import {
@@ -18,9 +17,6 @@ import { STEP_CONFIRMACION, type MovimientoData } from "./types";
 import { QuickCreateModal } from "@/components/ui/quick-create-modal";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { crearCategoriaGasto } from "@/backend/src/actions/gastos";
-import type { ResultadoDictado } from "@/lib/voz/tipos";
-import { DictadoCampos } from "@/components/voz/dictado-campos";
-import { crearDictadoGasto } from "./dictado-gasto";
 
 export function GastoDirecto() {
   const { data, handleSetData, navigateTo, options, addCategoriaGasto } =
@@ -30,101 +26,6 @@ export function GastoDirecto() {
   const [nuevaCategoria, setNuevaCategoria] = useState<string | null>(null);
   // Overlay que BLOQUEA la pantalla mientras se trae el último gasto.
   const [buscandoUltimo, setBuscandoUltimo] = useState(false);
-
-  /**
-   * Dictado: se recuerda **qué** se aplicó (para los chips) y **qué había
-   * antes** (para deshacer, 1 nivel). Las dos entradas —el panel de la pantalla
-   * y el texto que llega por URL (`?dicho=`) desde `/voz`— terminan llamando a
-   * `aplicarDictado`, así que los chips y el deshacer funcionan igual.
-   */
-  /**
-   * Dictado: se recuerda **qué** se aplicó (para los chips) y **qué había**
-   * antes (para deshacer, 1 nivel).
-   *
-   * Además, si la frase dejó la **Descripción** pero no la Categoría (o el
-   * Monto), se completan con el **último gasto que tenga esa misma descripción**
-   * —igual que hace el autocompletado al elegir una sugerencia—.
-   *
-   * ⚠️ **Lo que la frase dijo manda**: solo se completa lo que quedó vacío, así
-   * que si el usuario nombró una categoría, esa se respeta.
-   */
-  const [dictadoAplicado, setDictadoAplicado] = useState<ResultadoDictado | null>(null);
-  const antesDelDictado = useRef<Partial<MovimientoData> | null>(null);
-
-  const aplicarDictado = async (resultado: ResultadoDictado) => {
-    const valores = { ...resultado.valores };
-    const asignaciones = [...resultado.asignaciones];
-    const descripcion =
-      typeof valores.descripcion === "string" ? valores.descripcion.trim() : "";
-    const faltaCategoria = valores.idCategoriaGasto === undefined;
-    const faltaMonto = valores.montoOrigen === undefined;
-
-    if (descripcion && (faltaCategoria || faltaMonto)) {
-      setBuscandoUltimo(true);
-      try {
-        const ultimo = await ultimoGastoPorDescripcionAction({
-          descripcion,
-          idCuenta: Number(valores.cuentaOrigen) || data.cuentaOrigen || undefined,
-          // El dictado llega en minúsculas: se compara igual, pero exacto.
-          sinMayusculas: true,
-        });
-        if (ultimo) {
-          if (
-            faltaCategoria &&
-            ultimo.categoriaId &&
-            options.categoriasGasto.some((c) => c.id === ultimo.categoriaId)
-          ) {
-            valores.idCategoriaGasto = ultimo.categoriaId;
-            asignaciones.push({
-              campo: "idCategoriaGasto",
-              valor: ultimo.categoriaId,
-              texto: descripcion,
-              origen: "historial",
-              puntaje: 1,
-            });
-          }
-          if (faltaMonto && ultimo.monto > 0) {
-            valores.montoOrigen = ultimo.monto;
-            asignaciones.push({
-              campo: "montoOrigen",
-              valor: ultimo.monto,
-              texto: descripcion,
-              origen: "historial",
-              puntaje: 1,
-            });
-          }
-        }
-      } catch {
-        // Si la consulta falla, se aplica igual lo que se entendió de la frase.
-      } finally {
-        setBuscandoUltimo(false);
-      }
-    }
-
-    const antes: Record<string, unknown> = {};
-    for (const campo of Object.keys(valores)) {
-      antes[campo] = (data as unknown as Record<string, unknown>)[campo];
-    }
-    antesDelDictado.current = antes as Partial<MovimientoData>;
-    // `valores` ya trae los nombres de campo de `MovimientoData`
-    // (idCategoriaGasto/cuentaOrigen numéricos, fecha yyyy-mm-dd).
-    handleSetData(valores as unknown as Partial<MovimientoData>);
-    setDictadoAplicado({ ...resultado, valores, asignaciones });
-  };
-
-  const deshacerDictado = () => {
-    if (antesDelDictado.current) handleSetData(antesDelDictado.current);
-    antesDelDictado.current = null;
-    setDictadoAplicado(null);
-  };
-
-  /**
-   * Texto que llega **por URL** (`?dicho=`), de la entrada `/voz` (Atajo de
-   * Apple). No se aplica solo: **precarga el campo de dictado** para que el
-   * usuario vea qué se dictó y confirme con «Interpretar».
-   */
-  const searchParams = useSearchParams();
-  const dicho = searchParams.get("dicho") ?? "";
 
   /**
    * Al ELEGIR una sugerencia de descripción (no al tipear): completa Categoría y
@@ -183,14 +84,6 @@ export function GastoDirecto() {
         />
       }
     >
-      <DictadoCampos
-        config={crearDictadoGasto(options)}
-        textoInicial={dicho}
-        onInterpretar={aplicarDictado}
-        aplicado={dictadoAplicado}
-        onDeshacer={deshacerDictado}
-      />
-
       <AutoCompleteField
         label="Descripción"
         value={data.descripcion}

@@ -3,9 +3,13 @@
 /**
  * Chip de un campo que el dictado completó ("Monto $ 3.500").
  *
- * Es **solo presentacional**: el contenido lo arma `DictadoCampos`, que es quien
- * conoce la config y puede resolver el valor "lindo" (la etiqueta de la opción,
- * el monto formateado, la fecha en dd/mm/aaaa).
+ * Es **solo presentacional**: el valor "lindo" (la etiqueta de la opción, el monto
+ * formateado, la fecha en dd/mm/aaaa) lo resuelve quien tiene la config.
+ *
+ * ⚠️ **Hoy sin consumidores** (2026-09-23): lo usaba `DictadoCampos`, el panel de
+ * texto + "Interpretar" que se **retiró** con el replanteo de la voz (§14 del plan:
+ * se decidió que **no haya campo ni panel**, sino un **FAB 🎤**). Se conserva
+ * porque es **lo que va a mostrar el FAB** al llenar la pantalla actual (fase G3).
  */
 export function ChipAsignacion({
   etiqueta,
