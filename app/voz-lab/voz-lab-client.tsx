@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useMontado } from "@/lib/use-cliente";
-import { VOZ_LANG } from "@/lib/voz/config";
+import { REINICIO_MS, VOZ_LANG } from "@/lib/voz/config";
 import { parsearCampos } from "@/lib/voz/parse-campos";
 import { parsearIntencion } from "@/lib/voz/parse-intencion";
 import {
@@ -11,6 +11,7 @@ import {
   soporteVoz,
   type ErrorVoz,
   type EstadoDictado,
+  type PreparacionAudio,
   type SesionDictado,
 } from "@/lib/voz/speech";
 import {
@@ -78,6 +79,13 @@ export function VozLabClient({
   const [continuo, setContinuo] = useState(true);
   const [interino, setInterino] = useState(true);
   const [permiso, setPermiso] = useState("");
+  // Parche del bug de WebKit (sesión de audio de iOS). Arranca con la combinación
+  // que recomiendan los reportes; cada interruptor se puede comparar contra el
+  // valor histórico (`preparacion` = "ninguna").
+  const [preparacion, setPreparacion] = useState<PreparacionAudio>("ambas");
+  const [mantenerPrep, setMantenerPrep] = useState(REINICIO_MS);
+  const [pausaReapertura, setPausaReapertura] = useState(REINICIO_MS);
+  const [abortar, setAbortar] = useState(false);
   const sesion = useRef<SesionDictado | null>(null);
 
   const diag = montado ? leerDiagnostico() : null;
@@ -149,6 +157,10 @@ export function VozLabClient({
       // Por defecto, UNA sesión por tap (sin reiniciar): es la ruta más estable
       // en iOS. El reinicio queda como experimento opt-in.
       permitirReinicio: reintentar,
+      preparacionAudio: preparacion,
+      mantenerPreparacionMs: mantenerPrep,
+      pausaReaperturaMs: pausaReapertura,
+      abortarAlCerrar: abortar,
       onParcial: setParcial,
       onEstado: (e) => {
         setEstado(e);
@@ -345,6 +357,78 @@ export function VozLabClient({
             />
             interimResults
           </label>
+
+          {/* Parche del bug de WebKit: la 2ª sesión arranca pero no llega NINGÚN
+              evento (ni texto, ni error, ni end). Ver `lib/voz/speech.ts`. */}
+          <div className="mt-1 space-y-2 border-t border-border pt-2">
+            <p className="text-[12px] font-medium text-header">
+              Sesión de audio (bug de WebKit en iOS)
+            </p>
+            <p className="text-[11px] text-subtitle">
+              En iOS la <strong>2ª sesión arranca muda</strong>: no llega{" "}
+              <code>onresult</code>, ni <code>onerror</code>, ni <code>onend</code>.
+              Es el bug{" "}
+              <a
+                href="https://bugs.webkit.org/show_bug.cgi?id=317741"
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
+                WebKit 317741
+              </a>{" "}
+              (Apple lo arregló en WebKit main el 26/06/2026; todavía no está en
+              iOS estable). Abajo, las mitigaciones que reporta la comunidad: dejalas
+              como están y después probá con <code>ninguna</code> para comparar. Si
+              el modo continuo se corta solo, activá “Reabrir la sesión”.
+            </p>
+            <label className="flex items-center gap-2 text-[12px] text-subtitle">
+              Preparar el audio
+              <select
+                value={preparacion}
+                onChange={(e) =>
+                  setPreparacion(e.target.value as PreparacionAudio)
+                }
+                className="rounded-md border border-border bg-background px-2 py-1 text-[12px] text-card-foreground"
+              >
+                <option value="ninguna">ninguna (histórico)</option>
+                <option value="microfono">abrir y soltar el micrófono</option>
+                <option value="audioContext">AudioContext</option>
+                <option value="ambas">ambas (recomendado)</option>
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-[12px] text-subtitle">
+              Mantener el micrófono de prueba
+              <input
+                type="number"
+                min={0}
+                step={100}
+                value={mantenerPrep}
+                onChange={(e) => setMantenerPrep(Number(e.target.value) || 0)}
+                className="w-20 rounded-md border border-border bg-background px-2 py-1 text-[12px] text-card-foreground"
+              />
+              ms
+            </label>
+            <label className="flex items-center gap-2 text-[12px] text-subtitle">
+              Pausa antes de reabrir
+              <input
+                type="number"
+                min={0}
+                step={100}
+                value={pausaReapertura}
+                onChange={(e) => setPausaReapertura(Number(e.target.value) || 0)}
+                className="w-20 rounded-md border border-border bg-background px-2 py-1 text-[12px] text-card-foreground"
+              />
+              ms
+            </label>
+            <label className="flex items-center gap-2 text-[12px] text-subtitle">
+              <input
+                type="checkbox"
+                checked={abortar}
+                onChange={(e) => setAbortar(e.target.checked)}
+              />
+              stop() + abort() al cerrar
+            </label>
+          </div>
         </div>
 
         {(parcial || escuchando) && (
