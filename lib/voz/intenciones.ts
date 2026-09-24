@@ -79,6 +79,38 @@ export const INTENCIONES: Intencion[] = [
       "necesito",
       "quiero",
     ],
+    // 🔑 **Verbos que alcanzan solos** (2026-09-24): "cargué mil doscientos de cig"
+    // o "pagué el alquiler" no dicen "gasto" ⇒ sin esta lista el FAB respondía
+    // "no entendí" a las frases más naturales (el usuario lo reportó en el iPhone).
+    // ⚠️ Quedan **fuera** los genéricos, que pueden pertenecer a otras intenciones
+    // ("crear", "nuevo", "poner", "quiero", "necesito").
+    verbosSuficientes: [
+      "cargar",
+      "carga",
+      "cargue",
+      "ingresar",
+      "ingresa",
+      "ingreso",
+      "registrar",
+      "registra",
+      "registro",
+      "anotar",
+      "anota",
+      "anote",
+      "agregar",
+      "agrega",
+      "agregue",
+      "sumar",
+      "suma",
+      "meter",
+      "mete",
+      "pagar",
+      "paga",
+      "pague",
+      "pago",
+      "gastar",
+      "gaste",
+    ],
     // Ruta directa con precarga: el wizard en "modo directo" ya existe y no
     // necesita estado compartido (ver `app/(app)/movimientos/nuevo/[tipo]/page.tsx`).
     href: () => "/movimientos/nuevo/gasto",

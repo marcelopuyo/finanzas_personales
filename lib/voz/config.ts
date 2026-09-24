@@ -78,6 +78,11 @@ export const RELLENO_INICIAL = new Set([
   "mi",
   "mis",
   "me",
+  "te",
+  "nos",
+  "lo",
+  "le",
+  "les",
   "se",
   "fue",
   // Verbos de la acción

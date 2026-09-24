@@ -1,10 +1,14 @@
 /**
  * Parser de **intención**: ¿qué quiere hacer el usuario?
  *
- * Regla (D9 del plan): hace falta un **sustantivo** ("gasto") y, además, un
- * **verbo de acción** ("cargar", "anotar", "necesito"…) — o una frase muy corta,
- * que ya es suficientemente explícita ("un gasto"). Sin intención reconocida
- * **no se navega**: se le muestran ejemplos.
+ * Regla: hace falta un **sustantivo** ("gasto") o un **verbo que alcance solo**
+ * ("cargué", "pagué" — `verbosSuficientes`) y, además, un **verbo de acción** — o
+ * una frase muy corta, que ya es suficientemente explícita ("un gasto").
+ * Sin intención reconocida **no se navega**: se le muestran ejemplos.
+ *
+ * 🔑 Los `verbosSuficientes` se agregaron el 2026-09-24 porque las frases más
+ * naturales ("cargué mil doscientos de cig", "pagué el alquiler") **no dicen
+ * "gasto"** y quedaban sin entender (reportado en el iPhone).
  */
 
 import { INTENCIONES } from "./intenciones";
@@ -26,17 +30,29 @@ export function parsearIntencion(
   if (!orig.length) return { intencion: null, resto: "" };
 
   for (const intencion of intenciones) {
-    const idxSust = nrm.findIndex((t) => intencion.sustantivos.includes(t));
-    if (idxSust === -1) continue;
+    const haySustantivo = nrm.some((t) => intencion.sustantivos.includes(t));
+    const hayVerboSuficiente = nrm.some((t) =>
+      (intencion.verbosSuficientes ?? []).includes(t)
+    );
+    // Hace falta el sustantivo **o** un verbo que valga solo.
+    if (!haySustantivo && !hayVerboSuficiente) continue;
 
     const hayVerbo = nrm.some((t) => intencion.verbos.includes(t));
-    if (!hayVerbo && orig.length > MAX_SIN_VERBO) continue;
+    // Sin verbo alguno, la frase tiene que ser corta ("un gasto"); un verbo
+    // suficiente ya cuenta como verbo.
+    if (!hayVerbo && !hayVerboSuficiente && orig.length > MAX_SIN_VERBO) continue;
 
     // Se descartan TODAS las palabras de la intención (no solo la primera):
     // "necesito ingresar un gasto" tiene dos verbos y ninguno va al destino.
     const usados = new Set<number>();
     nrm.forEach((t, i) => {
-      if (intencion.sustantivos.includes(t) || intencion.verbos.includes(t)) usados.add(i);
+      if (
+        intencion.sustantivos.includes(t) ||
+        intencion.verbos.includes(t) ||
+        (intencion.verbosSuficientes ?? []).includes(t)
+      ) {
+        usados.add(i);
+      }
     });
 
     const restantes = orig.filter((_, i) => !usados.has(i));

@@ -153,6 +153,17 @@ export interface Intencion {
   sustantivos: string[];
   /** Verbos de acción que la confirman ("cargar", "anotar"…). */
   verbos: string[];
+  /**
+   * Verbos que alcanzan **por sí solos**, sin el sustantivo.
+   *
+   * 🔑 Sin esto, la frase más natural de todas fallaba: *"cargué mil doscientos de
+   * cig"* o *"pagué el alquiler, doscientos mil"* **no dicen "gasto"**, así que el
+   * FAB respondía "no entendí" (reportado por el usuario en el iPhone, 2026-09-24).
+   *
+   * ⚠️ Cuidado con el solapamiento: un verbo suelto manda a **esta** intención, así
+   * que los genéricos ("crear", "poner", "quiero", "necesito") **no** van acá.
+   */
+  verbosSuficientes?: string[];
   /** A dónde navega. */
   href: () => string;
   /** Si el destino necesita que el usuario elija una cuenta. */
