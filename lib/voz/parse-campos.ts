@@ -19,7 +19,7 @@ import { MARGEN_GANADOR, MAX_CANDIDATOS, MAX_TOKENS_TEXTO, RELLENO_INICIAL, UMBR
 import { extraerFechas } from "./fechas";
 import { extraerNumeros, numeroMayor } from "./numeros";
 import { norm, tokenizar } from "./normalizar";
-import { buscarOpciones, buscarSinonimo } from "./opciones";
+import { buscarAlias, buscarOpciones, buscarSinonimo } from "./opciones";
 import type {
   Asignacion,
   CampoDictable,
@@ -200,6 +200,28 @@ export function parsearCampos(texto: string, config: ConfigDictado): ResultadoDi
     const idx = zona ? libresDeZona(zona) : libres();
     if (!idx.length) continue;
 
+    // 4.0) **Vocabulario** (sistema + aprendido): máxima prioridad.
+    const vocabulario = buscarAlias(
+      idx.map((i) => nrm[i]),
+      campo.alias
+    );
+    if (vocabulario) {
+      if (vocabulario.opciones.length === 1) {
+        const [hit] = vocabulario.opciones;
+        asignar(campo, hit.valor, vocabulario.termino, "alias", hit.puntaje);
+        marcarTermino(vocabulario.termino, Boolean(campo.aportaTexto));
+      } else {
+        candidatos.push({
+          campo: campo.campo,
+          termino: vocabulario.termino,
+          opciones: vocabulario.opciones
+            .slice(0, MAX_CANDIDATOS)
+            .map((o) => ({ value: o.valor, label: o.etiqueta })),
+        });
+      }
+      continue;
+    }
+
     const sin = buscarSinonimo(
       idx.map((i) => nrm[i]),
       campo,
@@ -219,11 +241,14 @@ export function parsearCampos(texto: string, config: ConfigDictado): ResultadoDi
 
     const [primero, segundo] = matches;
     if (!segundo || primero.puntaje - segundo.puntaje >= MARGEN_GANADOR) {
-      asignar(campo, primero.opcion.value, primero.opcion.label, "opcion", primero.puntaje);
+      // `texto` = la ventana del dictado que produjo el match (no la etiqueta):
+      // es lo que después se usa para **aprender** (vía B del plan de G2).
+      asignar(campo, primero.opcion.value, primero.termino, "opcion", primero.puntaje);
       marcarTermino(primero.termino, Boolean(campo.aportaTexto));
     } else {
       candidatos.push({
         campo: campo.campo,
+        termino: primero.termino,
         opciones: matches.slice(0, MAX_CANDIDATOS).map((m) => m.opcion),
       });
     }

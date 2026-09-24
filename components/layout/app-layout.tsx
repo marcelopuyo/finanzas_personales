@@ -13,6 +13,9 @@ import { VozFab } from "@/components/voz/voz-fab";
  * El contenido va dentro de `PullToRefresh`, que es quien renderiza el `<main>`
  * que scrollea: ahí vive el gesto de "tirar para actualizar" (con el dedo en
  * mobile, y en desktop con la rueda/trackpad o arrastrando con el mouse).
+ *
+ * Los dos providers de la voz (`VozProvider` + `VozPantallaProvider`) se montan
+ * **por fuera**, en `app/(app)/layout.tsx`: así envuelven al contenido y al FAB.
  */
 export default function AppLayout({
   children,

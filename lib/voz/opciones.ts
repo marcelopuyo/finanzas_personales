@@ -5,7 +5,7 @@
  */
 
 import { norm } from "./normalizar";
-import type { CampoDictable, OpcionVoz } from "./tipos";
+import type { AliasOpcion, CampoDictable, OpcionVoz } from "./tipos";
 
 /** Bigramas de caracteres, sin espacios repetidos. */
 function bigramas(s: string): string[] {
@@ -110,5 +110,39 @@ export function buscarSinonimo(
     const hit = opciones.find((o) => objetivo.includes(norm(o.label)));
     if (hit) return { opcion: hit, puntaje: 0.95, termino: t };
   }
+  return undefined;
+}
+
+/**
+ * **Vocabulario** (capa de sistema + lo aprendido): el término dictado ya viene
+ * resuelto contra las opciones del usuario (`lib/voz/vocabulario.ts`), así que acá
+ * solo hay que buscarlo en la frase.
+ *
+ * 🔑 Es la fuente **de mayor prioridad**: 0.99, por encima de los sinónimos del
+ * código (0.95) y del match difuso (calculado).
+ *
+ * - **1 opción** ⇒ resolución determinista.
+ * - **varias** ⇒ el llamador las ofrece como **candidatos** (elección → se aprende).
+ *
+ * ⚠️ Se prueban primero los **pares** de palabras ("mercado pago", "caja de
+ * ahorro") y después las sueltas: lo más específico gana.
+ */
+export function buscarAlias(
+  tokens: string[],
+  alias?: Map<string, AliasOpcion[]>
+): { termino: string; opciones: AliasOpcion[] } | undefined {
+  if (!alias?.size || !tokens.length) return undefined;
+
+  for (let i = 0; i < tokens.length - 1; i++) {
+    const par = `${tokens[i]} ${tokens[i + 1]}`;
+    const hit = alias.get(par);
+    if (hit) return { termino: par, opciones: hit };
+  }
+
+  for (const t of tokens) {
+    const hit = alias.get(t);
+    if (hit) return { termino: t, opciones: hit };
+  }
+
   return undefined;
 }

@@ -22,6 +22,7 @@ import { Prestamo } from "./entities/prestamo.entity";
 import { Movimiento } from "./entities/movimiento.entity";
 import { Usuario } from "./entities/usuario.entity";
 import { WebauthnCredential } from "./entities/webauthn-credential.entity";
+import { VozAlias } from "./entities/voz-alias.entity";
 import { pgSslOption } from "./lib/pg-ssl";
 
 // Singleton global para evitar reconexiones duplicadas durante HMR
@@ -36,7 +37,7 @@ const ENTITIES = [
   HistoricoCuenta, Inflacion, CategoriaGasto, Gasto,
   Tarjeta, PeriodoTarjeta, MovimientoTarjeta,
   Trabajo, PeriodoTrabajo, JornadaTrabajo, TareaTrabajo, Prestamo, Movimiento,
-  Usuario, WebauthnCredential,
+  Usuario, WebauthnCredential, VozAlias,
 ];
 
 // El driver `pg` devuelve `numeric` (OID 1700) como string. Como los montos y

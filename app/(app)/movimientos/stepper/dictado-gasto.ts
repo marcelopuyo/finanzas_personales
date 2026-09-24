@@ -67,6 +67,8 @@ export function crearDictadoGasto({
         tipo: "opcion",
         etiqueta: "Cuenta",
         numerico: true,
+        // Catálogo al que apunta (R12): lo usa el vocabulario ("billetera", "caja"…).
+        catalogo: "cuenta",
         disparadores: ["cuenta", "de la cuenta", "con la cuenta"],
         opciones: () =>
           cuentas.map((c) => ({ value: String(c.id), label: c.nombre })),
@@ -76,6 +78,7 @@ export function crearDictadoGasto({
         tipo: "opcion",
         etiqueta: "Categoría",
         numerico: true,
+        catalogo: "categoriaGasto",
         disparadores: ["categoria", "rubro"],
         opciones: () =>
           categoriasGasto.map((c) => ({ value: String(c.id), label: c.nombre })),

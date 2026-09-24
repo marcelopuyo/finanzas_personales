@@ -55,7 +55,12 @@ export class VozAlias {
   @Column({ type: "varchar", length: 20 })
   origen: string;
 
-  /** Cuántas veces resolvió (sirve para detectar alias de un solo uso). */
+  /**
+   * Cuántas veces resolvió (sirve para detectar alias de un solo uso).
+   *
+   * ⚠️ Se incrementa **al guardar el formulario** (decisión 2026-09-23), no en cada
+   * resolución: así el camino crítico del dictado no paga una escritura extra.
+   */
   @Column({ type: "integer", default: 0 })
   usos: number;
 

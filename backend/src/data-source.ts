@@ -21,6 +21,7 @@ import { Prestamo } from "./entities/prestamo.entity";
 import { Movimiento } from "./entities/movimiento.entity";
 import { Usuario } from "./entities/usuario.entity";
 import { WebauthnCredential } from "./entities/webauthn-credential.entity";
+import { VozAlias } from "./entities/voz-alias.entity";
 import { pgSslOption } from "./lib/pg-ssl";
 
 // ============================================================
@@ -36,7 +37,7 @@ export const ENTITIES = [
   HistoricoCuenta, Inflacion, CategoriaGasto, Gasto,
   Tarjeta, PeriodoTarjeta, MovimientoTarjeta,
   Trabajo, PeriodoTrabajo, JornadaTrabajo, TareaTrabajo, Prestamo, Movimiento,
-  Usuario, WebauthnCredential,
+  Usuario, WebauthnCredential, VozAlias,
 ];
 
 export const AppDataSource = new DataSource({

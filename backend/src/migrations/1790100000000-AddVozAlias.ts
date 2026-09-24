@@ -11,7 +11,7 @@ import { MigrationInterface, QueryRunner } from "typeorm";
  * | Capa | `usuarioId` | `destinoValor` | Cómo resuelve |
  * |---|---|---|---|
  * | **Aprendida** (usuario) | el usuario | **id** de una opción (`categoriaGasto`, `cuenta`…) | Por **id**, contra las opciones ya cargadas |
- * | **Sistema** (curada) | **NULL** | **concepto** ("supermercado", "alimentacion") | Por **parecido** contra las opciones del usuario |
+ * | **Sistema** (curada) | **NULL** | **concepto** ("tabaco", "combustible"…) | Por **tokens de la etiqueta** del usuario (ver `lib/voz/vocabulario.ts`) |
  *
  * ⚠️ **Por qué el sistema apunta a conceptos y no a ids**: los ids son **por
  * usuario** (la categoría "Alimentacion" de uno no es la de otro) ⇒ una fila
@@ -28,96 +28,171 @@ export class AddVozAlias1790100000000 implements MigrationInterface {
   name = "AddVozAlias1790100000000";
 
   /**
-   * Capa de SISTEMA: términos coloquiales → **conceptos candidatos**.
+   * Capa de SISTEMA: **conceptos estándar** + la jerga con la que se los nombra.
    *
-   * Los términos van en forma **normalizada** (minúsculas, sin tildes), que es la
-   * misma que produce `norm()` en `lib/voz/normalizar.ts` antes de comparar.
-   * Ampliar esta capa = agregar filas (no hace falta migrar de nuevo).
+   * ⚠️ **Acá NO va el nombre de la categoría de ningún usuario.** Un concepto es
+   * genérico (`tabaco`, `combustible`, `vivienda`…) y su lista son palabras que
+   * cualquiera puede decir. La traducción concepto → categoría **real** ocurre en
+   * memoria, en `lib/voz/vocabulario.ts`, comparando estos alias contra los
+   * **tokens de las etiquetas del usuario** ⇒ "Diario - Cig" resuelve por el token
+   * `cig` sin que el diccionario conozca esa categoría (y otro usuario con
+   * "Cigarrillos" o "Vicios" se resuelve con el **mismo** concepto).
+   *
+   * Los términos van en forma **normalizada** (minúsculas, **sin tildes ni ñ**),
+   * que es la misma que produce `norm()` en `lib/voz/normalizar.ts` antes de
+   * comparar: "cumpleaños" se escribe `cumpleanos`.
+   *
+   * ➕ **Ampliar = agregar un alias a un concepto** (o un concepto nuevo). No hace
+   * falta migrar de nuevo: son filas.
+   *
+   * 🎯 **Regla de oro para escribir alias**: que sean **distintivos**. Una palabra
+   * que suela aparecer en etiquetas de OTRO concepto ("diario", "general",
+   * "gastos", "cuota"…) crearía ambigüedad artificial. Ante la duda, no se agrega:
+   * ese caso lo aprende el usuario con el uso (vías A/B del plan de G2).
    */
   private readonly SISTEMA: Record<string, Record<string, string[]>> = {
-    // ── Categorías de gasto ────────────────────────────────────────────────
+    // ── Categorías de gasto (26 conceptos) ─────────────────────────────────
     categoriaGasto: {
-      super: ["supermercado", "alimentacion", "compras"],
-      supermercado: ["supermercado", "alimentacion"],
-      chino: ["supermercado", "alimentacion"],
-      almacen: ["almacen", "supermercado", "alimentacion"],
-      mercado: ["mercado", "supermercado"],
-      comestibles: ["alimentacion", "supermercado"],
-      comida: ["alimentacion", "comida"],
-      alimentacion: ["alimentacion"],
-      nafta: ["combustible", "transporte"],
-      bencina: ["combustible"],
-      gasoil: ["combustible"],
-      combustible: ["combustible"],
-      "estacion de servicio": ["combustible"],
-      luz: ["electricidad", "servicios"],
-      electricidad: ["electricidad", "servicios"],
-      edesur: ["electricidad"],
-      edenor: ["electricidad"],
-      gas: ["gas", "servicios"],
-      agua: ["agua", "servicios"],
-      internet: ["internet", "servicios"],
-      cable: ["internet", "cable", "servicios"],
-      telefono: ["telefono", "internet", "servicios"],
-      celular: ["telefono", "celular", "servicios"],
-      servicios: ["servicios"],
-      impuestos: ["impuestos", "servicios"],
-      expensas: ["expensas", "alquiler"],
-      alquiler: ["alquiler"],
-      renta: ["alquiler"],
-      farmacia: ["farmacia", "salud"],
-      remedios: ["farmacia", "salud"],
-      medicamentos: ["farmacia", "salud"],
-      salud: ["salud"],
-      medico: ["salud", "medico"],
-      "obra social": ["salud", "obra social"],
-      prepaga: ["salud", "prepaga"],
-      ropa: ["ropa"],
-      zapatillas: ["ropa", "calzado"],
-      indumentaria: ["ropa", "indumentaria"],
-      recreacion: ["recreacion"],
-      salida: ["recreacion", "salidas"],
-      cine: ["recreacion", "cine"],
-      bar: ["recreacion", "bar"],
-      restaurante: ["recreacion", "restaurante", "comida"],
-      cigarrillos: ["cigarrillos", "tabaco"],
-      puchos: ["cigarrillos", "tabaco"],
-      tabaco: ["tabaco", "cigarrillos"],
-      transporte: ["transporte"],
-      colectivo: ["transporte", "colectivo"],
-      taxi: ["transporte", "taxi"],
-      remis: ["transporte", "taxi"],
-      uber: ["transporte"],
-      sube: ["transporte", "sube"],
-      educacion: ["educacion"],
-      colegio: ["educacion", "colegio"],
-      facultad: ["educacion", "facultad"],
-      curso: ["educacion", "curso"],
-      mascota: ["mascotas", "mascota"],
-      veterinaria: ["mascotas", "veterinaria"],
-      regalo: ["regalos", "regalo"],
-      regalos: ["regalos", "regalo"],
-      viaje: ["viajes", "viaje"],
-      vacaciones: ["viajes", "vacaciones"],
-      peluqueria: ["peluqueria", "cuidado personal"],
-      barberia: ["peluqueria", "barberia"],
-      "cuidado personal": ["cuidado personal"],
-      compras: ["compras"],
-      shopping: ["compras", "shopping"],
+      alimentacion: [
+        "super", "supermercado", "chino", "almacen", "mercado", "comestibles",
+        "comida", "alimentacion", "autoservicio", "verduleria", "carniceria",
+        "panaderia", "dietetica", "fiambreria",
+      ],
+      tabaco: [
+        "tabaco", "cigarrillo", "cigarrillos", "cigarro", "cigarros", "pucho",
+        "puchos", "cig", "fumar", "vicios",
+      ],
+      combustible: [
+        "nafta", "combustible", "gasoil", "bencina", "diesel",
+        "estacion de servicio", "surtidor", "ypf", "shell", "axion",
+      ],
+      transporte: [
+        "transporte", "colectivo", "bondi", "sube", "subte", "tren", "taxi",
+        "remis", "uber", "cabify", "didi", "peaje", "estacionamiento",
+        "cochera", "garaje", "boleto",
+      ],
+      alquiler: ["alquiler", "renta", "arriendo", "arrendamiento"],
+      vivienda: ["vivienda", "casa", "expensas", "consorcio", "hipoteca", "mudanza"],
+      servicios: [
+        "servicios", "luz", "electricidad", "edesur", "edenor", "gas", "agua",
+        "internet", "cable", "telefono", "celular", "telefonia", "abl",
+        "municipal", "basura", "residuos",
+      ],
+      impuestos: [
+        "impuestos", "impuesto", "afip", "arba", "ganancias",
+        "bienes personales", "monotributo", "iva", "ingresos brutos", "tasas",
+        "contribuciones",
+      ],
+      salud: [
+        "salud", "farmacia", "remedios", "medicamento", "medicamentos",
+        "medico", "doctor", "obra social", "prepaga", "osde", "swiss medical",
+        "galeno", "medife", "clinica", "hospital", "dentista", "odontologo",
+        "kinesiologo", "psicologo", "terapia", "analisis", "laboratorio",
+      ],
+      indumentaria: [
+        "ropa", "indumentaria", "vestimenta", "zapatillas", "calzado",
+        "zapato", "zapateria", "prendas", "moda", "lenceria",
+      ],
+      cuidado_personal: [
+        "cuidado personal", "peluqueria", "barberia", "estetica", "cosmetica",
+        "cosmeticos", "perfumeria", "perfumes", "manicura", "pedicura",
+        "depilacion", "spa", "maquillaje",
+      ],
+      deportes: [
+        "deporte", "deportes", "gimnasio", "gym", "club", "cancha", "futbol",
+        "pileta", "natacion", "yoga", "pilates", "crossfit",
+      ],
+      educacion: [
+        "educacion", "colegio", "escuela", "jardin", "facultad", "universidad",
+        "curso", "cursos", "capacitacion", "instituto", "academia", "clases",
+        "apuntes", "utiles", "matricula",
+      ],
+      ocio: [
+        "ocio", "recreacion", "salida", "salidas", "entretenimiento", "cine",
+        "teatro", "bar", "restaurante", "restaurant", "recital", "concierto",
+        "fiesta", "juego", "juegos", "libros", "libreria", "museo",
+      ],
+      suscripciones: [
+        "suscripcion", "suscripciones", "membresia", "membresias", "abono",
+        "streaming", "netflix", "spotify", "hbo", "disney", "prime video",
+        "amazon prime", "youtube premium",
+      ],
+      viajes: [
+        "viaje", "viajes", "vacaciones", "turismo", "hotel", "pasaje",
+        "pasajes", "vuelo", "vuelos", "excursion", "veraneo", "airbnb", "booking",
+      ],
+      mascotas: [
+        "mascota", "mascotas", "perro", "gato", "veterinaria", "veterinario",
+        "balanceado", "piedritas", "animales",
+      ],
+      regalos: [
+        "regalo", "regalos", "obsequio", "obsequios", "presente", "presentes",
+        "cumpleanos",
+      ],
+      compras: [
+        "compras", "compra", "shopping", "shoping", "articulos", "cosas",
+        "bazar", "ferreteria", "decoracion", "muebles", "electrodomesticos",
+      ],
+      tecnologia: [
+        "tecnologia", "electronica", "computadora", "computacion", "notebook",
+        "tablet", "hardware", "software", "hosting", "dominio", "gadgets",
+      ],
+      tarjeta: [
+        "tarjeta", "tarjetas", "tarjeta de credito", "credito", "plastico",
+        "visa", "master", "mastercard", "amex", "american express", "resumen",
+        "cuotas", "refinanciacion",
+      ],
+      comisiones: [
+        "comision", "comisiones", "gastos bancarios", "bancarios", "bancario",
+        "mantenimiento", "administracion de cuenta", "sellado", "sello",
+        "cheques", "cambio de cheques", "comision de cambio",
+        "comision de envio", "envio de dinero", "envio", "impuesto al cheque",
+      ],
+      seguros: [
+        "seguro", "seguros", "poliza", "polizas", "seguro de vida",
+        "seguro del hogar", "seguro del auto",
+      ],
+      vehiculo: [
+        "vehiculo", "auto", "coche", "automotor", "patente", "patentes", "vtv",
+        "mecanico", "taller", "service", "repuesto", "repuestos", "reparacion",
+        "multa", "multas", "lavadero", "cubiertas",
+      ],
+      limpieza: [
+        "limpieza", "limpiador", "limpiadores", "detergente", "lavanderia",
+        "tintoreria",
+      ],
+      otros: [
+        "otros", "otro", "varios", "miscelaneo", "miscelaneos", "imprevisto",
+        "imprevistos",
+      ],
     },
-    // ── Cuentas ────────────────────────────────────────────────────────────
+    // ── Cuentas (5 conceptos) ──────────────────────────────────────────────
+    // `cuenta_*` = **tipo de cuenta**, no el nombre de una cuenta real. Los
+    // canales (banco/billetera virtual/efectivo) sí son vocabulario público;
+    // una cuenta con nombre propio ("Cuenta Alexis") NO va acá: se aprende.
     cuenta: {
-      galicia: ["galicia", "banco galicia"],
-      "banco galicia": ["banco galicia", "galicia"],
-      truist: ["truist", "banco truist"],
-      billetera: ["billetera"],
-      efectivo: ["efectivo", "billetera", "caja"],
-      cash: ["efectivo", "billetera"],
-      caja: ["caja"],
-      "caja de ahorro": ["caja de ahorro", "caja"],
-      western: ["western union", "western"],
-      "western union": ["western union", "western"],
-      banco: ["banco"],
+      cuenta_efectivo: [
+        "efectivo", "cash", "plata", "mano", "caja",
+      ],
+      cuenta_banco: [
+        "banco", "bco", "caja de ahorro", "cuenta corriente", "galicia",
+        "santander", "bbva", "nacion", "provincia", "macro", "hsbc", "icbc",
+        "supervielle", "credicoop", "brubank", "truist",
+      ],
+      cuenta_billetera_virtual: [
+        "billetera", "billetera virtual", "virtual", "mercado pago",
+        "mercadopago", "mp", "uala", "naranja", "personal pay", "modo",
+        "cuenta dni",
+      ],
+      cuenta_por_cobrar: [
+        "por cobrar", "a cobrar", "pendiente", "pendientes", "deudores",
+        "cobros", "a favor",
+      ],
+      cuenta_inversion: [
+        "inversion", "inversiones", "plazo fijo", "fci", "fondo", "fondos",
+        "acciones", "cedears", "cedear", "bonos", "broker", "cripto",
+        "criptomonedas", "bitcoin",
+      ],
     },
   };
 
@@ -178,16 +253,17 @@ export class AddVozAlias1790100000000 implements MigrationInterface {
     );
 
     // ── Seed de la capa de SISTEMA ─────────────────────────────────────────
-    for (const [ambito, terminos] of Object.entries(this.SISTEMA)) {
-      for (const [termino, destinos] of Object.entries(terminos)) {
-        for (const destino of destinos) {
+    // Una fila por **alias**; `destinoValor` = el **concepto** (no un id).
+    for (const [ambito, conceptos] of Object.entries(this.SISTEMA)) {
+      for (const [concepto, alias] of Object.entries(conceptos)) {
+        for (const termino of alias) {
           await queryRunner.query(
             `INSERT INTO "voz_alias"
                ("usuarioId", "ambito", "termino", "terminoNorm", "destinoValor",
                 "destinoEtiqueta", "origen", "usos", "correcciones", "activo", "eliminado")
              VALUES (NULL, $1, $2, $3, $4, $4, 'sistema', 0, 0, true, false)
              ON CONFLICT DO NOTHING`,
-            [ambito, termino, termino, destino]
+            [ambito, termino, termino, concepto]
           );
         }
       }

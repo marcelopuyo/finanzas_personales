@@ -8,12 +8,42 @@
 /** Tipo de dato que un campo acepta por voz. */
 export type TipoCampoVoz = "texto" | "monto" | "fecha" | "opcion";
 
+/**
+ * Catálogos con **vocabulario** soportado (R12: la granularidad es por catálogo).
+ *
+ * ⚠️ Es la única fuente de verdad del tipo: `backend/src/lib/vocabulario.ts`
+ * construye su lista de ámbitos con `satisfies readonly AmbitoVoz[]`, así que
+ * agregar un catálogo acá **rompe el typecheck** hasta registrarlo allá (y en el
+ * `Enum` de la base).
+ */
+export type AmbitoVoz = "categoriaGasto" | "cuenta";
+
 /** Opción seleccionable de un campo `opcion` (select / combobox). */
 export interface OpcionVoz {
   /** Valor que se escribe en el formulario (id o nombre, según el campo). */
   value: string;
   /** Texto visible: es lo que el usuario nombra al dictar. */
   label: string;
+}
+
+/** Un concepto del **diccionario de sistema** con su jerga (ver `vocabulario.ts`). */
+export interface ConceptoVoz {
+  /** Identificador genérico del concepto (`tabaco`, `combustible`…). */
+  concepto: string;
+  /** Palabras que el usuario puede decir (en forma normalizada o no). */
+  alias: string[];
+}
+
+/** Un alias resuelto contra una opción real del catálogo del usuario. */
+export interface AliasOpcion {
+  /** `value` de la opción (id o nombre, según el campo). */
+  valor: string;
+  /** Etiqueta actual de la opción (para los chips). */
+  etiqueta: string;
+  /** Puntaje del match (1 = el alias es literalmente un token de la etiqueta). */
+  puntaje: number;
+  /** Concepto de sistema que lo produjo, o `"aprendido"` si lo eligió el usuario. */
+  concepto: string;
 }
 
 /** Campo del formulario que se puede llenar por voz. */
@@ -35,6 +65,25 @@ export interface CampoDictable {
    * Es lo que permite que "nafta" caiga en la categoría "Combustible".
    */
   sinonimos?: Record<string, string[]>;
+  /**
+   * Catálogo al que apunta el campo (`categoriaGasto`, `cuenta`…). R12: la
+   * granularidad del vocabulario aprendido es **por catálogo**. Es la clave con la
+   * que `useAliasDeCampo()` pide el diccionario del ámbito correcto.
+   */
+  catalogo?: AmbitoVoz;
+  /**
+   * **Alias ya resueltos** contra las opciones de *este* usuario, listos para que
+   * el parser los use: término dictado → opciones del usuario (1 = determinista,
+   * varias = candidatos).
+   *
+   * Lo arma la pantalla con `useAliasDeCampo()` (`components/voz/voz-provider.tsx`),
+   * que fusiona la capa de **sistema** (concepto → tus categorías, por tokens de la
+   * etiqueta) con la **aprendida** (término → id, que pisa todo).
+   *
+   * ℹ️ Se declara como `Map` a propósito: la config vive en el cliente y nunca
+   * cruza el límite de RSC (si algún día cruza, hay que serializarla).
+   */
+  alias?: Map<string, AliasOpcion[]>;
   /** Convierte el valor a número antes de escribirlo (campos con id). */
   numerico?: boolean;
   /**
@@ -59,6 +108,8 @@ export type OrigenAsignacion =
   | "fecha"
   | "opcion"
   | "sinonimo"
+  /** Match del vocabulario (sistema o aprendido): máxima prioridad entre las opciones. */
+  | "alias"
   | "resto"
   /** Completado con el último gasto que tenía esa misma descripción. */
   | "historial";
@@ -78,6 +129,11 @@ export interface Asignacion {
 export interface Candidato {
   campo: string;
   opciones: OpcionVoz[];
+  /**
+   * Palabras del dictado que produjeron la ambigüedad. Se usan para **aprender**
+   * cuando el usuario elige una (vía A del plan de G2).
+   */
+  termino: string;
 }
 
 /** Resultado de parsear una frase contra una `ConfigDictado`. */
