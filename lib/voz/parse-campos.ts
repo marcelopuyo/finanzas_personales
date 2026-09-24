@@ -218,6 +218,10 @@ export function parsearCampos(texto: string, config: ConfigDictado): ResultadoDi
             .slice(0, MAX_CANDIDATOS)
             .map((o) => ({ value: o.valor, label: o.etiqueta })),
         });
+        // ⚠️ El término ambiguo **se consume igual**: si no, se filtraba a la
+        // Descripción ("pagué mil con la cuenta galicia" dejaba Galicia de
+        // descripción; reportado en el iPhone el 2026-09-24).
+        marcarTermino(vocabulario.termino, Boolean(campo.aportaTexto));
       }
       continue;
     }
@@ -251,6 +255,8 @@ export function parsearCampos(texto: string, config: ConfigDictado): ResultadoDi
         termino: primero.termino,
         opciones: matches.slice(0, MAX_CANDIDATOS).map((m) => m.opcion),
       });
+      // Mismo criterio que en el paso 4.0: la palabra ambigua no es Descripción.
+      marcarTermino(primero.termino, Boolean(campo.aportaTexto));
     }
   }
 

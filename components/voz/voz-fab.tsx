@@ -493,6 +493,24 @@ export function VozFab() {
             Revisalos y guardá vos.
           </p>
 
+          {/* La **pregunta** va primero: es lo único que falta decidir. */}
+          {dictado.resultado.candidatos.map((c) => (
+            <div key={c.campo} className="mt-2.5">
+              <p className="text-[11.5px] font-medium text-header">
+                ¿Cuál es {campoDe(c.campo)?.etiqueta?.toLowerCase() ?? c.campo}?
+              </p>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {c.opciones.map((o) => (
+                  <BotonCandidato
+                    key={o.value}
+                    texto={o.label}
+                    onElegir={() => elegirCandidato(c, o)}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+
           <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1.5">
             {dictado.resultado.asignaciones.map((a) => (
               <ChipVoz
@@ -507,23 +525,6 @@ export function VozFab() {
               />
             ))}
           </div>
-
-          {dictado.resultado.candidatos.map((c) => (
-            <div key={c.campo} className="mt-2.5">
-              <p className="text-[11.5px] text-subtitle">
-                ¿Cuál es {campoDe(c.campo)?.etiqueta?.toLowerCase() ?? c.campo}?
-              </p>
-              <div className="mt-1 flex flex-wrap gap-1.5">
-                {c.opciones.map((o) => (
-                  <BotonCandidato
-                    key={o.value}
-                    texto={o.label}
-                    onElegir={() => elegirCandidato(c, o)}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
 
           {dictado.resultado.noEntendido.length > 0 && (
             <p className="mt-2 text-[11px] text-subtitle">
