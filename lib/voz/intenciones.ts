@@ -14,7 +14,14 @@ import type { Intencion } from "./tipos";
  *
  * ⚠️ Son **decorativos**: la navegación la decide el **sustantivo** (regla 2 de
  * §15.4). Existen para que "muéstrame las cuentas" y "las cuentas" se comporten
- * igual, y para exigir una orden explícita en frases largas.
+ * igual, y para exigir una orden explícita en frases largas (y en los destinos con
+ * `soloConVerbo`).
+ *
+ * 📝 **2026-09-24 (pedido del usuario)**: se sumaron las formas habladas con
+ * subordinada (*"quiero que me **muestres**"*, *"quisiera que me **muestres**"*) y
+ * los sinónimos *"visualizar"*, *"mostrar"*. Las fórmulas *"quiero ver"* /
+ * *"quisiera ver"* / *"ve a"* / *"andá a"* / *"llévame"* ya estaban cubiertas por
+ * el verbo suelto (`ver`, `ve`, `anda`, `llevame`) + el `RELLENO_ORDEN`.
  */
 const VERBOS_NAVEGAR = [
   "ir",
@@ -24,18 +31,78 @@ const VERBOS_NAVEGAR = [
   "abrir",
   "abri",
   "abrime",
+  "entrar",
+  "entra",
+  "entrate",
   "mostrar",
+  "mostra",
   "mostrame",
+  "mostrarme",
+  "mostranos",
+  "mostras",
   "muestra",
   "muestrame",
+  "muestres",
+  "muestre",
+  "muestren",
+  "visualizar",
+  "visualiza",
+  "visualizame",
+  "fijate",
+  "fijar",
+  "mira",
+  "mirar",
+  "echa",
+  "buscar",
+  "busca",
+  "buscame",
+  "navegar",
+  "navega",
+  "navegame",
   "llevar",
   "llevame",
+  "llavame",
+  "yevame",
   "lleva",
   "volver",
   "volve",
   "anda",
   "andate",
   "dame",
+];
+
+/**
+ * **Relleno de las órdenes habladas**: muletillas y auxiliares que no son
+ * contenido ni verbos por sí solos.
+ *
+ * - No cuentan para el **término a aprender** (§15.6): *"quiero ver las deudas"*
+ *   aprende `deudas`, no `quiero ver las deudas`.
+ * - Se descartan del **sobrante** que viaja a la pantalla destino.
+ *
+ * ⛔ `quiero` / `quisiera` **no** son verbos: por sí solos no ordenan nada
+ * ("quiero" a secas no navega ni carga).
+ */
+export const RELLENO_ORDEN = [
+  "quiero",
+  "quisiera",
+  "queria",
+  "querria",
+  "quieras",
+  "podrias",
+  "podria",
+  "podes",
+  "puede",
+  "puedes",
+  "favor",
+  "me",
+  "te",
+  "nos",
+  "que",
+  // "mostrame la **pantalla** de cuentas" / "echá un **vistazo**": la palabra no
+  // es contenido (el destino lo dice el sustantivo).
+  "pantalla",
+  "pantallas",
+  "vistazo",
 ];
 
 /**

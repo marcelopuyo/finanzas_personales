@@ -245,4 +245,10 @@ export interface ResultadoIntencion {
   destinos?: Intencion[];
   /** Término significativo que no se entendió: es lo que se aprende al elegir. */
   terminoDesconocido?: string;
+  /**
+   * La frase es una **consulta** ("cuánto gasté este mes"): la voz **no la usa**
+   * —no navega, no llena campos— y el FAB lo dice en vez de intentar adivinar
+   * (decisión del usuario, 2026-09-24: fuera de los ejemplos y del uso).
+   */
+  esConsulta?: boolean;
 }

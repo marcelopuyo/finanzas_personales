@@ -75,7 +75,7 @@ export default async function VozPage({
   );
 
   const { intencion, resto, dato } = parsearIntencion(texto, {
-    cuentas: { alias: aliasCuentas, monedas },
+    cuentas: { alias: aliasCuentas, monedas, opciones: opcionesCuenta },
     navegacion,
   });
   // Sin intención —o con un destino que necesita un dato que no se pudo resolver

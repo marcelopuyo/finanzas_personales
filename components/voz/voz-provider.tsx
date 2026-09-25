@@ -273,6 +273,7 @@ export function useAliasDeCampo(
 export function useCuentasNavegables(): {
   alias: Map<string, AliasOpcion[]>;
   monedas: Record<string, string>;
+  opciones: OpcionVoz[];
 } {
   const ctx = useVoz();
   const filas = ctx?.filas ?? null;
@@ -296,7 +297,7 @@ export function useCuentasNavegables(): {
     return fusionarAprendidos(mapa, filas, opciones, "cuenta");
   }, [filas, sistema, opciones]);
 
-  return { alias, monedas };
+  return { alias, monedas, opciones };
 }
 
 /**

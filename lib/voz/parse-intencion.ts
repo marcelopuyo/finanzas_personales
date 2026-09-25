@@ -15,7 +15,12 @@
 import { MAX_CANDIDATOS } from "./config";
 import { extraerNumeros } from "./numeros";
 import { buscarAlias } from "./opciones";
-import { DESTINOS_APRENDIBLES, INTENCIONES, NO_ES_GASTO } from "./intenciones";
+import {
+  DESTINOS_APRENDIBLES,
+  INTENCIONES,
+  NO_ES_GASTO,
+  RELLENO_ORDEN,
+} from "./intenciones";
 import { norm, tokenizar } from "./normalizar";
 import type {
   AliasOpcion,
@@ -62,6 +67,7 @@ const CALIFICADORES: Record<string, string[]> = {
   pesos: ["ars", "arg"],
   peso: ["ars", "arg"],
   argentinos: ["ars", "arg"],
+  ars: ["ars"],
   dolares: ["usd"],
   dolar: ["usd"],
   usd: ["usd"],
@@ -69,6 +75,21 @@ const CALIFICADORES: Record<string, string[]> = {
   euros: ["eur"],
   euro: ["eur"],
 };
+
+/**
+ * Términos que **no** identifican una cuenta por sí solos: los enlaces y el propio
+ * sustantivo (`cuenta`, `cuentas`). Evita que *"muéstrame **la cuenta** caja 1"* se
+ * resuelva por la palabra "cuenta" en vez de por el nombre.
+ */
+const NO_IDENTIFICA = new Set<string>([...ENLACES, "cuenta", "cuentas"]);
+
+/** Ventanas del dictado, de la **más específica** a la menos: pares y luego sueltas. */
+function ventanasDictado(nrm: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < nrm.length - 1; i++) out.push(`${nrm[i]} ${nrm[i + 1]}`);
+  out.push(...nrm);
+  return out;
+}
 
 /**
  * Marcadores de **consulta**: si aparecen, la frase **no** es una orden de carga
@@ -106,6 +127,8 @@ export interface ContextoIntencion {
   cuentas?: {
     alias: Map<string, AliasOpcion[]>;
     monedas?: Record<string, string>;
+    /** Cuentas del usuario, para resolver por el **nombre propio** de cada una. */
+    opciones?: OpcionVoz[];
   };
   /** **Órdenes aprendidas** (ámbito `navegacion`): término → id de la intención. */
   navegacion?: Map<string, AliasOpcion[]>;
@@ -113,7 +136,19 @@ export interface ContextoIntencion {
 
 /**
  * Resuelve el **nombre hablado de una cuenta** contra las cuentas del usuario
- * (`contexto.cuentas`): diccionario de sistema del ámbito `cuenta` + lo aprendido.
+ * (`contexto.cuentas`).
+ *
+ * Se prueban **dos capas**, porque un usuario puede nombrar la cuenta de dos
+ * maneras y las dos son legítimas:
+ *
+ * 1. **El nombre propio de la cuenta** — cualquier **tramo** de su etiqueta
+ *    ("caja 1", "truist", "galicia", "transito western"): es lo que el usuario lee
+ *    en la app y dice tal cual. Se prueban primero los **pares** (más específicos:
+ *    *"caja 1"* gana sobre *"caja"*) y después las palabras sueltas; se saltean los
+ *    enlaces y el sustantivo `cuenta` (si no, *"muéstrame la cuenta caja 1"* se
+ *    resolvería por la palabra "cuenta").
+ * 2. **El vocabulario** (jerga de sistema + lo aprendido): `caja`, `billetera`,
+ *    `plata`, `mercado pago`… y lo que el usuario ya eligió alguna vez.
  *
  * - 1 cuenta ⇒ navegación determinista.
  * - varias ⇒ **candidatos** (y el calificador de moneda filtra: "galicia pesos").
@@ -124,9 +159,12 @@ function resolverCuenta(
   contexto: ContextoIntencion
 ): { dato?: string; terminoDato?: string; datoCandidatos?: OpcionVoz[] } | null {
   const cuentas = contexto.cuentas;
-  if (!cuentas?.alias.size) return null;
+  if (!cuentas) return null;
 
-  const hit = buscarAlias(nrm, cuentas.alias);
+  const propio = porNombreDeCuenta(nrm, cuentas.opciones ?? []);
+  const vocab = cuentas.alias.size ? buscarAlias(nrm, cuentas.alias) : undefined;
+  // El **nombre propio** gana: es más específico y es el que el usuario ve.
+  const hit = propio ?? vocab;
   if (!hit) return null;
 
   const opciones =
@@ -143,6 +181,43 @@ function resolverCuenta(
       .slice(0, MAX_CANDIDATOS)
       .map((o) => ({ value: o.valor, label: o.etiqueta })),
   };
+}
+
+/**
+ * **Nombre propio**: busca en el dictado un tramo de la etiqueta de alguna cuenta
+ * (comparación por tokens **exactos**, sin difuso: los nombres de cuenta no son
+ * vocabulario, son texto del usuario).
+ */
+function porNombreDeCuenta(
+  nrm: string[],
+  opciones: OpcionVoz[]
+): { termino: string; opciones: AliasOpcion[] } | undefined {
+  if (!opciones.length) return undefined;
+  const etiquetas = opciones.map((o) => ({
+    opcion: o,
+    tokens: norm(o.label).split(" ").filter(Boolean),
+  }));
+
+  for (const ventana of ventanasDictado(nrm)) {
+    const partes = ventana.split(" ");
+    if (partes.some((p) => NO_IDENTIFICA.has(p))) continue;
+
+    const hits = etiquetas.filter(({ tokens }) =>
+      tokens.some((_, i) => partes.every((p, k) => tokens[i + k] === p))
+    );
+    if (!hits.length) continue;
+
+    return {
+      termino: ventana,
+      opciones: hits.map(({ opcion }) => ({
+        valor: opcion.value,
+        etiqueta: opcion.label,
+        puntaje: 1,
+        concepto: "etiqueta",
+      })),
+    };
+  }
+  return undefined;
 }
 
 /**
@@ -194,7 +269,9 @@ function filtrarPorMoneda(
  * ⛔ Si la frase nombra **otra** pantalla del catálogo (préstamos, períodos,
  * resumen…) la carga se cancela: es de otro dominio ("pagué 5000 del préstamo"
  * ⇒ ejemplos, porque el pago de préstamo no está en el catálogo).
- * ⛔ Las **consultas** nunca son una carga (regla 4).
+ * ⛔ Las **consultas** ("cuánto gasté este mes") quedan **fuera del uso**: la voz no
+ * las interpreta como orden, no navega, no llena campos y no ofrece destinos; el
+ * FAB lo dice tal cual (`esConsulta`, decisión del usuario 2026-09-24).
  */
 export function parsearIntencion(
   texto: string,
@@ -220,18 +297,34 @@ export function parsearIntencion(
     });
     const restantes = orig.filter((_, i) => !usados.has(i));
     let k = 0;
-    while (k < restantes.length && ENLACES.has(norm(restantes[k]))) k++;
+    while (
+      k < restantes.length &&
+      (ENLACES.has(norm(restantes[k])) || RELLENO_ORDEN.includes(norm(restantes[k])))
+    ) {
+      k++;
+    }
     return restantes.slice(k).join(" ").trim();
   };
 
   const navegables = intenciones.filter((i) => i.tipo === "navegacion");
   const carga = intenciones.find((i) => i.tipo === "carga");
+  /**
+   * **Consulta** ("cuánto gasté este mes", "cómo vengo"): la voz **no la usa**.
+   * No navega, no llena campos y **no** ofrece el catálogo de destinos.
+   */
+  const esConsulta = nrm.some((t) => CONSULTAS.has(t));
   const hayMovimiento = nrm.some((t) =>
     navegables.some((n) => n.verbos.includes(t))
   );
-  /** Términos significativos: sin enlaces ni verbos de movimiento. */
+  /**
+   * Términos significativos: sin enlaces, sin muletillas de la orden
+   * (`RELLENO_ORDEN`: "quiero", "que", "me"…) ni verbos de movimiento.
+   */
   const significativos = nrm.filter(
-    (t) => !ENLACES.has(t) && !navegables.some((n) => n.verbos.includes(t))
+    (t) =>
+      !ENLACES.has(t) &&
+      !RELLENO_ORDEN.includes(t) &&
+      !navegables.some((n) => n.verbos.includes(t))
   );
 
   // ── Pasada 0: ÓRDENES APRENDIDAS (§15.6) ───────────────────────────────────
@@ -259,12 +352,12 @@ export function parsearIntencion(
 
     // **Destino parametrizado** (`ir-cuenta`): hay que resolver el nombre.
     if (intencion.dato === "cuenta") {
-      // ⚠️ Guard de la carga: "pagué 3500 con la cuenta galicia" (o "lo pagué con
-      // la billetera") es el **campo Cuenta** del wizard, no una orden ⇒ se deja
-      // pasar a la pasada de carga / al llenado de campos.
-      const esCarga =
-        (carga?.verbos.some((v) => nrm.includes(v)) ?? false) ||
-        extraerNumeros(orig).length > 0;
+      // ⚠️ Guard de la carga: *"pagué 3500 con la cuenta galicia"* es el **campo
+      // Cuenta** del wizard, no una orden. Se mira el **verbo de gasto** (no el
+      // número: *"muéstrame la cuenta caja **1**"* es un nombre con dígitos y tiene
+      // que navegar; y una frase de carga sin verbo de gasto ya queda afuera por
+      // `soloConVerbo`).
+      const esCarga = carga?.verbos.some((v) => nrm.includes(v)) ?? false;
       if (esCarga) continue;
 
       const resuelto = resolverCuenta(nrm, contexto);
@@ -279,7 +372,7 @@ export function parsearIntencion(
   // "muéstrame las deudas del banco": verbo de movimiento + ningún sustantivo del
   // catálogo ⇒ se ofrecen los destinos. Se aprende **sólo** si queda **un** término
   // significativo (con más, navega pero no ensucia el vocabulario).
-  if (hayMovimiento && significativos.length) {
+  if (hayMovimiento && significativos.length && !esConsulta) {
     return {
       intencion: null,
       resto: "",
@@ -291,15 +384,13 @@ export function parsearIntencion(
     };
   }
 
-
-  // ── Pasada 2: CARGA ───────────────────────────────────────────────────────
-  if (carga) {
-    const esConsulta = nrm.some((t) => CONSULTAS.has(t));
+  // ── Pasada 2: CARGA ──────────────────────────────────────────────────────
+  if (carga && !esConsulta) {
     // Si la frase nombra **otra cosa** de la lista (préstamos, períodos, resumen…)
     // es de otro dominio: el pago de préstamo no está en la voz ⇒ ejemplos (no se
     // la apropia el wizard de gasto). Lista curada: ver `NO_ES_GASTO`.
     const otraCosa = nrm.some((t) => NO_ES_GASTO.includes(t));
-    if (!esConsulta && !otraCosa && !hayMovimiento) {
+    if (!otraCosa && !hayMovimiento) {
       const haySustantivo = nrm.some((t) => carga.sustantivos.includes(t));
       const hayVerbo = nrm.some((t) => carga.verbos.includes(t));
       const hayMonto = extraerNumeros(orig).length > 0;
@@ -309,5 +400,5 @@ export function parsearIntencion(
     }
   }
 
-  return { intencion: null, resto: "" };
+  return { intencion: null, resto: "", esConsulta };
 }

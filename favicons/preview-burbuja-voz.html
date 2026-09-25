@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Preview — Burbuja del FAB 🎤 (voz): estados reales</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 22px; display: flex; flex-direction: column; gap: 26px;
+    font-family: Inter, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: #111; color: #e8e8ea;
+  }
+  h1 { font-size: 15px; margin: 0; }
+  .lead { font-size: 12px; line-height: 1.65; opacity: .72; max-width: 980px; margin: 6px 0 0; }
+  .lead b { opacity: .95; }
+  .grid { display: flex; flex-wrap: wrap; gap: 26px; align-items: flex-start; }
+  code { font-size: 11px; opacity: .8; }
+  .ok { color: #51cf66; }
+
+  /* ── Tokens (copiados de app/globals.css) ── */
+  .dark {
+    --background:#151517; --foreground:#e2e4f0; --primary:#4c6ef5; --muted:#1e1e20;
+    --muted-foreground:#9a9b9e; --border:#3e3f42; --card:#353638; --card-foreground:#e2e4f0;
+    --success:#51cf66; --danger:#ff6b6b; --warning:#ffd43b;
+    --label:#9a9b9e; --value:#ffffff; --subtitle:#808185; --header:#ffffff;
+  }
+  .light {
+    --background:#f6f7f9; --foreground:#1e293b; --muted:#eef1f5; --border:#e2e8f0;
+    --card:#ffffff; --card-foreground:#1e293b; --subtitle:#7c8798; --header:#0f172a;
+    --primary:#2563eb; --success:#16a34a; --warning:#d97706; --danger:#dc2626;
+  }
+  .phone {
+    position: relative; width: 390px; height: 620px; border-radius: 16px; overflow: hidden;
+    background: var(--background); border: 1px solid #2a2a2c;
+    /* La app calcula el ancho de la burbuja con `100vw`: acá `--vw` es el "viewport" del panel. */
+    --vw: 390px;
+  }
+  .phone.w320 { width: 320px; --vw: 320px; }
+  .cap { display: flex; flex-direction: column; gap: 8px; }
+  .cap > h2 { font-size: 12.5px; margin: 0; letter-spacing: .02em; }
+  .cap > h2 span { opacity: .5; font-weight: 400; }
+  .cap > p { font-size: 11.5px; line-height: 1.55; opacity: .62; margin: 0; max-width: 390px; }
+
+  /* ── FAB + burbuja (mismas clases que components/voz/voz-fab.tsx) ── */
+  .fp-voz-fab {
+    position: absolute; right: 16px; bottom: 16px;
+    display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+  }
+  .burbuja {
+    position: relative;
+    width: min(20rem, calc(var(--vw) - 2rem));
+    /* ✅ 2026-09-24: `bg-background` (antes `bg-card`) ⇒ se separa de los PANELES
+       del dashboard, que son `bg-card`. */
+    border-radius: 12px; border: 1px solid var(--border); background: var(--background);
+    padding: 12px; box-shadow: 0 10px 15px -3px rgb(0 0 0 / .4), 0 4px 6px -4px rgb(0 0 0 / .4);
+  }
+  /* ✕ del ángulo superior derecho: `absolute right-2 top-2 h-7 w-7 rounded-lg text-subtitle` */
+  .x-cerrar {
+    position: absolute; right: 8px; top: 8px; width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    border: 0; background: transparent; border-radius: 8px;
+    color: var(--subtitle); font-size: 13px; line-height: 1;
+  }
+  .burbuja .t { font-size: 12.5px; color: var(--card-foreground); margin: 0; padding-right: 32px; }
+  .burbuja .esc { margin: 4px 0 0; font-size: 12.5px; color: var(--subtitle); }
+  .fila-ej { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  /* ✅ 2026-09-24: mismo tratamiento que los FILTROS del dashboard
+     (`border border-border bg-muted font-medium text-card-foreground`). */
+  .pill {
+    border-radius: 999px; border: 1px solid var(--border); padding: 4px 10px;
+    font-size: 11.5px; font-weight: 500; color: var(--card-foreground); background: var(--muted);
+  }
+  /* 🎨 Píldoras de OPCIÓN: tinte semitransparente por índice (fondo 10 %, borde 40 %). */
+  .op { border-radius: 999px; padding: 4px 10px; font-size: 11.5px; font-weight: 500; border: 1px solid; }
+  .op0 { border-color: color-mix(in srgb, var(--primary) 40%, transparent); background: color-mix(in srgb, var(--primary) 10%, transparent); color: var(--primary); }
+  .op1 { border-color: color-mix(in srgb, var(--success) 45%, transparent); background: color-mix(in srgb, var(--success) 10%, transparent); color: var(--success); }
+  .op2 { border-color: color-mix(in srgb, var(--warning) 45%, transparent); background: color-mix(in srgb, var(--warning) 10%, transparent); color: var(--warning); }
+  .op3 { border-color: color-mix(in srgb, var(--danger) 40%, transparent); background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
+  .lnk { margin-top: 8px; font-size: 11px; color: var(--subtitle); text-decoration: underline; }
+  .lnk.ml { margin-left: auto; }
+  .pie { margin-top: 10px; display: flex; align-items: center; gap: 12px; }
+  .q { margin: 10px 0 0; font-size: 11.5px; font-weight: 500; color: var(--header); }
+  .ops { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips { margin-top: 8px; display: flex; flex-wrap: wrap; column-gap: 8px; row-gap: 6px; }
+  .chipw { display: inline-flex; align-items: center; gap: 2px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card); padding: 2px 8px; font-size: 11px;
+  }
+  .chip .k { color: var(--subtitle); }
+  .chip .v { font-weight: 500; color: var(--card-foreground); }
+  .chip .n { font-size: 10px; color: var(--subtitle); font-style: italic; }
+  /* 🗑️ 2026-09-24: la ✕ por chip pasó a ser un ícono de papelera (lucide `Trash2`,
+     14 px dentro de un botón de 20 px). */
+  .x {
+    width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;
+    color: var(--subtitle);
+  }
+  .x svg { width: 14px; height: 14px; }
+  .olv {
+    height: 16px; display: inline-flex; align-items: center; padding: 0 4px;
+    font-size: 10px; color: var(--subtitle); text-decoration: underline;
+  }
+  .nota { margin: 8px 0 0; font-size: 11px; color: var(--subtitle); }
+  /* ✅ 2026-09-24: Deshacer y «Lo que aprendí» pasaron a **íconos** (mismo tamaño y
+     forma que la ✕ de la esquina: 28×28, radio 8, `text-subtitle`). */
+  .ico-btn {
+    display: inline-flex; width: 28px; height: 28px; align-items: center; justify-content: center;
+    border: 0; background: transparent; border-radius: 8px; color: var(--subtitle);
+  }
+  .ico-btn svg { width: 16px; height: 16px; }
+  .mic {
+    position: relative; width: 52px; height: 52px; border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--header); color: var(--background); border: 0;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / .4);
+  }
+  .mic.rec { background: var(--danger); color: #fff; }
+  .mic svg { width: 22px; height: 22px; }
+
+  /* ── Modal «Lo que aprendí» (components/ui/modal.tsx, `centrado`) ── */
+  .overlay { position: absolute; inset: 0; background: rgb(0 0 0 / .5); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .dialog {
+    width: 100%; max-width: 24rem; border-radius: 16px; border: 1px solid var(--border);
+    background: var(--card); box-shadow: 0 20px 25px -5px rgb(0 0 0 / .5); overflow: hidden;
+  }
+  .dialog .hd { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding: 12px 16px; }
+  .dialog .hd h3 { margin: 0; font-size: 15px; font-weight: 600; color: var(--header); }
+  .dialog .bd { padding: 12px 16px; }
+  .lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .item { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-radius: 10px; border: 1px solid var(--border); padding: 8px 12px; }
+  .item .l1 { margin: 0; font-size: 12.5px; color: var(--header); }
+  .item .l2 { margin: 0; font-size: 11px; color: var(--subtitle); }
+
+  /* ── Chrome falso de la app, para ubicar la burbuja en contexto ── */
+  .topbar {
+    height: 52px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px; border-bottom: 1px solid var(--border);
+  }
+  .topbar .logo { font-size: 13px; font-weight: 600; color: var(--header); letter-spacing: -.01em; }
+  .topbar .logo span { display: block; font-weight: 400; opacity: .55; font-size: 11px; }
+  .avatar { width: 26px; height: 26px; border-radius: 999px; background: var(--muted); color: var(--header); font-size: 11px; display: flex; align-items: center; justify-content: center; }
+  .cards { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; opacity: .5; }
+  .card { border-radius: 10px; border: 1px solid var(--border); background: var(--card); padding: 10px 12px; }
+  .card .a { font-size: 12px; font-weight: 600; color: var(--header); }
+  .card .b { font-size: 11px; color: var(--subtitle); margin-top: 3px; }
+
+  /* ─────────────── v2 · affordance ─────────────── */
+  hr { border: 0; border-top: 1px solid #2a2a2c; margin: 4px 0; }
+  .cmp { display: flex; gap: 18px; flex-wrap: wrap; }
+  .mini {
+    width: 320px; border-radius: 12px; border: 1px solid var(--border); background: var(--card);
+    padding: 12px; display: flex; flex-direction: column; gap: 7px;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / .25);
+  }
+  .mini .tag {
+    font-size: 9px; letter-spacing: .07em; text-transform: uppercase; color: var(--subtitle);
+    font-weight: 600; margin-bottom: 1px;
+  }
+  .mini .fila { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .p-hoy { border-radius: 999px; border: 1px solid var(--border); padding: 4px 10px; font-size: 11.5px; color: var(--header); background: transparent; }
+  .p-a { border-radius: 999px; border: 0; padding: 5px 11px; font-size: 11.5px; color: var(--header); background: var(--muted); }
+  .p-b { border-radius: 999px; border: 1px solid var(--border); padding: 4px 10px; font-size: 11.5px; color: var(--header); background: var(--muted); }
+  .p-c { border-radius: 999px; border: 0; padding: 5px 11px; font-size: 11.5px; color: var(--header); background: color-mix(in srgb, var(--primary, #4c6ef5) 20%, transparent); }
+  .p-d { border-radius: 999px; border: 1px solid var(--border); padding: 4px 10px; font-size: 11.5px; color: var(--header); background: transparent; box-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 1px 3px rgb(0 0 0 / .18); }
+  .p-e { border-radius: 999px; border: 1px solid var(--border); padding: 4px 10px; font-size: 11.5px; color: var(--header); background: var(--muted); box-shadow: 0 1px 2px rgb(0 0 0 / .3); }
+  .c-hoy { display:inline-flex; gap:4px; align-items:center; border-radius:999px; border:1px solid var(--border); background:var(--card); padding:2px 8px; font-size:11px; color:var(--subtitle); }
+  .c-hoy b { color: var(--card-foreground); font-weight: 500; }
+  .c-a { display:inline-flex; gap:4px; align-items:center; border-radius:999px; border:0; background:var(--muted); padding:3px 9px; font-size:11px; color:var(--subtitle); }
+  .c-a b { color: var(--card-foreground); font-weight: 500; }
+  .x2 { color: var(--subtitle); font-size: 11px; }
+  .a-hoy { font-size: 11px; color: var(--subtitle); text-decoration: underline; background: none; border: 0; }
+  .a-btn { display:inline-flex; align-items:center; gap:5px; border-radius:999px; border:0; background:var(--muted); padding:5px 11px; font-size:11.5px; color:var(--header); }
+  .a-icon { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:8px; background:transparent; border:0; color:var(--subtitle); font-size:13px; }
+  .a-icon.lleno { background: var(--muted); }
+</style>
+</head>
+<body class="dark">
+
+<h1>Burbuja del FAB 🎤 — <b>estados reales</b> (tema oscuro)</h1>
+<p class="lead">
+  Markup y clases copiados de <b>components/voz/voz-fab.tsx</b> + <b>chip-asignacion.tsx</b> + <b>ui/modal.tsx</b>; colores de
+  <b>app/globals.css</b>. Ancho de la burbuja: <b>min(20 rem, 100% − 2 rem)</b> ⇒ 320 px en un celu de 390 (288 px en uno de 320).<br/>
+  <span class="ok">✔ Cambio aplicado (2026-09-24):</span> el cierre pasó de ser un link “Cerrar” al pie a una
+  <b>✕ en el ángulo superior derecho</b> (28×28 px, como los popups). El pie queda sólo con <b>Deshacer</b> y <b>⋯ Lo que aprendí</b>.
+</p>
+
+<div class="grid">
+
+  <!-- 1 · No entendí -->
+  <div class="cap">
+    <h2>1 · No entendí <span>(estado más frecuente)</span></h2>
+    <p>Frase sin orden reconocida: <b>qué dijo</b> ("Escuché…"), <b>11 ejemplos tocables</b> y la ✕ para cerrar.</p>
+    <div class="phone">
+      <div class="topbar"><div class="logo">finanzas<span>personales</span></div><div class="avatar">A</div></div>
+      <div class="cards">
+        <div class="card"><div class="a">Balance actual</div><div class="b">$ 1.234.567</div></div>
+        <div class="card"><div class="a">Cuentas</div><div class="b">5 cuentas</div></div>
+      </div>
+      <div class="fp-voz-fab">
+        <div class="burbuja">
+          <button class="x-cerrar" title="Cerrar">✕</button>
+          <p class="t">No entendí qué querías hacer. Probá con uno de estos ejemplos:</p>
+          <p class="esc">Escuché: «anotá la transferencia»</p>
+          <div class="fila-ej">
+            <button class="pill">«gasté 3.500 en el super»</button>
+            <button class="pill">«andá al resumen»</button>
+            <button class="pill">«mostrame el balance»</button>
+            <button class="pill">«mostrame las cuentas»</button>
+            <button class="pill">«mostrame el trabajo»</button>
+            <button class="pill">«mostrame los gastos»</button>
+            <button class="pill">«mostrame los ingresos»</button>
+            <button class="pill">«mostrame los resultados»</button>
+            <button class="pill">«mostrame los préstamos»</button>
+            <button class="pill">«andá a los períodos»</button>
+            <button class="pill">«mostrame la cuenta billetera»</button>
+          </div>
+          <div class="pie">
+            <button class="ico-btn" style="margin-left:auto" title="Lo que aprendí"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          </div>
+        </div>
+        <button class="mic" title="Dictar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2 · Consulta / sin texto -->
+  <div class="cap">
+    <h2>2 · Consulta y "No te escuché" <span>(avisos cortos)</span></h2>
+    <p>Consulta ⇒ "no sé responder"; sin voz ⇒ "no te escuché". En los dos casos la salida son los ejemplos, y se cierra con la ✕.</p>
+    <div class="phone">
+      <div class="topbar"><div class="logo">finanzas<span>personales</span></div><div class="avatar">A</div></div>
+      <div class="cards"><div class="card"><div class="a">Balance actual</div><div class="b">$ 1.234.567</div></div></div>
+      <div class="fp-voz-fab">
+        <div class="burbuja">
+          <button class="x-cerrar" title="Cerrar">✕</button>
+          <p class="t">Eso todavía no lo sé responder. Probá con uno de estos ejemplos:</p>
+          <p class="esc">Escuché: «cuánto gasté este mes»</p>
+          <div class="fila-ej">
+            <button class="pill">«gasté 3.500 en el super»</button>
+            <button class="pill">«andá al resumen»</button>
+            <button class="pill">«mostrame las cuentas»</button>
+          </div>
+        </div>
+        <button class="mic rec" title="Escuchando…">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3 · Dictado aplicado -->
+  <div class="cap">
+    <h2>3 · Dictado aplicado <span>(chips + Deshacer)</span></h2>
+    <p>Cada campo es un chip con su <b>✕</b> (vuelve ESE campo) y, si el término era aprendido, un <b>olvidar</b> al lado. El pie queda con <b>Deshacer</b> y <b>⋯</b>.</p>
+    <div class="phone">
+      <div class="topbar"><div class="logo">finanzas<span>personales</span></div><div class="avatar">A</div></div>
+      <div class="cards">
+        <div class="card"><div class="a">Gasto directo</div><div class="b">Descripción · Fecha · Cuenta · Monto · Categoría</div></div>
+      </div>
+      <div class="fp-voz-fab">
+        <div class="burbuja">
+          <button class="x-cerrar" title="Cerrar">✕</button>
+          <p class="t">Completé 3 campos. Revisalos y guardá vos.</p>
+          <div class="chips">
+            <span class="chipw"><span class="chip"><span class="k">Monto</span><span class="v">$ 3.500</span></span><span class="x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></span></span>
+            <span class="chipw"><span class="chip"><span class="k">Categoría</span><span class="v">Alimentacion</span><span class="n">ya lo sabía</span></span><span class="olv">olvidar</span><span class="x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></span></span>
+            <span class="chipw"><span class="chip"><span class="k">Cuenta</span><span class="v">Billetera</span><span class="n">del último gasto</span></span><span class="x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></span></span>
+            <span class="chipw"><span class="chip"><span class="k">Descripción</span><span class="v">Super</span></span><span class="x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></span></span>
+          </div>
+          <p class="nota">No toqué Fecha: ya tenía valor.</p>
+          <div class="pie">
+            <button class="ico-btn" title="Deshacer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></svg></button>
+            <button class="ico-btn" style="margin-left:auto" title="Lo que aprendí"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          </div>
+        </div>
+        <button class="mic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4 · Con pregunta pendiente -->
+  <div class="cap">
+    <h2>4 · Con pregunta pendiente <span>(candidatos)</span></h2>
+    <p>La pregunta va <b>arriba</b> (es lo único que falta decidir): elegir <b>llena el campo y aprende</b>. Después, los chips de lo que ya completó.
+      🎨 Las píldoras de <b>opción</b> (candidatos, destinos, cuentas) llevan <b>tinte semitransparente por posición</b> (fondo 10 % / borde 40 % / texto pleno).</p>
+    <div class="phone">
+      <div class="topbar"><div class="logo">finanzas<span>personales</span></div><div class="avatar">A</div></div>
+      <div class="cards"><div class="card"><div class="a">Gasto directo</div><div class="b">Monto 200.000 · Fecha 24/09/2026</div></div></div>
+      <div class="fp-voz-fab">
+        <div class="burbuja">
+          <button class="x-cerrar" title="Cerrar">✕</button>
+          <p class="t">Completé 1 campo. Elegí lo que falta:</p>
+          <p class="q">¿Cuál es categoría de gasto?</p>
+          <div class="ops">
+            <button class="op op0">Alquiler</button>
+            <button class="op op1">Alquiler Santa Fe</button>
+          </div>
+          <div class="chips">
+            <span class="chipw"><span class="chip"><span class="k">Monto</span><span class="v">$ 200.000</span></span><span class="x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></span></span>
+            <span class="chipw"><span class="chip"><span class="k">Descripción</span><span class="v">Alquiler</span></span><span class="x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></span></span>
+          </div>
+          <div class="pie"><button class="ico-btn" title="Deshacer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></svg></button></div>
+        </div>
+        <button class="mic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5 · Destinos de navegación -->
+  <div class="cap">
+    <h2>5 · Destino no reconocido <span>(navegación, §15.6)</span></h2>
+    <p>Orden de movimiento con un término que no está en el catálogo: se ofrecen los <b>9 destinos</b>. Al elegir navega y <b>aprende</b> el término.</p>
+    <div class="phone">
+      <div class="topbar"><div class="logo">finanzas<span>personales</span></div><div class="avatar">A</div></div>
+      <div class="cards"><div class="card"><div class="a">Balance actual</div><div class="b">$ 1.234.567</div></div></div>
+      <div class="fp-voz-fab">
+        <div class="burbuja">
+          <button class="x-cerrar" title="Cerrar">✕</button>
+          <p class="t">¿A dónde querés ir?</p>
+          <p class="esc">Todavía no sé donde queda «guita».</p>
+          <div class="fila-ej">
+            <button class="op op0">Resumen</button><button class="op op1">Balance</button>
+            <button class="op op2">Cuentas</button><button class="op op3">Trabajo</button>
+            <button class="op op0">Gastos</button><button class="op op1">Ingresos</button>
+            <button class="op op2">Resultados</button><button class="op op3">Préstamos</button>
+            <button class="op op0">Períodos de trabajo</button>
+          </div>
+        </div>
+        <button class="mic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6 · Cuenta ambigua -->
+  <div class="cap">
+    <h2>6 · Cuenta ambigua <span>(nombre repetido / moneda)</span></h2>
+    <p>"muéstrame la cuenta galicia" ⇒ dos cuentas. Elegir navega a <b>/cuentas/[id]</b> y aprende.</p>
+    <div class="phone">
+      <div class="topbar"><div class="logo">finanzas<span>personales</span></div><div class="avatar">A</div></div>
+      <div class="cards"><div class="card"><div class="a">Balance actual</div><div class="b">$ 1.234.567</div></div></div>
+      <div class="fp-voz-fab">
+        <div class="burbuja">
+          <button class="x-cerrar" title="Cerrar">✕</button>
+          <p class="t">¿Cuál de estas cuentas?</p>
+          <div class="ops">
+            <button class="op op0">Bco Galicia ARS</button>
+            <button class="op op1">Bco Galicia USD</button>
+          </div>
+        </div>
+        <button class="mic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7 · Lo que aprendí -->
+  <div class="cap">
+    <h2>7 · «Lo que aprendí» <span>(modal centrado, ⋯ de la burbuja)</span></h2>
+    <p>Lista compacta: <b>término → destino</b>, catálogo y usos; <b>olvidar</b> por fila. No es un CRUD.</p>
+    <div class="phone">
+      <div class="topbar"><div class="logo">finanzas<span>personales</span></div><div class="avatar">A</div></div>
+      <div class="cards"><div class="card"><div class="a">Balance actual</div><div class="b">$ 1.234.567</div></div></div>
+      <div class="overlay">
+        <div class="dialog">
+          <div class="hd"><h3>Lo que aprendí</h3><span style="color:#808185;font-size:14px">✕</span></div>
+          <div class="bd">
+            <ul class="lista">
+              <li class="item"><div><p class="l1">«cig» → Diario - Cig</p><p class="l2">Categorías de gasto · 4 usos</p></div><span class="olv" style="height:auto">olvidar</span></li>
+              <li class="item"><div><p class="l1">«truist» → Cuenta Truist USD</p><p class="l2">Cuentas · 2 usos</p></div><span class="olv" style="height:auto">olvidar</span></li>
+              <li class="item"><div><p class="l1">«guita» → Cuentas</p><p class="l2">Navegación · 1 uso</p></div><span class="olv" style="height:auto">olvidar</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8 · 320 px -->
+  <div class="cap">
+    <h2>8 · El caso más chico <span>(320 px)</span></h2>
+    <p>La burbuja mide <b>288 px</b> y los 11 ejemplos se envuelven en 4-5 líneas: es el estado más alto (≈412 px).</p>
+    <div class="phone w320">
+      <div class="topbar"><div class="logo">finanzas<span>personales</span></div><div class="avatar">A</div></div>
+      <div class="cards"><div class="card"><div class="a">Balance</div><div class="b">$ 1.234.567</div></div></div>
+      <div class="fp-voz-fab">
+        <div class="burbuja">
+          <button class="x-cerrar" title="Cerrar">✕</button>
+          <p class="t">No entendí qué querías hacer. Probá con uno de estos ejemplos:</p>
+          <div class="fila-ej">
+            <button class="pill">«gasté 3.500 en el super»</button>
+            <button class="pill">«andá al resumen»</button>
+            <button class="pill">«mostrame el balance»</button>
+            <button class="pill">«mostrame las cuentas»</button>
+            <button class="pill">«mostrame el trabajo»</button>
+            <button class="pill">«mostrame los gastos»</button>
+            <button class="pill">«mostrame los ingresos»</button>
+            <button class="pill">«mostrame los resultados»</button>
+            <button class="pill">«mostrame los préstamos»</button>
+            <button class="pill">«andá a los períodos»</button>
+            <button class="pill">«mostrame la cuenta billetera»</button>
+          </div>
+        </div>
+        <button class="mic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<hr/>
+<h1>v2 · Affordance: que se lean como <b>botones</b> (no como texto)</h1>
+<p class="lead">
+  El borde de las píldoras es <b>1,2:1</b> contra el fondo de la burbuja (y <b>1,15:1</b> en claro) y van <b>sin relleno</b>
+  ⇒ sólo se ve el texto. Opciones sobre el fondo <b>real</b> de la tarjeta, en <b>oscuro</b> y en <b>claro</b>.
+  Ojo: en claro el relleno <code>--muted</code> es #eef1f5 sobre blanco (1,06:1) ⇒ tampoco se ve; el <b>tinte de marca</b> (C) y la
+  <b>elevación</b> (D/E) sí funcionan en los dos temas.
+</p>
+
+<div class="grid">
+
+  <!-- A · píldoras -->
+  <div class="cap">
+    <h2>A · Píldoras (ejemplos · candidatos · destinos)</h2>
+    <p>A = relleno sin borde · B = relleno + borde · C = tinte de marca · D = borde + elevación · E = relleno + borde + elevación.</p>
+    <div class="cmp">
+      <div class="mini dark">
+        <span class="tag">oscuro</span>
+        <div class="fila"><span class="tag" style="margin:0">hoy</span><button class="p-hoy">«mostrame las cuentas»</button></div>
+        <div class="fila"><span class="tag" style="margin:0">A</span><button class="p-a">«mostrame las cuentas»</button></div>
+        <div class="fila"><span class="tag" style="margin:0">B</span><button class="p-b">«mostrame las cuentas»</button></div>
+        <div class="fila"><span class="tag" style="margin:0">C</span><button class="p-c">«mostrame las cuentas»</button></div>
+        <div class="fila"><span class="tag" style="margin:0">D</span><button class="p-d">«mostrame las cuentas»</button></div>
+        <div class="fila"><span class="tag" style="margin:0">E</span><button class="p-e">«mostrame las cuentas»</button></div>
+      </div>
+      <div class="mini light">
+        <span class="tag">claro</span>
+        <div class="fila"><span class="tag" style="margin:0">hoy</span><button class="p-hoy">«mostrame las cuentas»</button></div>
+        <div class="fila"><span class="tag" style="margin:0">A</span><button class="p-a">«mostrame las cuentas»</button></div>
+        <div class="fila"><span class="tag" style="margin:0">B</span><button class="p-b">«mostrame las cuentas»</button></div>
+        <div class="fila"><span class="tag" style="margin:0">C</span><button class="p-c">«mostrame las cuentas»</button></div>
+        <div class="fila"><span class="tag" style="margin:0">D</span><button class="p-d">«mostrame las cuentas»</button></div>
+        <div class="fila"><span class="tag" style="margin:0">E</span><button class="p-e">«mostrame las cuentas»</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- B · chips -->
+  <div class="cap">
+    <h2>B · Chips de campo</h2>
+    <p>Hoy el chip usa <code>bg-card</code> = <b>el mismo fondo de la burbuja</b> ⇒ sólo queda el borde. Con relleno se lee como etiqueta.</p>
+    <div class="cmp">
+      <div class="mini dark">
+        <span class="tag">oscuro · hoy</span>
+        <div class="fila">
+          <span class="c-hoy">Monto <b>$ 3.500</b></span>
+          <span class="c-hoy">Categoría <b>Alimentacion</b></span>
+          <span class="x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></span>
+        </div>
+        <span class="tag">oscuro · relleno</span>
+        <div class="fila">
+          <span class="c-a">Monto <b>$ 3.500</b></span>
+          <span class="c-a">Categoría <b>Alimentacion</b></span>
+          <span class="x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></span>
+        </div>
+      </div>
+      <div class="mini light">
+        <span class="tag">claro · hoy</span>
+        <div class="fila">
+          <span class="c-hoy">Monto <b>$ 3.500</b></span>
+          <span class="c-hoy">Categoría <b>Alimentacion</b></span>
+          <span class="x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></span>
+        </div>
+        <span class="tag">claro · relleno</span>
+        <div class="fila">
+          <span class="c-a">Monto <b>$ 3.500</b></span>
+          <span class="c-a">Categoría <b>Alimentacion</b></span>
+          <span class="x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- C · pie -->
+  <div class="cap">
+    <h2>C · Pie de la burbuja <span>(íconos, ya sin "Cerrar")</span></h2>
+    <p>✅ Decidido (2026-09-24): el pie son <b>dos íconos</b> — <b>↺ Deshacer</b> (izquierda) y <b>⚙️ Lo que aprendí</b> (derecha) — de 28×28, igual que la ✕ de la esquina. Queda la variante con relleno, por si se quiere más presencia.</p>
+    <div class="cmp">
+      <div class="mini dark">
+        <span class="tag">oscuro · íconos (actual)</span>
+        <div class="fila" style="justify-content:space-between">
+          <button class="ico-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></svg></button>
+          <button class="ico-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </div>
+        <span class="tag">oscuro · con relleno (opción)</span>
+        <div class="fila" style="justify-content:space-between">
+          <button class="a-icon lleno">↺</button><button class="a-icon lleno">⚙</button>
+        </div>
+      </div>
+      <div class="mini light">
+        <span class="tag">claro · íconos (actual)</span>
+        <div class="fila" style="justify-content:space-between">
+          <button class="ico-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></svg></button>
+          <button class="ico-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </div>
+        <span class="tag">claro · con relleno (opción)</span>
+        <div class="fila" style="justify-content:space-between">
+          <button class="a-icon lleno">↺</button><button class="a-icon lleno">⚙</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

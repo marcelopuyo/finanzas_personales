@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Mic, MoreHorizontal, Undo2, X } from "lucide-react";
+import { Mic, Settings, Trash2, Undo2, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useTap } from "@/lib/tap";
@@ -102,6 +102,28 @@ const MARGEN_FRANJA = 8;
 /** ¿El destino de esta intención **es** la pantalla actual? (sin query) */
 function esMiPantallaDe(intencion: Intencion, ruta: string): boolean {
   return intencion.href().split("?")[0] === ruta;
+}
+
+/**
+ * **Paleta de las píldoras de OPCIÓN** (candidatos, destinos de navegación y
+ * cuentas): cada opción toma un color distinto, en **tinte semitransparente**
+ * (fondo al 10 %, borde al 40 %, texto pleno) — el mismo lenguaje que usan los
+ * chips de estado de la app (`bg-success/10 text-success`).
+ *
+ * 🔑 Se **cicla por índice**: determinista, independiente del texto, y dos opciones
+ * seguidas nunca comparten color. Los tokens (`primary`/`success`/`warning`/`danger`)
+ * están definidos en **los dos temas** (`app/globals.css`).
+ */
+const PALETA_OPCION = [
+  "border-primary/40 bg-primary/10 text-primary",
+  "border-success/45 bg-success/10 text-success",
+  "border-warning/45 bg-warning/10 text-warning",
+  "border-danger/40 bg-danger/10 text-danger",
+];
+
+/** Color del tinte que le toca a la opción en la posición `indice`. */
+function colorOpcion(indice: number): string {
+  return PALETA_OPCION[indice % PALETA_OPCION.length];
 }
 
 /** Nombre visible del catálogo de un alias aprendido (lista «Lo que aprendí»). */
@@ -291,12 +313,24 @@ export function VozFab() {
       datoCandidatos,
       destinos,
       terminoDesconocido,
+      esConsulta,
     } = parsearIntencion(texto, {
       cuentas: cuentasVoz,
       navegacion: navesAprendidas,
     });
     setPreguntaNav(null);
     setPreguntaCuenta(null);
+
+    // **Consultas** ("cuánto gasté este mes"): fuera del uso ⇒ no se navega ni se
+    // intenta llenar ningún campo; se dice que todavía no se sabe responder.
+    if (esConsulta) {
+      setDictado(null);
+      setAviso({
+        escuchado: texto,
+        texto: "Eso todavía no lo sé responder. Probá con uno de estos ejemplos:",
+      });
+      return;
+    }
 
     // §15.6: no se reconoció el destino pero la orden era de navegación ⇒ se le
     // ofrecen los destinos (y se aprende el término si es uno solo y significativo).
@@ -522,7 +556,6 @@ export function VozFab() {
   };
 
   const tapDeshacer = useTap(deshacerTodo);
-  const tapCerrar = useTap(() => setDictado(null));
   const tapAprendido = useTap(() => setVerAprendido(true));
 
   /**
@@ -686,9 +719,10 @@ export function VozFab() {
       {preguntaNav && (
         <div
           role="status"
-          className="w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-border bg-card p-3 shadow-lg"
+          className="relative w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-border bg-background p-3 shadow-lg"
         >
-          <p className="text-[12.5px] text-card-foreground">
+          <BotonCerrar onCerrar={() => setPreguntaNav(null)} />
+          <p className="pr-8 text-[12.5px] text-card-foreground">
             ¿A dónde querés ir?
           </p>
           {preguntaNav.termino && (
@@ -697,21 +731,15 @@ export function VozFab() {
             </p>
           )}
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {preguntaNav.destinos.map((i) => (
+            {preguntaNav.destinos.map((i, k) => (
               <BotonCandidato
                 key={i.id}
+                indice={k}
                 texto={i.etiqueta ?? i.id}
                 onElegir={() => elegirDestino(i)}
               />
             ))}
           </div>
-          <button
-            type="button"
-            onClick={() => setPreguntaNav(null)}
-            className="mt-2 text-[11px] text-subtitle underline"
-          >
-            Cerrar
-          </button>
         </div>
       )}
 
@@ -720,27 +748,22 @@ export function VozFab() {
       {preguntaCuenta && (
         <div
           role="status"
-          className="w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-border bg-card p-3 shadow-lg"
+          className="relative w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-border bg-background p-3 shadow-lg"
         >
-          <p className="text-[12.5px] text-card-foreground">
+          <BotonCerrar onCerrar={() => setPreguntaCuenta(null)} />
+          <p className="pr-8 text-[12.5px] text-card-foreground">
             ¿Cuál de estas cuentas?
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {preguntaCuenta.opciones.map((o) => (
+            {preguntaCuenta.opciones.map((o, k) => (
               <BotonCandidato
                 key={o.value}
+                indice={k}
                 texto={o.label}
                 onElegir={() => elegirCuenta(o)}
               />
             ))}
           </div>
-          <button
-            type="button"
-            onClick={() => setPreguntaCuenta(null)}
-            className="mt-2 text-[11px] text-subtitle underline"
-          >
-            Cerrar
-          </button>
         </div>
       )}
 
@@ -748,9 +771,10 @@ export function VozFab() {
       {aviso && (
         <div
           role="status"
-          className="w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-border bg-card p-3 shadow-lg"
+          className="relative w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-border bg-background p-3 shadow-lg"
         >
-          <p className="text-[12.5px] text-card-foreground">{aviso.texto}</p>
+          <BotonCerrar onCerrar={() => setAviso(null)} />
+          <p className="pr-8 text-[12.5px] text-card-foreground">{aviso.texto}</p>
           {aviso.escuchado && (
             <p className="mt-1 text-[12.5px] text-subtitle">
               Escuché: «{aviso.escuchado}»
@@ -769,23 +793,18 @@ export function VozFab() {
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={() => setAviso(null)}
-            className="mt-2 text-[11px] text-subtitle underline"
-          >
-            Cerrar
-          </button>
           {aprendidas.length > 0 && (
-            <button
-              type="button"
-              aria-label="Lo que aprendí"
-              title="Lo que aprendí"
-              className="ml-3 inline-flex items-center gap-1 text-[11px] text-subtitle underline"
-              {...tapAprendido}
-            >
-              <MoreHorizontal className="h-3 w-3" /> Lo que aprendí
-            </button>
+            <div className="mt-2.5 flex">
+              <button
+                type="button"
+                aria-label="Lo que aprendí"
+                title="Lo que aprendí"
+                className="ml-auto flex h-7 w-7 items-center justify-center rounded-lg text-subtitle active:bg-muted"
+                {...tapAprendido}
+              >
+                <Settings className="h-4 w-4" />
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -795,9 +814,10 @@ export function VozFab() {
       {dictado && !aviso && !preguntaNav && !preguntaCuenta && (
         <div
           role="status"
-          className="w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-border bg-card p-3 shadow-lg"
+          className="relative w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-border bg-background p-3 shadow-lg"
         >
-          <p className="text-[12.5px] text-card-foreground">
+          <BotonCerrar onCerrar={() => setDictado(null)} />
+          <p className="pr-8 text-[12.5px] text-card-foreground">
             {dictado.resultado.candidatos.length
               ? dictado.resultado.asignaciones.length
                 ? `Completé ${
@@ -820,9 +840,10 @@ export function VozFab() {
                 ¿Cuál es {campoDe(c.campo)?.etiqueta?.toLowerCase() ?? c.campo}?
               </p>
               <div className="mt-1 flex flex-wrap gap-1.5">
-                {c.opciones.map((o) => (
+                {c.opciones.map((o, k) => (
                   <BotonCandidato
                     key={o.value}
+                    indice={k}
                     texto={o.label}
                     onElegir={() => elegirCandidato(c, o)}
                   />
@@ -863,27 +884,22 @@ export function VozFab() {
           <div className="mt-2.5 flex items-center gap-3">
             <button
               type="button"
-              className="inline-flex items-center gap-1 text-[11px] text-subtitle underline"
+              aria-label="Deshacer el dictado"
+              title="Deshacer"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-subtitle active:bg-muted"
               {...tapDeshacer}
             >
-              <Undo2 className="h-3 w-3" /> Deshacer
-            </button>
-            <button
-              type="button"
-              className="text-[11px] text-subtitle underline"
-              {...tapCerrar}
-            >
-              Cerrar
+              <Undo2 className="h-4 w-4" />
             </button>
             {aprendidas.length > 0 && (
               <button
                 type="button"
                 aria-label="Lo que aprendí"
                 title="Lo que aprendí"
-                className="ml-auto inline-flex items-center gap-1 text-[11px] text-subtitle underline"
+                className="ml-auto flex h-7 w-7 items-center justify-center rounded-lg text-subtitle active:bg-muted"
                 {...tapAprendido}
               >
-                <MoreHorizontal className="h-3 w-3" /> Lo que aprendí
+                <Settings className="h-4 w-4" />
               </button>
             )}
           </div>
@@ -949,6 +965,29 @@ export function VozFab() {
 }
 
 /**
+ * **✕ de la burbuja**, en el ángulo superior derecho: es el mismo gesto de cierre
+ * que usan los popups de la app (`ui/modal.tsx`), pedido por el usuario el
+ * 2026-09-24 (antes era un link "Cerrar" al pie, de 11 px y sin área de toque).
+ *
+ * `absolute` ⇒ la burbuja que lo monta tiene que ser `relative` y **su primera
+ * línea** lleva `pr-8` para no pasar por debajo.
+ */
+function BotonCerrar({ onCerrar }: { onCerrar: () => void }) {
+  const tap = useTap(onCerrar);
+  return (
+    <button
+      type="button"
+      aria-label="Cerrar"
+      title="Cerrar"
+      className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg text-subtitle active:bg-muted"
+      {...tap}
+    >
+      <X className="h-4 w-4" />
+    </button>
+  );
+}
+
+/**
  * Ejemplo tocable de la burbuja: al tocarlo se **ejecuta** esa frase (o sea,
  * navega), no se copia el texto. Va en su propio componente para poder usar
  * `useTap` (los hooks no se pueden llamar dentro de un `map`).
@@ -964,7 +1003,7 @@ function EjemploVoz({
   return (
     <button
       type="button"
-      className="rounded-full border border-border px-2.5 py-1 text-[11.5px] text-header active:bg-muted"
+      className="rounded-full border border-border bg-muted px-2.5 py-1 text-[11.5px] font-medium text-card-foreground transition-colors active:bg-card"
       {...tap}
     >
       «{texto}»
@@ -973,9 +1012,12 @@ function EjemploVoz({
 }
 
 /**
- * Chip de un campo que el dictado completó, con su **✕** para volver ese campo
- * al valor que tenía antes. El ✕ va aparte para poder usar `useTap` (en iOS el
- * `click` puede no llegar, §119).
+ * **Chip de un campo** que el dictado completó, con su **papelera** para volver
+ * ese campo al valor que tenía antes. El botón va aparte para poder usar `useTap`
+ * (en iOS el `click` puede no llegar, §119).
+ *
+ * 🗑️ El ícono es `Trash2` (pedido del usuario, 2026-09-24): antes era una ✕, que
+ * se leía como "cerrar" y no como "quitar esto".
  */
 function ChipVoz({
   etiqueta,
@@ -1000,10 +1042,10 @@ function ChipVoz({
         type="button"
         aria-label={`Quitar ${etiqueta}`}
         title="Volver a como estaba"
-        className="flex h-4 w-4 items-center justify-center rounded-full text-subtitle active:bg-muted"
+        className="flex h-5 w-5 items-center justify-center rounded-full text-subtitle active:bg-muted"
         {...tap}
       >
-        <X className="h-3 w-3" />
+        <Trash2 className="h-3.5 w-3.5" />
       </button>
     </span>
   );
@@ -1057,19 +1099,30 @@ function FilaAprendida({
   );
 }
 
-/** Opción tocable de un candidato ("¿Cuál es categoría?"): elegirla **aprende**. */
+/**
+ * Opción tocable de una pregunta ("¿Cuál es categoría?"): elegirla **aprende**.
+ *
+ * 🎨 El color del tinte lo define la **posición** en la lista (`indice`): las
+ * opciones de una misma pregunta se ven de colores distintos, semitransparentes.
+ */
 function BotonCandidato({
   texto,
+  indice,
   onElegir,
 }: {
   texto: string;
+  /** Posición en la lista de opciones (define el color). */
+  indice: number;
   onElegir: () => void;
 }) {
   const tap = useTap(onElegir);
   return (
     <button
       type="button"
-      className="rounded-full border border-border px-2.5 py-1 text-[11.5px] text-header active:bg-muted"
+      className={cn(
+        "rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition-colors active:opacity-70",
+        colorOpcion(indice)
+      )}
       {...tap}
     >
       {texto}
