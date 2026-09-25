@@ -6,6 +6,7 @@
  * El alcance del experimento es solo la carga de gastos (D9 del plan).
  */
 
+import { ANCLA_TOPE } from "../panel-scroll";
 import type { Intencion } from "./tipos";
 
 /**
@@ -199,14 +200,22 @@ export const INTENCIONES: Intencion[] = [
   // ─── Navegación — catálogo CERRADO (plan de voz §15.2) ───────────────────
   // ⚠️ **Agregar un destino = agregar una entrada acá, y nada más.**
   // El **sustantivo** es el que manda (regla 2 de §15.4); el verbo de movimiento
-  // es decorativo. Cuando existan las anclas de los paneles del dashboard
-  // (§15.5 ítem 1), cada panel suma su entrada (con su acción de scroll).
+  // es decorativo.
+  //
+  // 🔑 **`panel`** (§15.5): los destinos que son un **panel del dashboard** llevan
+  // el nombre de su ancla. Estando ya en el dashboard, el FAB **scrollea** al panel
+  // en vez de navegar (sin barra de carga y sin repetir las 7 consultas); desde
+  // otra pantalla navega a `?panel=<ancla>` y el dashboard scrollea al montar. Lo
+  // resuelve `lib/panel-scroll.ts` (el dashboard registra su scroll).
   {
     id: "ir-resumen",
     tipo: "navegacion",
     sustantivos: ["resumen", "dashboard", "inicio", "panel", "home"],
     verbos: VERBOS_NAVEGAR,
     href: () => "/dashboard",
+    // El resumen **es** el dashboard ⇒ ya estando en él, la orden es "volvé al
+    // tope" (antes: `push("/dashboard")` sobre la misma URL = no-op silencioso).
+    panel: ANCLA_TOPE,
     etiqueta: "Resumen",
     ejemplo: "andá al resumen",
   },
@@ -218,6 +227,7 @@ export const INTENCIONES: Intencion[] = [
     sustantivos: ["balance", "saldo"],
     verbos: VERBOS_NAVEGAR,
     href: () => "/dashboard?panel=balance",
+    panel: "balance",
     etiqueta: "Balance",
     ejemplo: "mostrame el balance",
   },
@@ -229,6 +239,7 @@ export const INTENCIONES: Intencion[] = [
     sustantivos: ["cuentas"],
     verbos: VERBOS_NAVEGAR,
     href: () => "/dashboard?panel=cuentas",
+    panel: "cuentas",
     etiqueta: "Cuentas",
     ejemplo: "mostrame las cuentas",
   },
@@ -256,6 +267,7 @@ export const INTENCIONES: Intencion[] = [
     sustantivos: ["trabajo", "trabajos"],
     verbos: VERBOS_NAVEGAR,
     href: () => "/dashboard?panel=trabajo",
+    panel: "trabajo",
     etiqueta: "Trabajo",
     ejemplo: "mostrame el trabajo",
   },  {
@@ -267,6 +279,7 @@ export const INTENCIONES: Intencion[] = [
     verbos: VERBOS_NAVEGAR,
     soloConVerbo: true,
     href: () => "/dashboard?panel=gastos",
+    panel: "gastos",
     etiqueta: "Gastos",
     ejemplo: "mostrame los gastos",
   },
@@ -276,6 +289,7 @@ export const INTENCIONES: Intencion[] = [
     sustantivos: ["ingresos"],
     verbos: VERBOS_NAVEGAR,
     href: () => "/dashboard?panel=ingresos",
+    panel: "ingresos",
     etiqueta: "Ingresos",
     ejemplo: "mostrame los ingresos",
   },
@@ -285,6 +299,7 @@ export const INTENCIONES: Intencion[] = [
     sustantivos: ["resultado", "resultados"],
     verbos: VERBOS_NAVEGAR,
     href: () => "/dashboard?panel=resultados",
+    panel: "resultados",
     etiqueta: "Resultados",
     ejemplo: "mostrame los resultados",
   },
@@ -295,6 +310,7 @@ export const INTENCIONES: Intencion[] = [
     sustantivos: ["prestamo", "prestamos", "deuda", "deudas"],
     verbos: VERBOS_NAVEGAR,
     href: () => "/dashboard?panel=prestamos",
+    panel: "prestamos",
     etiqueta: "Préstamos",
     ejemplo: "mostrame los préstamos",
   },

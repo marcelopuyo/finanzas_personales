@@ -202,6 +202,17 @@ export interface Intencion {
    * usuario elija entre `datoCandidatos`.
    */
   dato?: "cuenta";
+  /**
+   * **Ancla de un panel de la MISMA pantalla** (§15.5): si la orden apunta a un
+   * panel de la pantalla actual, el FAB **scrollea** (sin barra de carga, sin
+   * volver a pedir los datos) en vez de navegar. El valor es el `data-panel` de la
+   * pantalla; `ANCLA_TOPE` (`"top"`) = el tope (lo que pide `ir-resumen` cuando ya
+   * estás en el dashboard).
+   *
+   * ⚠️ El scroll lo ejecuta la **pantalla** (hoy `DashboardScrollKeeper`, vía
+   * `lib/panel-scroll.ts`): si nadie lo tiene registrado, se navega como siempre.
+   */
+  panel?: string;
   /** Etiqueta visible del destino (lista de opciones del FAB, «Lo que aprendí»). */
   etiqueta?: string;
   /**

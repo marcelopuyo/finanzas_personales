@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useTap } from "@/lib/tap";
 import { norm } from "@/lib/voz/normalizar";
+import { irAlPanel } from "@/lib/panel-scroll";
 import { usePendingNav } from "@/components/ui/nav-progress";
 import { Modal } from "@/components/ui/modal";
 import { VOZ_LANG } from "@/lib/voz/config";
@@ -47,8 +48,9 @@ import {
  * la voz (plan §14: R1-R8).
  *
  * Un solo botón que decide **qué quiere hacer** el usuario:
- * 1. **Orden explícita de navegación** (`ir-*`) ⇒ navega (aunque la pantalla
- *    actual tenga campos).
+ * 1. **Orden explícita de navegación** (`ir-*`) ⇒ navega —o **scrollea**, si el
+ *    destino es un panel de la pantalla actual (`intencion.panel`, §15.5)—
+ *    (aunque la pantalla actual tenga campos).
  * 2. **Su destino es la pantalla actual** ("cargar un gasto" estando ya en el
  *    formulario) ⇒ **llena** los campos de esta pantalla.
  * 3. **Intención de carga** con otro destino ⇒ navega y deja el sobrante en el
@@ -255,6 +257,28 @@ export function VozFab() {
     go(intencion.href(dato), `voz-${intencion.id}`);
   };
 
+  /**
+   * **Atiende una orden de navegación**: si el destino es un **panel de esta misma
+   * pantalla** (`intencion.panel`, §15.5), **scrollea** en vez de navegar — sin
+   * barra de carga y sin repetir las consultas del dashboard—; si no (otra
+   * pantalla, o nadie sabe scrollear a ese panel), navega como siempre.
+   *
+   * La URL se acomoda con `replaceState` **sin navegar**: no hay fetch, pero
+   * repetir la orden, recargar o "tirar para actualizar" aterrizan en el mismo
+   * panel (y la URL deja de quedar desfasada respecto de lo que se está viendo).
+   */
+  const irA = (intencion: Intencion, resto: string, dato?: string) => {
+    if (
+      intencion.panel &&
+      esMiPantallaDe(intencion, ruta) &&
+      irAlPanel(intencion.panel)
+    ) {
+      window.history.replaceState(null, "", intencion.href(dato));
+      return;
+    }
+    navegar(intencion, resto, dato);
+  };
+
   /** Llena la pantalla actual con lo dictado. `true` si aplicó algo. */
   const llenar = useCallback(
     async (texto: string): Promise<boolean> => {
@@ -367,7 +391,7 @@ export function VozFab() {
 
     if (intencion && !sinDato && (navegacionExplicita || !pantalla)) {
       setDictado(null);
-      navegar(intencion, resto, dato);
+      irA(intencion, resto, dato);
       return;
     }
 
@@ -379,7 +403,7 @@ export function VozFab() {
 
     if (intencion && !sinDato) {
       setDictado(null);
-      navegar(intencion, resto, dato);
+      irA(intencion, resto, dato);
       return;
     }
 
@@ -390,10 +414,13 @@ export function VozFab() {
   };
 
   /**
-   * **Elegir un destino** cuando la orden no se entendió (§15.6): **siempre
-   * navega** (decisión del usuario, 2026-09-24) y, si había un término
-   * significativo, **lo aprende** (`usos` +1 al navegar: la orden se cumple en el
-   * acto, a diferencia de la carga que suma al guardar).
+   * **Elegir un destino** cuando la orden no se entendió (§15.6): **siempre navega**
+   * (decisión del usuario, 2026-09-24) y, si había un término significativo, **lo
+   * aprende** (`usos` +1 al navegar: la orden se cumple en el acto, a diferencia de
+   * la carga que suma al guardar).
+   *
+   * Pasa por `irA`: un panel del dashboard se resuelve con scroll, no con una
+   * navegación (2026-09-25).
    */
   const elegirDestino = (intencion: Intencion) => {
     const termino = preguntaNav?.termino;
@@ -413,7 +440,7 @@ export function VozFab() {
           ])
         );
     }
-    navegar(intencion, "");
+    irA(intencion, "");
   };
 
   /**

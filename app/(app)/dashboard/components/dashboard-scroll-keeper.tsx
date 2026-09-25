@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { ANCLA_TOPE, registrarIrAlPanel } from "@/lib/panel-scroll";
 
 // Posición de scroll del dashboard en una VARIABLE INTERNA del módulo (memoria
 // del cliente): sobrevive a la navegación interna porque el módulo JS no se
@@ -40,21 +41,53 @@ const MARGEN_PANEL = 8;
  * dashboard.
  */
 export function DashboardScrollKeeper({ panel }: { panel?: string }) {
+  /**
+   * Ancla pedida **sin navegar**: el FAB 🎤 (u otra orden de voz) ya estando en el
+   * dashboard pide "llevame al panel X" por `lib/panel-scroll.ts` y se atiende acá.
+   *
+   * ⚠️ El contador `n` no es decorativo: es lo que hace que **repetir la misma
+   * orden** vuelva a scrollear. Sin él, pedir otra vez el panel ya pedido no
+   * cambiaría el estado y el efecto de abajo (que depende de esto) no volvería a
+   * correr — así se rompía en el celular (2026-09-25): la URL quedaba en
+   * `?panel=prestamos`, `router.push` a la misma URL es un no-op y la orden
+   * "navega a los préstamos" no hacía nada.
+   */
+  const [pedido, setPedido] = useState<{ panel: string; n: number } | null>(null);
+
+  // El canal del FAB: pide un panel y lo resuelve el efecto de abajo. Se registra
+  // atado al montaje (al salir del dashboard queda vacío y la orden vuelve a
+  // navegar como siempre).
+  useEffect(
+    () =>
+      registrarIrAlPanel((ancla) =>
+        setPedido((prev) => ({ panel: ancla, n: (prev?.n ?? 0) + 1 }))
+      ),
+    []
+  );
+
   useEffect(() => {
     const main = document.querySelector<HTMLElement>("main");
     if (!main) return;
 
     /**
-     * Offset del **panel pedido por voz** (`?panel=`) dentro del `<main>`, que es
-     * quien scrollea. Se recalcula en cada intento porque el dashboard crece por
-     * partes (los gráficos y las tarjetas llegan después del primer paint).
+     * Ancla que hay que dejar a la vista: la que pidió el FAB **ahora** (scroll
+     * sin navegar) o, al navegar/recargar, la del `?panel=` de la URL.
+     */
+    const ancla = pedido?.panel ?? panel;
+
+    /**
+     * Offset del ancla dentro del `<main>`, que es quien scrollea. Se recalcula en
+     * cada intento porque el dashboard crece por partes (los gráficos y las
+     * tarjetas llegan después del primer paint).
      *
-     * `null` = todavía no está en el DOM (p. ej. **Resultados** sólo existe si
-     * hay datos) ⇒ no se scrollea a ningún lado y se deja el dashboard como está.
+     * `null` = todavía no está en el DOM (p. ej. **Resultados** sólo existe si hay
+     * datos) ⇒ se apunta al tope del dashboard, que es lo menos confuso (dejarlo
+     * donde estaba sería peor: la orden fue "mostrame esto").
      */
     const objetivoPanel = () => {
-      if (!panel) return null;
-      const el = main.querySelector<HTMLElement>(`[data-panel="${panel}"]`);
+      if (!ancla) return null;
+      if (ancla === ANCLA_TOPE) return 0;
+      const el = main.querySelector<HTMLElement>(`[data-panel="${ancla}"]`);
       if (!el) return null;
       return (
         el.getBoundingClientRect().top -
@@ -99,9 +132,9 @@ export function DashboardScrollKeeper({ panel }: { panel?: string }) {
     const restaurar = () => {
       if (cancelado) return;
       const max = main.scrollHeight - main.clientHeight;
-      // Con `?panel=` manda el panel (y si no existe todavía se deja el dashboard
-      // donde está: **no** se restaura la posición vieja, que sería confuso).
-      const objetivo = panel
+      // Con ancla manda el panel (y si no existe todavía se deja el dashboard en
+      // el tope: **no** se restaura la posición vieja, que sería confuso).
+      const objetivo = ancla
         ? Math.max(0, Math.min(objetivoPanel() ?? 0, max))
         : Math.min(destino, max);
       if (Math.abs(main.scrollTop - objetivo) > 1) {
@@ -109,9 +142,9 @@ export function DashboardScrollKeeper({ panel }: { panel?: string }) {
         main.scrollTo(0, objetivo);
       }
       // Se deja de insistir cuando ya se llegó al destino (el contenido terminó de
-      // crecer) o cuando se agotó el tiempo. Con `?panel=` se insiste todo el
-      // tiempo: el panel puede entrar al DOM más tarde (o nunca).
-      if (panel) {
+      // crecer) o cuando se agotó el tiempo. Con ancla se insiste todo el tiempo:
+      // el panel puede entrar al DOM más tarde (o nunca).
+      if (ancla) {
         if (performance.now() > fin) return;
       } else if (max >= destino || performance.now() > fin) {
         return;
@@ -123,7 +156,7 @@ export function DashboardScrollKeeper({ panel }: { panel?: string }) {
     // último paso por el dashboard, o un panel pedido por voz.
     // OJO: no llamar a save() antes de restaurar: al montar el <main> arranca en
     // scrollTop 0 y pisaría el valor guardado (por eso nunca restauraba).
-    if (destino > 0 || panel) raf = requestAnimationFrame(restaurar);
+    if (destino > 0 || ancla) raf = requestAnimationFrame(restaurar);
 
     main.addEventListener("scroll", onScroll, { passive: true });
 
@@ -131,9 +164,10 @@ export function DashboardScrollKeeper({ panel }: { panel?: string }) {
       cancelAnimationFrame(raf);
       main.removeEventListener("scroll", onScroll);
     };
-    // `panel` entra en las deps: si estando ya en el dashboard se pide otro panel
-    // (o el mismo desde el tope), el efecto tiene que volver a correr.
-  }, [panel]);
+    // `ancla` entra en las deps (por `panel` de la URL y por `pedido`): estando ya
+    // en el dashboard, pedir un panel (o el mismo otra vez) tiene que volver a
+    // correr el efecto.
+  }, [panel, pedido]);
 
   return null;
 }
