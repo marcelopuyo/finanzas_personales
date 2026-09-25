@@ -350,18 +350,22 @@ export function VozFab() {
     // Destino parametrizado sin dato resuelto (cuenta): no se puede navegar a ciegas.
     const sinDato = Boolean(intencion?.dato && !dato);
 
+    // ⚠️ **Las opciones del dato van PRIMERO**: si la cuenta quedó ambigua (o no se
+    // reconoció), eso es lo único que falta decidir ⇒ se pregunta. Antes esta rama
+    // estaba **dentro** del `!sinDato`, así que un `datoCandidatos` con `dato` nulo
+    // (¡el caso normal de una ambigüedad!) caía en "No entendí" y mostraba ejemplos
+    // (bug reportado desde el celular el 2026-09-25: *"muéstrame la cuenta galicia"*).
+    if (intencion && navegacionExplicita && datoCandidatos?.length) {
+      setAviso(null);
+      setPreguntaCuenta({
+        opciones: datoCandidatos,
+        termino: terminoDato ?? "",
+        sinResolver: datoSinResolver,
+      });
+      return;
+    }
+
     if (intencion && !sinDato && (navegacionExplicita || !pantalla)) {
-      if (datoCandidatos?.length) {
-        // Ambigüedad (dos cuentas con el mismo nombre) o nombre **no reconocido**
-        // (se ofrecen todas las cuentas): elige y se aprende.
-        setAviso(null);
-        setPreguntaCuenta({
-          opciones: datoCandidatos,
-          termino: terminoDato ?? "",
-          sinResolver: datoSinResolver,
-        });
-        return;
-      }
       setDictado(null);
       navegar(intencion, resto, dato);
       return;
@@ -723,8 +727,7 @@ export function VozFab() {
         ceder && "pointer-events-none opacity-0"
       )}
       aria-hidden={ceder || undefined}
-    >
-      {/* Pregunta de **navegación** (§15.6): la orden se entendió, el destino no.
+    >      {/* Pregunta de **navegación** (§15.6): la orden se entendió, el destino no.
           Un botón por destino; el elegido **navega** y (si había un término
           significativo) **se aprende** para la próxima. */}
       {preguntaNav && (
@@ -738,7 +741,7 @@ export function VozFab() {
           </p>
           {preguntaNav.termino && (
             <p className="mt-1 text-[12.5px] text-subtitle">
-              Todavía no sé donde queda «{preguntaNav.termino}».
+              Todavía no sé dónde queda «{preguntaNav.termino}».
             </p>
           )}
           <div className="mt-2 flex flex-wrap gap-1.5">
