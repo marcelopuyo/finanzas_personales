@@ -134,6 +134,9 @@ export interface ContextoIntencion {
   navegacion?: Map<string, AliasOpcion[]>;
 }
 
+/** Máximo de cuentas que se ofrecen cuando el nombre no se reconoce. */
+const MAX_CUENTAS_OFERTA = 8;
+
 /**
  * Resuelve el **nombre hablado de una cuenta** contra las cuentas del usuario
  * (`contexto.cuentas`).
@@ -309,6 +312,16 @@ export function parsearIntencion(
   const navegables = intenciones.filter((i) => i.tipo === "navegacion");
   const carga = intenciones.find((i) => i.tipo === "carga");
   /**
+   * Sustantivos de los destinos **parametrizados** (hoy: `cuenta`).
+   *
+   * Sirven para **no** ofrecer el catálogo de destinos cuando la frase los nombra:
+   * *"muéstrame la cuenta galicia"* no es "no sé a dónde querés ir" — es una
+   * cuenta que no se reconoció (2026-09-25, reportado desde el celular).
+   */
+  const nombresParametrizados = navegables
+    .filter((i) => i.dato)
+    .flatMap((i) => i.sustantivos);
+  /**
    * **Consulta** ("cuánto gasté este mes", "cómo vengo"): la voz **no la usa**.
    * No navega, no llena campos y **no** ofrece el catálogo de destinos.
    */
@@ -361,8 +374,26 @@ export function parsearIntencion(
       if (esCarga) continue;
 
       const resuelto = resolverCuenta(nrm, contexto);
-      if (!resuelto) continue; // sin nombre reconocible no es esta orden
-      return { intencion, resto: "", ...resuelto };
+      if (resuelto) return { intencion, resto: "", ...resuelto };
+
+      // No se reconoció el nombre: la orden **sí** era "una cuenta" ⇒ se ofrecen
+      // **todas las cuentas del usuario** (mucho mejor que el catálogo de destinos:
+      // el usuario ya dijo lo que quería). Al elegir, se aprende el término.
+      const todas = contexto.cuentas?.opciones ?? [];
+      if (todas.length) {
+        return {
+          intencion,
+          resto: "",
+          datoSinResolver: true,
+          terminoDato: significativos
+            .filter((t) => !NO_IDENTIFICA.has(t))
+            .join(" "),
+          datoCandidatos: todas
+            .slice(0, MAX_CUENTAS_OFERTA)
+            .map((o) => ({ value: o.value, label: o.label })),
+        };
+      }
+      continue; // sin cuentas cargadas no hay nada que ofrecer
     }
 
     return { intencion, resto: restoDe(intencion) };
@@ -372,7 +403,14 @@ export function parsearIntencion(
   // "muéstrame las deudas del banco": verbo de movimiento + ningún sustantivo del
   // catálogo ⇒ se ofrecen los destinos. Se aprende **sólo** si queda **un** término
   // significativo (con más, navega pero no ensucia el vocabulario).
-  if (hayMovimiento && significativos.length && !esConsulta) {
+  if (
+    hayMovimiento &&
+    significativos.length &&
+    !esConsulta &&
+    // Si la frase nombra un destino **parametrizado** ("la cuenta …"), el catálogo
+    // de destinos no es la respuesta: eso ya se intentó resolver arriba.
+    !nrm.some((t) => nombresParametrizados.includes(t))
+  ) {
     return {
       intencion: null,
       resto: "",

@@ -239,6 +239,13 @@ export interface ResultadoIntencion {
   /** El término apuntó a **varias** opciones: el FAB las ofrece ("¿cuál de estas?"). */
   datoCandidatos?: OpcionVoz[];
   /**
+   * El dato **venía en la frase pero no se pudo resolver** contra el catálogo
+   * (p. ej. una cuenta que no se reconoce): se ofrecen **todas** las opciones para
+   * que el usuario elija (y al elegir se **aprende**). El FAB lo dice distinto
+   * ("No conozco esa cuenta…") en vez de fingir una ambigüedad.
+   */
+  datoSinResolver?: boolean;
+  /**
    * **No se reconoció el destino** (plan §15.6): el FAB ofrece el catálogo de
    * destinos navegables y lo que el usuario elija **se aprende**.
    */

@@ -94,7 +94,12 @@ type Aviso = { texto: string; escuchado?: string } | null;
 type PreguntaNav = { destinos: Intencion[]; termino?: string } | null;
 
 /** Cuenta **ambigua** (`ir-cuenta`): el usuario elige entre las suyas y se aprende. */
-type PreguntaCuenta = { opciones: OpcionVoz[]; termino: string } | null;
+type PreguntaCuenta = {
+  opciones: OpcionVoz[];
+  termino: string;
+  /** `true` = el nombre **no se reconoció** (se ofrecen todas las cuentas). */
+  sinResolver?: boolean;
+} | null;
 
 /** Margen (px) alrededor de la franja del FAB para decidir si se corre. */
 const MARGEN_FRANJA = 8;
@@ -311,6 +316,7 @@ export function VozFab() {
       dato,
       terminoDato,
       datoCandidatos,
+      datoSinResolver,
       destinos,
       terminoDesconocido,
       esConsulta,
@@ -345,10 +351,15 @@ export function VozFab() {
     const sinDato = Boolean(intencion?.dato && !dato);
 
     if (intencion && !sinDato && (navegacionExplicita || !pantalla)) {
-      if (datoCandidatos?.length && terminoDato) {
-        // Ambigüedad (dos cuentas con el mismo nombre, ARS/USD): elige y se aprende.
+      if (datoCandidatos?.length) {
+        // Ambigüedad (dos cuentas con el mismo nombre) o nombre **no reconocido**
+        // (se ofrecen todas las cuentas): elige y se aprende.
         setAviso(null);
-        setPreguntaCuenta({ opciones: datoCandidatos, termino: terminoDato });
+        setPreguntaCuenta({
+          opciones: datoCandidatos,
+          termino: terminoDato ?? "",
+          sinResolver: datoSinResolver,
+        });
         return;
       }
       setDictado(null);
@@ -752,7 +763,9 @@ export function VozFab() {
         >
           <BotonCerrar onCerrar={() => setPreguntaCuenta(null)} />
           <p className="pr-8 text-[12.5px] text-card-foreground">
-            ¿Cuál de estas cuentas?
+            {preguntaCuenta.sinResolver
+              ? "No conozco esa cuenta. ¿Cuál de estas?"
+              : "¿Cuál de estas cuentas?"}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {preguntaCuenta.opciones.map((o, k) => (
