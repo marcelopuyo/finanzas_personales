@@ -541,7 +541,10 @@ export function DashboardClient({ data, periodosInicial }: Props) {
           alto fijo de AccountCard (título + importe + área del gráfico h-10).
           El `pt-4 lg:pt-0` separa la tarjeta de la barra superior de menú en
           mobile (en desktop el main ya aporta margen superior, lg:pt-6). */}
-      <div className="relative flex min-h-31.75 items-center justify-center rounded-lg border border-border bg-card p-4 shadow-sm">
+      <div
+        data-panel="balance"
+        className="relative flex min-h-31.75 items-center justify-center rounded-lg border border-border bg-card p-4 shadow-sm"
+      >
         {/* Rótulo en el ángulo superior izquierdo, como el título de las
             tarjetas de cuentas (dentro del mismo padding p-4). */}
         <p className="absolute left-4 top-4 text-[16px] font-semibold text-header">Balance Actual</p>
@@ -553,7 +556,7 @@ export function DashboardClient({ data, periodosInicial }: Props) {
       {/* Panel Cuentas — solo cuentas reales (el toque abre la pantalla de sus
           movimientos, `/cuentas/[id]`). El panel usa bg-card como el resto; las
           tarjetas internas van en bg-muted. */}
-      <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
+      <div data-panel="cuentas" className="rounded-lg border border-border bg-card p-4 sm:p-5">
         {/* Encabezado: título a la izquierda y menú (⋮) anclado al ángulo
             superior derecho del panel (accede al CRUD de cuentas). */}
         <div className="relative mb-3 pr-8">
@@ -598,7 +601,7 @@ export function DashboardClient({ data, periodosInicial }: Props) {
           como scroll) ⇒ había que tocar 2-3 veces. `role="link"` + Enter
           mantienen el acceso por teclado; `cursor-default`, `select-none` y
           `-webkit-tap-highlight-color: transparent` lo dejan sin señal visual. */}
-      <div className="relative">
+      <div data-panel="trabajo" className="relative">
         <div
           role="link"
           tabIndex={0}
@@ -631,7 +634,9 @@ export function DashboardClient({ data, periodosInicial }: Props) {
         </div>
       </div>
 
-      {/* Gastos Section — filtro compartido */}
+      {/* Gastos Section — filtro compartido. El ancla de voz (`?panel=gastos`) va
+          en un wrapper: las 3 vistas (Resumen/Detalle/Histórico) se excluyen. */}
+      <div data-panel="gastos">
       {tabGastos === "resumen" ? (
         <DonutChart
           title="Gastos"
@@ -684,8 +689,10 @@ export function DashboardClient({ data, periodosInicial }: Props) {
           area
         />
       )}
+      </div>
 
-      {/* Ingresos Section — filtro compartido */}
+      {/* Ingresos Section — filtro compartido (mismo criterio de ancla). */}
+      <div data-panel="ingresos">
       {tabIngresos === "resumen" ? (
         <DonutChart
           title="Ingresos"
@@ -725,8 +732,12 @@ export function DashboardClient({ data, periodosInicial }: Props) {
           currency={data.monedaPredeterminadaISO}
         />
       )}
+      </div>
 
+      {/* El ancla de **Resultados** existe sólo si hay datos: si se pide el panel
+          y no está, el dashboard no scrollea a ningún lado. */}
       {data.evolucionResultados.length > 0 && (
+        <div data-panel="resultados">
         <EvolutionChart
           title="Resultados"
           badge={<StatBadge label="Mes actual" value={badges.resultados} />}
@@ -735,10 +746,12 @@ export function DashboardClient({ data, periodosInicial }: Props) {
           area
           currency={data.monedaPredeterminadaISO}
         />
+        </div>
       )}
 
       {/* Panel de préstamos: se muestra SIEMPRE (también sin préstamos
           cargados; en ese caso PrestamosChart muestra su estado vacío). */}
+      <div data-panel="prestamos">
       <PrestamosChart
         title="Préstamos Pendientes"
         badge={
@@ -756,6 +769,7 @@ export function DashboardClient({ data, periodosInicial }: Props) {
         series={data.prestamosChart.series}
         action={<PrestamosActionsMenu />}
       />
+      </div>
 
       {/* Modal de filtros */}
       <Modal open={open} onClose={() => setOpen(false)} title="Filtros"

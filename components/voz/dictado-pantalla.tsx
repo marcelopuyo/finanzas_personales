@@ -10,7 +10,12 @@ import {
   type ReactNode,
   type SetStateAction,
 } from "react";
-import type { ConfigDictado, ResultadoDictado } from "@/lib/voz/tipos";
+import type {
+  CampoDictable,
+  ConfigDictado,
+  ResultadoDictado,
+  UsoAliasDictado,
+} from "@/lib/voz/tipos";
 
 /**
  * **Puente entre la pantalla y el FAB 🎤** (fase G3 del plan de voz).
@@ -37,8 +42,14 @@ export interface PantallaDictable {
    * misma descripción para completar lo que la frase no dijo.
    */
   aplicar: (resultado: ResultadoDictado) => ValoresPantalla | Promise<ValoresPantalla>;
-  /** Escribe valores sueltos sin pasar por el parser (deshacer / elegir candidato). */
-  escribir: (valores: ValoresPantalla) => void;
+  /**
+   * Escribe valores sueltos sin pasar por el parser (deshacer / elegir candidato).
+   *
+   * Devuelve el **"antes"** de esos campos (mismo formato que `aplicar`): lo usa
+   * el FAB al elegir un candidato, para que la ✕ del chip que agrega pueda
+   * deshacer también lo elegido por esa vía.
+   */
+  escribir: (valores: ValoresPantalla) => ValoresPantalla;
 }
 
 /** Lo que se aplicó la última vez: para los chips, el deshacer y la vía B. */
@@ -46,6 +57,17 @@ export interface UltimoDictado {
   resultado: ResultadoDictado;
   /** Cómo estaba cada campo **antes** de aplicar (para deshacer). */
   antes: ValoresPantalla;
+  /**
+   * Campos de la pantalla que aplicó el dictado.
+   *
+   * ⚠️ Se guardan **junto con el dictado** porque la pantalla puede desmontarse
+   * antes de que el usuario cierre la burbuja (al pasar al paso de confirmación
+   * del wizard): sin esto, los chips mostraban el **nombre crudo** del campo
+   * (`montoOrigen`) en lugar de su etiqueta.
+   */
+  campos: CampoDictable[];
+  /** Alias **propios** que resolvieron algún valor: suman `usos` **al guardar**. */
+  usos: UsoAliasDictado[];
 }
 
 interface Contexto {

@@ -135,6 +135,37 @@ export function fusionarAprendidos(
 }
 
 /**
+ * Agrupa la **capa de sistema** en conceptos por ámbito, lista para
+ * `aliasDeCatalogo` (`categoriaGasto` → conceptos, `cuenta` → conceptos, …).
+ *
+ * 🔑 Compartido por el `VozProvider` (cliente, snapshot en memoria) y por la
+ * entrada `/voz?t=` (servidor): la misma construcción en los dos lados.
+ */
+export function conceptosDeSistema(
+  filas: readonly {
+    usuarioId: number | null;
+    ambito: string;
+    destinoValor: string;
+    terminoNorm: string;
+  }[]
+): Record<string, ConceptoVoz[]> {
+  const porAmbito: Record<string, Record<string, string[]>> = {};
+  for (const fila of filas) {
+    if (fila.usuarioId !== null) continue;
+    const conceptos = (porAmbito[fila.ambito] ??= {});
+    (conceptos[fila.destinoValor] ??= []).push(fila.terminoNorm);
+  }
+  const out: Record<string, ConceptoVoz[]> = {};
+  for (const [ambito, conceptos] of Object.entries(porAmbito)) {
+    out[ambito] = Object.entries(conceptos).map(([concepto, alias]) => ({
+      concepto,
+      alias,
+    }));
+  }
+  return out;
+}
+
+/**
  * **Vía B — corrección silenciosa** (plan de G2, §7): compara lo que la voz
  * aplicó con el valor **final** del formulario.
  *

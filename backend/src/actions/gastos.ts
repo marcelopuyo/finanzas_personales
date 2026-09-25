@@ -170,7 +170,13 @@ export async function eliminarGasto(id: string) {
     for (const mov of movimientos) {
       const cuenta = mov.cuenta;
       if (cuenta) {
-        cuenta.saldo += mov.monto;
+        // ⚠️ Se devuelve el monto en la moneda de la **cuenta**
+        // (`montoCuentaMonedaOrigen`), que es el delta que se le había restado al
+        // crear el gasto. `mov.monto` está en la moneda **predeterminada del
+        // usuario**: en una cuenta de otra moneda devolvía una fracción del
+        // importe (bug 2026-09-24: el saldo no volvía a su valor original).
+        // Mismo criterio que `anularMovimiento`.
+        cuenta.saldo += mov.montoCuentaMonedaOrigen;
         await cuentaRepo.save(cuenta);
         await crearHistoricoCuenta(manager, cuenta);
       }

@@ -1,5 +1,16 @@
 import { redirect } from "next/navigation";
+import {
+  getCuentasParaVozSeguro,
+  getVocabularioSeguro,
+} from "@/backend/src/queries/voz";
+import { DESTINOS_APRENDIBLES } from "@/lib/voz/intenciones";
 import { parsearIntencion } from "@/lib/voz/parse-intencion";
+import type { OpcionVoz } from "@/lib/voz/tipos";
+import {
+  aliasDeCatalogo,
+  conceptosDeSistema,
+  fusionarAprendidos,
+} from "@/lib/voz/vocabulario";
 import { SinIntencion } from "./sin-intencion";
 
 /**
@@ -34,9 +45,47 @@ export default async function VozPage({
 
   if (!texto) redirect("/dashboard");
 
-  const { intencion, resto } = parsearIntencion(texto);
-  if (!intencion) return <SinIntencion texto={texto} />;
+  // Contexto de navegación: **las cuentas del usuario** (`ir-cuenta`) y sus
+  // **órdenes aprendidas** (§15.6). Es la misma construcción que hace el FAB con
+  // `useCuentasNavegables` / `useNavegacionAprendida`, pero acá en el servidor
+  // (el parser es puro en los dos lados). Las dos consultas son capas opcionales
+  // que **fallan abierto**.
+  const [filas, cuentas] = await Promise.all([
+    getVocabularioSeguro(),
+    getCuentasParaVozSeguro(),
+  ]);
+  const sistema = conceptosDeSistema(filas);
+  const opcionesCuenta: OpcionVoz[] = cuentas.map((c) => ({
+    value: c.id,
+    label: c.nombre,
+  }));
+  const aliasCuentas = fusionarAprendidos(
+    aliasDeCatalogo(opcionesCuenta, sistema.cuenta ?? []),
+    filas,
+    opcionesCuenta,
+    "cuenta"
+  );
+  const monedas: Record<string, string> = {};
+  for (const c of cuentas) monedas[c.id] = c.moneda;
+  const navegacion = fusionarAprendidos(
+    new Map(),
+    filas,
+    DESTINOS_APRENDIBLES.map((i) => ({ value: i.id, label: i.etiqueta ?? i.id })),
+    "navegacion"
+  );
 
-  const dicho = resto ? `?dicho=${encodeURIComponent(resto)}` : "";
-  redirect(`${intencion.href()}${dicho}`);
+  const { intencion, resto, dato } = parsearIntencion(texto, {
+    cuentas: { alias: aliasCuentas, monedas },
+    navegacion,
+  });
+  // Sin intención —o con un destino que necesita un dato que no se pudo resolver
+  // (cuenta ambigua)— no se navega: se muestra qué se escuchó.
+  if (!intencion || (intencion.dato && !dato)) return <SinIntencion texto={texto} />;
+
+  // Sólo las intenciones que **dejan texto** arrastran el sobrante (F4 del QA):
+  // en una orden de navegación el resto es ruido ("andá al resumen" → "al") y el
+  // FAB lo interpretaría como campos a llenar en la pantalla destino.
+  const dicho =
+    intencion.llevaTexto && resto ? `?dicho=${encodeURIComponent(resto)}` : "";
+  redirect(`${intencion.href(dato)}${dicho}`);
 }

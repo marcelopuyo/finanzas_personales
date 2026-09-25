@@ -1,5 +1,6 @@
 import { IsNull } from "typeorm";
 import { getDb } from "../db";
+import { Cuenta } from "../entities/cuenta.entity";
 import { VozAlias } from "../entities/voz-alias.entity";
 import { getSessionUserId } from "../lib/auth";
 
@@ -105,4 +106,54 @@ export async function getAliasAprendidos(): Promise<AliasVozOut[]> {
     order: { actualizadoEn: "DESC", creadoEn: "DESC" },
   });
   return filas.map(aSalida);
+}
+
+/** Una cuenta que la voz puede usar como **destino** (`/cuentas/[id]`). */
+export interface CuentaVozOut {
+  /** Id de la cuenta, como string (es el `value` de la opción de voz). */
+  id: string;
+  /** Nombre visible: es lo que el usuario dice ("Bco Galicia ARS"). */
+  nombre: string;
+  /** Código de la moneda ("ARS", "USD"…): desambigua ("galicia **pesos**"). */
+  moneda: string;
+}
+
+/**
+ * **Cuentas navegables por voz** (destino `ir-cuenta`, plan §15.2 b).
+ *
+ * ⚠️ Son las **del usuario**: el diccionario es genérico, así que cada uno tiene
+ * cuentas con nombres distintos y la resolución se hace en memoria, comparando la
+ * jerga contra los **tokens de estas etiquetas** (`aliasDeCatalogo`), nunca contra
+ * nombres fijos.
+ *
+ * 🔑 `cuenta.nombre` es **único por usuario** (índice de la tabla), así que el
+ * nombre alcanza para nombrarla; el id es el que arma la URL.
+ */
+export async function getCuentasParaVoz(userId: number): Promise<CuentaVozOut[]> {
+  const ds = await getDb();
+  const cuentas = await ds.getRepository(Cuenta).find({
+    where: { usuario: { id: userId }, eliminado: false },
+    relations: { moneda: true },
+    order: { orden: "ASC", id: "ASC" },
+  });
+  return cuentas.map((c) => ({
+    id: String(c.id),
+    nombre: c.nombre,
+    moneda: c.moneda?.codigoISO ?? "",
+  }));
+}
+
+/**
+ * Igual que `getCuentasParaVoz` pero **falla abierto** (misma lección que el
+ * vocabulario: la voz es una capa opcional, no puede romper el layout).
+ */
+export async function getCuentasParaVozSeguro(): Promise<CuentaVozOut[]> {
+  const userId = await getSessionUserId();
+  if (!userId) return [];
+  try {
+    return await getCuentasParaVoz(userId);
+  } catch (error) {
+    console.error("voz: no se pudieron cargar las cuentas", error);
+    return [];
+  }
 }

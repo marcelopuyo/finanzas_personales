@@ -12,6 +12,9 @@ let dashboardScrollTop = 0;
 /** Tiempo máximo durante el que se sigue reintentando la restauración (ms). */
 const RESTORE_MS = 2000;
 
+/** Aire (px) que se deja arriba del panel al que se llega por voz. */
+const MARGEN_PANEL = 8;
+
 /**
  * Restaura la posición de scroll del dashboard al volver desde otro CRUD
  * (p. ej. el botón "volver" de la grilla con ?origen=dashboard).
@@ -36,10 +39,30 @@ const RESTORE_MS = 2000;
  * volver a /dashboard) restaura la posición. Vive únicamente en la página del
  * dashboard.
  */
-export function DashboardScrollKeeper() {
+export function DashboardScrollKeeper({ panel }: { panel?: string }) {
   useEffect(() => {
     const main = document.querySelector<HTMLElement>("main");
     if (!main) return;
+
+    /**
+     * Offset del **panel pedido por voz** (`?panel=`) dentro del `<main>`, que es
+     * quien scrollea. Se recalcula en cada intento porque el dashboard crece por
+     * partes (los gráficos y las tarjetas llegan después del primer paint).
+     *
+     * `null` = todavía no está en el DOM (p. ej. **Resultados** sólo existe si
+     * hay datos) ⇒ no se scrollea a ningún lado y se deja el dashboard como está.
+     */
+    const objetivoPanel = () => {
+      if (!panel) return null;
+      const el = main.querySelector<HTMLElement>(`[data-panel="${panel}"]`);
+      if (!el) return null;
+      return (
+        el.getBoundingClientRect().top -
+        main.getBoundingClientRect().top +
+        main.scrollTop -
+        MARGEN_PANEL
+      );
+    };
 
     /** Posición que hay que alcanzar (la que tenía el usuario al irse). */
     const destino = dashboardScrollTop;
@@ -76,21 +99,31 @@ export function DashboardScrollKeeper() {
     const restaurar = () => {
       if (cancelado) return;
       const max = main.scrollHeight - main.clientHeight;
-      const objetivo = Math.min(destino, max);
+      // Con `?panel=` manda el panel (y si no existe todavía se deja el dashboard
+      // donde está: **no** se restaura la posición vieja, que sería confuso).
+      const objetivo = panel
+        ? Math.max(0, Math.min(objetivoPanel() ?? 0, max))
+        : Math.min(destino, max);
       if (Math.abs(main.scrollTop - objetivo) > 1) {
         ultimoPedido = objetivo;
         main.scrollTo(0, objetivo);
       }
-      // Ya se puede llegar al destino (el contenido terminó de crecer) o se
-      // agotó el tiempo: se deja de insistir.
-      if (max >= destino || performance.now() > fin) return;
+      // Se deja de insistir cuando ya se llegó al destino (el contenido terminó de
+      // crecer) o cuando se agotó el tiempo. Con `?panel=` se insiste todo el
+      // tiempo: el panel puede entrar al DOM más tarde (o nunca).
+      if (panel) {
+        if (performance.now() > fin) return;
+      } else if (max >= destino || performance.now() > fin) {
+        return;
+      }
       raf = requestAnimationFrame(restaurar);
     };
 
-    // Restaurar SOLO si hay algo guardado del último paso por el dashboard.
+    // Restaurar/ir al panel SOLO si hay algo que hacer: una posición guardada del
+    // último paso por el dashboard, o un panel pedido por voz.
     // OJO: no llamar a save() antes de restaurar: al montar el <main> arranca en
     // scrollTop 0 y pisaría el valor guardado (por eso nunca restauraba).
-    if (destino > 0) raf = requestAnimationFrame(restaurar);
+    if (destino > 0 || panel) raf = requestAnimationFrame(restaurar);
 
     main.addEventListener("scroll", onScroll, { passive: true });
 
@@ -98,7 +131,9 @@ export function DashboardScrollKeeper() {
       cancelAnimationFrame(raf);
       main.removeEventListener("scroll", onScroll);
     };
-  }, []);
+    // `panel` entra en las deps: si estando ya en el dashboard se pide otro panel
+    // (o el mismo desde el tope), el efecto tiene que volver a correr.
+  }, [panel]);
 
   return null;
 }

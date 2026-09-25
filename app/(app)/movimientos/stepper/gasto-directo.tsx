@@ -18,14 +18,35 @@ import { QuickCreateModal } from "@/components/ui/quick-create-modal";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { crearCategoriaGasto } from "@/backend/src/actions/gastos";
 import { crearDictadoGasto } from "./dictado-gasto";
-import { useAliasDeCampo, useVoz } from "@/components/voz/voz-provider";
-import { correccionesDeDictado } from "@/lib/voz/vocabulario";
+import { useAliasDeCampo } from "@/components/voz/voz-provider";
 import {
   useRegistrarPantallaDictable,
-  useUltimoDictado,
   type PantallaDictable,
   type ValoresPantalla,
 } from "@/components/voz/dictado-pantalla";
+import { todayLocalISODate } from "@/lib/utils";
+import type { CampoDictable } from "@/lib/voz/tipos";
+
+/**
+ * ¿El formulario **ya tiene** un valor en ese campo?
+ *
+ * 🔑 Es la mitad de la regla **7** de §15.4 (*"lo implícito no pisa"*): el dictado
+ * sólo completa lo que está vacío. La **Fecha** cuenta como vacía mientras siga
+ * siendo el día de hoy (es el valor inicial, no una decisión del usuario) ⇒
+ * "gasté 500 ayer" sigue actualizando la fecha, pero si el usuario la eligió a
+ * mano no se pisa.
+ */
+function tieneValorEn(
+  campo: CampoDictable,
+  actuales: Record<string, unknown>
+): boolean {
+  const actual = actuales[campo.campo];
+  if (actual === undefined || actual === null || actual === "" || actual === 0) {
+    return false;
+  }
+  if (campo.tipo === "fecha") return String(actual) !== todayLocalISODate();
+  return true;
+}
 
 export function GastoDirecto() {
   const { data, handleSetData, navigateTo, options, addCategoriaGasto } =
@@ -131,12 +152,43 @@ export function GastoDirecto() {
     () => ({
       config,
       aplicar: async (resultado) => {
-        const valores = { ...resultado.valores };
-        const asignaciones = [...resultado.asignaciones];
+        const actuales = dataRef.current as unknown as Record<string, unknown>;
+        const campoDe = (nombre: string) =>
+          config.campos.find((c) => c.campo === nombre);
+        const tieneValor = (campo: CampoDictable) => tieneValorEn(campo, actuales);
+        const tieneValorDe = (nombre: string) => {
+          const campo = campoDe(nombre);
+          return campo ? tieneValor(campo) : false;
+        };
+
+        /**
+         * Regla **7** del plan de voz (§15.4): **lo explícito pisa, lo implícito
+         * sólo completa campos vacíos**. El parser marca cada asignación como
+         * explícita (salió de la zona de un campo nombrado) o implícita; acá se
+         * descartan las implícitas cuyo campo **ya tiene valor** (lo que el
+         * usuario cargó a mano se respeta) y se avisa en la burbuja.
+         */
+        const omitidos: string[] = [];
+        const vigentes = resultado.asignaciones.filter((a) => {
+          if (a.explicito) return true;
+          const campo = campoDe(a.campo);
+          if (!campo || !tieneValor(campo)) return true;
+          omitidos.push(campo.etiqueta ?? campo.campo);
+          return false;
+        });
+
+        const valores: Record<string, string | number> = {};
+        for (const a of vigentes) valores[a.campo] = a.valor;
+
         const descripcion =
           typeof valores.descripcion === "string" ? valores.descripcion.trim() : "";
-        const faltaCategoria = valores.idCategoriaGasto === undefined;
-        const faltaMonto = valores.montoOrigen === undefined;
+        // El **historial** también es implícito ⇒ sólo completa campos que estén
+        // vacíos (si el usuario ya eligió categoría o monto, se respetan).
+        const faltaCategoria =
+          valores.idCategoriaGasto === undefined &&
+          !tieneValorDe("idCategoriaGasto");
+        const faltaMonto =
+          valores.montoOrigen === undefined && !tieneValorDe("montoOrigen");
 
         if (descripcion && (faltaCategoria || faltaMonto)) {
           setBuscandoUltimo(true);
@@ -157,7 +209,7 @@ export function GastoDirecto() {
                 options.categoriasGasto.some((c) => c.id === ultimo.categoriaId)
               ) {
                 valores.idCategoriaGasto = ultimo.categoriaId;
-                asignaciones.push({
+                vigentes.push({
                   campo: "idCategoriaGasto",
                   valor: ultimo.categoriaId,
                   texto: descripcion,
@@ -167,7 +219,7 @@ export function GastoDirecto() {
               }
               if (faltaMonto && ultimo.monto > 0) {
                 valores.montoOrigen = ultimo.monto;
-                asignaciones.push({
+                vigentes.push({
                   campo: "montoOrigen",
                   valor: ultimo.monto,
                   texto: descripcion,
@@ -191,40 +243,36 @@ export function GastoDirecto() {
           )[campo];
         }
         handleSetData(valores as unknown as Partial<MovimientoData>);
+
+        // El FAB arma los chips y el aviso con el resultado **filtrado**.
+        resultado.asignaciones = vigentes;
+        resultado.valores = valores;
+        resultado.omitidos = omitidos;
         return antes;
       },
-      escribir: (valores) =>
-        handleSetData(valores as unknown as Partial<MovimientoData>),
+      /**
+       * Escribe valores sueltos (✕ de un chip, elegir un candidato, deshacer) y
+       * devuelve el **"antes"** de esos campos: así el chip que agrega el FAB al
+       * elegir un candidato también sabe a qué valor volver.
+       */
+      escribir: (valores) => {
+        const antes: ValoresPantalla = {};
+        for (const campo of Object.keys(valores)) {
+          antes[campo] = (
+            dataRef.current as unknown as Record<string, string | number | undefined>
+          )[campo];
+        }
+        handleSetData(valores as unknown as Partial<MovimientoData>);
+        return antes;
+      },
     }),
     [config, handleSetData, options]
   );
 
   useRegistrarPantallaDictable(pantalla);
 
-  /**
-   * **Vía B — corrección silenciosa** (plan de G2, §7): al confirmar el paso se
-   * compara lo que la voz había llenado con lo que quedó en el formulario.
-   *
-   * Si el usuario **cambió** un campo de catálogo por una opción real, se aprende
-   * ("cuando digo «X», es esta categoría") con `origen: 'correccion'`. Si lo dejó
-   * **vacío** o **igual**, no se aprende nada.
-   *
-   * ⚠️ La voz **nunca guarda**: esto solo aprende; el gasto se crea en el paso de
-   * confirmación, como siempre.
-   */
-  const { ultimo } = useUltimoDictado();
-  const voz = useVoz();
-  const aprenderCorrecciones = () => {
-    if (!ultimo) return;
-    const correcciones = correccionesDeDictado(
-      ultimo.resultado,
-      dataRef.current as unknown as Record<string, unknown>,
-      (campo) => config.campos.find((c) => c.campo === campo)
-    );
-    for (const c of correcciones) {
-      void voz?.aprender({ ...c, origen: "correccion" });
-    }
-  };
+  // ℹ️ La **vía B** (aprender la corrección) se mudó al paso de confirmación
+  // (2026-09-24): se aprende **al guardar con éxito**, no al tocar Siguiente.
 
   return (
     <StepShell
@@ -234,11 +282,7 @@ export function GastoDirecto() {
       footer={
         <NavButtons
           onBack={() => navigateTo(0)}
-          onNext={() => {
-            // Antes de pasar al resumen: ¿corrigió algo que la voz había llenado?
-            aprenderCorrecciones();
-            navigateTo(STEP_CONFIRMACION);
-          }}
+          onNext={() => navigateTo(STEP_CONFIRMACION)}
           nextDisabled={!isValid}
         />
       }

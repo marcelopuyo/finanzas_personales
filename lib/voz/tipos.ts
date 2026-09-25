@@ -15,8 +15,13 @@ export type TipoCampoVoz = "texto" | "monto" | "fecha" | "opcion";
  * construye su lista de ámbitos con `satisfies readonly AmbitoVoz[]`, así que
  * agregar un catálogo acá **rompe el typecheck** hasta registrarlo allá (y en el
  * `Enum` de la base).
+ *
+ * ➕ `navegacion` (plan §15.6): **órdenes de navegación** aprendidas. El
+ * `destinoValor` es el **id de la intención** (`ir-panel-prestamos`…), no un id de
+ * catálogo; la etiqueta es la del destino ("Préstamos"). ⚠️ La columna `ambito` es
+ * `varchar(40)` **sin CHECK** ⇒ este ámbito no necesita migración (verificado).
  */
-export type AmbitoVoz = "categoriaGasto" | "cuenta";
+export type AmbitoVoz = "categoriaGasto" | "cuenta" | "navegacion";
 
 /** Opción seleccionable de un campo `opcion` (select / combobox). */
 export interface OpcionVoz {
@@ -123,6 +128,16 @@ export interface Asignacion {
   origen: OrigenAsignacion;
   /** 1 = certeza total; menos de 1 = match difuso. */
   puntaje: number;
+  /**
+   * `true` = el valor salió de la **zona del campo nombrado** ("monto 500",
+   * "descripción pizza").
+   *
+   * 🔑 Es lo que distingue **explícito** de **implícito** (regla 7 de §15.4):
+   * *lo explícito **pisa** el valor que hubiera; lo implícito sólo completa
+   * campos **vacíos***. La política la aplica la pantalla (que conoce el
+   * formulario); el parser sólo marca el origen.
+   */
+  explicito?: boolean;
 }
 
 /** Un campo `opcion` donde el dictado no se animó a elegir (D6). */
@@ -144,28 +159,57 @@ export interface ResultadoDictado {
   candidatos: Candidato[];
   /** Palabras que no se pudieron ubicar en ningún campo. */
   noEntendido: string[];
+  /**
+   * **Etiquetas** de los campos que el dictado **NO tocó** por la regla 7 de
+   * §15.4 (*"lo implícito no pisa"*): ya tenían un valor y el dictado no los
+   * nombró. La burbuja lo dice en voz alta ("No toqué Cuenta: ya tenía valor").
+   */
+  omitidos: string[];
 }
+
+/**
+ * Par (ámbito, término) de un alias **propio** que resolvió un valor del dictado.
+ * Es lo que se manda a sumar `usos` **al guardar** (no en el camino del dictado).
+ */
+export interface UsoAliasDictado {
+  ambito: string;
+  terminoNorm: string;
+}
+
+/** Las dos —y únicas— cosas que hace la voz (plan de voz §15: catálogo cerrado). */
+export type IntencionTipo = "navegacion" | "carga";
 
 /** Intención global (botón flotante / entrada por URL). */
 export interface Intencion {
   id: string;
-  /** Sustantivos que la disparan ("gasto"). */
+  /** Qué hace la intención: **navegar** o **cargar** (llenar un wizard). */
+  tipo: IntencionTipo;
+  /** Sustantivos que la disparan ("gasto", "prestamos"). **Son los que mandan** en la navegación. */
   sustantivos: string[];
-  /** Verbos de acción que la confirman ("cargar", "anotar"…). */
-  verbos: string[];
   /**
-   * Verbos que alcanzan **por sí solos**, sin el sustantivo.
+   * Verbos: de **movimiento** (navegación: *mostrame, andá, abrí*) o de **gasto**
+   * (carga: *gasté, pagué, compré*).
    *
-   * 🔑 Sin esto, la frase más natural de todas fallaba: *"cargué mil doscientos de
-   * cig"* o *"pagué el alquiler, doscientos mil"* **no dicen "gasto"**, así que el
-   * FAB respondía "no entendí" (reportado por el usuario en el iPhone, 2026-09-24).
-   *
-   * ⚠️ Cuidado con el solapamiento: un verbo suelto manda a **esta** intención, así
-   * que los genéricos ("crear", "poner", "quiero", "necesito") **no** van acá.
+   * ⚠️ En la navegación el verbo es **decorativo** (el sustantivo manda); en la
+   * carga **es obligatorio** salvo que la frase diga el sustantivo `gasto`.
    */
-  verbosSuficientes?: string[];
-  /** A dónde navega. */
-  href: () => string;
+  verbos: string[];
+  /** A dónde navega. `dato` = valor del **destino parametrizado** (`ir-cuenta`). */
+  href: (dato?: string) => string;
+  /**
+   * **Destino parametrizado**: necesita un dato resuelto en la frase (hoy solo
+   * `cuenta` ⇒ `/cuentas/<id>`). El FAB exige que venga resuelto (`dato`) o que el
+   * usuario elija entre `datoCandidatos`.
+   */
+  dato?: "cuenta";
+  /** Etiqueta visible del destino (lista de opciones del FAB, «Lo que aprendí»). */
+  etiqueta?: string;
+  /**
+   * Navegación: exige un **verbo de movimiento** (no alcanza la frase corta con
+   * el sustantivo solo). Lo usa el panel **Gastos**, cuyo sustantivo (`gastos`)
+   * convive con el de la carga: *"cargar gastos"* **no** debe navegar.
+   */
+  soloConVerbo?: boolean;
   /** Si el destino necesita que el usuario elija una cuenta. */
   requiereCuenta?: boolean;
   /**
@@ -176,10 +220,29 @@ export interface Intencion {
   llevaTexto?: boolean;
   /** Frase de ejemplo: es el **atajo tocable** que ofrece la burbuja del FAB. */
   ejemplo?: string;
+  /**
+   * Palabras de **jerga de la orden** que no son contenido y se descartan del
+   * texto sobrante ("**cargar** un gasto" ⇒ sobrante vacío). No cuentan como
+   * verbos de la intención (no disparan nada por sí solas).
+   */
+  relleno?: string[];
 }
 
 export interface ResultadoIntencion {
   intencion: Intencion | null;
   /** Texto sobrante, ya sin las palabras de la intención (va al destino). */
   resto: string;
+  /** Valor resuelto del **destino parametrizado** (hoy: id de la cuenta). */
+  dato?: string;
+  /** Término dictado que produjo el dato (se **aprende** si el usuario elige). */
+  terminoDato?: string;
+  /** El término apuntó a **varias** opciones: el FAB las ofrece ("¿cuál de estas?"). */
+  datoCandidatos?: OpcionVoz[];
+  /**
+   * **No se reconoció el destino** (plan §15.6): el FAB ofrece el catálogo de
+   * destinos navegables y lo que el usuario elija **se aprende**.
+   */
+  destinos?: Intencion[];
+  /** Término significativo que no se entendió: es lo que se aprende al elegir. */
+  terminoDesconocido?: string;
 }

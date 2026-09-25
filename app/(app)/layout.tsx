@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/backend/src/lib/auth";
-import { getVocabularioSeguro } from "@/backend/src/queries/voz";
+import {
+  getCuentasParaVozSeguro,
+  getVocabularioSeguro,
+} from "@/backend/src/queries/voz";
 import AppLayout from "@/components/layout/app-layout";
 import { VozProvider } from "@/components/voz/voz-provider";
 import { VozPantallaProvider } from "@/components/voz/dictado-pantalla";
@@ -20,13 +23,18 @@ export default async function ProtectedLayout({
   // vacío en vez de tirar abajo toda el área protegida (capa opcional).
   const vocabulario = await getVocabularioSeguro();
 
+  // Cuentas **navegables por voz** (`ir-cuenta`, plan §15.2 b): son las del
+  // usuario (cada uno tiene nombres distintos) y viajan en el snapshot para que
+  // el FAB resuelva "la cuenta <nombre>" y ofrezca candidatos si es ambigua.
+  const cuentas = await getCuentasParaVozSeguro();
+
   // Etiqueta del usuario (tooltip/aria del avatar de la top bar): nombre del
   // usuario logueado (o su email si no tiene nombre), y su primera letra.
   const userLabel = (user.nombre?.trim() || user.email || "Perfil").trim();
   const initial = userLabel.charAt(0).toUpperCase();
 
   return (
-    <VozProvider rows={vocabulario}>
+    <VozProvider rows={vocabulario} cuentas={cuentas}>
       {/* Puente pantalla ↔ FAB 🎤 (G3): la pantalla actual se declara dictable y
           el FAB global la consulta. Envuelve al contenido **y** al FAB. */}
       <VozPantallaProvider>

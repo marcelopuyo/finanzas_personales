@@ -12,8 +12,10 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { norm } from "@/lib/voz/normalizar";
+import { DESTINOS_APRENDIBLES } from "@/lib/voz/intenciones";
 import {
   aliasDeCatalogo,
+  conceptosDeSistema,
   fusionarAprendidos,
   type AliasOpcion,
   type ConceptoVoz,
@@ -22,9 +24,10 @@ import {
   aprenderAlias,
   olvidarAlias,
   olvidarTermino,
+  registrarUsoAlias,
 } from "@/backend/src/actions/voz";
-import type { AliasVozOut } from "@/backend/src/queries/voz";
-import type { AmbitoVoz, OpcionVoz } from "@/lib/voz/tipos";
+import type { AliasVozOut, CuentaVozOut } from "@/backend/src/queries/voz";
+import type { AmbitoVoz, OpcionVoz, UsoAliasDictado } from "@/lib/voz/tipos";
 
 /**
  * **Vocabulario de voz en memoria** (G2 del plan de voz, §14.5).
@@ -45,12 +48,21 @@ interface VozContexto {
   filas: AliasVozOut[];
   /** Capa de sistema agrupada por ámbito, lista para `aliasDeCatalogo`. */
   sistema: Record<string, ConceptoVoz[]>;
+  /** Cuentas **del usuario**, destino de `ir-cuenta` (plan §15.2 b). */
+  cuentas: CuentaVozOut[];
   /** Aprende (optimista). Revertir + avisar si la Server Action falla. */
   aprender: (input: AprenderLocal) => Promise<void>;
   /** Olvida un alias propio. */
   olvidar: (id: number) => Promise<void>;
   /** Olvida el término completo (lo que usa la ✕ del chip). */
   olvidarPorTermino: (input: { ambito: string; terminoNorm: string }) => Promise<void>;
+  /**
+   * Suma `usos` a los alias **propios** que resolvieron un dictado. Se llama
+   * **al guardar** el formulario (nunca en el camino del dictado): "usar" es
+   * haber guardado con ese término, y así el contador no paga una escritura por
+   * cada frase entendida.
+   */
+  registrarUsos: (usos: UsoAliasDictado[]) => Promise<void>;
 }
 
 export interface AprenderLocal {
@@ -68,9 +80,12 @@ const Contexto = createContext<VozContexto | null>(null);
 
 export function VozProvider({
   rows,
+  cuentas = [],
   children,
 }: {
   rows: AliasVozOut[];
+  // Cuentas navegables por voz: vienen del layout (consulta propia, capa opcional).
+  cuentas?: CuentaVozOut[];
   children: ReactNode;
 }) {
   const [filas, setFilas] = useState<AliasVozOut[]>(rows);
@@ -93,22 +108,7 @@ export function VozProvider({
     filasRef.current = filas;
   }, [filas]);
 
-  const sistema = useMemo(() => {
-    const porAmbito: Record<string, Record<string, string[]>> = {};
-    for (const fila of filas) {
-      if (fila.usuarioId !== null) continue;
-      const conceptos = (porAmbito[fila.ambito] ??= {});
-      (conceptos[fila.destinoValor] ??= []).push(fila.terminoNorm);
-    }
-    const out: Record<string, ConceptoVoz[]> = {};
-    for (const [ambito, conceptos] of Object.entries(porAmbito)) {
-      out[ambito] = Object.entries(conceptos).map(([concepto, alias]) => ({
-        concepto,
-        alias,
-      }));
-    }
-    return out;
-  }, [filas]);
+  const sistema = useMemo(() => conceptosDeSistema(filas), [filas]);
 
   const aprender = useCallback(async (input: AprenderLocal) => {
     const terminoNorm = norm(input.termino);
@@ -189,9 +189,42 @@ export function VozProvider({
     []
   );
 
+  /**
+   * Suma `usos` (optimista y **silencioso**: el guardado ya salió bien, no se le
+   * avisa al usuario por un contador). Sirve para detectar alias de un solo uso.
+   */
+  const registrarUsos = useCallback(async (usos: UsoAliasDictado[]) => {
+    if (!usos.length) return;
+    const previas = filasRef.current;
+    const clave = (u: { ambito: string; terminoNorm: string }) =>
+      `${u.ambito}|${u.terminoNorm}`;
+    const set = new Set(usos.map(clave));
+    setFilas(
+      previas.map((f) =>
+        f.usuarioId !== null && set.has(clave(f))
+          ? { ...f, usos: f.usos + 1 }
+          : f
+      )
+    );
+    try {
+      for (const u of usos) await registrarUsoAlias(u);
+    } catch (error) {
+      console.error("voz: no se pudo registrar el uso del alias", error);
+      setFilas(previas);
+    }
+  }, []);
+
   const valor = useMemo<VozContexto>(
-    () => ({ filas, sistema, aprender, olvidar, olvidarPorTermino }),
-    [filas, sistema, aprender, olvidar, olvidarPorTermino]
+    () => ({
+      filas,
+      sistema,
+      cuentas,
+      aprender,
+      olvidar,
+      olvidarPorTermino,
+      registrarUsos,
+    }),
+    [filas, sistema, cuentas, aprender, olvidar, olvidarPorTermino, registrarUsos]
   );
 
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;
@@ -226,4 +259,61 @@ export function useAliasDeCampo(
     if (!filas) return mapa;
     return fusionarAprendidos(mapa, filas, opciones, ambito);
   }, [filas, sistema, opciones, ambito]);
+}
+
+/**
+ * **Cuentas navegables por voz** (`ir-cuenta`, plan §15.2 b): arma el mapa
+ * término dictado → cuentas del usuario con **la misma lógica** que los campos
+ * (diccionario de sistema del ámbito `cuenta` + lo aprendido) y devuelve, además,
+ * la moneda de cada una para el **calificador** ("galicia pesos").
+ *
+ * 🔑 Es genérico a propósito: **cada usuario tiene cuentas con nombres distintos**
+ * y la traducción se hace contra los tokens de **sus** etiquetas.
+ */
+export function useCuentasNavegables(): {
+  alias: Map<string, AliasOpcion[]>;
+  monedas: Record<string, string>;
+} {
+  const ctx = useVoz();
+  const filas = ctx?.filas ?? null;
+  const sistema = ctx?.sistema ?? null;
+  const cuentas = ctx?.cuentas ?? null;
+
+  const opciones = useMemo<OpcionVoz[]>(
+    () => (cuentas ?? []).map((c) => ({ value: c.id, label: c.nombre })),
+    [cuentas]
+  );
+
+  const monedas = useMemo<Record<string, string>>(() => {
+    const out: Record<string, string> = {};
+    for (const c of cuentas ?? []) out[c.id] = c.moneda;
+    return out;
+  }, [cuentas]);
+
+  const alias = useMemo(() => {
+    const mapa = aliasDeCatalogo(opciones, sistema?.cuenta ?? []);
+    if (!filas) return mapa;
+    return fusionarAprendidos(mapa, filas, opciones, "cuenta");
+  }, [filas, sistema, opciones]);
+
+  return { alias, monedas };
+}
+
+/**
+ * **Órdenes de navegación aprendidas** (plan §15.6): término → **id de la
+ * intención**. Es la misma capa aprendida que un campo, pero con el destino siendo
+ * un id estable de código (no un id de catálogo).
+ */
+export function useNavegacionAprendida(): Map<string, AliasOpcion[]> {
+  const ctx = useVoz();
+  const filas = ctx?.filas ?? null;
+
+  return useMemo(() => {
+    const opciones: OpcionVoz[] = DESTINOS_APRENDIBLES.map((i) => ({
+      value: i.id,
+      label: i.etiqueta ?? i.id,
+    }));
+    if (!filas) return new Map<string, AliasOpcion[]>();
+    return fusionarAprendidos(new Map(), filas, opciones, "navegacion");
+  }, [filas]);
 }

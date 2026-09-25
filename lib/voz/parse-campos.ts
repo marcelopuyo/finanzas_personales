@@ -72,7 +72,14 @@ export function parsearCampos(texto: string, config: ConfigDictado): ResultadoDi
     valor: string | number,
     textoAsig: string,
     origen: OrigenAsignacion,
-    puntaje = 1
+    puntaje = 1,
+    /**
+     * ⚠️ `true` sólo cuando el valor salió de la **zona del campo nombrado**
+     * ("monto 500", "descripción pizza"). Es lo que distingue **explícito** de
+     * **implícito** para la regla 7 del plan (§15.4): *lo explícito pisa, lo
+     * implícito sólo completa campos vacíos*. La política la aplica la pantalla.
+     */
+    explicito = false
   ): boolean => {
     if (asignado.has(campo.campo)) return false;
     asignado.add(campo.campo);
@@ -82,6 +89,7 @@ export function parsearCampos(texto: string, config: ConfigDictado): ResultadoDi
       texto: textoAsig,
       origen,
       puntaje,
+      explicito,
     });
     return true;
   };
@@ -171,7 +179,16 @@ export function parsearCampos(texto: string, config: ConfigDictado): ResultadoDi
       const mejor = numeroMayor(extraerNumeros(tokensZona));
       if (campoDestino && mejor) {
         const origen: OrigenAsignacion = z.campo ? "disparador" : "numero";
-        if (asignar(campoDestino, mejor.valor, mejor.texto, origen)) {
+        if (
+          asignar(
+            campoDestino,
+            mejor.valor,
+            mejor.texto,
+            origen,
+            1,
+            z.campo !== null
+          )
+        ) {
           marcar(z.desde + mejor.desde, z.desde + mejor.hasta);
         }
       }
@@ -183,7 +200,16 @@ export function parsearCampos(texto: string, config: ConfigDictado): ResultadoDi
       const primera = extraerFechas(tokensZona)[0];
       if (campoDestino && primera) {
         const origen: OrigenAsignacion = z.campo ? "disparador" : "fecha";
-        if (asignar(campoDestino, primera.fecha, primera.texto, origen)) {
+        if (
+          asignar(
+            campoDestino,
+            primera.fecha,
+            primera.texto,
+            origen,
+            1,
+            z.campo !== null
+          )
+        ) {
           marcar(z.desde + primera.desde, z.desde + primera.hasta);
         }
       }
@@ -208,7 +234,14 @@ export function parsearCampos(texto: string, config: ConfigDictado): ResultadoDi
     if (vocabulario) {
       if (vocabulario.opciones.length === 1) {
         const [hit] = vocabulario.opciones;
-        asignar(campo, hit.valor, vocabulario.termino, "alias", hit.puntaje);
+        asignar(
+          campo,
+          hit.valor,
+          vocabulario.termino,
+          "alias",
+          hit.puntaje,
+          Boolean(zona)
+        );
         marcarTermino(vocabulario.termino, Boolean(campo.aportaTexto));
       } else {
         candidatos.push({
@@ -232,7 +265,14 @@ export function parsearCampos(texto: string, config: ConfigDictado): ResultadoDi
       opciones
     );
     if (sin) {
-      asignar(campo, sin.opcion.value, sin.termino, "sinonimo", sin.puntaje);
+      asignar(
+        campo,
+        sin.opcion.value,
+        sin.termino,
+        "sinonimo",
+        sin.puntaje,
+        Boolean(zona)
+      );
       marcarTermino(norm(sin.termino), Boolean(campo.aportaTexto));
       continue;
     }
@@ -247,7 +287,14 @@ export function parsearCampos(texto: string, config: ConfigDictado): ResultadoDi
     if (!segundo || primero.puntaje - segundo.puntaje >= MARGEN_GANADOR) {
       // `texto` = la ventana del dictado que produjo el match (no la etiqueta):
       // es lo que después se usa para **aprender** (vía B del plan de G2).
-      asignar(campo, primero.opcion.value, primero.termino, "opcion", primero.puntaje);
+      asignar(
+        campo,
+        primero.opcion.value,
+        primero.termino,
+        "opcion",
+        primero.puntaje,
+        Boolean(zona)
+      );
       marcarTermino(primero.termino, Boolean(campo.aportaTexto));
     } else {
       candidatos.push({
@@ -286,7 +333,7 @@ export function parsearCampos(texto: string, config: ConfigDictado): ResultadoDi
       }
     }
 
-    if (valor) asignar(campoTexto, valor, valor, "resto", 0.8);
+    if (valor) asignar(campoTexto, valor, valor, "resto", 0.8, Boolean(zonaTexto));
   }
 
   // ── Salida ────────────────────────────────────────────────────────────────
@@ -297,5 +344,5 @@ export function parsearCampos(texto: string, config: ConfigDictado): ResultadoDi
   const noEntendido =
     asignaciones.length === 0 && orig.length ? orig : sobrantes;
 
-  return { valores, asignaciones, candidatos, noEntendido };
+  return { valores, asignaciones, candidatos, noEntendido, omitidos: [] };
 }

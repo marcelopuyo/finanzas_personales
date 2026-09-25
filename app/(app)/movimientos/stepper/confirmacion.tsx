@@ -19,6 +19,9 @@ import {
   cargarJornadaTrabajo,
   cargarTareaTrabajo,
 } from "@/backend/src/actions/movimientos";
+import { useUltimoDictado } from "@/components/voz/dictado-pantalla";
+import { useVoz } from "@/components/voz/voz-provider";
+import { correccionesDeDictado } from "@/lib/voz/vocabulario";
 
 const TITULOS: Record<MovimientoConcepto, string> = {
   CobroSueldo: "Revisar la información y confirmar el registro del cobro.",
@@ -36,6 +39,10 @@ export function Confirmacion() {
     useMovimientoStepper();
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  // Dictado aplicado (si el usuario llenó esta pantalla por voz): al guardar se
+  // le suman `usos` a los alias propios que resolvieron valores.
+  const { ultimo, setUltimo } = useUltimoDictado();
+  const voz = useVoz();
 
   const concepto = data.concepto as MovimientoConcepto | "";
   const cuentaNombre = (id: number) =>
@@ -304,6 +311,25 @@ export function Confirmacion() {
         }
       }
       toast.success("Movimiento guardado correctamente");
+      // **Vía B** (aprender la corrección) — movida acá el 2026-09-24: se aprende
+      // **al guardar con éxito**, no al tocar Siguiente. Si el guardado falla, no
+      // se aprende nada. Compara lo que la voz había llenado contra lo que quedó
+      // en el formulario (`correccionesDeDictado` ya ignora vacíos e iguales).
+      if (ultimo) {
+        for (const c of correccionesDeDictado(
+          ultimo.resultado,
+          data as unknown as Record<string, unknown>,
+          (campo) => ultimo.campos.find((c) => c.campo === campo)
+        )) {
+          void voz?.aprender({ ...c, origen: "correccion" });
+        }
+      }
+      // `usos` del vocabulario: se suma **acá** (al guardar) y no en el camino
+      // del dictado. No se espera: es un contador de diagnóstico y no debe
+      // demorar la salida del wizard. El dictado se consume (si no, quedaría la
+      // burbuja con chips viejos al volver al paso 1).
+      if (ultimo?.usos.length) void voz?.registrarUsos(ultimo.usos);
+      setUltimo(null);
       // En modo directo (sin stepper) se vuelve al origen que lanzó el wizard
       // (volverA, ej. la pantalla del período) o al dashboard por defecto.
       if (direct) {

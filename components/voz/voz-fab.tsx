@@ -14,7 +14,11 @@ import { dejarTexto, tomarTexto } from "@/lib/voz/handoff";
 import { INTENCIONES } from "@/lib/voz/intenciones";
 import { parsearIntencion } from "@/lib/voz/parse-intencion";
 import { parsearCampos } from "@/lib/voz/parse-campos";
-import { useVoz } from "./voz-provider";
+import {
+  useCuentasNavegables,
+  useNavegacionAprendida,
+  useVoz,
+} from "./voz-provider";
 import {
   usePantallaDictable,
   useUltimoDictado,
@@ -27,6 +31,8 @@ import type {
   Candidato,
   Intencion,
   OpcionVoz,
+  ResultadoDictado,
+  UsoAliasDictado,
 } from "@/lib/voz/tipos";
 import {
   iniciarDictado,
@@ -80,10 +86,83 @@ const MENSAJE_ERROR: Record<ErrorVoz, string> = {
 /** Aviso de la burbuja (R8: pegada al FAB). `escuchado` solo cuando no entendió. */
 type Aviso = { texto: string; escuchado?: string } | null;
 
+/**
+ * Destino **no reconocido** (§15.6): la orden era de navegación pero el término no
+ * está en el catálogo ⇒ se ofrecen los destinos y el elegido se aprende.
+ * `termino` viene sólo cuando vale la pena aprender (1-2 palabras significativas).
+ */
+type PreguntaNav = { destinos: Intencion[]; termino?: string } | null;
+
+/** Cuenta **ambigua** (`ir-cuenta`): el usuario elige entre las suyas y se aprende. */
+type PreguntaCuenta = { opciones: OpcionVoz[]; termino: string } | null;
+
+/** Margen (px) alrededor de la franja del FAB para decidir si se corre. */
+const MARGEN_FRANJA = 8;
+
+/** ¿El destino de esta intención **es** la pantalla actual? (sin query) */
+function esMiPantallaDe(intencion: Intencion, ruta: string): boolean {
+  return intencion.href().split("?")[0] === ruta;
+}
+
+/** Nombre visible del catálogo de un alias aprendido (lista «Lo que aprendí»). */
+function etiquetaAmbito(ambito: string): string {
+  if (ambito === "cuenta") return "Cuentas";
+  if (ambito === "navegacion") return "Navegación";
+  return "Categorías de gasto";
+}
+
+/** "Cuenta", "Cuenta y Fecha", "Monto, Cuenta y Fecha" (para los avisos). */
+function listar(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  return `${items.slice(0, -1).join(", ")} y ${items[items.length - 1]}`;
+}
+
 /** La sesión terminó y no se reconoció nada (feedback garantizado, 2026-09-23). */
 const SIN_TEXTO: Aviso = {
   texto: "No te escuché. Probá de nuevo hablando un poco más fuerte.",
 };
+
+/** Campo de la config (de la pantalla actual o la que viaja con el dictado). */
+function buscarCampo(campos: CampoDictable[], nombre: string) {
+  return campos.find((c) => c.campo === nombre);
+}
+
+/**
+ * Alias **propio** que resolvió una asignación (mismo criterio para el chip
+ * "olvidar" y para el contador `usos`): el campo tiene catálogo y el término
+ * dictado es una fila del usuario.
+ */
+function filaPropiaDe(
+  a: Asignacion,
+  campos: CampoDictable[],
+  filas: AliasVozOut[]
+) {
+  const catalogo = buscarCampo(campos, a.campo)?.catalogo;
+  if (!catalogo) return undefined;
+  const terminoNorm = norm(a.texto);
+  return filas.find(
+    (f) =>
+      f.usuarioId !== null &&
+      f.ambito === catalogo &&
+      f.terminoNorm === terminoNorm
+  );
+}
+
+/**
+ * Pares (ámbito, término) de los alias propios que resolvieron valores: es lo
+ * que se le suma a `usos` **al guardar** (ver `VozProvider.registrarUsos`).
+ */
+function usosDeDictado(
+  resultado: ResultadoDictado,
+  campos: CampoDictable[],
+  filas: AliasVozOut[]
+): UsoAliasDictado[] {
+  return resultado.asignaciones
+    .filter((a) => a.origen === "alias")
+    .map((a) => filaPropiaDe(a, campos, filas))
+    .filter((f): f is AliasVozOut => Boolean(f))
+    .map((f) => ({ ambito: f.ambito, terminoNorm: f.terminoNorm }));
+}
 
 export function VozFab() {
   const { go } = usePendingNav();
@@ -93,6 +172,9 @@ export function VozFab() {
   /** Pantalla actual (si se declaró dictable) y vocabulario en memoria. */
   const pantalla = usePantallaDictable();
   const voz = useVoz();
+  /** Cuentas del usuario (`ir-cuenta`) y órdenes de navegación aprendidas (§15.6). */
+  const cuentasVoz = useCuentasNavegables();
+  const navesAprendidas = useNavegacionAprendida();
   const [estado, setEstado] = useState<EstadoDictado>("listo");
   const [aviso, setAviso] = useState<Aviso>(null);
   /**
@@ -100,12 +182,17 @@ export function VozFab() {
    * formulario dentro de la franja del FAB): el FAB se corre para no taparla.
    */
   const [ceder, setCeder] = useState(false);
+  /** Preguntas de navegación pendientes (plan §15.6 y `ir-cuenta`). */
+  const [preguntaNav, setPreguntaNav] = useState<PreguntaNav>(null);
+  const [preguntaCuenta, setPreguntaCuenta] = useState<PreguntaCuenta>(null);
   /**
    * Último dictado aplicado. Vive en el **contexto** (no en el FAB) para que la
    * pantalla pueda leerlo al guardar y aprender las correcciones (vía B).
    */
   const { ultimo: dictado, setUltimo: setDictado } = useUltimoDictado();
   const sesion = useRef<SesionDictado | null>(null);
+  /** El botón, para **medir** la franja que se corre (F5). */
+  const botonRef = useRef<HTMLButtonElement | null>(null);
   /** El motor ya avisó un error más específico: no lo pisa el "no te escuché". */
   const huboError = useRef(false);
 
@@ -118,6 +205,9 @@ export function VozFab() {
     setRutaDelCeder(ruta);
     setCeder(false);
     setDictado(null);
+    // Las preguntas de navegación eran de la pantalla anterior.
+    setPreguntaNav(null);
+    setPreguntaCuenta(null);
   }
 
   const escuchando = estado === "iniciando" || estado === "escuchando";
@@ -133,9 +223,9 @@ export function VozFab() {
     .sort((a, b) => b.usos - a.usos || a.termino.localeCompare(b.termino));
 
   /** Navega dejando el sobrante para la pantalla destino (D10). */
-  const navegar = (intencion: Intencion, resto: string) => {
+  const navegar = (intencion: Intencion, resto: string, dato?: string) => {
     if (intencion.llevaTexto && resto) dejarTexto(resto);
-    go(intencion.href(), `voz-${intencion.id}`);
+    go(intencion.href(dato), `voz-${intencion.id}`);
   };
 
   /** Llena la pantalla actual con lo dictado. `true` si aplicó algo. */
@@ -147,17 +237,45 @@ export function VozFab() {
         return false;
       }
       const antes = await pantalla.aplicar(resultado);
+      // La frase traía cosas, pero el formulario **ya tenía todo** y la regla 7
+      // (§15.4: "lo implícito no pisa") descartó cada campo ⇒ se avisa en vez de
+      // no decir nada (y **no** se navega: la orden ya se atendió acá).
+      // ⚠️ **No** se limpia el dictado anterior: la vía B (aprender la corrección)
+      // lo necesita en la confirmación para comparar contra el formulario.
+      if (!resultado.asignaciones.length && !resultado.candidatos.length) {
+        setAviso({
+          escuchado: texto,
+          texto: resultado.omitidos.length
+            ? `No toqué ${listar(resultado.omitidos)}: ya tenía${
+                resultado.omitidos.length === 1 ? "" : "n"
+              } valor.`
+            : "No entendí qué querías anotar.",
+        });
+        return true;
+      }
       setAviso(null);
-      setDictado({ resultado, antes });
+      // El dictado se lleva **su** config (por si la pantalla se desmonta: paso de
+      // confirmación del wizard) y los alias propios que resolvió, para sumar
+      // `usos` al guardar.
+      setDictado({
+        resultado,
+        antes,
+        campos: pantalla.config.campos,
+        usos: usosDeDictado(resultado, pantalla.config.campos, voz?.filas ?? []),
+      });
       return true;
     },
-    [pantalla, setDictado]
+    [pantalla, setDictado, voz?.filas]
   );
 
   /**
    * Resuelve el texto reconocido. La regla de decisión (R1, plan §6.2) es:
    *
-   * 1. **Orden explícita de navegación** (`ir-*`) ⇒ navega.
+   * 0. **Destino no reconocido con orden de movimiento** (§15.6) ⇒ se ofrecen los
+   *    destinos y lo que elija **se aprende** (navega siempre).
+   * 1. **Orden explícita de navegación** (`ir-*`) ⇒ navega (con su **dato** si el
+   *    destino es parametrizado, `ir-cuenta`); si el dato quedó **ambiguo**, se
+   *    ofrecen las cuentas (elegir = navegar + aprender).
    * 2. **Su destino es esta pantalla** ("cargar un gasto" ya en el formulario) ⇒
    *    llena.
    * 3. **Intención de carga** con otro destino ⇒ navega con el sobrante.
@@ -165,25 +283,54 @@ export function VozFab() {
    * 5. Nada de eso ⇒ burbuja con ejemplos.
    */
   const interpretar = async (texto: string) => {
-    const { intencion, resto } = parsearIntencion(texto);
-    const navegacionExplicita = Boolean(intencion?.id.startsWith("ir-"));
-    const esMiPantalla = intencion
-      ? intencion.href().split("?")[0] === ruta
-      : false;
+    const {
+      intencion,
+      resto,
+      dato,
+      terminoDato,
+      datoCandidatos,
+      destinos,
+      terminoDesconocido,
+    } = parsearIntencion(texto, {
+      cuentas: cuentasVoz,
+      navegacion: navesAprendidas,
+    });
+    setPreguntaNav(null);
+    setPreguntaCuenta(null);
 
-    if (intencion && (navegacionExplicita || !pantalla)) {
+    // §15.6: no se reconoció el destino pero la orden era de navegación ⇒ se le
+    // ofrecen los destinos (y se aprende el término si es uno solo y significativo).
+    if (destinos?.length) {
+      setAviso(null);
+      setPreguntaNav({ destinos, termino: terminoDesconocido });
+      return;
+    }
+
+    const navegacionExplicita = intencion?.tipo === "navegacion";
+    // Destino parametrizado sin dato resuelto (cuenta): no se puede navegar a ciegas.
+    const sinDato = Boolean(intencion?.dato && !dato);
+
+    if (intencion && !sinDato && (navegacionExplicita || !pantalla)) {
+      if (datoCandidatos?.length && terminoDato) {
+        // Ambigüedad (dos cuentas con el mismo nombre, ARS/USD): elige y se aprende.
+        setAviso(null);
+        setPreguntaCuenta({ opciones: datoCandidatos, termino: terminoDato });
+        return;
+      }
       setDictado(null);
-      navegar(intencion, resto);
+      navegar(intencion, resto, dato);
       return;
     }
 
     // El sobrante ya no tiene las palabras de la intención ("gasté"): es lo que
     // hay que parsear contra los campos.
-    if ((!intencion || esMiPantalla) && (await llenar(resto || texto))) return;
+    if ((!intencion || esMiPantallaDe(intencion, ruta)) && (await llenar(resto || texto))) {
+      return;
+    }
 
-    if (intencion) {
+    if (intencion && !sinDato) {
       setDictado(null);
-      navegar(intencion, resto);
+      navegar(intencion, resto, dato);
       return;
     }
 
@@ -191,6 +338,58 @@ export function VozFab() {
       escuchado: texto,
       texto: "No entendí qué querías hacer. Probá con uno de estos ejemplos:",
     });
+  };
+
+  /**
+   * **Elegir un destino** cuando la orden no se entendió (§15.6): **siempre
+   * navega** (decisión del usuario, 2026-09-24) y, si había un término
+   * significativo, **lo aprende** (`usos` +1 al navegar: la orden se cumple en el
+   * acto, a diferencia de la carga que suma al guardar).
+   */
+  const elegirDestino = (intencion: Intencion) => {
+    const termino = preguntaNav?.termino;
+    setPreguntaNav(null);
+    if (termino) {
+      void voz
+        ?.aprender({
+          ambito: "navegacion",
+          termino,
+          destinoValor: intencion.id,
+          destinoEtiqueta: intencion.etiqueta ?? intencion.id,
+          origen: "ambiguedad",
+        })
+        .then(() =>
+          voz?.registrarUsos([
+            { ambito: "navegacion", terminoNorm: norm(termino) },
+          ])
+        );
+    }
+    navegar(intencion, "");
+  };
+
+  /**
+   * **Elegir la cuenta** cuando el nombre era ambiguo (`ir-cuenta`): navega a la
+   * cuenta y aprende el término (ámbito `cuenta`, el mismo que usan los campos).
+   */
+  const elegirCuenta = (opcion: OpcionVoz) => {
+    const termino = preguntaCuenta?.termino ?? "";
+    const destino = INTENCIONES.find((i) => i.id === "ir-cuenta");
+    setPreguntaCuenta(null);
+    if (!destino) return;
+    if (termino) {
+      void voz
+        ?.aprender({
+          ambito: "cuenta",
+          termino,
+          destinoValor: opcion.value,
+          destinoEtiqueta: opcion.label,
+          origen: "ambiguedad",
+        })
+        .then(() =>
+          voz?.registrarUsos([{ ambito: "cuenta", terminoNorm: norm(termino) }])
+        );
+    }
+    navegar(destino, "", opcion.value);
   };
 
   /** Arranca una sesión de dictado nueva. */
@@ -261,9 +460,15 @@ export function VozFab() {
     void llenar(pendiente);
   }, [pantalla, dicho, llenar]);
 
+  /**
+   * Campos vigentes para leer los chips: los de la pantalla actual y, si ya no
+   * está (paso de confirmación del wizard), los que viajaron con el dictado.
+   */
+  const camposVigentes = pantalla?.config.campos ?? dictado?.campos ?? [];
+
   /** Config del campo que se está mostrando (para etiqueta y formato). */
   const campoDe = (nombre: string): CampoDictable | undefined =>
-    pantalla?.config.campos.find((c) => c.campo === nombre);
+    buscarCampo(camposVigentes, nombre);
 
   /** Valor presentable de una asignación (monto con $, fecha dd/mm/aaaa, etiqueta). */
   const valorLindo = (a: Asignacion): string => {
@@ -294,14 +499,18 @@ export function VozFab() {
   const quitarCampo = (campo: string) => {
     if (!dictado || !pantalla) return;
     pantalla.escribir({ [campo]: dictado.antes[campo] });
+    const asignaciones = dictado.resultado.asignaciones.filter(
+      (a) => a.campo !== campo
+    );
     setDictado({
       ...dictado,
-      resultado: {
-        ...dictado.resultado,
-        asignaciones: dictado.resultado.asignaciones.filter(
-          (a) => a.campo !== campo
-        ),
-      },
+      resultado: { ...dictado.resultado, asignaciones },
+      // Ese término ya no resolvió nada en este dictado: no debe contar como uso.
+      usos: usosDeDictado(
+        { ...dictado.resultado, asignaciones },
+        dictado.campos,
+        voz?.filas ?? []
+      ),
     });
   };
 
@@ -321,17 +530,8 @@ export function VozFab() {
    * Sirve para ofrecer **olvidar** justo en el chip del término que se resolvió
    * con lo que la app "ya sabía" (R11).
    */
-  const filaAprendidaDe = (a: Asignacion): AliasVozOut | undefined => {
-    const campo = campoDe(a.campo);
-    if (!campo?.catalogo) return undefined;
-    const terminoNorm = norm(a.texto);
-    return voz?.filas.find(
-      (f) =>
-        f.usuarioId !== null &&
-        f.ambito === campo.catalogo &&
-        f.terminoNorm === terminoNorm
-    );
-  };
+  const filaAprendidaDe = (a: Asignacion): AliasVozOut | undefined =>
+    filaPropiaDe(a, camposVigentes, voz?.filas ?? []);
 
   /** Olvidar el término que resolvió este chip (vuelve al comportamiento difuso). */
   const olvidarDe = (a: Asignacion) => {
@@ -352,9 +552,10 @@ export function VozFab() {
   const elegirCandidato = (c: Candidato, opcion: OpcionVoz) => {
     if (!pantalla) return;
     const campo = campoDe(c.campo);
-    pantalla.escribir({
-      [c.campo]: campo?.numerico ? Number(opcion.value) : opcion.value,
-    });
+    const valor = campo?.numerico ? Number(opcion.value) : opcion.value;
+    // `escribir` devuelve el "antes": lo guardamos para que el chip que se agrega
+    // abajo también sepa a qué valor volver.
+    const antes = pantalla.escribir({ [c.campo]: valor });
     if (campo?.catalogo) {
       void voz?.aprender({
         ambito: campo.catalogo,
@@ -364,17 +565,43 @@ export function VozFab() {
         origen: "ambiguedad",
       });
     }
-    setDictado((d) =>
-      d
-        ? {
-            ...d,
-            resultado: {
-              ...d.resultado,
-              candidatos: d.resultado.candidatos.filter((x) => x.campo !== c.campo),
-            },
-          }
-        : d
-    );
+    // Lo elegido también resolvió un término con catálogo ⇒ entra como chip y
+    // cuenta como uso si el usuario guarda.
+    const asignacion: Asignacion = {
+      campo: c.campo,
+      valor,
+      texto: c.termino,
+      origen: "alias",
+      puntaje: 1,
+    };
+    setDictado((d) => {
+      if (!d) return d;
+      const asignaciones = [
+        ...d.resultado.asignaciones.filter((x) => x.campo !== c.campo),
+        asignacion,
+      ];
+      // ⚠️ El par del alias recién aprendido se agrega **a mano**: la capa
+      // aprendida se actualiza de forma **optimista y asincrónica**, así que en
+      // este instante `voz.filas` todavía no lo tiene y `usosDeDictado` no lo
+      // vería (era el bug de `usos: 0`).
+      const par = campo?.catalogo
+        ? { ambito: campo.catalogo, terminoNorm: norm(c.termino) }
+        : null;
+      const usos = [...usosDeDictado({ ...d.resultado, asignaciones }, d.campos, voz?.filas ?? [])];
+      if (par && !usos.some((u) => u.ambito === par.ambito && u.terminoNorm === par.terminoNorm)) {
+        usos.push(par);
+      }
+      return {
+        ...d,
+        antes: { ...d.antes, ...antes },
+        resultado: {
+          ...d.resultado,
+          asignaciones,
+          candidatos: d.resultado.candidatos.filter((x) => x.campo !== c.campo),
+        },
+        usos,
+      };
+    });
   };
 
   // Al abandonar la página hay que soltar el micrófono: una sesión viva deja el
@@ -399,6 +626,12 @@ export function VozFab() {
    * `CrudForm`) "interseca" exactamente mientras estaría debajo del FAB ―sea
    * scrolleando o al llegar al final―. Reemplaza la reserva de espacio, que no
    * alcanzaba cuando el pie pasa por la franja a mitad del scroll.
+   *
+   * ⚠️ La franja se **mide** (ver `conectar`): si se recorta sólo el borde
+   * inferior, cualquier pie visible en la parte baja de la pantalla "interseca"
+   * y el FAB desaparece **sin estar debajo** (en escritorio, con el pie a la vista
+   * desde el arranque, el FAB no aparecía nunca ⇒ no se podía dictar ni responder
+   * una pregunta del dictado).
    */
   useEffect(() => {
     let io: IntersectionObserver | null = null;
@@ -406,17 +639,31 @@ export function VozFab() {
       io?.disconnect();
       const pies = document.querySelectorAll("[data-pie-accion]");
       if (!pies.length) return;
+      // **Franja real del FAB**, no todo el viewport: se recorta el root a la
+      // banda que ocupa el botón. El botón es el último hijo del contenedor (que
+      // está anclado abajo), así que su borde inferior es estable aunque la
+      // burbuja esté abierta.
+      const rect = botonRef.current?.getBoundingClientRect();
+      const abajo = Math.round(
+        (rect ? window.innerHeight - rect.bottom : 16) - MARGEN_FRANJA
+      );
+      const arriba = Math.round(
+        window.innerHeight - abajo - (rect?.height ?? 52) - MARGEN_FRANJA
+      );
       io = new IntersectionObserver(
         (entradas) => setCeder(entradas.some((e) => e.isIntersecting)),
-        { rootMargin: "0px 0px -112px 0px" }
+        { rootMargin: `${arriba}px 0px -${abajo}px 0px` }
       );
       pies.forEach((p) => io?.observe(p));
     };
     conectar();
-    // Los pies pueden montarse después del cambio de ruta (pasos del wizard).
+    // Los pies pueden montarse después del cambio de ruta (pasos del wizard) y la
+    // franja depende del tamaño de la ventana.
     const t = setTimeout(conectar, 700);
+    window.addEventListener("resize", conectar);
     return () => {
       clearTimeout(t);
+      window.removeEventListener("resize", conectar);
       io?.disconnect();
     };
   }, [ruta]);
@@ -433,6 +680,70 @@ export function VozFab() {
       )}
       aria-hidden={ceder || undefined}
     >
+      {/* Pregunta de **navegación** (§15.6): la orden se entendió, el destino no.
+          Un botón por destino; el elegido **navega** y (si había un término
+          significativo) **se aprende** para la próxima. */}
+      {preguntaNav && (
+        <div
+          role="status"
+          className="w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-border bg-card p-3 shadow-lg"
+        >
+          <p className="text-[12.5px] text-card-foreground">
+            ¿A dónde querés ir?
+          </p>
+          {preguntaNav.termino && (
+            <p className="mt-1 text-[12.5px] text-subtitle">
+              Todavía no sé donde queda «{preguntaNav.termino}».
+            </p>
+          )}
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {preguntaNav.destinos.map((i) => (
+              <BotonCandidato
+                key={i.id}
+                texto={i.etiqueta ?? i.id}
+                onElegir={() => elegirDestino(i)}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setPreguntaNav(null)}
+            className="mt-2 text-[11px] text-subtitle underline"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
+
+      {/* Cuenta **ambigua** (`ir-cuenta`): "galicia" puede ser ARS o USD. Elegir
+          navega (`/cuentas/[id]`) y aprende el término. */}
+      {preguntaCuenta && (
+        <div
+          role="status"
+          className="w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-border bg-card p-3 shadow-lg"
+        >
+          <p className="text-[12.5px] text-card-foreground">
+            ¿Cuál de estas cuentas?
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {preguntaCuenta.opciones.map((o) => (
+              <BotonCandidato
+                key={o.value}
+                texto={o.label}
+                onElegir={() => elegirCuenta(o)}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setPreguntaCuenta(null)}
+            className="mt-2 text-[11px] text-subtitle underline"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
+
       {/* Burbuja pegada al FAB (R8) */}
       {aviso && (
         <div
@@ -481,16 +792,25 @@ export function VozFab() {
 
       {/* Resultado del último dictado (G3): chips con ✕ por campo, candidatos
           para la ambigüedad y Deshacer de todo (1 nivel). */}
-      {dictado && !aviso && (
+      {dictado && !aviso && !preguntaNav && !preguntaCuenta && (
         <div
           role="status"
           className="w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-border bg-card p-3 shadow-lg"
         >
           <p className="text-[12.5px] text-card-foreground">
-            {dictado.resultado.asignaciones.length === 1
-              ? "Completé 1 campo. "
-              : `Completé ${dictado.resultado.asignaciones.length} campos. `}
-            Revisalos y guardá vos.
+            {dictado.resultado.candidatos.length
+              ? dictado.resultado.asignaciones.length
+                ? `Completé ${
+                    dictado.resultado.asignaciones.length === 1
+                      ? "1 campo"
+                      : `${dictado.resultado.asignaciones.length} campos`
+                  }. Elegí lo que falta:`
+                : "Para seguir necesito que elijas una opción:"
+              : `Completé ${
+                  dictado.resultado.asignaciones.length === 1
+                    ? "1 campo"
+                    : `${dictado.resultado.asignaciones.length} campos`
+                }. Revisalos y guardá vos.`}
           </p>
 
           {/* La **pregunta** va primero: es lo único que falta decidir. */}
@@ -529,6 +849,14 @@ export function VozFab() {
           {dictado.resultado.noEntendido.length > 0 && (
             <p className="mt-2 text-[11px] text-subtitle">
               No entendí: «{dictado.resultado.noEntendido.join(" ")}»
+            </p>
+          )}
+
+          {/* Regla 7 (§15.4): lo implícito no pisa ⇒ se dice qué **no** se tocó. */}
+          {dictado.resultado.omitidos.length > 0 && (
+            <p className="mt-2 text-[11px] text-subtitle">
+              No toqué {listar(dictado.resultado.omitidos)}: ya tenía
+              {dictado.resultado.omitidos.length === 1 ? "" : "n"} valor.
             </p>
           )}
 
@@ -582,7 +910,7 @@ export function VozFab() {
                 key={f.id}
                 termino={f.termino}
                 destino={f.destinoEtiqueta}
-                catalogo={f.ambito === "cuenta" ? "Cuentas" : "Categorías de gasto"}
+                catalogo={etiquetaAmbito(f.ambito)}
                 usos={f.usos}
                 onOlvidar={() => voz?.olvidar(f.id)}
               />
@@ -593,6 +921,7 @@ export function VozFab() {
 
       <button
         type="button"
+        ref={botonRef}
         aria-label={escuchando ? "Detener el dictado" : "Dictar por voz"}
         title={escuchando ? "Escuchando…" : "Dictar"}
         className={cn(

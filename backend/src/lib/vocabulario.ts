@@ -1,5 +1,6 @@
 import { LessThan } from "typeorm";
 import { getDb } from "../db";
+import { INTENCIONES } from "../../../lib/voz/intenciones";
 import { norm } from "../../../lib/voz/normalizar";
 import type { AmbitoVoz } from "../../../lib/voz/tipos";
 import { VozAlias } from "../entities/voz-alias.entity";
@@ -18,8 +19,8 @@ import { Cuenta } from "../entities/cuenta.entity";
  * "olvidar"** desde la app.
  */
 
-/** Ámbitos (catálogos) soportados hoy. R12: la granularidad es por catálogo. */
-export const AMBITOS_VOZ = ["categoriaGasto", "cuenta"] as const satisfies readonly AmbitoVoz[];
+/** Ámbitos (catálogos) soportados. R12: la granularidad es por catálogo. */
+export const AMBITOS_VOZ = ["categoriaGasto", "cuenta", "navegacion"] as const satisfies readonly AmbitoVoz[];
 export type { AmbitoVoz };
 
 export interface AprenderInput {
@@ -56,6 +57,14 @@ export async function etiquetaDeDestino(
     });
     if (!cuenta) throw new Error("La cuenta destino no existe");
     return cuenta.nombre;
+  }
+
+  if (ambito === "navegacion") {
+    // El destino es el **id de la intención** (`ir-panel-prestamos`…), que vive en
+    // código: se valida contra el catálogo (nunca se guarda un destino inventado).
+    const intencion = INTENCIONES.find((i) => i.id === valor && i.tipo === "navegacion");
+    if (!intencion?.etiqueta) throw new Error("El destino de navegación no existe");
+    return intencion.etiqueta;
   }
 
   throw new Error(`Ámbito de voz desconocido: ${ambito}`);
