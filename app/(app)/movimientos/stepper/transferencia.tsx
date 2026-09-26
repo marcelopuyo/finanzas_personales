@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMovimientoStepper } from "./stepper-context";
 import {
   StepShell,
@@ -9,8 +9,16 @@ import {
   SelectField,
   NumberField,
 } from "./ui";
-import { MOTIVOS_TRANSFERENCIA, STEP_CONFIRMACION } from "./types";
+import { MOTIVOS_TRANSFERENCIA, STEP_CONFIRMACION, type MovimientoData } from "./types";
 import { convertirMontoParaUI } from "@/backend/src/actions/cotizaciones";
+import { crearDictadoTransferencia } from "./dictado-transferencia";
+import { aplicarDictadoSimple, escribirEnPantalla } from "./dictado-comun";
+import { useAliasDeCampo } from "@/components/voz/voz-provider";
+import {
+  useRegistrarPantallaDictable,
+  type PantallaDictable,
+  type ValoresPantalla,
+} from "@/components/voz/dictado-pantalla";
 
 export function Transferencia() {
   const { data, handleSetData, navigateTo, options } = useMovimientoStepper();
@@ -84,6 +92,61 @@ export function Transferencia() {
     mismaMoneda,
     destinoEditado,
   ]);
+
+  // ── Dictado por voz (plan de voz §16.2) ─────────────────────────────────
+  // La pantalla se declara dictable ante el FAB 🎤: `config` = los campos con el
+  // vocabulario de **cuentas** ya fusionado (sistema + aprendido); `aplicar` /
+  // `escribir` escriben en el wizard con la regla 7 (lo implícito no pisa).
+  // ⚠️ `montoDestino` **no** está en la config a propósito: lo autocompleta el
+  // efecto de arriba (misma moneda ⇒ mismo monto; distinta ⇒ cotizado).
+  const dataRef = useRef(data);
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
+  const opcionesCuenta = useMemo(
+    () => options.cuentas.map((c) => ({ value: String(c.id), label: c.nombre })),
+    [options.cuentas]
+  );
+  const aliasCuenta = useAliasDeCampo("cuenta", opcionesCuenta);
+
+  const config = useMemo(() => {
+    const base = crearDictadoTransferencia(options);
+    return {
+      ...base,
+      campos: base.campos.map((campo) =>
+        campo.catalogo === "cuenta" ? { ...campo, alias: aliasCuenta } : campo
+      ),
+    };
+  }, [options, aliasCuenta]);
+
+  const escribir = useCallback(
+    (valores: ValoresPantalla) =>
+      handleSetData(valores as unknown as Partial<MovimientoData>),
+    [handleSetData]
+  );
+
+  const pantalla = useMemo<PantallaDictable>(
+    () => ({
+      config,
+      aplicar: async (resultado) =>
+        aplicarDictadoSimple(
+          resultado,
+          config,
+          dataRef.current as unknown as Record<string, unknown>,
+          escribir
+        ),
+      escribir: (valores) =>
+        escribirEnPantalla(
+          valores,
+          dataRef.current as unknown as Record<string, unknown>,
+          escribir
+        ),
+    }),
+    [config, escribir]
+  );
+
+  useRegistrarPantallaDictable(pantalla);
 
   return (
     <StepShell

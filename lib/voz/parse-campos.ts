@@ -35,6 +35,34 @@ function capitalizar(texto: string): string {
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
+/**
+ * Marcadores de **signo negativo** (hueco 2: el monto del ajuste de cuenta). Se
+ * comparan normalizados (minúsculas, sin tildes).
+ *
+ * ⚠️ El `-` literal **no** sirve: `tokenizar()` recorta la puntuación de los extremos
+ * del token (`"-500"` llega como `500`). Decisión del usuario (2026-09-25): alcanza
+ * con el marcador; los verbos de resta ("restá", "descontá") quedan para después.
+ */
+const NEGATIVO = new Set(["menos", "negativo", "negativa"]);
+
+/**
+ * Índice del marcador de signo que precede al token `i`, o `null`.
+ *
+ * Saltea **un** token ya consumido (el disparador: "menos **importe** 500") pero se
+ * detiene ante cualquier otra palabra libre: el "menos" tiene que estar pegado.
+ */
+function negativoEn(
+  orig: string[],
+  usado: boolean[],
+  i: number
+): number | null {
+  for (let k = i - 1; k >= 0 && k >= i - 2; k--) {
+    if (NEGATIVO.has(norm(orig[k] ?? ""))) return k;
+    if (!usado[k]) return null;
+  }
+  return null;
+}
+
 /** Tramo de la frase: o es "libre" (sin disparador) o pertenece a un campo. */
 interface Zona {
   campo: CampoDictable | null;
@@ -167,6 +195,15 @@ export function parsearCampos(texto: string, config: ConfigDictado): ResultadoDi
     });
   }
 
+  // Palabras de la **ORDEN** que declaró la pantalla ("ajustá la **cuenta** en"): no
+  // son contenido ⇒ se consumen para que no salgan en "No entendí: …" ni en la
+  // Descripción. El diccionario es **por config** a propósito: `RELLENO_INICIAL`
+  // incluye "con" y marcarlo global rompería descripciones ("pizza con fede").
+  const relleno = config.relleno?.length ? new Set(config.relleno) : null;
+  if (relleno) {
+    for (let i = 0; i < N; i++) if (relleno.has(nrm[i])) marcar(i, i);
+  }
+
   // ── 2 y 3) Números y fechas ────────────────────────────────────────────────
   for (const z of zonas) {
     const tokensZona = orig.slice(z.desde, z.hasta + 1);
@@ -179,10 +216,23 @@ export function parsearCampos(texto: string, config: ConfigDictado): ResultadoDi
       const mejor = numeroMayor(extraerNumeros(tokensZona));
       if (campoDestino && mejor) {
         const origen: OrigenAsignacion = z.campo ? "disparador" : "numero";
+        /**
+         * **Signo (hueco 2)**: sólo en los campos que lo declaran
+         * (`permiteNegativo`) y **pegado antes** del número ("menos 500").
+         *
+         * 🔑 Se detecta por **palabra**: `tokenizar()` recorta el `-` de los
+         * extremos del token (`"-500"` ⇒ `500`), así que el símbolo no llega nunca.
+         */
+        const primero = z.desde + mejor.desde;
+        const marcaNegativa = negativoEn(orig, usado, primero);
+        const negativo = campoDestino.permiteNegativo === true && marcaNegativa !== null;
+        if (marcaNegativa !== null && campoDestino.permiteNegativo === true) {
+          marcar(marcaNegativa, marcaNegativa); // "menos" no es contenido
+        }
         if (
           asignar(
             campoDestino,
-            mejor.valor,
+            negativo ? -mejor.valor : mejor.valor,
             mejor.texto,
             origen,
             1,
@@ -223,7 +273,14 @@ export function parsearCampos(texto: string, config: ConfigDictado): ResultadoDi
     if (!opciones.length) continue;
 
     const zona = zonas.find((z) => z.campo === campo);
-    const idx = zona ? libresDeZona(zona) : libres();
+    // `soloEnZona` (campos **hermanos** del mismo catálogo): si el usuario no lo
+    // nombró, este campo **no adivina** por el resto de la frase — si no, el
+    // destino de una transferencia se lleva la cuenta del origen. Ver `tipos.ts`.
+    const idx = zona
+      ? libresDeZona(zona)
+      : campo.soloEnZona
+        ? []
+        : libres();
     if (!idx.length) continue;
 
     // 4.0) **Vocabulario** (sistema + aprendido): máxima prioridad.

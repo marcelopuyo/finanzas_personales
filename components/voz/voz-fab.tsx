@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Mic, Settings, Trash2, Undo2, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useTap } from "@/lib/tap";
-import { norm } from "@/lib/voz/normalizar";
+import { norm, tokenizar } from "@/lib/voz/normalizar";
 import { irAlPanel } from "@/lib/panel-scroll";
 import { usePendingNav } from "@/components/ui/nav-progress";
 import { Modal } from "@/components/ui/modal";
@@ -743,7 +743,52 @@ export function VozFab() {
     };
   }, [ruta]);
 
-  const ejemplos = INTENCIONES.filter((i) => i.ejemplo);
+  /**
+   * **Ejemplos de la burbuja.**
+   *
+   * 🔑 Los que **nombran cuentas** (`ejemploCuentas`) se arman con las cuentas **de
+   * quien mira** (`cuentasVoz.opciones`): un ejemplo con el nombre de la cuenta de
+   * otro usuario no le sirve a nadie y expone datos ajenos. Además:
+   *
+   * - se usan sólo cuentas que el **motor reconoce de una**: si el término apunta a
+   *   dos cuentas (típico: dos cuentas del mismo banco), el dictado **pregunta** en
+   *   vez de resolver ⇒ el ejemplo enseñaría mal;
+   * - el nombre va **sin el sufijo de moneda** (`nombreDictable`), que sólo agrega
+   *   una palabra que el dictado deja como sobrante;
+   * - si no alcanzan las cuentas, ese ejemplo **no se muestra** (queda el resto).
+   */
+  const ejemplos = useMemo(() => {
+    const alias = cuentasVoz.alias;
+    const dictables = cuentasVoz.opciones
+      .filter((o) =>
+        tokenizar(o.label).some((t) => {
+          const ops = alias.get(norm(t));
+          return ops?.length === 1 && ops[0].valor === o.value;
+        })
+      )
+      .map((o) => nombreDictable(o.label));
+    /** Con **una** cuenta se prefiere una cuyo nombre no arranque con "cuenta": si no,
+     *  la frase queda *"la cuenta **Cuenta** Truist"*. */
+    const una =
+      dictables.find((n) => !/^cuenta(\s|$)/i.test(n)) ?? dictables[0];
+    const [primera, segunda] = dictables;
+
+    return INTENCIONES.flatMap((i) => {
+      if (!i.ejemploCuentas) {
+        return i.ejemplo ? [{ id: i.id, texto: i.ejemplo }] : [];
+      }
+      const dosCuentas = i.ejemploCuentas.includes("{cuenta2}");
+      if (dosCuentas ? !segunda : !una) return [];
+      return [
+        {
+          id: i.id,
+          texto: i.ejemploCuentas
+            .replace("{cuenta}", dosCuentas ? primera : una)
+            .replace("{cuenta2}", segunda ?? ""),
+        },
+      ];
+    });
+  }, [cuentasVoz.opciones, cuentasVoz.alias]);
 
   return (
     <div
@@ -826,10 +871,10 @@ export function VozFab() {
 
           {ejemplos.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {ejemplos.map((i) => (
+              {ejemplos.map((e) => (
                 <EjemploVoz
-                  key={i.id}
-                  texto={i.ejemplo ?? ""}
+                  key={e.id}
+                  texto={e.texto}
                   onElegir={interpretar}
                 />
               ))}
@@ -1031,7 +1076,20 @@ function BotonCerrar({ onCerrar }: { onCerrar: () => void }) {
 }
 
 /**
- * Ejemplo tocable de la burbuja: al tocarlo se **ejecuta** esa frase (o sea,
+ * **Nombre de cuenta dictable**: el de la cuenta sin el sufijo de moneda, que puede
+ * venir entre paréntesis o suelto (`"Billetera (USD)"` → `"Billetera"`,
+ * `"Cuenta Truist USD"` → `"Cuenta Truist"`).
+ *
+ * 🔑 Se usa en los **ejemplos** de la burbuja: la moneda no aporta nada (cada cuenta
+ * ya tiene la suya) y el dictado la deja como palabra sobrante.
+ */
+function nombreDictable(nombre: string): string {
+  const limpio = nombre.replace(/\s*\(?[A-Z]{3}\)?$/, "").trim();
+  return limpio || nombre;
+}
+
+/**
+ * **Ejemplo tocable** de la burbuja: al tocarlo se **ejecuta** esa frase (o sea,
  * navega), no se copia el texto. Va en su propio componente para poder usar
  * `useTap` (los hooks no se pueden llamar dentro de un `map`).
  */

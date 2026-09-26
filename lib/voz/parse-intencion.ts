@@ -310,7 +310,13 @@ export function parsearIntencion(
   };
 
   const navegables = intenciones.filter((i) => i.tipo === "navegacion");
-  const carga = intenciones.find((i) => i.tipo === "carga");
+  /**
+   * Las **cargas** del catálogo (hoy: gasto · transferencia · ajuste).
+   *
+   * ⚠️ Antes era **una sola** (`find`): con la transferencia y el ajuste hay que
+   * probar las tres y quedarse con la que matchea (ver la pasada 2).
+   */
+  const cargas = intenciones.filter((i) => i.tipo === "carga");
   /**
    * Sustantivos de los destinos **parametrizados** (hoy: `cuenta`).
    *
@@ -370,7 +376,7 @@ export function parsearIntencion(
       // número: *"muéstrame la cuenta caja **1**"* es un nombre con dígitos y tiene
       // que navegar; y una frase de carga sin verbo de gasto ya queda afuera por
       // `soloConVerbo`).
-      const esCarga = carga?.verbos.some((v) => nrm.includes(v)) ?? false;
+      const esCarga = cargas.some((c) => c.verbos.some((v) => nrm.includes(v)));
       if (esCarga) continue;
 
       const resuelto = resolverCuenta(nrm, contexto);
@@ -422,16 +428,19 @@ export function parsearIntencion(
     };
   }
 
-  // ── Pasada 2: CARGA ──────────────────────────────────────────────────────
-  if (carga && !esConsulta) {
-    // Si la frase nombra **otra cosa** de la lista (préstamos, períodos, resumen…)
-    // es de otro dominio: el pago de préstamo no está en la voz ⇒ ejemplos (no se
-    // la apropia el wizard de gasto). Lista curada: ver `NO_ES_GASTO`.
+  // ── Pasada 2: CARGA (puede haber varias: gasto · transferencia · ajuste) ──
+  if (cargas.length && !esConsulta && !hayMovimiento) {
+    // El **gasto** conserva su guard de "otra cosa": si la frase nombra préstamos,
+    // períodos, resumen… (lista curada `NO_ES_GASTO`, que ya incluye las **otras
+    // cargas**) no se la apropia. Las cargas nuevas no lo necesitan: se disparan por
+    // **su** sustantivo o por **su** verbo, que no comparten con el gasto (`pasé`,
+    // `ajustá`… no están en `VERBOS_GASTO`).
     const otraCosa = nrm.some((t) => NO_ES_GASTO.includes(t));
-    if (!otraCosa && !hayMovimiento) {
+    const hayMonto = extraerNumeros(orig).length > 0;
+    for (const carga of cargas) {
+      if (carga.id === "cargar-gasto" && otraCosa) continue;
       const haySustantivo = nrm.some((t) => carga.sustantivos.includes(t));
       const hayVerbo = nrm.some((t) => carga.verbos.includes(t));
-      const hayMonto = extraerNumeros(orig).length > 0;
       if (haySustantivo || (hayVerbo && hayMonto)) {
         return { intencion: carga, resto: restoDe(carga) };
       }

@@ -1,9 +1,18 @@
 "use client";
 
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useMovimientoStepper } from "./stepper-context";
 import { StepShell, NavButtons, DateField, SelectField, NumberField } from "./ui";
-import { STEP_CONFIRMACION } from "./types";
+import { STEP_CONFIRMACION, type MovimientoData } from "./types";
 import { numberToCurrency } from "@/lib/utils";
+import { crearDictadoAjuste } from "./dictado-ajuste";
+import { aplicarDictadoSimple, escribirEnPantalla } from "./dictado-comun";
+import { useAliasDeCampo } from "@/components/voz/voz-provider";
+import {
+  useRegistrarPantallaDictable,
+  type PantallaDictable,
+  type ValoresPantalla,
+} from "@/components/voz/dictado-pantalla";
 
 export function AjusteCuenta() {
   const { data, handleSetData, navigateTo, options } = useMovimientoStepper();
@@ -17,6 +26,59 @@ export function AjusteCuenta() {
   const iso = cuenta?.moneda?.codigoISO ?? "ARS";
   const saldoActual = cuenta?.saldo ?? 0;
   const saldoAjustado = saldoActual + (data.montoOrigen || 0);
+
+  // ── Dictado por voz (plan de voz §16.2) ─────────────────────────────────
+  // Es el **único flujo con monto negativo** (hueco 2): decir *"menos 500"* escribe
+  // −500 (egreso) y *"ajustá 500"* deja +500 (ingreso). El campo del wizard ya
+  // admite el signo (`allowNegative`) y el backend hace `saldo += monto`.
+  const dataRef = useRef(data);
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
+  const opcionesCuenta = useMemo(
+    () => options.cuentas.map((c) => ({ value: String(c.id), label: c.nombre })),
+    [options.cuentas]
+  );
+  const aliasCuenta = useAliasDeCampo("cuenta", opcionesCuenta);
+
+  const config = useMemo(() => {
+    const base = crearDictadoAjuste(options);
+    return {
+      ...base,
+      campos: base.campos.map((campo) =>
+        campo.catalogo === "cuenta" ? { ...campo, alias: aliasCuenta } : campo
+      ),
+    };
+  }, [options, aliasCuenta]);
+
+  const escribir = useCallback(
+    (valores: ValoresPantalla) =>
+      handleSetData(valores as unknown as Partial<MovimientoData>),
+    [handleSetData]
+  );
+
+  const pantalla = useMemo<PantallaDictable>(
+    () => ({
+      config,
+      aplicar: async (resultado) =>
+        aplicarDictadoSimple(
+          resultado,
+          config,
+          dataRef.current as unknown as Record<string, unknown>,
+          escribir
+        ),
+      escribir: (valores) =>
+        escribirEnPantalla(
+          valores,
+          dataRef.current as unknown as Record<string, unknown>,
+          escribir
+        ),
+    }),
+    [config, escribir]
+  );
+
+  useRegistrarPantallaDictable(pantalla);
 
   return (
     <StepShell

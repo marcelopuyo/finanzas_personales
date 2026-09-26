@@ -5,7 +5,13 @@
  * por voz (`ConfigDictado`) y el parser hace el resto.
  */
 
-/** Tipo de dato que un campo acepta por voz. */
+/**
+ * Tipo de dato que un campo acepta por voz.
+ *
+ * 📌 Es **lo que decide qué paso del parser lo llena** (`parse-campos.ts`):
+ * números (2) · fechas (3) · opciones (4) · resto a texto (5). Agregar un tipo al union
+ * **no alcanza**: sin su paso, el campo no se llena **nunca** y falla en silencio.
+ */
 export type TipoCampoVoz = "texto" | "monto" | "fecha" | "opcion";
 
 /**
@@ -98,12 +104,44 @@ export interface CampoDictable {
    * `false`, porque "Santander" no es una descripción de gasto.
    */
   aportaTexto?: boolean;
+  /**
+   * El campo **acepta valores negativos** (hoy: el monto del **ajuste de cuenta**,
+   * el único de la app que los admite: `saldo += monto`).
+   *
+   * 🔑 **Opt-in a propósito**: sin este flag el **signo se ignora** ("menos 500" ⇒
+   * `500`), así ningún flujo que no lo declare cambia de comportamiento. El signo se
+   * detecta por **palabra** (`menos`, `negativo`) porque `tokenizar()` recorta el `-`
+   * de los extremos del token (ver `parse-campos.ts`).
+   */
+  permiteNegativo?: boolean;
+  /**
+   * **Sólo se llena si el usuario NOMBRÓ el campo** (o sea: no adivina por el resto
+   * de la frase).
+   *
+   * 🔑 Para **campos hermanos** del mismo catálogo (las **dos cuentas** de una
+   * transferencia): sin esto, la cuenta que no se nombró se lleva el token de la
+   * otra ⇒ **valor equivocado**. El hermano que declara este flag sólo toma lo que
+   * está dentro de su propia zona de `disparadores` (el marcador de la frase:
+   * *"**a** billetera"*).
+   */
+  soloEnZona?: boolean;
 }
 
 /** Declaración de los campos dictables de una pantalla. */
 export interface ConfigDictado {
   lang?: string;
   campos: CampoDictable[];
+  /**
+   * Palabras de la **ORDEN** que no son contenido (artículos, enlaces y los verbos
+   * con los que se pide este flujo: *"**ajustá** **la** **cuenta** billetera **en**
+   * menos 500"*). Se marcan como consumidas ⇒ no salen en el aviso
+   * *"No entendí: …"* ni se filtran a la Descripción.
+   *
+   * ⚠️ Lo necesitan las pantallas que **no** tienen campo de Descripción (el gasto no
+   * las necesita: su sobrante es la Descripción). ⚠️ **No** poner nombres de opciones
+   * ("billetera"): un campo `opcion` no podría matchearlos.
+   */
+  relleno?: string[];
 }
 
 /** De dónde salió el valor de un campo (para explicarlo en el chip). */
@@ -231,6 +269,15 @@ export interface Intencion {
   llevaTexto?: boolean;
   /** Frase de ejemplo: es el **atajo tocable** que ofrece la burbuja del FAB. */
   ejemplo?: string;
+  /**
+   * Ejemplo que **nombra cuentas** (`{cuenta}` / `{cuenta2}`): el FAB lo arma con las
+   * cuentas **reales de quien mira** — nunca con nombres fijos, porque un ejemplo con
+   * el nombre de la cuenta de otro usuario no sirve (y expone datos ajenos). Si no hay
+   * cuentas suficientes, el ejemplo **no se muestra**.
+   *
+   * Manda sobre `ejemplo`: si está, se usa este.
+   */
+  ejemploCuentas?: string;
   /**
    * Palabras de **jerga de la orden** que no son contenido y se descartan del
    * texto sobrante ("**cargar** un gasto" ⇒ sobrante vacío). No cuentan como

@@ -148,6 +148,45 @@ export const NO_ES_GASTO = [
   "home",
   "resultado",
   "resultados",
+  // ➕ 2026-09-25: **otras cargas** (transferencia y ajuste ya tienen su intención).
+  // Si la frase las nombra, el **gasto** no se la apropia — *"pagué 5.000 de la
+  // transferencia"* es de la transferencia, no un gasto.
+  "transferencia",
+  "transferencias",
+  "ajuste",
+  "ajustes",
+];
+
+/**
+ * Jerga de la **orden de carga** (no es contenido): *"**cargar** un gasto"* ⇒ el
+ * sobrante queda vacío. La comparten las 3 cargas (gasto · transferencia · ajuste).
+ *
+ * ⚠️ **No** son verbos de las intenciones (⛔ `cargué`/`anoté` no son habla natural
+ * para un gasto, decisión del usuario): sólo se descartan del texto sobrante.
+ * ⚠️ **No** poner acá nombres de campos o de opciones ("cuenta", "billetera"): el
+ * sobrante viaja a la pantalla destino, que lo parsea **contra sus campos**.
+ */
+const RELLENO_CARGA = [
+  "cargar",
+  "carga",
+  "cargue",
+  "anotar",
+  "anota",
+  "anote",
+  "registrar",
+  "registra",
+  "registrar",
+  "ingresar",
+  "ingresa",
+  "agregar",
+  "agrega",
+  "agregue",
+  "sumar",
+  "suma",
+  "meter",
+  "mete",
+  "nuevo",
+  "nueva",
 ];
 
 export const INTENCIONES: Intencion[] = [
@@ -170,31 +209,62 @@ export const INTENCIONES: Intencion[] = [
     // que lo parsee contra sus campos (ver `lib/voz/handoff.ts`).
     llevaTexto: true,
     // Jerga de la orden (no es contenido): "**cargar** un gasto" ⇒ sin sobrante.
-    // ⚠️ No son verbos de la intención (⛔ `cargué`/`anoté` no son habla natural,
-    // decisión del usuario): sólo se descartan del resto.
-    relleno: [
-      "cargar",
-      "carga",
-      "cargue",
-      "anotar",
-      "anota",
-      "anote",
-      "registrar",
-      "registra",
-      "registrar",
-      "ingresar",
-      "ingresa",
-      "agregar",
-      "agrega",
-      "agregue",
-      "sumar",
-      "suma",
-      "meter",
-      "mete",
-      "nuevo",
-      "nueva",
-    ],
+    relleno: RELLENO_CARGA,
     ejemplo: "gasté 3.500 en el super",
+  },
+
+  {
+    id: "cargar-transferencia",
+    tipo: "carga",
+    /**
+     * **Pasar plata entre cuentas** (2026-09-25). El sustantivo alcanza solo
+     * (*"cargá una transferencia"*) y los verbos necesitan un **monto**
+     * (*"pasé 5.000 a billetera"*).
+     *
+     * 🔑 `pasá`/`pasé`/`paso` **entran**: son la forma natural de decirlo en
+     * Argentina (corrección del usuario). ⚠️ No están en `VERBOS_GASTO` ⇒ **no**
+     * pueden abrir el wizard de gasto.
+     */
+    sustantivos: ["transferencia", "transferencias"],
+    verbos: [
+      "transferi",
+      "transferir",
+      "transfiere",
+      "pasa",
+      "pase",
+      "paso",
+      "pasamos",
+      "pasaron",
+      "pasar",
+      "pasame",
+      "manda",
+      "mande",
+      "mando",
+      "mandar",
+      "haceme",
+    ],
+    href: () => "/movimientos/nuevo/transferencia",
+    etiqueta: "Transferencia",
+    llevaTexto: true,
+    relleno: RELLENO_CARGA,
+    // Ejemplo con las **dos primeras cuentas del usuario** (ver `ejemploCuentas`).
+    ejemploCuentas: "pasé 5.000 de {cuenta} a {cuenta2}",
+  },
+
+  {
+    id: "cargar-ajuste",
+    tipo: "carga",
+    /**
+     * **Corregir el saldo de una cuenta** (2026-09-25): *"ajustá la cuenta billetera
+     * en menos 500"*. El monto admite **signo** (ver `CampoDictable.permiteNegativo`).
+     */
+    sustantivos: ["ajuste", "ajustes"],
+    verbos: ["ajusta", "ajustar", "corregi", "corregir", "corrige"],
+    href: () => "/movimientos/nuevo/ajuste",
+    etiqueta: "Ajuste de cuenta",
+    llevaTexto: true,
+    relleno: RELLENO_CARGA,
+    ejemploCuentas: "ajustá la cuenta {cuenta} en menos 500",
   },
 
   // ─── Navegación — catálogo CERRADO (plan de voz §15.2) ───────────────────
@@ -259,7 +329,9 @@ export const INTENCIONES: Intencion[] = [
     href: (dato) => `/cuentas/${dato ?? ""}`,
     dato: "cuenta",
     etiqueta: "Cuenta",
-    ejemplo: "mostrame la cuenta billetera",
+    // ⚠️ El ejemplo NOMBRA una cuenta ⇒ se arma con las cuentas **del usuario**
+    // (nunca con un nombre fijo: era el nombre de la cuenta de quien lo escribió).
+    ejemploCuentas: "mostrame la cuenta {cuenta}",
   },
   {
     id: "ir-panel-trabajo",
