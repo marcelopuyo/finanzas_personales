@@ -3,7 +3,7 @@ import { Concepto } from "./concepto.entity";
 import { Cuenta } from "./cuenta.entity";
 import { Gasto } from "./gasto.entity";
 import { Prestamo } from "./prestamo.entity";
-import { PeriodoTrabajo } from "./periodo-trabajo.entity";
+import { Liquidacion } from "./periodo-trabajo.entity";
 import { JornadaTrabajo } from "./jornada-trabajo.entity";
 
 // Relaciones propietarias (ManyToOne). Las inversas se omiten por estar ya
@@ -50,8 +50,8 @@ export class Movimiento {
 
   /** Período de trabajo cobrado (solo movimientos "Cobro Sueldo"). Se usa al
    * revertir el cobro para limpiar el fechaDeCobro del período exacto. */
-  @ManyToOne(() => PeriodoTrabajo, { nullable: true })
-  periodoTrabajo?: PeriodoTrabajo | null;
+  @ManyToOne(() => Liquidacion, { nullable: true })
+  periodoTrabajo?: Liquidacion | null;
 
   /** Jornada que originó el depósito de propina (solo movimientos
    * "Cobro Propina"). Se usa al borrar la jornada para revertir el depósito. */

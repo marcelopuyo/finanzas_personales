@@ -6,7 +6,7 @@ import { CONCEPTO_STEP, type MovimientoConcepto } from "./types";
 import { cn } from "@/lib/utils";
 
 const OPCIONES: { value: MovimientoConcepto; label: string; desc: string }[] = [
-  { value: "CobroSueldo", label: "Cobro Sueldo", desc: "Registrar el cobro de un sueldo" },
+  { value: "CobrarTrabajo", label: "Cobrar trabajo", desc: "Registrar el cobro de un trabajo (liquidación)" },
   { value: "PagoPrestamo", label: "Pago Préstamo", desc: "Abonar cuota de un préstamo" },
   { value: "AjusteCuenta", label: "Ajuste Cuenta", desc: "Corregir el saldo de una cuenta" },
   // PagoGasto oculto por pedido del usuario (la lógica sigue disponible en

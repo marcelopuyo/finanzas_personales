@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Acciones en "Períodos de trabajo" · variantes (tema oscuro)</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; display: flex; flex-direction: column; gap: 24px;
+    font-family: "SF Pro Display", Inter, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #111; color: #e8e8ea;
+  }
+  h1 { font-size: 15px; margin: 0; }
+  h1 small { display: block; font-weight: 400; font-size: 12px; opacity: .65; margin-top: 7px; line-height: 1.7; max-width: 1180px; }
+  h1 b { color: #fff; }
+  .rowwrap { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+
+  /* ── Tokens reales del tema oscuro de la app (globals.css) ── */
+  .cell {
+    --background: #151517; --card: #353638; --card-foreground: #e2e4f0;
+    --border: #3e3f42; --subtitle: #808185; --header: #ffffff; --muted: #1e1e20;
+    --primary: #4c6ef5; --success: #51cf66; --danger: #ff6b6b; --value: #ffffff;
+  }
+  .frame {
+    position: relative; width: 390px; padding: 14px 14px 0; border-radius: 16px;
+    border: 1px solid #2a2a2d; background: var(--background); color: var(--card-foreground);
+    display: flex; flex-direction: column; height: 520px; overflow: hidden;
+  }
+  .frame.w320 { width: 320px; }
+  .cap { margin: 0 0 9px 2px; font-size: 12px; color: #b9babd; max-width: 390px; }
+  .cap b { color: #fff; }
+  .cap em { color: #8f9094; font-style: normal; }
+
+  /* ── barra superior ── */
+  .appbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex: none; }
+  .back { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--subtitle); flex: none; }
+  .title { font-size: 17px; font-weight: 600; color: var(--header); margin: 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .spacer { margin-left: auto; }
+  .dots {
+    width: 32px; height: 32px; border-radius: 999px; flex: none;
+    background: color-mix(in srgb, var(--muted) 60%, transparent);
+    display: flex; align-items: center; justify-content: center; color: var(--subtitle);
+  }
+  .btn-cobrar {
+    flex: none; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px;
+    border-radius: 999px; background: var(--success); color: #10240f; font-size: 13px; font-weight: 700;
+    box-shadow: 0 1px 2px rgba(0,0,0,.3);
+  }
+  .btn-cobrar.icononly { width: 34px; padding: 0; justify-content: center; }
+
+  /* ── resumen de una línea ── */
+  .resumen { display: flex; align-items: baseline; gap: 6px; font-size: 12.5px; color: var(--subtitle); margin-bottom: 8px; flex: none; }
+  .resumen .green { color: var(--success); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .resumen .r { margin-left: auto; }
+
+  /* ── grilla: una sola lista, filas de 2 líneas ── */
+  .grid { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 0 12px; flex: 1 1 auto; overflow: hidden; }
+  .row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--border); }
+  .row:last-child { border-bottom: 0; }
+  .row .m { flex: 1 1 auto; min-width: 0; }
+  .row .t { margin: 0; font-size: 13.5px; font-weight: 600; line-height: 18px; color: var(--header); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .s { margin: 1px 0 0; font-size: 11px; line-height: 15px; color: var(--subtitle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .amt { flex: none; font-size: 14.5px; font-weight: 600; line-height: 18px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .row .amt.pend { color: var(--success); }
+  .row .amt.cob { color: var(--value); }
+  .row .calc { display: block; font-size: 10.5px; line-height: 13px; color: var(--subtitle); font-variant-numeric: tabular-nums; text-align: right; }
+  .row .chev { flex: none; margin-top: 2px; color: var(--subtitle); }
+  .est { font-size: 9.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--subtitle); border: 1px solid var(--border); border-radius: 999px; padding: 0 5px; margin-left: 4px; vertical-align: 1px; }
+
+  /* ── menú ⋯ desplegado ── */
+  .menu {
+    position: absolute; top: 50px; right: 14px; z-index: 3; width: 208px; overflow: hidden;
+    border: 1px solid var(--border); border-radius: 10px; background: var(--card); box-shadow: 0 8px 24px rgba(0,0,0,.45);
+  }
+  .mi { display: flex; align-items: center; gap: 10px; padding: 9px 12px; font-size: 13px; font-weight: 500; color: var(--card-foreground); border-top: 1px solid var(--border); }
+  .mi:first-child { border-top: 0; }
+  .mi .ic { color: var(--subtitle); flex: none; }
+  .mi.sel { background: var(--muted); }
+  .mi .chk { margin-left: auto; font-size: 11px; color: var(--success); }
+
+  /* ── barra inferior sticky + FAB de voz ── */
+  .bottom {
+    flex: none; margin: 0 -14px; padding: 10px 14px 12px; border-top: 1px solid var(--border);
+    background: color-mix(in srgb, var(--background) 92%, #000); display: flex; align-items: center; gap: 8px;
+  }
+  .iconbtn {
+    width: 38px; height: 38px; border-radius: 12px; border: 1px solid var(--border); background: var(--card);
+    display: flex; align-items: center; justify-content: center; color: var(--card-foreground); flex: none;
+  }
+  .btntext {
+    height: 38px; border-radius: 12px; background: var(--card); border: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px; padding: 0 14px; font-size: 13.5px; font-weight: 600; color: var(--card-foreground);
+  }
+  .btntext.primary { background: var(--success); border-color: transparent; color: #10240f; font-weight: 700; margin-left: auto; padding: 0 20px; }
+  .voz {
+    position: absolute; right: 14px; bottom: 66px; z-index: 4; width: 44px; height: 44px; border-radius: 999px;
+    background: var(--card); border: 1px solid var(--border); box-shadow: 0 6px 18px rgba(0,0,0,.45);
+    display: flex; align-items: center; justify-content: center; color: var(--header);
+  }
+  /* En C la voz queda desplazada por el dial: se corre a la izquierda. */
+  .voz.hi { right: 78px; bottom: 14px; }
+
+  /* ── speed-dial (FAB +) ── */
+  .dial { position: absolute; right: 14px; bottom: 14px; z-index: 4; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  .dial .opt { display: flex; align-items: center; gap: 8px; }
+  .dial .lbl { background: #232326; border: 1px solid var(--border); border-radius: 999px; padding: 5px 11px; font-size: 12px; font-weight: 500; color: var(--card-foreground); white-space: nowrap; }
+  .dial .fab {
+    width: 48px; height: 48px; border-radius: 999px; background: var(--primary); color: #fff;
+    display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 18px rgba(0,0,0,.45);
+  }
+  .dial .fab.green { background: var(--success); color: #10240f; }
+
+  /* ── notas / reglas ── */
+  .notas { font-size: 11.5px; line-height: 1.7; color: #9a9b9e; margin: 10px 2px 0; max-width: 390px; }
+  .notas b { color: #d6d7da; }
+  .notas code { background: #26262a; padding: 1px 4px; border-radius: 4px; font-size: 10.5px; }
+  .bad { color: #ff8787; } .ok { color: #51cf66; }
+  .reglas { background: #17171a; border: 1px solid #2a2a2d; border-radius: 14px; padding: 14px 18px; max-width: 1120px; font-size: 12px; line-height: 1.75; color: #b9babd; }
+  .reglas h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #fff; margin: 0 0 8px; opacity: .7; }
+  .reglas b { color: #fff; }
+  .reglas code { background: #26262a; padding: 1px 4px; border-radius: 4px; font-size: 11px; }
+  .reglas table { border-collapse: collapse; width: 100%; margin-top: 6px; }
+  .reglas th, .reglas td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #26262a; vertical-align: top; }
+  .reglas th { color: #fff; font-weight: 600; }
+  svg.i { width: 16px; height: 16px; }
+  svg.i.lg { width: 20px; height: 20px; }
+</style>
+</head>
+<body>
+
+<!-- iconos (lucide, stroke) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-bank" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></symbol>
+    <symbol id="i-cal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18M12 14v4M10 16h4"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M11 12H3M16 6H3M16 18H3M18 9v6M21 12h-6"/></symbol>
+    <symbol id="i-brief" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2M2 13h20"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-dots" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></symbol>
+  </defs>
+</svg>
+
+<h1>Acciones en <b>“Períodos de trabajo”</b> · 6 variantes para comparar
+  <small>
+    Misma pantalla en todas: el <b>encabezado</b>, el resumen de una línea y <b>una sola grilla</b> (pendientes en verde arriba, cobrados en blanco abajo).
+    Lo único que cambia es <b>dónde viven</b> las 3 acciones: <b>Cobrar trabajo</b>, <b>Cargar jornada</b> y <b>Cargar tarea</b>.
+    ⚠️ Las acciones <b>por fila</b> están descartadas: los trabajos <code>fijo</code>/<code>horas_fijas</code> no generan ítems, así que <b>nunca tienen fila</b> y quedarían sin punto de entrada.
+  </small>
+</h1>
+
+<div class="rowwrap">
+
+  <!-- ══════════ F · COMO ESTÁ HOY ══════════ -->
+  <div class="cell">
+    <div class="cap"><b>F · Como está hoy</b> — el ⋯ con las <b>4</b> acciones <em>(todo a un toque de distancia)</em></div>
+    <div class="frame">
+      <div class="appbar">
+        <span class="back"><svg class="i lg"><use href="#i-back"/></svg></span>
+        <h1 class="title">Períodos de trabajo</h1>
+        <span class="spacer"></span>
+        <span class="dots" style="background:var(--muted);color:var(--header)"><svg class="i"><use href="#i-dots"/></svg></span>
+      </div>
+      <div class="resumen">Por cobrar <span class="green">US$ 604,00</span> · 6 ítems <span class="r">75 cobrados</span></div>
+      <div class="grid">
+        <div class="row"><div class="m"><p class="t">Publix</p><p class="s">2 jornadas · 24/09 → 26/09</p></div><span class="amt pend">US$ 204,00</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="m"><p class="t">Labado Autos</p><p class="s">4 tareas · 06/09 → 24/09</p></div><span class="amt pend">US$ 400,00</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="m"><p class="t">Duffys</p><p class="s">27/06 → 10/07 · cobrado 23/07</p></div><span class="amt cob">US$ 754,17</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="m"><p class="t">Atlas</p><p class="s">29/06 → 08/07 · cobrado 23/07</p></div><span class="amt cob">US$ 224,10</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+      </div>
+      <div class="menu">
+        <div class="mi"><svg class="i ic"><use href="#i-bank"/></svg> Cobrar trabajo</div>
+        <div class="mi"><svg class="i ic"><use href="#i-cal"/></svg> Cargar jornada</div>
+        <div class="mi"><svg class="i ic"><use href="#i-list"/></svg> Cargar tarea</div>
+        <div class="mi"><svg class="i ic"><use href="#i-brief"/></svg> Gestionar trabajos</div>
+      </div>
+    </div>
+    <p class="notas">Nada nuevo que aprender, pero <b>la acción principal está escondida</b> y comparte el mismo peso visual que “Gestionar trabajos”.</p>
+  </div>
+
+  <!-- ══════════ D · COBRAR EN EL ENCABEZADO ══════════ -->
+  <div class="cell">
+    <div class="cap"><b>D · <span class="ok">Cobrar</span> en el encabezado</b> — el ⋯ conserva las otras 3</div>
+    <div class="frame">
+      <div class="appbar">
+        <span class="back"><svg class="i lg"><use href="#i-back"/></svg></span>
+        <h1 class="title">Períodos de trabajo</h1>
+        <span class="spacer"></span>
+        <span class="btn-cobrar"><svg class="i"><use href="#i-bank"/></svg> Cobrar</span>
+        <span class="dots" style="background:var(--muted);color:var(--header);margin-left:4px"><svg class="i"><use href="#i-dots"/></svg></span>
+      </div>
+      <div class="resumen">Por cobrar <span class="green">US$ 604,00</span> · 6 ítems <span class="r">75 cobrados</span></div>
+      <div class="grid">
+        <div class="row"><div class="m"><p class="t">Publix</p><p class="s">2 jornadas · 24/09 → 26/09</p></div><span class="amt pend">US$ 204,00</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="m"><p class="t">Labado Autos</p><p class="s">4 tareas · 06/09 → 24/09</p></div><span class="amt pend">US$ 400,00</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="m"><p class="t">Duffys</p><p class="s">27/06 → 10/07 · cobrado 23/07</p></div><span class="amt cob">US$ 754,17</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="m"><p class="t">Atlas</p><p class="s">29/06 → 08/07 · cobrado 23/07</p></div><span class="amt cob">US$ 224,10</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+      </div>
+      <div class="menu">
+        <div class="mi"><svg class="i ic"><use href="#i-bank"/></svg> Cobrar trabajo <span class="chk">✓ movido</span></div>
+        <div class="mi sel"><svg class="i ic"><use href="#i-cal"/></svg> Cargar jornada</div>
+        <div class="mi"><svg class="i ic"><use href="#i-list"/></svg> Cargar tarea</div>
+        <div class="mi"><svg class="i ic"><use href="#i-brief"/></svg> Gestionar trabajos</div>
+      </div>
+    </div>
+    <p class="notas">La acción principal <b>siempre visible</b> y <b>el wizard ya lista todos los trabajos</b> en su paso 1 ⇒ cubre las declaradas (<code>fijo</code>/<code>horas_fijas</code>), que no tienen fila.</p>
+  </div>
+
+  <!-- ══════════ D a 320 px ══════════ -->
+  <div class="cell">
+    <div class="cap"><b>D a 320 px</b> — el título se recorta, <em>“Cobrar” pasa a icono</em></div>
+    <div class="frame w320">
+      <div class="appbar">
+        <span class="back"><svg class="i lg"><use href="#i-back"/></svg></span>
+        <h1 class="title" style="font-size:16px">Períodos de trabajo</h1>
+        <span class="spacer"></span>
+        <span class="btn-cobrar icononly"><svg class="i"><use href="#i-bank"/></svg></span>
+        <span class="dots" style="background:var(--muted);color:var(--header);margin-left:4px"><svg class="i"><use href="#i-dots"/></svg></span>
+      </div>
+      <div class="resumen">Por cobrar <span class="green">US$ 604,00</span> <span class="r">75 cobr.</span></div>
+      <div class="grid">
+        <div class="row"><div class="m"><p class="t">Labado Autos</p><p class="s">4 tareas · 06/09 → 24/09</p></div><span class="amt pend">US$ 400,00</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="m"><p class="t">Publix</p><p class="s">2 jornadas · 24/09 → 26/09</p></div><span class="amt pend">US$ 204,00</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="m"><p class="t">Duffys</p><p class="s">27/06 → 10/07 · cobrado 23/07</p></div><span class="amt cob">US$ 754,17</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="m"><p class="t">Atlas</p><p class="s">29/06 → 08/07 · cobrado 23/07</p></div><span class="amt cob">US$ 224,10</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+      </div>
+    </div>
+    <p class="notas">Sin el texto no hay riesgo de que el título se corte a la mitad: <b>el icono del billete ya es la marca del cobro</b> (mismo icono que usa el menú).</p>
+  </div>
+
+  <!-- ══════════ E · BARRA INFERIOR ══════════ -->
+  <div class="cell">
+    <div class="cap"><b>E · Barra inferior fija</b> — <em>el FAB de voz ya se apila solo encima</em></div>
+    <div class="frame">
+      <div class="appbar">
+        <span class="back"><svg class="i lg"><use href="#i-back"/></svg></span>
+        <h1 class="title">Períodos de trabajo</h1>
+        <span class="spacer"></span>
+        <span class="dots"><svg class="i"><use href="#i-dots"/></svg></span>
+      </div>
+      <div class="resumen">Por cobrar <span class="green">US$ 604,00</span> · 6 ítems <span class="r">75 cobrados</span></div>
+      <div class="grid">
+        <div class="row"><div class="m"><p class="t">Publix</p><p class="s">2 jornadas · 24/09 → 26/09</p></div><span class="amt pend">US$ 204,00</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="m"><p class="t">Labado Autos</p><p class="s">4 tareas · 06/09 → 24/09</p></div><span class="amt pend">US$ 400,00</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="m"><p class="t">Duffys</p><p class="s">27/06 → 10/07 · cobrado 23/07</p></div><span class="amt cob">US$ 754,17</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="m"><p class="t">Atlas</p><p class="s">29/06 → 08/07 · cobrado 23/07</p></div><span class="amt cob">US$ 224,10</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+      </div>
+      <div class="bottom">
+        <span class="btntext"><svg class="i"><use href="#i-cal"/></svg> Jornada</span>
+        <span class="btntext"><svg class="i"><use href="#i-list"/></svg> Tarea</span>
+        <span class="btntext primary">Cobrar</span>
+      </div>
+      <span class="voz"><svg class="i lg"><use href="#i-mic"/></svg></span>
+    </div>
+    <p class="notas">Todo a un toque <b>mientras scrolleás el histórico</b> (que es largo). La voz queda encima porque ya existe la regla <code>:has([data-barra-inferior])</code>. Cuesta ~56 px de alto fija.</p>
+  </div>
+
+  <!-- ══════════ D + E ══════════ -->
+  <div class="cell">
+    <div class="cap"><b>D + E · combinada</b> — <em>Cobrar arriba y las cargas abajo (sin duplicar)</em></div>
+    <div class="frame">
+      <div class="appbar">
+        <span class="back"><svg class="i lg"><use href="#i-back"/></svg></span>
+        <h1 class="title">Períodos de trabajo</h1>
+        <span class="spacer"></span>
+        <span class="btn-cobrar"><svg class="i"><use href="#i-bank"/></svg> Cobrar</span>
+        <span class="dots" style="margin-left:4px"><svg class="i"><use href="#i-dots"/></svg></span>
+      </div>
+      <div class="resumen">Por cobrar <span class="green">US$ 604,00</span> · 6 ítems <span class="r">75 cobrados</span></div>
+      <div class="grid">
+        <div class="row"><div class="m"><p class="t">Publix</p><p class="s">2 jornadas · 24/09 → 26/09</p></div><span class="amt pend">US$ 204,00</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="m"><p class="t">Labado Autos</p><p class="s">4 tareas · 06/09 → 24/09</p></div><span class="amt pend">US$ 400,00</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="m"><p class="t">Duffys</p><p class="s">27/06 → 10/07 · cobrado 23/07</p></div><span class="amt cob">US$ 754,17</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="m"><p class="t">Atlas</p><p class="s">29/06 → 08/07 · cobrado 23/07</p></div><span class="amt cob">US$ 224,10</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+      </div>
+      <div class="bottom">
+        <span class="btntext"><svg class="i"><use href="#i-cal"/></svg> Jornada</span>
+        <span class="btntext"><svg class="i"><use href="#i-list"/></svg> Tarea</span>
+        <span class="btntext"><svg class="i"><use href="#i-brief"/></svg> Trabajos</span>
+      </div>
+      <span class="voz"><svg class="i lg"><use href="#i-mic"/></svg></span>
+    </div>
+    <p class="notas">El ⋯ desaparece: <b>las 4 acciones quedan siempre visibles</b> (1 arriba, 3 abajo). Es la opción más “sin menús”, a costa de la barra fija.</p>
+  </div>
+
+  <!-- ══════════ C · FAB CON SPEED-DIAL ══════════ -->
+  <div class="cell">
+    <div class="cap"><b>C · FAB “+” con speed-dial</b> — <span class="bad">choca con el FAB de voz</span></div>
+    <div class="frame">
+      <div class="appbar">
+        <span class="back"><svg class="i lg"><use href="#i-back"/></svg></span>
+        <h1 class="title">Períodos de trabajo</h1>
+        <span class="spacer"></span>
+        <span class="dots"><svg class="i"><use href="#i-dots"/></svg></span>
+      </div>
+      <div class="resumen">Por cobrar <span class="green">US$ 604,00</span> · 6 ítems <span class="r">75 cobrados</span></div>
+      <div class="grid">
+        <div class="row"><div class="m"><p class="t">Publix</p><p class="s">2 jornadas · 24/09 → 26/09</p></div><span class="amt pend">US$ 204,00</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="m"><p class="t">Labado Autos</p><p class="s">4 tareas · 06/09 → 24/09</p></div><span class="amt pend">US$ 400,00</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="m"><p class="t">Duffys</p><p class="s">27/06 → 10/07 · cobrado 23/07</p></div><span class="amt cob">US$ 754,17</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="m"><p class="t">Atlas</p><p class="s">29/06 → 08/07 · cobrado 23/07</p></div><span class="amt cob">US$ 224,10</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+      </div>
+      <div class="dial">
+        <span class="opt"><span class="lbl">Cobrar trabajo</span><span class="iconbtn" style="background:var(--success);border-color:transparent;color:#10240f"><svg class="i"><use href="#i-bank"/></svg></span></span>
+        <span class="opt"><span class="lbl">Cargar jornada</span><span class="iconbtn"><svg class="i"><use href="#i-cal"/></svg></span></span>
+        <span class="opt"><span class="lbl">Cargar tarea</span><span class="iconbtn"><svg class="i"><use href="#i-list"/></svg></span></span>
+        <span class="fab"><svg class="i lg"><use href="#i-plus"/></svg></span>
+      </div>
+      <span class="voz hi"><svg class="i lg"><use href="#i-mic"/></svg></span>
+    </div>
+    <p class="notas">El dial ocupa el rincón que ya usa la <b>voz</b> ⇒ la voz tiene que correrse a la izquierda (acá <code>right: 78px</code>) y quedan <b>dos flotantes</b> en la misma esquina, comiéndose el ancho de las filas.</p>
+  </div>
+
+</div>
+
+<div class="rowwrap" style="margin-top:6px">
+  <!-- ══════════ EXTRA · FILA ESTIMADA PARA DECLARADAS ══════════ -->
+  <div class="cell">
+    <div class="cap"><b>Extra</b> — qué pasaría si la <b>declarada</b> también tuviera fila <em>(decisión aparte)</em></div>
+    <div class="frame">
+      <div class="appbar">
+        <span class="back"><svg class="i lg"><use href="#i-back"/></svg></span>
+        <h1 class="title">Períodos de trabajo</h1>
+        <span class="spacer"></span>
+        <span class="btn-cobrar"><svg class="i"><use href="#i-bank"/></svg> Cobrar</span>
+        <span class="dots" style="margin-left:4px"><svg class="i"><use href="#i-dots"/></svg></span>
+      </div>
+      <div class="resumen">Por cobrar <span class="green">US$ 2.104,00</span> · 3 trabajos <span class="r">75 cobrados</span></div>
+      <div class="grid">
+        <div class="row"><div class="m"><p class="t">TRT <span class="est">est.</span></p><p class="s">Período 1/9 al 30/9 · fijo</p></div><span class="amt pend">US$ 1.500,00</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="m"><p class="t">Publix</p><p class="s">2 jornadas · 24/09 → 26/09</p></div><span class="amt pend">US$ 204,00</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="m"><p class="t">Labado Autos</p><p class="s">4 tareas · 06/09 → 24/09</p></div><span class="amt pend">US$ 400,00</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="m"><p class="t">Duffys</p><p class="s">27/06 → 10/07 · cobrado 23/07</p></div><span class="amt cob">US$ 754,17</span><svg class="i chev"><use href="#i-chev"/></svg></div>
+      </div>
+    </div>
+    <p class="notas">Ventaja: <b>se ve lo que falta cobrar de las declaradas</b> y ese monto ya no se pierde. Cuidado: el verde pasaría a mezclar <b>plata cierta</b> (suma de ítems) con <b>una estimación</b> — de ahí el chip <code>est.</code> — y hay que decidir qué estimar (último cobro vs. precio del período).</p>
+  </div>
+
+  <div class="reglas" style="max-width:640px">
+    <h2>Qué expone cada variante</h2>
+    <table>
+      <tr><th></th><th>Cobrar</th><th>Cargar jornada</th><th>Cargar tarea</th><th>Gestionar</th></tr>
+      <tr><td><b>F</b> ⋯ (hoy)</td><td>⋯ toque 2</td><td>⋯ toque 2</td><td>⋯ toque 2</td><td>⋯ toque 2</td></tr>
+      <tr><td><b>D</b> encabezado</td><td class="ok">toque 1</td><td>⋯ toque 2</td><td>⋯ toque 2</td><td>⋯ toque 2</td></tr>
+      <tr><td><b>E</b> barra inferior</td><td class="ok">toque 1</td><td class="ok">toque 1</td><td class="ok">toque 1</td><td>⋯ toque 2</td></tr>
+      <tr><td><b>D+E</b></td><td class="ok">toque 1</td><td class="ok">toque 1</td><td class="ok">toque 1</td><td class="ok">toque 1</td></tr>
+      <tr><td><b>C</b> FAB +</td><td>2 toques</td><td>2 toques</td><td>2 toques</td><td>⋯ toque 2</td></tr>
+    </table>
+    <h2 style="margin-top:14px">En común</h2>
+    <ul style="margin:6px 0 0; padding-left:18px">
+      <li>Las 4 variantes <b>cubren las declaradas</b>: el wizard de cobro lista <b>todos</b> los trabajos en su paso 1 (con ítems o sin ellos).</li>
+      <li>Atajo opcional (recomendado): que el wizard acepte <code>?trabajo=&lt;id&gt;</code> y arranque en el paso de modalidad en lugar de volver a preguntar el trabajo.</li>
+      <li>En <b>escritorio</b> la barra de <b>E</b> se puede omitir (ahí ya hay lugar y el encabezado no scrollea tanto), o dejarla igual para no tener dos diseños.</li>
+      <li>Los trabajos <b>con ítems</b> ya se distinguen por el monto verde: eso no cambia en ninguna variante.</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>

@@ -10,7 +10,7 @@ import { CONCEPTO_STEP, MOTIVOS_TRANSFERENCIA, type MovimientoConcepto } from ".
 import { numberToCurrency, timeToDecimal } from "@/lib/utils";
 import { fraseContraparte } from "@/lib/prestamos";
 import {
-  cobrarSueldo,
+  cobrarTrabajo,
   pagarPrestamo,
   ajustarCuenta,
   pagarGasto,
@@ -19,12 +19,17 @@ import {
   cargarJornadaTrabajo,
   cargarTareaTrabajo,
 } from "@/backend/src/actions/movimientos";
+import {
+  itemsDelTrabajo,
+  modalidadDeclarada,
+  seleccionDeItems,
+} from "./cobro-items";
 import { useUltimoDictado } from "@/components/voz/dictado-pantalla";
 import { useVoz } from "@/components/voz/voz-provider";
 import { correccionesDeDictado } from "@/lib/voz/vocabulario";
 
 const TITULOS: Record<MovimientoConcepto, string> = {
-  CobroSueldo: "Revisar la información y confirmar el registro del cobro.",
+  CobrarTrabajo: "Revisar la información y confirmar el registro del cobro.",
   PagoPrestamo: "Revisar la información y confirmar el pago de préstamo.",
   AjusteCuenta: "Revisar la información y confirmar el registro del ajuste.",
   PagoGasto: "Revisar la información y confirmar el pago de gasto.",
@@ -52,9 +57,6 @@ export function Confirmacion() {
   const cuentaISO = (id: number) =>
     options.cuentas.find((c) => c.id === id)?.moneda?.codigoISO ?? "ARS";
 
-  const periodo = options.periodosTrabajo.find(
-    (p) => p.id === data.periodoTrabajo
-  );
   const prestamo = options.prestamos.find((p) => p.id === data.idPrestamo);
   const gasto = options.gastos.find((g) => g.id === data.idGasto);
   const categoria = options.categoriasGasto.find(
@@ -63,18 +65,58 @@ export function Confirmacion() {
 
   const filas: { label: string; value: string }[] = [];
 
-  if (concepto === "CobroSueldo") {
+  if (concepto === "CobrarTrabajo") {
+    const trabajoC = options.trabajos.find((t) => t.id === data.idTrabajo);
+    const modalidad = trabajoC?.modalidadCobro ?? "horas_variables";
+    const esHorasFijas = modalidad === "horas_fijas";
+    const declarada = modalidadDeclarada(modalidad);
+    const items = itemsDelTrabajo(options.itemsPendientes, data.idTrabajo);
+    const seleccion = seleccionDeItems(items, [
+      ...data.idsJornadas,
+      ...data.idsTareas,
+    ]);
+    // Mismo cálculo que el paso y que el backend: Σ ítems · horas × precio · monto en `fijo`.
+    const calculado = declarada
+      ? esHorasFijas
+        ? Number((data.horasPeriodo * (trabajoC?.precioHora ?? 0)).toFixed(2))
+        : data.montoOrigen
+      : seleccion.monto;
+
     filas.push(
       { label: "Fecha", value: formatFecha(data.fecha) },
+      { label: "Trabajo", value: trabajoC?.nombre ?? "—" },
       {
-        label: "Período de trabajo",
-        value: periodo
-          ? `${periodo.trabajo?.nombre ?? "Trabajo"}: ${formatFecha(periodo.fechaDesde)} al ${formatFecha(periodo.fechaHasta)}`
-          : "—",
-      },
+        label: "Período",
+        value:
+          data.fechaDesde && data.fechaHasta
+            ? `${formatFecha(data.fechaDesde)} al ${formatFecha(data.fechaHasta)}`
+            : "—",
+      }
+    );
+    if (esHorasFijas) {
+      filas.push({
+        label: "Horas",
+        value: `${data.horasPeriodo} h × ${numberToCurrency(trabajoC?.precioHora ?? 0)}`,
+      });
+    } else if (!declarada) {
+      filas.push({
+        label: "Ítems",
+        value: `${seleccion.idsJornadas.length} jornada(s) · ${seleccion.idsTareas.length} tarea(s)`,
+      });
+    }
+    // El calculado se muestra sólo si difiere: en `fijo` son el mismo número y en
+    // los demás casos igualarlo significa que no hubo ajuste (P2: la diferencia es
+    // un snapshot, no se sigue ni ajusta el ingreso).
+    if (calculado !== data.montoOrigen) {
+      filas.push({
+        label: "Calculado",
+        value: numberToCurrency(calculado, cuentaISO(data.cuentaOrigen)),
+      });
+    }
+    filas.push(
       { label: "Cuenta", value: cuentaNombre(data.cuentaOrigen) },
       {
-        label: "Monto",
+        label: "Cobrado",
         value: numberToCurrency(data.montoOrigen, cuentaISO(data.cuentaOrigen)),
       }
     );
@@ -153,26 +195,10 @@ export function Confirmacion() {
       }
     );
   } else if (concepto === "JornadaTrabajo") {
-    const periodoJ = options.periodosTrabajo.find(
-      (p) => p.id === data.periodoTrabajo
-    );
     const trabajoJ = options.trabajos.find((t) => t.id === data.idTrabajo);
     filas.push(
       { label: "Fecha", value: formatFecha(data.fecha) },
-      {
-        label: data.crearPeriodoAutomatico
-          ? "Trabajo (período automático)"
-          : "Período de trabajo",
-        value: data.crearPeriodoAutomatico
-          ? `${trabajoJ?.nombre ?? "Trabajo"} — período del ${formatFecha(
-              data.fecha
-            )}`
-          : periodoJ
-          ? `${periodoJ.trabajo?.nombre ?? "Trabajo"}: ${formatFecha(
-              periodoJ.fechaDesde
-            )} al ${formatFecha(periodoJ.fechaHasta)}`
-          : "—",
-      },
+      { label: "Trabajo", value: trabajoJ?.nombre ?? "—" },
       { label: "Hora desde", value: data.horaDesde || "—" },
       { label: "Hora hasta", value: data.horaHasta || "—" }
     );
@@ -186,29 +212,13 @@ export function Confirmacion() {
       );
     }
   } else if (concepto === "CargarTarea") {
-    const periodoT = options.periodosTrabajo.find(
-      (p) => p.id === data.periodoTrabajo
-    );
     const trabajoT = options.trabajos.find((t) => t.id === data.idTrabajo);
     filas.push(
       {
         label: "Fecha/hora",
         value: `${formatFecha(data.fecha)} ${data.horaDesde || "—"}`,
       },
-      {
-        label: data.crearPeriodoAutomatico
-          ? "Trabajo (período automático)"
-          : "Período de trabajo",
-        value: data.crearPeriodoAutomatico
-          ? `${trabajoT?.nombre ?? "Trabajo"} — período del ${formatFecha(
-              data.fecha
-            )}`
-          : periodoT
-          ? `${periodoT.trabajo?.nombre ?? "Trabajo"}: ${formatFecha(
-              periodoT.fechaDesde
-            )} al ${formatFecha(periodoT.fechaHasta)}`
-          : "—",
-      },
+      { label: "Trabajo", value: trabajoT?.nombre ?? "—" },
       { label: "Descripción", value: data.descripcionTarea || "—" }
     );
     if (data.horasTarea > 0) {
@@ -222,12 +232,20 @@ export function Confirmacion() {
     setSubmitting(true);
     try {
       switch (concepto) {
-        case "CobroSueldo":
-          await cobrarSueldo({
+        case "CobrarTrabajo":
+          await cobrarTrabajo({
             fecha: data.fecha,
-            monto: data.montoOrigen,
+            idTrabajo: data.idTrabajo,
             idCuenta: data.cuentaOrigen,
-            idPeriodoTrabajo: data.periodoTrabajo,
+            // El monto es el COBRADO (editable); el calculado lo arma el backend.
+            monto: data.montoOrigen,
+            // El rango declarado sólo viaja en `fijo`/`horas_fijas`: en las
+            // variables el backend lo deriva de los ítems tildados.
+            fechaDesde: data.fechaDesde || undefined,
+            fechaHasta: data.fechaHasta || undefined,
+            horasPeriodo: data.horasPeriodo > 0 ? data.horasPeriodo : undefined,
+            idsJornadas: data.idsJornadas,
+            idsTareas: data.idsTareas,
           });
           break;
         case "PagoPrestamo":
@@ -278,14 +296,9 @@ export function Confirmacion() {
             horaDesde: timeToDecimal(data.horaDesde),
             horaHasta: timeToDecimal(data.horaHasta),
             montoPropina: data.montoPropina,
-            idPeriodo: data.crearPeriodoAutomatico
-              ? undefined
-              : data.periodoTrabajo,
             idCuenta: data.montoPropina > 0 ? data.cuentaPropina : undefined,
-            crearPeriodoAutomatico: data.crearPeriodoAutomatico,
-            idTrabajo: data.crearPeriodoAutomatico
-              ? data.idTrabajo
-              : undefined,
+            // Único vínculo: la jornada nace **pendiente de liquidar**.
+            idTrabajo: data.idTrabajo,
           });
           break;
         case "CargarTarea": {
@@ -299,13 +312,8 @@ export function Confirmacion() {
             descripcion: (data.descripcionTarea ?? "").trim() || undefined,
             horasTarea: data.horasTarea > 0 ? data.horasTarea : undefined,
             montoTarea: data.montoTarea,
-            idPeriodo: data.crearPeriodoAutomatico
-              ? undefined
-              : data.periodoTrabajo,
-            crearPeriodoAutomatico: data.crearPeriodoAutomatico,
-            idTrabajo: data.crearPeriodoAutomatico
-              ? data.idTrabajo
-              : undefined,
+            // Único vínculo: la tarea nace **pendiente de liquidar**.
+            idTrabajo: data.idTrabajo,
           });
           break;
         }

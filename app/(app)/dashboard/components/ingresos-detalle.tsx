@@ -2,7 +2,7 @@
 
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
-import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
+import type { LiquidacionOut } from "@/backend/src/queries/trabajos";
 import { cn, dateTimeToString, numberToCurrency } from "@/lib/utils";
 import { SparkLineChart } from "./sparkline-chart";
 
@@ -25,24 +25,40 @@ function fechaHoraLabel(value: string | Date): string {
 }
 
 function ImporteCell({
-  montoACobrar,
+  montoCobrado,
+  montoCalculado,
   fechaDeCobro,
   currency,
 }: {
-  montoACobrar: number | null;
+  montoCobrado: number | null;
+  montoCalculado: number | null;
   fechaDeCobro?: string | Date | null;
   currency: string;
 }) {
   const cobrado =
     !!fechaDeCobro && new Date(fechaDeCobro).getFullYear() >= 1901;
+  // El importe del panel es lo COBRADO (P1.a: el ingreso es lo que entró); si el
+  // cobro difirió del calculado (cobro parcial, P2), el calculado se muestra
+  // como referencia para que la diferencia quede a la vista.
+  const monto = (cobrado ? montoCobrado : null) ?? montoCalculado ?? 0;
+  const difiere =
+    cobrado &&
+    montoCalculado != null &&
+    montoCobrado != null &&
+    Math.abs(montoCobrado - montoCalculado) > 0.005;
   return (
     <span
       className={cn(
-        "inline-flex min-w-22 items-center justify-end rounded-full px-2 py-0.5 text-[12px] font-medium",
+        "inline-flex min-w-22 flex-col items-end rounded-full px-2 py-0.5 text-[12px] font-medium",
         cobrado ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
       )}
     >
-      {numberToCurrency(montoACobrar ?? 0, currency)}
+      {numberToCurrency(monto, currency)}
+      {difiere && (
+        <span className="text-[10px] font-normal text-subtitle">
+          calc. {numberToCurrency(montoCalculado ?? 0, currency)}
+        </span>
+      )}
     </span>
   );
 }
@@ -52,8 +68,8 @@ export function ActividadCell({
   tareas,
   currency,
 }: {
-  jornadas?: PeriodoTrabajoOut["jornadas"];
-  tareas?: PeriodoTrabajoOut["tareas"];
+  jornadas?: LiquidacionOut["jornadas"];
+  tareas?: LiquidacionOut["tareas"];
   currency: string;
 }) {
   // Discriminador §8: si el período tiene JORNADAS se grafican las jornadas
@@ -95,7 +111,7 @@ export function ActividadCell({
 
 export function ingresosDetalleColumns(
   currency: string
-): ColumnDef<PeriodoTrabajoOut>[] {
+): ColumnDef<LiquidacionOut>[] {
   return [
   {
     accessorFn: (row) => row.trabajo?.nombre ?? "",
@@ -105,9 +121,11 @@ export function ingresosDetalleColumns(
     footer: "Total",
   },
   {
-    // "Desde" y "Hasta" fusionadas en una sola columna. El accessor expone
-    // `fechaDesde`, así el orden por defecto y el clic en el header son
-    // CRONOLÓGICOS por fecha de inicio (no por el texto "dd-mm-aaaa al ...").
+    // "Desde" y "Hasta" fusionadas en una sola columna (P1.e): en el modelo nuevo
+    // el RANGO es el dato de la liquidación (en `fijo`/`horas_fijas` es declarado
+    // y en las variables se deriva de los ítems). El accessor expone `fechaDesde`,
+    // así el orden por defecto y el clic en el header son CRONOLÓGICOS (no por el
+    // texto "dd-mm-aaaa al ...").
     id: "periodo",
     header: "Período",
     accessorFn: (row) => row.fechaDesde,
@@ -121,12 +139,16 @@ export function ingresosDetalleColumns(
       )}`,
   },
   {
-    accessorKey: "montoACobrar",
+    // `id` explícito (no `accessorKey: "montoACobrar"`, que ya no existe): el
+    // orden sigue funcionando sobre el monto realmente cobrado.
+    id: "importe",
+    accessorFn: (row) => row.montoCobrado ?? row.montoCalculado ?? 0,
     header: "Importe",
     meta: { align: "right" },
     cell: ({ row }) => (
       <ImporteCell
-        montoACobrar={row.original.montoACobrar}
+        montoCobrado={row.original.montoCobrado}
+        montoCalculado={row.original.montoCalculado}
         fechaDeCobro={row.original.fechaDeCobro}
         currency={currency}
       />
@@ -134,21 +156,20 @@ export function ingresosDetalleColumns(
     footer: ({ table }) => {
       const rows = table.getFilteredRowModel().rows;
       const total = rows.reduce(
-        (acc, row) => acc + (row.original.montoACobrar || 0),
+        (acc, row) =>
+          acc +
+          ((row.original.montoCobrado ?? row.original.montoCalculado) || 0),
         0
       );
       return numberToCurrency(total, currency);
     },
   },
   {
-    accessorKey: "fechaEstimadaCobro",
-    header: "Estimación Cobro",
-    meta: { align: "center" },
-    cell: ({ getValue }) => formatCobroDate(getValue<string | Date>()),
-  },
-  {
+    // La liquidación se muestra con su RANGO (columna Período) **además** de la
+    // fecha de cobro (P1.e). La vieja columna "Estimación Cobro" se quitó: en el
+    // modelo nuevo `fechaEstimadaCobro` no se carga (P1.c).
     accessorKey: "fechaDeCobro",
-    header: "Fecha Cobro",
+    header: "Cobrado",
     meta: { align: "center" },
     cell: ({ getValue }) => formatCobroDate(getValue<string | Date>()),
   },
@@ -173,7 +194,7 @@ export function IngresosDetalle({
   data,
   currency,
 }: {
-  data: PeriodoTrabajoOut[];
+  data: LiquidacionOut[];
   currency: string;
 }) {
   return (

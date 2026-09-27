@@ -16,6 +16,12 @@ import {
   type MovimientoInitial,
   type MovimientoOptions,
 } from "./types";
+import {
+  idsDeItems,
+  itemsDelTrabajo,
+  modalidadDeclarada,
+  seleccionDeItems,
+} from "./cobro-items";
 
 interface StepperContextValue {
   activeStep: number;
@@ -84,22 +90,36 @@ export function MovimientoProvider({
       descripcionTarea: "",
       montoTarea: 0,
       horasTarea: 0,
+      // Cobrar trabajo (R2): ítems tildados + rango declarado/derivado.
+      idsJornadas: [],
+      idsTareas: [],
+      horasPeriodo: 0,
+      fechaDesde: "",
+      fechaHasta: "",
     };
     if (!initial) return base;
     // En Jornada trabajo la cuenta precargada va al depósito de propina.
     const esJornada = initial.concepto === "JornadaTrabajo";
-    // Período preseleccionado por fila: en Cobro (listado "Por cobrar") y en
-    // jornada/tarea (columna por fila del popup "Actuales") se precarga el
-    // período. El monto solo se precarga en Cobro (en jornada/tarea el monto se
-    // ingresa o calcula por horas/tarea).
-    const preseleccionaPeriodo =
-      initial.periodo != null &&
-      (initial.concepto === "CobroSueldo" ||
-        initial.concepto === "JornadaTrabajo" ||
-        initial.concepto === "CargarTarea");
-    const periodoPre = preseleccionaPeriodo
-      ? optionsIniciales.periodosTrabajo.find((p) => p.id === initial.periodo)
-      : undefined;
+    // Cobrar trabajo: la tarjeta "Por cobrar" precarga la LIQUIDACIÓN (`?periodo=`),
+    // que sirve para elegir el **trabajo**; sus ítems pendientes quedan tildados
+    // y el monto es su suma (P7: el usuario destilda lo que no quiere cobrar).
+    const liquidacionPre =
+      initial.periodo != null && initial.concepto === "CobrarTrabajo"
+        ? optionsIniciales.periodosTrabajo.find((p) => p.id === initial.periodo)
+        : undefined;
+    const idTrabajoPre = liquidacionPre?.trabajo?.id ?? 0;
+    // En `fijo`/`horas_fijas` no hay ítems que tildar: el período se declara.
+    const seleccionPre =
+      idTrabajoPre &&
+      !modalidadDeclarada(liquidacionPre?.trabajo?.modalidadCobro)
+        ? (() => {
+            const pend = itemsDelTrabajo(
+              optionsIniciales.itemsPendientes,
+              idTrabajoPre
+            );
+            return seleccionDeItems(pend, idsDeItems(pend));
+          })()
+        : undefined;
     // Préstamo preseleccionado por fila (botón "Pagar" de la grilla de
     // préstamos): en PagoPrestamo se precarga el préstamo y su monto (saldo).
     const prestamoPre =
@@ -112,14 +132,18 @@ export function MovimientoProvider({
       cuentaOrigen: esJornada ? 0 : (initial.cuenta ?? initial.origen ?? 0),
       cuentaDestino: initial.destino ?? 0,
       cuentaPropina: esJornada ? (initial.cuenta ?? 0) : 0,
-      periodoTrabajo: periodoPre?.id ?? 0,
+      periodoTrabajo: liquidacionPre?.id ?? 0,
+      idTrabajo: idTrabajoPre,
+      idsJornadas: seleccionPre?.idsJornadas ?? [],
+      idsTareas: seleccionPre?.idsTareas ?? [],
+      fechaDesde: seleccionPre?.fechaDesde ?? "",
+      fechaHasta: seleccionPre?.fechaHasta ?? "",
       idPrestamo: prestamoPre?.id ?? "",
-      montoOrigen:
-        initial.concepto === "CobroSueldo"
-          ? (periodoPre?.montoACobrar ?? 0)
-          : prestamoPre
-            ? prestamoPre.saldo
-            : 0,
+      montoOrigen: seleccionPre
+        ? seleccionPre.monto
+        : prestamoPre
+          ? prestamoPre.saldo
+          : 0,
     };
   });
 
@@ -172,6 +196,11 @@ export function MovimientoProvider({
       descripcionTarea: "",
       montoTarea: 0,
       horasTarea: 0,
+      idsJornadas: [],
+      idsTareas: [],
+      horasPeriodo: 0,
+      fechaDesde: "",
+      fechaHasta: "",
     }));
 
   const navigateTo = (step: number) => setActiveStep(step);
@@ -199,6 +228,11 @@ export function MovimientoProvider({
       descripcionTarea: "",
       montoTarea: 0,
       horasTarea: 0,
+      idsJornadas: [],
+      idsTareas: [],
+      horasPeriodo: 0,
+      fechaDesde: "",
+      fechaHasta: "",
     }));
 
   return (

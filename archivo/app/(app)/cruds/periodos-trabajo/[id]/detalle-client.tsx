@@ -13,7 +13,7 @@ import {
 import { cobroAdelantado, periodoCobrable } from "@/backend/src/lib/jornadas";
 import type {
   JornadaTrabajoOut,
-  PeriodoTrabajoOut,
+  LiquidacionOut,
   TareaTrabajoOut,
 } from "@/backend/src/queries/trabajos";
 import {
@@ -141,7 +141,7 @@ function TareaCard({
 
 /** Datos derivados del período. Los usan el resumen en pantalla y la cabecera
     del PDF, para no duplicar los cálculos ni poder desincronizarse. */
-function datosPeriodo(periodo: PeriodoTrabajoOut) {
+function datosPeriodo(periodo: LiquidacionOut) {
   const trabajo = periodo.trabajo;
   const modalidad = trabajo?.modalidadCobro ?? "horas_variables";
   const esTareas = modalidad === "por_tarea";
@@ -186,14 +186,14 @@ function datosPeriodo(periodo: PeriodoTrabajoOut) {
     montoPropina,
     // Cobro ADELANTADO: cobrado antes de la fecha de cierre del período.
     adelantado: cobroAdelantado(periodo),
-    total: Number(periodo.montoACobrar ?? 0),
+    total: Number(periodo.montoCalculado ?? 0),
   };
 }
 
 /** Cabecera del PDF: los datos del período que se exportan arriba de la grilla
     de jornadas/tareas (mismos valores que el resumen en pantalla). */
 function cabeceraPeriodo(
-  periodo: PeriodoTrabajoOut,
+  periodo: LiquidacionOut,
   currency: string
 ): { label: string; value: string }[] {
   const d = datosPeriodo(periodo);
@@ -238,7 +238,7 @@ function ResumenPeriodo({
   cobrable,
   enCurso,
 }: {
-  periodo: PeriodoTrabajoOut;
+  periodo: LiquidacionOut;
   currency: string;
   /** Se puede cobrar (ya empezó y no está cobrado). */
   cobrable: boolean;
@@ -343,7 +343,7 @@ function ResumenPeriodo({
           {cobrado ? "Total cobrado" : "Total a cobrar"}
         </p>
         <p className="text-[16px] font-semibold tracking-tight text-value">
-          {numberToCurrency(Number(periodo.montoACobrar ?? 0), currency)}
+          {numberToCurrency(Number(periodo.montoCalculado ?? 0), currency)}
         </p>
       </div>
 
@@ -369,7 +369,7 @@ function ResumenPeriodo({
 }
 
 interface Props {
-  periodo: PeriodoTrabajoOut;
+  periodo: LiquidacionOut;
   /** ISO 4217 de la moneda predeterminada del usuario. */
   currency?: string;
   /** Origen de navegación (?origen=...). "dashboard" al venir del popup. */

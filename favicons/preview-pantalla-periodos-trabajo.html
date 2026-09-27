@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Pantalla "Períodos de trabajo" · rediseño (tema oscuro)</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; display: flex; flex-direction: column; gap: 26px;
+    font-family: "SF Pro Display", Inter, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #111; color: #e8e8ea;
+  }
+  h1 { font-size: 15px; margin: 0; }
+  h1 small { display: block; font-weight: 400; font-size: 12px; opacity: .6; margin-top: 6px; line-height: 1.7; max-width: 1180px; }
+  h1 b { color: #fff; }
+  .rowwrap { display: flex; flex-wrap: wrap; gap: 26px; align-items: flex-start; }
+
+  /* Tokens reales del tema oscuro de la app (globals.css) */
+  .panel-cell {
+    --background: #151517; --card: #353638; --card-foreground: #e2e4f0;
+    --border: #3e3f42; --subtitle: #808185; --header: #ffffff; --muted: #1e1e20;
+    --primary: #4c6ef5; --success: #51cf66; --danger: #ff6b6b; --value: #ffffff;
+    --tabs-bg: #1e1e20;
+  }
+  .frame {
+    width: 390px; padding: 14px; border-radius: 16px; border: 1px solid #2a2a2d;
+    background: var(--background); color: var(--card-foreground);
+  }
+  .frame.w320 { width: 320px; }
+  .cap { margin: 0 0 10px 2px; font-size: 12px; color: #b9babd; }
+  .cap b { color: #fff; }
+  .cap em { color: #8f9094; font-style: normal; }
+
+  /* ── encabezado de la pantalla: ← + título + ⋯ ── */
+  .appbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .back { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--subtitle); }
+  .title { font-size: 18px; font-weight: 600; color: var(--header); margin: 0; }
+  .dots { margin-left: auto; width: 32px; height: 32px; border-radius: 999px; background: color-mix(in srgb, var(--muted) 60%, transparent); display: flex; align-items: center; justify-content: center; color: var(--subtitle); font-size: 13px; letter-spacing: 1px; }
+
+  /* ── pestañas (patrón de los paneles del dashboard) ── */
+  .tabs { display: flex; gap: 3px; background: var(--tabs-bg); border-radius: 8px; padding: 3px; margin-bottom: 12px; }
+  .tab { flex: 1; text-align: center; padding: 6px 8px; border-radius: 6px; font-size: 12.5px; font-weight: 500; color: var(--subtitle); }
+  .tab.on { background: var(--card); color: var(--header); box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+  .tab b { font-weight: 600; }
+
+  /* ── encabezado de sección ── */
+  .sec { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 2px 8px; }
+  .sec h2 { margin: 0; font-size: 16px; font-weight: 600; color: var(--header); }
+  .sec .tot { font-size: 15px; font-weight: 600; color: var(--value); font-variant-numeric: tabular-nums; }
+  .sec.sub { margin-top: 18px; }
+
+  /* ── "Por cobrar": ficha por trabajo (ya implementada en el panel) ── */
+  .fichas { display: flex; flex-direction: column; gap: 8px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; }
+  .ficha { background: var(--muted); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .f-top { display: flex; align-items: baseline; gap: 10px; }
+  .f-name { margin: 0; min-width: 0; flex: 1 1 auto; font-size: 13.5px; font-weight: 600; color: var(--header); }
+  .f-total { flex: none; font-size: 14.5px; font-weight: 600; color: var(--value); font-variant-numeric: tabular-nums; }
+  .f-meta { margin: 2px 0 0; font-size: 11px; line-height: 15px; color: var(--subtitle); }
+
+  /* ── "Cobrados": FILAS MULTILÍNEA (2 líneas, sin tabla, sin scroll horizontal) ── */
+  .liqs { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 4px 12px; }
+  .liq { display: flex; align-items: flex-start; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--border); }
+  .liq:last-child { border-bottom: 0; }
+  .liq > .grow { flex: 1 1 auto; min-width: 0; }
+  .liq .l1 { font-size: 13.5px; font-weight: 600; line-height: 17px; color: var(--header); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .liq .l2 { font-size: 11px; line-height: 15px; color: var(--subtitle); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .amtcol { flex: 0 0 auto; text-align: right; }
+  .amt { font-size: 14.5px; font-weight: 600; line-height: 18px; letter-spacing: -.01em; color: var(--success); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .calc { font-size: 10.5px; line-height: 13px; color: var(--subtitle); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .spark { flex: none; align-self: center; }
+
+  /* ── paginador ── */
+  .pager { display: flex; align-items: center; justify-content: space-between; margin: 10px 2px 0; font-size: 12px; color: var(--subtitle); }
+  .pbtns { display: flex; gap: 6px; }
+  .pb { width: 30px; height: 28px; border-radius: 8px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--card-foreground); font-size: 12px; }
+  .pb.off { opacity: .35; }
+
+  .notas { font-size: 11.5px; line-height: 1.7; color: #9a9b9e; margin: 10px 2px 0; max-width: 400px; }
+  .notas b { color: #d6d7da; }
+  .notas code { background: #26262a; padding: 1px 4px; border-radius: 4px; font-size: 10.5px; }
+  .reglas { background: #17171a; border: 1px solid #2a2a2d; border-radius: 14px; padding: 14px 18px; max-width: 980px; font-size: 12px; line-height: 1.75; color: #b9babd; }
+  .reglas h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #fff; margin: 0 0 8px; opacity: .7; }
+  .reglas b { color: #fff; }
+  .reglas code { background: #26262a; padding: 1px 4px; border-radius: 4px; font-size: 11px; }
+  .reglas ul { margin: 6px 0 0; padding-left: 18px; }
+  .reglas li { margin-bottom: 5px; }
+  .bad { color: #ff8787; }
+  .ok { color: var(--success); }
+</style>
+</head>
+<body>
+
+<h1>Pantalla <b>“Períodos de trabajo”</b> · rediseño (mobile)
+  <small>Se renombra el <b>título</b> a <b>Períodos de trabajo</b> (la ruta sigue siendo <code>/trabajo</code>). Lo que se rediseña es la sección <b>Cobrados</b>: hoy es una tabla de 5 columnas (Trabajo · Período · Importe · Cobrado · Jornadas/Tareas) que <span class="bad">desborda 137 px a 390 px</span> y obliga a scroll horizontal, en 15 páginas de 5. En mobile pasa a <b>filas multilínea de 2 renglones</b>, sin scroll horizontal. <b>Por cobrar</b> no cambia: ya son las fichas del panel.</small>
+</h1>
+
+<div class="reglas">
+  <h2>Cómo se lee cada fila de Cobrados</h2>
+  <ul>
+    <li><b>Línea 1</b> — el <b>trabajo</b> (13,5 px semibold, se recorta con <code>…</code> si es largo) · a la derecha el <b>importe cobrado</b> (14,5 px semibold, verde).</li>
+    <li><b>Línea 2</b> — el <b>rango del período</b> + <b>cuándo se cobró</b> (<code>25/09 → 26/09 · cobrado 26/09</code>), en 11 px.</li>
+    <li><b>Cobro parcial</b> — si lo cobrado difiere de lo calculado, aparece debajo del importe en <code>calc. US$ 125,00</code> (como hoy), sin agrandar la fila.</li>
+    <li><b>Sparkline</b> (el gráfico de barras por jornada/tarea): en la tabla de escritorio queda igual; en las filas de mobile va chico a la derecha de la línea 1 — <b>o se quita</b>, según lo que elijas.</li>
+    <li><b>Lo que se gana</b>: el rango y la fecha de cobro dejan de estar en columnas apretadas y se leen como una frase; nada de scroll horizontal a 390 px ni a 320 px.</li>
+  </ul>
+  <h2 style="margin-top:12px">Estructura: 2 formas</h2>
+  <ul>
+    <li><b>Opción A · apilada</b> (como hoy): <b>Por cobrar</b> arriba y <b>Cobrados</b> abajo, cada una con su total.</li>
+    <li><b>Opción B · pestañas</b>: <code>Por cobrar</code> | <code>Cobrados</code> con la cantidad y el total de la activa; una sección a la vez (el patrón que ya usan los paneles Gastos/Ingresos del dashboard). La pantalla deja de ser un scroll largo.</li>
+  </ul>
+</div>
+
+<div class="rowwrap">
+
+  <!-- ═══════════ A · APILADA ═══════════ -->
+  <div class="panel-cell">
+    <div class="cap"><b>Opción A</b> · apilada <em>(por cobrar + cobrados, con scroll vertical)</em></div>
+    <div class="frame">
+      <div class="appbar">
+        <span class="back">‹</span>
+        <h1 class="title" style="font-size:18px">Períodos de trabajo</h1>
+        <span class="dots">⋯</span>
+      </div>
+
+      <div class="sec"><h2>Por cobrar</h2><span class="tot">US$ 3.248,99</span></div>
+      <div class="fichas">
+        <div class="ficha">
+          <div class="f-top"><p class="f-name">Labado Autos</p><span class="f-total">US$ 400,00</span></div>
+          <p class="f-meta">4 tareas · 06/09 → 24/09</p>
+        </div>
+        <div class="ficha">
+          <div class="f-top"><p class="f-name">Duffys</p><span class="f-total">US$ 1.473,74</span></div>
+          <p class="f-meta">18 jornadas · 11/07 → 07/08</p>
+        </div>
+        <div class="ficha">
+          <div class="f-top"><p class="f-name">QA Test - Por Tarea</p><span class="f-total">US$ 423,45</span></div>
+          <p class="f-meta">2 tareas · 05/09</p>
+        </div>
+      </div>
+
+      <div class="sec sub"><h2>Cobrados</h2><span class="tot">US$ 26.368,31</span></div>
+      <div class="liqs">
+        <div class="liq">
+          <div class="grow"><div class="l1">Publix</div><div class="l2">25/09 → 26/09 · cobrado 26/09</div></div>
+          <div class="amtcol"><div class="amt">US$ 204,00</div></div>
+        </div>
+        <div class="liq">
+          <div class="grow"><div class="l1">Planillas Eliseo</div><div class="l2">02/07 · cobrado 05/07</div></div>
+          <div class="amtcol"><div class="amt">US$ 100,00</div><div class="calc">calc. US$ 125,00</div></div>
+        </div>
+        <div class="liq">
+          <div class="grow"><div class="l1">Atlas</div><div class="l2">29/06 → 08/07 · cobrado 23/07</div></div>
+          <div class="amtcol"><div class="amt">US$ 224,10</div></div>
+        </div>
+        <div class="liq">
+          <div class="grow"><div class="l1">Duffys</div><div class="l2">27/06 → 10/07 · cobrado 23/07</div></div>
+          <div class="amtcol"><div class="amt">US$ 754,17</div></div>
+        </div>
+        <div class="liq">
+          <div class="grow"><div class="l1">Atlas</div><div class="l2">16/06 → 24/06 · cobrado 17/07</div></div>
+          <div class="amtcol"><div class="amt">US$ 509,39</div><div class="calc">calc. US$ 509,70</div></div>
+        </div>
+      </div>
+      <div class="pager"><span>Página 1 de 15</span><span class="pbtns"><span class="pb off">‹</span><span class="pb">›</span></span></div>
+    </div>
+    <p class="notas">Es la estructura actual con la lista arreglada. <b>Contra</b>: con 31 ítems pendientes + la lista de cobrados, la pantalla sigue siendo un scroll largo (por eso B).</p>
+  </div>
+
+  <!-- ═══════════ B · PESTAÑAS (Por cobrar) ═══════════ -->
+  <div class="panel-cell">
+    <div class="cap"><b>Opción B</b> · pestañas <em>— activa “Por cobrar”</em></div>
+    <div class="frame">
+      <div class="appbar">
+        <span class="back">‹</span>
+        <h1 class="title" style="font-size:18px">Períodos de trabajo</h1>
+        <span class="dots">⋯</span>
+      </div>
+
+      <div class="tabs">
+        <span class="tab on">Por cobrar <b>31</b></span>
+        <span class="tab">Cobrados <b>74</b></span>
+      </div>
+      <div class="sec"><h2>Por cobrar</h2><span class="tot">US$ 3.248,99</span></div>
+      <div class="fichas">
+        <div class="ficha">
+          <div class="f-top"><p class="f-name">Labado Autos</p><span class="f-total">US$ 400,00</span></div>
+          <p class="f-meta">4 tareas · 06/09 → 24/09</p>
+        </div>
+        <div class="ficha">
+          <div class="f-top"><p class="f-name">Duffys</p><span class="f-total">US$ 1.473,74</span></div>
+          <p class="f-meta">18 jornadas · 11/07 → 07/08</p>
+        </div>
+        <div class="ficha">
+          <div class="f-top"><p class="f-name">QA Test - Por Tarea</p><span class="f-total">US$ 423,45</span></div>
+          <p class="f-meta">2 tareas · 05/09</p>
+        </div>
+        <div class="ficha">
+          <div class="f-top"><p class="f-name">Atlas</p><span class="f-total">US$ 511,80</span></div>
+          <p class="f-meta">4 jornadas · 15/07 → 05/08</p>
+        </div>
+      </div>
+    </div>
+    <p class="notas">La pestaña lleva la <b>cantidad</b> y el encabezado el <b>total</b> de lo que estás viendo. <b>Pro</b>: cada lista respira y no hay que atravesar 31 fichas para llegar a los cobrados.</p>
+  </div>
+
+  <!-- ═══════════ B · PESTAÑAS (Cobrados) ═══════════ -->
+  <div class="panel-cell">
+    <div class="cap"><b>Opción B</b> · pestañas <em>— activa “Cobrados”</em></div>
+    <div class="frame">
+      <div class="appbar">
+        <span class="back">‹</span>
+        <h1 class="title" style="font-size:18px">Períodos de trabajo</h1>
+        <span class="dots">⋯</span>
+      </div>
+
+      <div class="tabs">
+        <span class="tab">Por cobrar <b>31</b></span>
+        <span class="tab on">Cobrados <b>74</b></span>
+      </div>
+      <div class="sec"><h2>Cobrados</h2><span class="tot">US$ 26.368,31</span></div>
+      <div class="liqs">
+        <div class="liq">
+          <div class="grow"><div class="l1">Publix</div><div class="l2">25/09 → 26/09 · cobrado 26/09</div></div>
+          <div class="amtcol"><div class="amt">US$ 204,00</div></div>
+        </div>
+        <div class="liq">
+          <div class="grow"><div class="l1">Planillas Eliseo</div><div class="l2">02/07 · cobrado 05/07</div></div>
+          <div class="amtcol"><div class="amt">US$ 100,00</div><div class="calc">calc. US$ 125,00</div></div>
+        </div>
+        <div class="liq">
+          <div class="grow"><div class="l1">Atlas</div><div class="l2">29/06 → 08/07 · cobrado 23/07</div></div>
+          <div class="amtcol"><div class="amt">US$ 224,10</div></div>
+        </div>
+        <div class="liq">
+          <div class="grow"><div class="l1">Duffys</div><div class="l2">27/06 → 10/07 · cobrado 23/07</div></div>
+          <div class="amtcol"><div class="amt">US$ 754,17</div></div>
+        </div>
+        <div class="liq">
+          <div class="grow"><div class="l1">Atlas</div><div class="l2">16/06 → 24/06 · cobrado 17/07</div></div>
+          <div class="amtcol"><div class="amt">US$ 509,39</div><div class="calc">calc. US$ 509,70</div></div>
+        </div>
+        <div class="liq">
+          <div class="grow"><div class="l1">Labado Autos</div><div class="l2">09/06 → 20/06 · cobrado 02/07</div></div>
+          <div class="amtcol"><div class="amt">US$ 640,00</div></div>
+        </div>
+      </div>
+      <div class="pager"><span>Página 1 de 8</span><span class="pbtns"><span class="pb off">‹</span><span class="pb">›</span></span></div>
+    </div>
+    <p class="notas">Mismo listado, sin la tabla. El paginador es el <b>componente compartido</b> que ya usan las grillas (<code>TablePagination</code>); con 6 filas por página son 8 páginas en vez de 15.</p>
+  </div>
+
+  <!-- ═══════════ B a 320 px ═══════════ -->
+  <div class="panel-cell">
+    <div class="cap"><b>Cobrados a 320 px</b> · <em>el ancho más chico: sin scroll horizontal</em></div>
+    <div class="frame w320">
+      <div class="appbar">
+        <span class="back">‹</span>
+        <h1 class="title" style="font-size:17px">Períodos de trabajo</h1>
+        <span class="dots">⋯</span>
+      </div>
+      <div class="sec"><h2>Cobrados</h2><span class="tot">US$ 26.368,31</span></div>
+      <div class="liqs">
+        <div class="liq">
+          <div class="grow"><div class="l1">Archivo confidencial de oficina</div><div class="l2">25/09 → 26/09 · cobrado 26/09</div></div>
+          <div class="amtcol"><div class="amt">US$ 204,00</div></div>
+        </div>
+        <div class="liq">
+          <div class="grow"><div class="l1">Planillas Eliseo</div><div class="l2">02/07 · cobrado 05/07</div></div>
+          <div class="amtcol"><div class="amt">US$ 100,00</div><div class="calc">calc. US$ 125,00</div></div>
+        </div>
+        <div class="liq">
+          <div class="grow"><div class="l1">Atlas</div><div class="l2">16/06 → 24/06 · cobrado 17/07</div></div>
+          <div class="amtcol"><div class="amt">US$ 509,39</div></div>
+        </div>
+      </div>
+      <div class="pager"><span>Página 1 de 8</span><span class="pbtns"><span class="pb off">‹</span><span class="pb">›</span></span></div>
+    </div>
+    <p class="notas">El nombre del trabajo largo se <b>recorta con <code>…</code></b> (1 línea): el importe tiene prioridad y la fila no se estira. Si preferís que <b>envuelva</b> (2 líneas, la fila crece) se cambia en 1 línea.</p>
+  </div>
+
+</div>
+
+</body>
+</html>

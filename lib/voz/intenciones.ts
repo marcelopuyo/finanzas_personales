@@ -155,6 +155,16 @@ export const NO_ES_GASTO = [
   "transferencias",
   "ajuste",
   "ajustes",
+  // ➕ 2026-09-27: **los 3 flujos de trabajo**. Si la frase los nombra, el gasto no
+  // se la apropia: *"pagué la tarea de publix"* es una **tarea**, no un gasto.
+  "jornada",
+  "jornadas",
+  "tarea",
+  "tareas",
+  "cobro",
+  "cobros",
+  "liquidacion",
+  "liquidaciones",
 ];
 
 /**
@@ -267,6 +277,55 @@ export const INTENCIONES: Intencion[] = [
     ejemploCuentas: "ajustá la cuenta {cuenta} en menos 500",
   },
 
+  // ─── Trabajo (2026-09-27): jornada · tarea · cobro ────────────────────────
+  // Los tres flujos del panel "Trabajo". ⚠️ El **sustantivo manda**: los verbos
+  // sueltos son ambiguos entre sí ("cobré" puede ser un cobro de trabajo o un
+  // gasto cobrado), así que ninguno alcanza sin el sustantivo ni un número.
+  {
+    id: "cargar-jornada",
+    tipo: "carga",
+    /** *"cargá una jornada de publix de 9 a 17"* · *"trabajé 8 horas en publix"*. */
+    sustantivos: ["jornada", "jornadas"],
+    // ⚠️ `trabajo` **no** va como verbo: también es el sustantivo del destino de
+    // navegación ("andá al trabajo") y se robaría las órdenes de los paneles.
+    // `verboSolo`: "trabajé en publix" sin horas también es una jornada.
+    verbos: ["trabaje", "trabajar", "labure", "laburar"],
+    verboSolo: true,
+    href: () => "/movimientos/nuevo/jornada",
+    etiqueta: "Jornada de trabajo",
+    llevaTexto: true,
+    relleno: RELLENO_CARGA,
+    // ⚠️ Sin `ejemploCuentas`: los `{cuenta}`/`{cuenta2}` del FAB son **cuentas**, y
+    // acá el nombre que falta es el del **trabajo** (no hay marcador para eso).
+    ejemplo: "cargá una jornada de 9 a 17",
+  },
+  {
+    id: "cargar-tarea",
+    tipo: "carga",
+    /** *"cargá una tarea de labado autos por 400"* · *"hice una tarea en publix"*. */
+    sustantivos: ["tarea", "tareas"],
+    verbos: ["hice", "hacer", "termine", "entregue"],
+    verboSolo: true,
+    href: () => "/movimientos/nuevo/tarea",
+    etiqueta: "Tarea de trabajo",
+    llevaTexto: true,
+    relleno: RELLENO_CARGA,
+    ejemplo: "cargá una tarea de labado autos por 400",
+  },
+  {
+    id: "cobrar-trabajo",
+    tipo: "carga",
+    /** *"cobrá publix"* · *"cobré grand cafe 90 en billetera"*. */
+    sustantivos: ["cobro", "cobros", "liquidacion", "liquidaciones"],
+    verbos: ["cobre", "cobrar", "cobra", "liquide", "liquidar", "liquida"],
+    verboSolo: true,
+    href: () => "/movimientos/nuevo/cobro",
+    etiqueta: "Cobro de trabajo",
+    llevaTexto: true,
+    relleno: RELLENO_CARGA,
+    ejemplo: "cobrá publix",
+  },
+
   // ─── Navegación — catálogo CERRADO (plan de voz §15.2) ───────────────────
   // ⚠️ **Agregar un destino = agregar una entrada acá, y nada más.**
   // El **sustantivo** es el que manda (regla 2 de §15.4); el verbo de movimiento
@@ -334,15 +393,6 @@ export const INTENCIONES: Intencion[] = [
     ejemploCuentas: "mostrame la cuenta {cuenta}",
   },
   {
-    id: "ir-panel-trabajo",
-    tipo: "navegacion",
-    sustantivos: ["trabajo", "trabajos"],
-    verbos: VERBOS_NAVEGAR,
-    href: () => "/dashboard?panel=trabajo",
-    panel: "trabajo",
-    etiqueta: "Trabajo",
-    ejemplo: "mostrame el trabajo",
-  },  {
     id: "ir-panel-gastos",
     tipo: "navegacion",
     // ⚠️ Sólo el plural, y **con verbo de movimiento**: `gasto/gastos` son los
@@ -387,14 +437,18 @@ export const INTENCIONES: Intencion[] = [
     ejemplo: "mostrame los préstamos",
   },
   {
-    id: "ir-periodos",
+    id: "ir-panel-trabajo",
     tipo: "navegacion",
-    // Normalizado: "períodos" → "periodos" (lo que ve el matcher).
-    sustantivos: ["periodo", "periodos"],
+    // El panel "Trabajo" del dashboard: antes esta orden llevaba al CRUD de
+    // PERÍODOS, que dejó de existir con el rediseño de liquidaciones
+    // (`plan-liquidaciones.md`): ahora el panel muestra las **jornadas/tareas
+    // pendientes de cobro** (P1.b), así que la orden apunta ahí.
+    sustantivos: ["trabajo", "trabajos", "pendientes"],
     verbos: VERBOS_NAVEGAR,
-    href: () => "/cruds/periodos-trabajo",
-    etiqueta: "Períodos de trabajo",
-    ejemplo: "andá a los períodos",
+    href: () => "/dashboard?panel=trabajo",
+    panel: "trabajo",
+    etiqueta: "Trabajo",
+    ejemplo: "mostrame el trabajo",
   },
 ];
 

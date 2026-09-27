@@ -14,7 +14,7 @@ import { Tarjeta } from "./entities/tarjeta.entity";
 import { PeriodoTarjeta } from "./entities/periodo-tarjeta.entity";
 import { MovimientoTarjeta } from "./entities/movimiento-tarjeta.entity";
 import { Trabajo } from "./entities/trabajo.entity";
-import { PeriodoTrabajo } from "./entities/periodo-trabajo.entity";
+import { Liquidacion } from "./entities/periodo-trabajo.entity";
 import { JornadaTrabajo } from "./entities/jornada-trabajo.entity";
 import { TareaTrabajo } from "./entities/tarea-trabajo.entity";
 import { Prestamo } from "./entities/prestamo.entity";
@@ -36,7 +36,7 @@ export const ENTITIES = [
   Concepto, Persona, Moneda, TipoCuenta, Cuenta, Cotizacion,
   HistoricoCuenta, Inflacion, CategoriaGasto, Gasto,
   Tarjeta, PeriodoTarjeta, MovimientoTarjeta,
-  Trabajo, PeriodoTrabajo, JornadaTrabajo, TareaTrabajo, Prestamo, Movimiento,
+  Trabajo, Liquidacion, JornadaTrabajo, TareaTrabajo, Prestamo, Movimiento,
   Usuario, WebauthnCredential, VozAlias,
 ];
 

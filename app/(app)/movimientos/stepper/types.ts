@@ -1,13 +1,15 @@
 import type { CuentaOut } from "@/backend/src/queries/maestros";
 import type {
-  PeriodoTrabajoOut,
+  ItemPendienteOut,
+  LiquidacionOut,
   TrabajoOut,
+  UltimoCobroTrabajoOut,
 } from "@/backend/src/queries/trabajos";
 import type { PrestamoOut } from "@/backend/src/queries/prestamos";
 import type { CategoriaGastoOut, GastoOut } from "@/backend/src/queries/gastos";
 
 export type MovimientoConcepto =
-  | "CobroSueldo"
+  | "CobrarTrabajo"
   | "PagoPrestamo"
   | "AjusteCuenta"
   | "PagoGasto"
@@ -24,7 +26,21 @@ export interface MovimientoData {
   montoDestino: number;
   cuentaOrigen: number;
   cuentaDestino: number;
+  /**
+   * Liquidación preseleccionada por la tarjeta del dashboard (query `?periodo=`):
+   * sirve para elegir el **trabajo** del cobro, no viaja a la action.
+   */
   periodoTrabajo: number;
+  /** Cobrar trabajo: jornadas pendientes tildadas en el paso. */
+  idsJornadas: string[];
+  /** Cobrar trabajo: tareas pendientes tildadas en el paso. */
+  idsTareas: string[];
+  /** Cobrar trabajo con modalidad `horas_fijas`: horas declaradas (`calculado = horas × precio`). */
+  horasPeriodo: number;
+  /** Cobrar trabajo con modalidad `fijo`/`horas_fijas`: rango DECLARADO. En las
+      variables se completa solo (min/max de los ítems tildados) como vista previa. */
+  fechaDesde: string; // "YYYY-MM-DD"
+  fechaHasta: string; // "YYYY-MM-DD"
   idPrestamo: string;
   idGasto: string;
   idCategoriaGasto: number;
@@ -61,9 +77,13 @@ export interface JornadaWizardOut {
 export interface MovimientoOptions {
   cuentas: CuentaOut[];
   /** Solo períodos de trabajo sin fecha de cobro (pendientes de cobrar). */
-  periodosTrabajo: PeriodoTrabajoOut[];
-  /** Trabajos del usuario (para crear un período automático al cargar jornada). */
+  periodosTrabajo: LiquidacionOut[];
+  /** Trabajos del usuario (libres o usados por la carga de jornada/tarea). */
   trabajos: TrabajoOut[];
+  /** Último cobro de cada trabajo: precarga el monto en `fijo`/`horas_fijas`. */
+  ultimosCobros: UltimoCobroTrabajoOut[];
+  /** Jornadas y tareas SIN liquidar (paso "Cobrar trabajo" y tarjeta "Por cobrar"). */
+  itemsPendientes: ItemPendienteOut[];
   /** Préstamos pendientes (saldo > 0). */
   prestamos: PrestamoOut[];
   /** Gastos pendientes (saldo > 0). */
@@ -75,7 +95,7 @@ export interface MovimientoOptions {
 
 /** Índice de paso del wizard al que lleva cada tipo de movimiento (0=Selector, Confirmación=STEP_CONFIRMACION). */
 export const CONCEPTO_STEP: Record<MovimientoConcepto, number> = {
-  CobroSueldo: 1,
+  CobrarTrabajo: 1,
   PagoPrestamo: 2,
   AjusteCuenta: 3,
   PagoGasto: 4,
@@ -97,7 +117,7 @@ export interface MovimientoInitial {
   origen?: number;
   /** Transferencia: cuenta destino. */
   destino?: number;
-  /** Cobro de sueldo: período de trabajo a cobrar preseleccionado (icono por fila del listado de períodos a cobrar). */
+  /** Cobrar trabajo: liquidación preseleccionada por fila del listado de pendientes (determina el trabajo). */
   periodo?: number;
   /** Pago de préstamo: préstamo a pagar preseleccionado (botón "Pagar" por fila del CRUD de préstamos). */
   prestamo?: string;
@@ -109,7 +129,7 @@ export interface MovimientoInitial {
 
 /** Valor de `?tipo=` en la URL para cada concepto (lo usan las tarjetas y el page). */
 export const MOVIMIENTO_TIPO_PARAM: Record<MovimientoConcepto, string> = {
-  CobroSueldo: "cobro",
+  CobrarTrabajo: "cobro",
   PagoPrestamo: "pago-prestamo",
   AjusteCuenta: "ajuste",
   PagoGasto: "pago-gasto",
@@ -126,7 +146,7 @@ export const MOVIMIENTO_TIPO_PARAM: Record<MovimientoConcepto, string> = {
  * usuario todavía está eligiendo el tipo.
  */
 export const CONCEPTO_TITULO_PAGINA: Record<MovimientoConcepto, string> = {
-  CobroSueldo: "Cobro de sueldo",
+  CobrarTrabajo: "Cobrar trabajo",
   PagoPrestamo: "Pago de préstamo",
   AjusteCuenta: "Ajuste de cuenta",
   PagoGasto: "Pago de gasto",

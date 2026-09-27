@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Panel "Trabajo" · 3 opciones de filas multilínea (tema oscuro)</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; display: flex; flex-direction: column; gap: 26px;
+    font-family: "SF Pro Display", Inter, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #111; color: #e8e8ea;
+  }
+  h1 { font-size: 15px; margin: 0; }
+  h1 small { display: block; font-weight: 400; font-size: 12px; opacity: .6; margin-top: 6px; line-height: 1.7; max-width: 1180px; }
+  h1 b { color: #fff; }
+  .rowwrap { display: flex; flex-wrap: wrap; gap: 26px; align-items: flex-start; }
+
+  /* Tokens reales del tema oscuro de la app (globals.css) */
+  .panel-cell {
+    background: #151517;
+    --background: #151517; --card: #353638; --card-foreground: #e2e4f0;
+    --border: #3e3f42; --subtitle: #808185; --header: #ffffff; --muted: #1e1e20;
+    --primary: #4c6ef5; --success: #51cf66; --danger: #ff6b6b; --value: #ffffff;
+  }
+  .frame {
+    width: 390px; padding: 14px; border-radius: 16px; border: 1px solid #2a2a2d;
+    background: var(--background); color: var(--card-foreground);
+  }
+  .frame.w320 { width: 320px; }
+  .cap { margin: 0 0 10px 2px; font-size: 12px; color: #b9babd; }
+  .cap b { color: #fff; }
+  .cap em { color: #8f9094; font-style: normal; }
+
+  /* ── el panel del dashboard (bg-card + border + p-4) ── */
+  .dashpanel {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px;
+  }
+  /* encabezado del panel: chip + cantidad + total (queda igual en las 3) */
+  .phead { display: flex; align-items: center; gap: 6px; padding-bottom: 6px; }
+  .chip-tag {
+    display: inline-flex; align-items: center; gap: 3px; flex: none;
+    border: 1px solid color-mix(in srgb, var(--success) 45%, transparent);
+    background: color-mix(in srgb, var(--success) 10%, transparent);
+    color: var(--success); border-radius: 999px; padding: 1px 6px;
+    font-size: 9px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  }
+  .pcount { font-size: 12.5px; color: var(--subtitle); }
+  .ptotal { margin-left: auto; font-size: 13.5px; font-weight: 600; color: var(--value); font-variant-numeric: tabular-nums; }
+
+  /* ── ficha de TRABAJO (común a A y B) ── */
+  .ficha {
+    background: var(--muted); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 12px; margin-top: 8px;
+  }
+  .f-top { display: flex; align-items: baseline; gap: 10px; }
+  .f-name { margin: 0; min-width: 0; flex: 1 1 auto; font-size: 13.5px; font-weight: 600; color: var(--header); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .f-total { flex: none; font-size: 14.5px; font-weight: 600; color: var(--value); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .f-meta { margin: 2px 0 0; font-size: 11px; line-height: 15px; color: var(--subtitle); }
+
+  /* ── A · desglose: 1 línea por ítem, fecha/detalle ←→ monto ── */
+  .items { margin-top: 7px; border-top: 1px solid rgba(255,255,255,.07); padding-top: 5px; }
+  .it { display: flex; align-items: baseline; gap: 10px; }
+  .it + .it { margin-top: 3px; }
+  .it-l { flex: 1 1 auto; min-width: 0; font-size: 12px; line-height: 16px; color: var(--card-foreground); }
+  .it-r { flex: none; font-size: 12.5px; font-weight: 600; color: var(--value); font-variant-numeric: tabular-nums; }
+  .it-d { color: var(--subtitle); }
+  .prop { color: var(--success); font-style: normal; }
+
+  /* ── B · los ítems como píldoras que envuelven (grilla) ── */
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .chip {
+    display: inline-flex; align-items: baseline; gap: 5px; max-width: 100%;
+    background: var(--card); border: 1px solid var(--border); border-radius: 999px;
+    padding: 3px 9px; font-size: 11px; line-height: 14px; color: var(--subtitle);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .chip b { color: var(--value); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .chip .prop { color: var(--success); font-weight: 600; }
+
+  /* ── C · resumen: la ficha son 2 líneas, sin desglose ── */
+  .ficha.slim { padding: 9px 12px; }
+  .ficha.slim .f-meta { display: flex; align-items: baseline; gap: 8px; }
+  .ficha.slim .f-meta i { margin-left: auto; font-style: normal; color: var(--subtitle); }
+
+  .vacio { padding: 12px 0 4px; font-size: 13px; color: var(--subtitle); }
+
+  .notas { font-size: 11.5px; line-height: 1.7; color: #9a9b9e; margin: 10px 2px 0; max-width: 390px; }
+  .notas b { color: #d6d7da; }
+  .notas code { background: #26262a; padding: 1px 4px; border-radius: 4px; font-size: 10.5px; }
+  .reglas {
+    background: #17171a; border: 1px solid #2a2a2d; border-radius: 14px;
+    padding: 14px 18px; max-width: 980px; font-size: 12px; line-height: 1.75; color: #b9babd;
+  }
+  .reglas h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #fff; margin: 0 0 8px; opacity: .7; }
+  .reglas b { color: #fff; }
+  .reglas code { background: #26262a; padding: 1px 4px; border-radius: 4px; font-size: 11px; }
+  .reglas ul { margin: 6px 0 0; padding-left: 18px; }
+  .reglas li { margin-bottom: 5px; }
+</style>
+</head>
+<body>
+
+<h1>Panel <b>“Trabajo”</b> del dashboard · 3 opciones con <b>filas multilínea</b>
+  <small>Mismos datos en las 3: 3 trabajos, 6 ítems pendientes, total <b>$ 652,00</b>. Todo vertical: <b>nada de scroll horizontal</b> (a 390 px y a 320 px). El encabezado del panel (chip <b>Por cobrar</b> + cantidad + total) no cambia en ninguna, y las filas siguen <b>sin señal de clic</b> (el panel entero navega a <code>/trabajo</code>).</small>
+</h1>
+
+<div class="reglas">
+  <h2>Qué cambia respecto de hoy</h2>
+  <ul>
+    <li><b>Cada trabajo pasa a ser una ficha</b> (<code>bg-muted</code> + borde + radio 10 px) en vez de un bloque separado por una línea: el agrupamiento se ve solo.</li>
+    <li><b>Dos niveles de jerarquía</b>: el nombre del trabajo (13,5 px semibold) y su subtotal (14,5 px semibold, tabular) arriba; debajo, una línea de contexto con <b>cantidad + rango de fechas</b> (nunca había existido).</li>
+    <li>Los ítems dejan de competir con el nombre: en <b>A</b> van en su propia zona separada por un hairline, con <b>fecha/detalle a la izquierda y monto a la derecha</b> (tabular, alineado columna). En <b>B</b> van en píldoras que envuelven. En <b>C</b> no se desglosan.</li>
+    <li>Se elimina todo <code>truncate</code> de 1 línea en el detalle: el texto ya no se corta con <code>…</code> para “entrar”.</li>
+  </ul>
+  <h2 style="margin-top:12px">Notas</h2>
+  <ul>
+    <li>La propina se muestra en <b>verde</b> dentro del ítem (no entra en el subtotal del trabajo: es ingreso por su propio depósito).</li>
+    <li><b>Ortogonal a la elección</b>: en <code>sm+</code> las fichas pueden ir en <b>1 o 2 columnas</b> de grilla (<code>sm:grid-cols-2</code>). En mobile siempre 1 columna ⇒ nunca hay scroll horizontal.</li>
+    <li>El mismo componente se usa en el panel del dashboard y en la pantalla <code>/trabajo</code> ⇒ las dos quedan iguales.</li>
+  </ul>
+</div>
+
+<div class="rowwrap">
+
+  <!-- ══════════════ A · DESGLOSE POR ÍTEM ══════════════ -->
+  <div class="panel-cell panel-cell">
+    <div class="cap"><b>Opción A</b> · desglose: 1 línea por ítem <em>(fecha/detalle ←→ monto)</em></div>
+    <div class="frame">
+      <div class="dashpanel">
+        <div class="phead">
+          <span class="chip-tag">⟳ Por cobrar</span>
+          <span class="pcount">· 6</span>
+          <span class="ptotal">$ 652,00</span>
+        </div>
+
+        <div class="ficha">
+          <div class="f-top"><p class="f-name">Taller Mecánico</p><span class="f-total">$ 204,00</span></div>
+          <p class="f-meta">3 jornadas · 24/09 → 26/09</p>
+          <div class="items">
+            <div class="it"><span class="it-l"><span class="it-d">26/09</span> · 09:00 a 13:00</span><span class="it-r">$ 68,00</span></div>
+            <div class="it"><span class="it-l"><span class="it-d">25/09</span> · 09:00 a 13:00 <span class="prop">· propina $ 150,00</span></span><span class="it-r">$ 68,00</span></div>
+            <div class="it"><span class="it-l"><span class="it-d">24/09</span> · 14:00 a 18:00</span><span class="it-r">$ 68,00</span></div>
+          </div>
+        </div>
+
+        <div class="ficha">
+          <div class="f-top"><p class="f-name">Duffys</p><span class="f-total">$ 380,00</span></div>
+          <p class="f-meta">2 tareas · 23/09 → 25/09</p>
+          <div class="items">
+            <div class="it"><span class="it-l"><span class="it-d">25/09</span> · Limpieza de salón · 2 h</span><span class="it-r">$ 200,00</span></div>
+            <div class="it"><span class="it-l"><span class="it-d">23/09</span> · Pintura de la reja del fondo</span><span class="it-r">$ 180,00</span></div>
+          </div>
+        </div>
+
+        <div class="ficha">
+          <div class="f-top"><p class="f-name">Sin trabajo</p><span class="f-total">$ 68,00</span></div>
+          <p class="f-meta">1 jornada · 20/09</p>
+          <div class="items">
+            <div class="it"><span class="it-l"><span class="it-d">20/09</span> · 09:00 a 13:00</span><span class="it-r">$ 68,00</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="notas"><b>Pros</b>: monto alineado en columna (se compara de un vistazo) y el detalle completo a la vista. <b>Contras</b>: es la más alta de las 3 (6 ítems ⇒ 6 líneas).</p>
+  </div>
+
+  <!-- ══════════════ B · ÍTEMS EN PÍLDORAS ══════════════ -->
+  <div class="panel-cell">
+    <div class="cap"><b>Opción B</b> · los ítems como píldoras que envuelven <em>(grilla)</em></div>
+    <div class="frame">
+      <div class="dashpanel">
+        <div class="phead">
+          <span class="chip-tag">⟳ Por cobrar</span>
+          <span class="pcount">· 6</span>
+          <span class="ptotal">$ 652,00</span>
+        </div>
+
+        <div class="ficha">
+          <div class="f-top"><p class="f-name">Taller Mecánico</p><span class="f-total">$ 204,00</span></div>
+          <p class="f-meta">3 jornadas · 24/09 → 26/09</p>
+          <div class="chips">
+            <span class="chip">26/09 · 09:00-13:00 <b>$ 68,00</b></span>
+            <span class="chip">25/09 · 09:00-13:00 <b>$ 68,00</b> <span class="prop">+150</span></span>
+            <span class="chip">24/09 · 14:00-18:00 <b>$ 68,00</b></span>
+          </div>
+        </div>
+
+        <div class="ficha">
+          <div class="f-top"><p class="f-name">Duffys</p><span class="f-total">$ 380,00</span></div>
+          <p class="f-meta">2 tareas · 23/09 → 25/09</p>
+          <div class="chips">
+            <span class="chip">25/09 · Limpieza de salón <b>$ 200,00</b></span>
+            <span class="chip">23/09 · Pintura de la reja del fondo <b>$ 180,00</b></span>
+          </div>
+        </div>
+
+        <div class="ficha">
+          <div class="f-top"><p class="f-name">Sin trabajo</p><span class="f-total">$ 68,00</span></div>
+          <p class="f-meta">1 jornada · 20/09</p>
+          <div class="chips">
+            <span class="chip">20/09 · 09:00-13:00 <b>$ 68,00</b></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="notas"><b>Pros</b>: la más compacta (2 alturas de píldora por trabajo). <b>Contras</b>: el monto queda “pegado” a la fecha y no forma columna ⇒ se compara peor; un detalle largo obliga a recortarlo con <code>…</code> dentro de la píldora.</p>
+  </div>
+
+  <!-- ══════════════ C · RESUMEN SIN DESGLOSE ══════════════ -->
+  <div class="panel-cell">
+    <div class="cap"><b>Opción C</b> · resumen: 2 líneas por trabajo, <em>sin desglosar ítems</em></div>
+    <div class="frame">
+      <div class="dashpanel">
+        <div class="phead">
+          <span class="chip-tag">⟳ Por cobrar</span>
+          <span class="pcount">· 6</span>
+          <span class="ptotal">$ 652,00</span>
+        </div>
+
+        <div class="ficha slim">
+          <div class="f-top"><p class="f-name">Taller Mecánico</p><span class="f-total">$ 204,00</span></div>
+          <p class="f-meta">3 jornadas · 24/09 → 26/09 <i>propina $ 150,00</i></p>
+        </div>
+
+        <div class="ficha slim">
+          <div class="f-top"><p class="f-name">Duffys</p><span class="f-total">$ 380,00</span></div>
+          <p class="f-meta">2 tareas · 23/09 → 25/09</p>
+        </div>
+
+        <div class="ficha slim">
+          <div class="f-top"><p class="f-name">Sin trabajo</p><span class="f-total">$ 68,00</span></div>
+          <p class="f-meta">1 jornada · 20/09</p>
+        </div>
+      </div>
+    </div>
+    <p class="notas"><b>Pros</b>: la más limpia y corta; el panel se lee como un índice de trabajos. <b>Contras</b>: se pierde el “qué” de cada pendiente (qué día, qué tarea) ⇒ para verlo hay que entrar a <code>/trabajo</code>.</p>
+  </div>
+
+  <!-- ══════════════ A a 320 px ══════════════ -->
+  <div class="panel-cell">
+    <div class="cap"><b>Opción A a 320 px</b> · <em>el ancho más chico: sin scroll horizontal</em></div>
+    <div class="frame w320">
+      <div class="dashpanel">
+        <div class="phead">
+          <span class="chip-tag">⟳ Por cobrar</span>
+          <span class="pcount">· 6</span>
+          <span class="ptotal">$ 652,00</span>
+        </div>
+
+        <div class="ficha">
+          <div class="f-top"><p class="f-name">Taller Mecánico</p><span class="f-total">$ 204,00</span></div>
+          <p class="f-meta">3 jornadas · 24/09 → 26/09</p>
+          <div class="items">
+            <div class="it"><span class="it-l"><span class="it-d">26/09</span> · 09:00 a 13:00</span><span class="it-r">$ 68,00</span></div>
+            <div class="it"><span class="it-l"><span class="it-d">25/09</span> · 09:00 a 13:00 <span class="prop">· propina $ 150,00</span></span><span class="it-r">$ 68,00</span></div>
+            <div class="it"><span class="it-l"><span class="it-d">24/09</span> · 14:00 a 18:00</span><span class="it-r">$ 68,00</span></div>
+          </div>
+        </div>
+
+        <div class="ficha">
+          <div class="f-top"><p class="f-name">Duffys</p><span class="f-total">$ 380,00</span></div>
+          <p class="f-meta">2 tareas · 23/09 → 25/09</p>
+          <div class="items">
+            <div class="it"><span class="it-l"><span class="it-d">25/09</span> · Limpieza de salón · 2 h</span><span class="it-r">$ 200,00</span></div>
+            <div class="it"><span class="it-l"><span class="it-d">23/09</span> · Pintura de la reja del fondo</span><span class="it-r">$ 180,00</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="notas">A 320 px el detalle largo de la tarea entra <b>en 1 línea</b> porque el monto ya no compite en el mismo renglón que el nombre. Si no entrara, el texto se envuelve (la fila crece) en lugar de recortarse.</p>
+  </div>
+
+</div>
+
+</body>
+</html>

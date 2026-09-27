@@ -6,7 +6,6 @@ import { requireUserId } from "../lib/auth";
 import { Cuenta } from "../entities/cuenta.entity";
 import { Gasto } from "../entities/gasto.entity";
 import { Movimiento } from "../entities/movimiento.entity";
-import { PeriodoTrabajo } from "../entities/periodo-trabajo.entity";
 import { Prestamo } from "../entities/prestamo.entity";
 import { crearHistoricoCuenta, refresh } from "../lib/action-helpers";
 
@@ -44,7 +43,6 @@ export async function anularMovimiento(movimientoId: string) {
     const cuentaRepo = manager.getRepository(Cuenta);
     const gastoRepo = manager.getRepository(Gasto);
     const prestamoRepo = manager.getRepository(Prestamo);
-    const periodoTrabajoRepo = manager.getRepository(PeriodoTrabajo);
 
     const mov = await movRepo.findOne({
       where: {
@@ -168,15 +166,27 @@ export async function anularMovimiento(movimientoId: string) {
         await prestamoRepo.save(prestamo);
       }
     } else if (conceptoNombre === "Cobro Sueldo") {
-      // ---- Cobro Sueldo ----
+      // ---- Cobro Sueldo (liquidación) ----
       cuenta.saldo -= mov.montoCuentaMonedaOrigen;
       if (mov.periodoTrabajo) {
-        // Los cobros legacy (sin vínculo) no limpian fechaDeCobro (decisión).
-        // ⚠️ TypeORM ignora `undefined` al guardar; `null` sí limpia la columna.
-        mov.periodoTrabajo.fechaDeCobro =
-          null as unknown as Date | undefined;
-        await periodoTrabajoRepo.save(mov.periodoTrabajo);
+        // **D4** (`plan-liquidaciones.md`): anular el cobro **libera los ítems**
+        // (vuelven a "pendientes de liquidar") y **soft-deletea la liquidación**,
+        // porque la liquidación es un hecho del cobro: sin cobro no existe.
+        const liqId = mov.periodoTrabajo.id;
+        await manager.query(
+          `UPDATE "jornada_trabajo" SET "periodoTrabajoId" = NULL WHERE "periodoTrabajoId" = $1`,
+          [liqId]
+        );
+        await manager.query(
+          `UPDATE "tarea_trabajo" SET "periodoTrabajoId" = NULL WHERE "periodoTrabajoId" = $1`,
+          [liqId]
+        );
+        await manager.query(
+          `UPDATE "periodo_trabajo" SET eliminado = true, "fechaDeCobro" = NULL, "montoCobrado" = NULL WHERE id = $1`,
+          [liqId]
+        );
       }
+      // Los cobros **legacy** (sin vínculo al período) sólo revierten el saldo.
     } else {
       // ---- Cobro Propina / Ajuste (y cualquier otro de cuenta única) ----
       // El monto de cuenta ya tiene el signo del efecto en la cuenta, así que

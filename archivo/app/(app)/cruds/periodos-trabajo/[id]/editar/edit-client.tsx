@@ -2,15 +2,15 @@
 import { useParams } from "next/navigation";
 import { CrudForm } from "@/components/crud/CrudForm";
 import { actualizarPeriodoTrabajo } from "@/backend/src/actions/trabajos";
-import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
+import type { LiquidacionOut } from "@/backend/src/queries/trabajos";
 import { periodoTrabajoSchema, periodoTrabajoFieldsEditar } from "../../periodo-trabajo-form-config";
 const dt = (v: Date | null) => (v ? String(v).slice(0, 10) : "");
-interface Props { data: PeriodoTrabajoOut }
+interface Props { data: LiquidacionOut }
 export function EditarPeriodoTrabajoClient({ data }: Props) {
   const p = useParams();
   const modalidad = data.trabajo?.modalidadCobro ?? "horas_variables";
   const esHorasFijas = modalidad === "horas_fijas";
-  return <CrudForm title="Editar Período de Trabajo" fields={periodoTrabajoFieldsEditar(modalidad)} schema={periodoTrabajoSchema} defaultValues={{ fechaDesde: dt(data.fechaDesde), fechaHasta: dt(data.fechaHasta), montoACobrar: data.montoACobrar ?? undefined, horasPeriodo: data.horasPeriodo ?? undefined, fechaEstimadaCobro: dt(data.fechaEstimadaCobro), nombreTrabajo: data.trabajo?.nombre ?? "" }} onSubmit={async (f) => {
+  return <CrudForm title="Editar Período de Trabajo" fields={periodoTrabajoFieldsEditar(modalidad)} schema={periodoTrabajoSchema} defaultValues={{ fechaDesde: dt(data.fechaDesde), fechaHasta: dt(data.fechaHasta), montoACobrar: data.montoCalculado ?? undefined, horasPeriodo: data.horasPeriodo ?? undefined, fechaEstimadaCobro: dt(data.fechaEstimadaCobro), nombreTrabajo: data.trabajo?.nombre ?? "" }} onSubmit={async (f) => {
     // Según la modalidad se envía monto u horas (no ambos). `fechaDeCobro` no se
     // envía nunca: la setea el cobro del período (decisión del usuario 2026-09-14).
     const payload: Record<string, unknown> = {

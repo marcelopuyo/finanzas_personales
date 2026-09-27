@@ -2,19 +2,13 @@
 
 import { useState } from "react";
 import {
-  CalendarCheck,
-  CalendarClock,
-  CircleCheck,
   Landmark,
   MoreVertical,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { SparkLineChart } from "./sparkline-chart";
-import {
-  AccountActionsSheet,
-  type AccionSintetica,
-} from "./account-actions-sheet";
+import { AccountActionsSheet } from "./account-actions-sheet";
 import { useLongPress } from "@/lib/long-press";
 import { useTap } from "@/lib/tap";
 import { cn } from "@/lib/utils";
@@ -24,9 +18,6 @@ import { cn } from "@/lib/utils";
 const ICONOS_POR_TIPO: Record<string, LucideIcon> = {
   "Cuenta Bancaria": Landmark,
   "Caja Fisica": Wallet,
-  "Por cobrar": CalendarClock,
-  "Actuales": CalendarCheck,
-  "Finalizados": CircleCheck,
 };
 
 interface AccountCardProps {
@@ -43,8 +34,6 @@ interface AccountCardProps {
   /** Se invoca al tocar una tarjeta de cuenta real (abre su pantalla de
       movimientos, `/cuentas/[id]`). */
   onOpen?: () => void;
-  /** Tarjeta sintética con menú de acción(es) (ej. Actuales → jornada/tarea). */
-  menuAccion?: AccionSintetica[];
 }
 
 export function AccountCard({
@@ -57,15 +46,11 @@ export function AccountCard({
   tipo,
   className,
   onOpen,
-  menuAccion,
 }: AccountCardProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const esCuentaReal = id != null && onOpen != null;
-  // Tarjeta con menú de acción(es) propio (tarjetas sintéticas: Actuales →
-  // jornada/tarea/nuevo período).
-  const conMenu = menuAccion != null && menuAccion.length > 0;
   /** ¿La tarjeta tiene acciones propias (bottom sheet)? */
-  const tieneAcciones = esCuentaReal || conMenu;
+  const tieneAcciones = esCuentaReal;
   // LONG PRESS en mobile (2026-09-17): manteniendo el dedo ~500 ms sobre la
   // tarjeta se abre el MISMO bottom sheet que antes abría el botón ⋮ — que ahora
   // se oculta en los equipos táctiles (`pointer-coarse`, ver `menuButton`) y se
@@ -200,13 +185,10 @@ export function AccountCard({
     );
   }
 
-  // Tarjeta sintética: puede ser clicable (abre el popup de períodos si se
-  // provee onOpen) y/o traer menú de acción(es) —que en mobile se abre con
-  // long press en vez del ⋮ (Actuales → jornada/tarea/nuevo período)—. "Por
-  // cobrar" ya NO trae menú: el cobro se lanza desde el icono por fila de su
-  // popup, así que la tarjeta queda clicable sin botón ⋮ (solo abre el listado).
+  // Tarjeta clicable (abre su pantalla de movimientos) con el ⋯ de acciones:
+  // en mobile el sheet se abre con **long press** en vez del ⋮.
   const clicable = onOpen != null;
-  if (conMenu || clicable) {
+  if (clicable) {
     return (
       <>
         <div
@@ -239,14 +221,13 @@ export function AccountCard({
           )}
         >
           {content}
-          {conMenu && menuButton}
+          {esCuentaReal && menuButton}
         </div>
-        {conMenu && (
+        {esCuentaReal && (
           <AccountActionsSheet
-            cuenta={{ nombre: title }}
+            cuenta={{ nombre: title, id }}
             open={sheetOpen}
             onClose={() => setSheetOpen(false)}
-            soloMovimiento={menuAccion}
           />
         )}
       </>

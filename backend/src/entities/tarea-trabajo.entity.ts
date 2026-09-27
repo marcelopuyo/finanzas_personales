@@ -1,5 +1,6 @@
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
-import { PeriodoTrabajo } from "./periodo-trabajo.entity";
+import { Column, Entity, Index, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Liquidacion } from "./periodo-trabajo.entity";
+import { Trabajo } from "./trabajo.entity";
 
 // Tarea de un trabajo con modalidad de cobro 'por_tarea' (2026-09-05).
 // Espejo de `jornada_trabajo` para esa modalidad: cada tarea se carga dentro de
@@ -7,6 +8,14 @@ import { PeriodoTrabajo } from "./periodo-trabajo.entity";
 // `fechaHoraTarea` (fecha/hora efectiva en que se realizó). No hay propina ni
 // depósito a cuenta al cargar: el ingreso se materializa al cobrar el período.
 @Entity({ name: "tarea_trabajo" })
+// Índice **parcial** de pendientes de liquidar (igual que en `jornada_trabajo`).
+@Index("IDX_tarea_trabajo_pendiente", ["periodoTrabajo"], {
+  where: '"periodoTrabajoId" IS NULL',
+})
+// Índice **parcial** de "pendientes de ESTE trabajo" (consulta de la pantalla de cobro).
+@Index("IDX_tarea_trabajo_pendientes_trabajo", ["trabajo"], {
+  where: '"periodoTrabajoId" IS NULL',
+})
 export class TareaTrabajo {
   @PrimaryGeneratedColumn("uuid")
   id: string;
@@ -45,6 +54,11 @@ export class TareaTrabajo {
   })
   eliminado: boolean;
 
-  @ManyToOne(() => PeriodoTrabajo)
-  periodoTrabajo: PeriodoTrabajo;
+  // ⚠️ `NULL` ⇒ **pendiente de liquidar** (igual que en la jornada).
+  @ManyToOne(() => Liquidacion, { nullable: true })
+  periodoTrabajo: Liquidacion;
+
+  /** Trabajo al que pertenece la tarea (único vínculo permanente; se completa siempre). */
+  @ManyToOne(() => Trabajo, { nullable: true, onDelete: "CASCADE" })
+  trabajo?: Trabajo;
 }

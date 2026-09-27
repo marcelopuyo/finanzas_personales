@@ -235,6 +235,46 @@ html.fp-sin-red [data-app-lock] {
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   FAB DE ACCIONES con speed-dial (2026-09-26 · `/trabajo`)
+
+   La pantalla "Períodos de trabajo" tiene su acción primaria en el rincón de
+   abajo a la derecha: un **➕ que despliega las 3 acciones del circuito**
+   (Cobrar trabajo · Cargar jornada · Cargar tarea). El marcador
+   `data-fab-acciones` del contenedor es lo que usa esta hoja para **correr el FAB
+   de VOZ a la izquierda** mientras está presente: acá el rincón es del botón de
+   la pantalla (mismo criterio que el apilado sobre `[data-barra-inferior]`, pero
+   al costado, porque el dial se despliega hacia arriba y se pisarían). Se
+   resuelve con `:has()` ⇒ sin estado compartido ni JS.
+   ───────────────────────────────────────────────────────────────────────── */
+.fp-fab-acciones {
+  right: 1rem;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+html:has([data-fab-acciones]) .fp-voz-fab {
+  right: calc(1rem + 4.25rem);
+}
+
+/* Aparición del dial (el `+` gira a ✕ en el componente). */
+@keyframes dial-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.fp-dial-in {
+  animation: dial-in 0.14s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fp-dial-in {
+    animation: none;
+  }
+}
+
 /* Indicador de "escuchando" (R6: solo visual, sin texto). */
 @keyframes voz-pulso {
   from {

@@ -59,6 +59,20 @@ const nextConfig: NextConfig = {
     // Con 30s, volver de un CRUD al dashboard es INSTANTÁNEO (reusa el payload
     // RSC) → menos esperas y menos pantallas de carga (decisión 2026-09-14).
     staleTimes: { dynamic: 30 },
+    // Server Actions a través del TÚNEL de desarrollo (2026-09-26): el agente
+    // de devtunnels reescribe el `Origin` a `localhost:3001` y agrega
+    // `x-forwarded-host: <túnel>`; Next compara el host del `Origin` contra el
+    // host de reenvío y, al no coincidir, ABORTA la acción por CSRF (500 en el
+    // navegador: "does not match ... from a forwarded Server Actions request").
+    // Acá se declara ese origen como confiable. SÓLO en desarrollo: en
+    // producción la lista queda vacía y el chequeo sigue siendo estricto.
+    ...(process.env.NODE_ENV === "development"
+      ? {
+          serverActions: {
+            allowedOrigins: ["localhost:3001", "*.use.devtunnels.ms"],
+          },
+        }
+      : {}),
   },
 };
 

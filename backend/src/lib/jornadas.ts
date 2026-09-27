@@ -1,7 +1,7 @@
 // Cálculos compartidos de jornadas de trabajo. Módulo PURO (sin "use server"):
-// lo usan actions/trabajos (CRUD) y actions/movimientos (wizard).
+// lo usa `actions/movimientos.ts` (wizard de jornada/tarea y cobro) y el guard de
+// modalidad de `actions/trabajos.ts`.
 import type { Repository } from "typeorm";
-import type { PeriodoTrabajo } from "../entities/periodo-trabajo.entity";
 import type { JornadaTrabajo } from "../entities/jornada-trabajo.entity";
 
 /**
@@ -21,24 +21,6 @@ export function calcularMontoJornada(
 }
 
 /**
- * Suma el monto a cobrar de un período a partir de sus jornadas NO eliminadas.
- * IMPORTANTE (decisión 2026-08-06): la propina NO se incluye. Las tarjetas
- * "Por cobrar" / "Actuales" del dashboard no contabilizan la
- * propina; la propina se deposita aparte en una cuenta (wizard "Jornada trabajo").
- */
-export function calcularMontoACobrar(
-  jornadas: { eliminado: boolean; montoJornada: number }[]
-): number {
-  let total = 0;
-  for (const jornada of jornadas) {
-    if (!jornada.eliminado) {
-      total += jornada.montoJornada;
-    }
-  }
-  return total;
-}
-
-/**
  * Normaliza una fecha (string "YYYY-MM-DD" o Date de una columna `date`) a su
  * representación ISO "YYYY-MM-DD", segura para comparar en queries.
  */
@@ -55,44 +37,6 @@ export function formatearFechaDMA(v: Date | string): string {
   return `${d}-${m}-${y}`;
 }
 
-/** ¿Está la fecha dentro del rango [desde, hasta]? (formato ISO YYYY-MM-DD). */
-export function fechaEnRango(
-  fecha: Date | string,
-  desde: Date | string,
-  hasta: Date | string
-): boolean {
-  const f = isoDate(fecha);
-  return f >= isoDate(desde) && f <= isoDate(hasta);
-}
-
-/**
- * Devuelve el primer período de trabajo del mismo trabajo (no eliminado) que se
- * SUPERPONE con el rango [fechaDesde, fechaHasta]. `excluirId` permite ignorar
- * un período (al editar). Acepta un repo del DataSource o del manager de una
- * transacción. Usa SOLO columnas (pt.trabajoId, pt.fechaDesde, ...) sin joins,
- * para no depender de la carga de relaciones.
- */
-export async function encontrarPeriodoSuperpuesto(
-  repo: Repository<PeriodoTrabajo>,
-  trabajoId: number,
-  fechaDesde: Date | string,
-  fechaHasta: Date | string,
-  excluirId?: number
-): Promise<PeriodoTrabajo | null> {
-  const qb = repo
-    .createQueryBuilder("pt")
-    .where("pt.trabajoId = :trabajoId", { trabajoId })
-    .andWhere("pt.eliminado = :eliminado", { eliminado: false })
-    .andWhere("pt.fechaDesde <= :hasta", { hasta: isoDate(fechaHasta) })
-    .andWhere("pt.fechaHasta >= :desde", { desde: isoDate(fechaDesde) })
-    .orderBy("pt.fechaDesde", "ASC")
-    .limit(1);
-  if (excluirId !== undefined) {
-    qb.andWhere("pt.id <> :excluirId", { excluirId });
-  }
-  return qb.getOne();
-}
-
 /** Formatea hora HH.MM (ej. 17.3 = 17:30) a "HH:MM" para mensajes al usuario. */
 export function formatearHora(v: number): string {
   const h = Math.trunc(v);
@@ -106,6 +50,12 @@ export function formatearHora(v: number): string {
  * (horaDesde < otra.horaHasta AND otra.horaDesde < horaHasta; las horas
  * contiguas, ej. 08:00-12:00 y 12:00-16:00, NO se consideran solapamiento).
  * `excluirId` permite ignorar la propia jornada al editar.
+ *
+ * ⚠️ El trabajo de la jornada se resuelve por **`jt.trabajoId`** (el vínculo
+ * propio del ítem, modelo nuevo) y, para las jornadas viejas que no lo tienen,
+ * cayendo a su **período** (`LEFT JOIN` + `COALESCE`). Antes se unía SÓLO al
+ * período: desde que la jornada nace **pendiente** (sin período) el guard no
+ * encontraba nada y dejaba cargar jornadas superpuestas.
  */
 export async function encontrarJornadaSuperpuesta(
   repo: Repository<JornadaTrabajo>,
@@ -117,9 +67,13 @@ export async function encontrarJornadaSuperpuesta(
 ): Promise<JornadaTrabajo | null> {
   const qb = repo
     .createQueryBuilder("jt")
-    .innerJoin("periodo_trabajo", "pt", "pt.id = jt.periodoTrabajoId")
-    .where("pt.trabajoId = :trabajoId", { trabajoId })
-    .andWhere("pt.eliminado = :eliminadoPt", { eliminadoPt: false })
+    .leftJoin("periodo_trabajo", "pt", "pt.id = jt.periodoTrabajoId")
+    .where("COALESCE(jt.trabajoId, pt.trabajoId) = :trabajoId", { trabajoId })
+    // Una jornada pendiente no tiene período: sólo se descartan las que sí lo
+    // tienen y está eliminado.
+    .andWhere("(pt.id IS NULL OR pt.eliminado = :eliminadoPt)", {
+      eliminadoPt: false,
+    })
     .andWhere("jt.eliminado = :eliminado", { eliminado: false })
     .andWhere("jt.fechaJornada = :fecha", { fecha: isoDate(fechaJornada) })
     .andWhere("jt.horaDesde < :hasta", { hasta: horaHasta })
@@ -150,11 +104,6 @@ export function modalidadAdmiteTareas(m: string): boolean {
   return m === "por_tarea";
 }
 
-/** Solo 'fijo' / 'horas_fijas' se prorratean por mes (períodos SIN hijos). */
-export function modalidadProrratea(m: string): boolean {
-  return m === "fijo" || m === "horas_fijas";
-}
-
 /** Etiqueta legible de una modalidad para mensajes al usuario. */
 export function etiquetaModalidad(m: string): string {
   switch (m) {
@@ -170,168 +119,26 @@ export function etiquetaModalidad(m: string): string {
   }
 }
 
-/** Suma el monto a cobrar de un período a partir de sus tareas NO eliminadas. */
-export function calcularMontoTareas(
-  tareas: { eliminado: boolean; montoTarea: number }[]
-): number {
-  let total = 0;
-  for (const tarea of tareas) {
-    if (!tarea.eliminado) {
-      total += tarea.montoTarea;
-    }
-  }
-  return total;
-}
-
 /**
- * Calcula el `montoACobrar` de un período según la modalidad de su trabajo:
- *  - fijo           → `montoCargado` (lo que se cargó junto con el período).
- *  - horas_fijas    → `horasPeriodo × precioHoraPeriodo` (snapshot).
- *  - horas_variables→ suma de jornadas (`calcularMontoACobrar`).
- *  - por_tarea      → suma de tareas (`calcularMontoTareas`).
+ * Lo que **ya no vive acá** (retirado en la refactor de liquidaciones):
+ *  · el **prorrateo por mes** y el reconocimiento del **cobro adelantado** (§8 de
+ *    `plan-remodelacion-trabajo.md`) ⇒ el criterio de ingresos es **único** y vive
+ *    en el módulo puro `lib/ingresos-trabajo.ts` (P1.a.1);
+ *  · `calcularMontoACobrar`, `calcularMontoTareas`,
+ *    `calcularMontoACobrarPorModalidad`, `encontrarPeriodoSuperpuesto` y
+ *    `fechaEnRango` ⇒ el monto de la liquidación lo arma `cobrarTrabajo` y la
+ *    superposición de períodos dejó de existir (los CRUDs se archivaron).
  */
-export function calcularMontoACobrarPorModalidad(params: {
-  modalidad: string;
-  montoCargado?: number;
-  horasPeriodo?: number;
-  precioHoraPeriodo?: number;
-  jornadas?: { eliminado: boolean; montoJornada: number }[];
-  tareas?: { eliminado: boolean; montoTarea: number }[];
-}): number {
-  switch (params.modalidad) {
-    case "fijo":
-      return params.montoCargado ?? 0;
-    case "horas_fijas":
-      return (params.horasPeriodo ?? 0) * (params.precioHoraPeriodo ?? 0);
-    case "por_tarea":
-      return params.tareas ? calcularMontoTareas(params.tareas) : 0;
-    case "horas_variables":
-    default:
-      return params.jornadas ? calcularMontoACobrar(params.jornadas) : 0;
-  }
-}
-
-/**
- * Normaliza una fecha/hora (Date o string ISO con o sin zona) a su parte de
- * FECHA "YYYY-MM-DD" (componentes UTC). NOTA (2026-09-05): para las TAREAS ya
- * no se usa esta función — la agrupación/validación usa la `fechaTarea` (fecha
- * LOCAL persistida como `date`). Se mantiene por compatibilidad.
- */
-export function isoFechaHora(v: Date | string): string {
-  const d = v instanceof Date ? v : new Date(v);
-  if (Number.isNaN(d.getTime())) {
-    return String(v).slice(0, 10);
-  }
-  return d.toISOString().slice(0, 10);
-}
-
-/**
- * ¿Cae la fecha/hora efectiva dentro del rango [desde, hasta]? Compara la
- * FECHA (UTC) contra el rango. NOTA (2026-09-05): para TAREAS se prefiere
- * `fechaEnRango(fechaTarea, ...)` (fecha local persistida), sin corrimiento
- * de zona. Se mantiene por compatibilidad.
- */
-export function fechaHoraEnRango(
-  fechaHora: Date | string,
-  desde: Date | string,
-  hasta: Date | string
-): boolean {
-  const f = isoFechaHora(fechaHora);
-  return f >= isoDate(desde) && f <= isoDate(hasta);
-}
-
-/**
- * Prorrateo de un período contra un mes calendario (§8 del plan).
- * devuelve el APORTE del período al mes [inicioMes, finMes]:
- *   aporte = monto × (días de P dentro del mes / días totales de P)
- * Las fechas se pasan como "YYYY-MM-DD" (comparables como string).
- */
-export function aporteProrrateado(
-  desde: Date | string,
-  hasta: Date | string,
-  monto: number,
-  inicioMes: string,
-  finMes: string
-): number {
-  const desdeStr = isoDate(desde);
-  const hastaStr = isoDate(hasta);
-  const totalDias = diffDias(desdeStr, hastaStr) + 1;
-  if (totalDias <= 0 || monto <= 0) return 0;
-  const ini = desdeStr > inicioMes ? desdeStr : inicioMes;
-  const fin = hastaStr < finMes ? hastaStr : finMes;
-  const dentro = diffDias(ini, fin) + 1;
-  if (dentro <= 0) return 0;
-  return (monto * dentro) / totalDias;
-}
-
-/** Días de diferencia entre dos "YYYY-MM-DD" (desde restado a hasta). */
-function diffDias(desde: string, hasta: string): number {
-  const d1 = Date.parse(`${desde}T00:00:00Z`);
-  const d2 = Date.parse(`${hasta}T00:00:00Z`);
-  return Math.round((d2 - d1) / 86400000);
-}
 
 /** ¿El período ya fue cobrado (pagado)? Un cobro real deja `fechaDeCobro`
- *  con una fecha >= 1901-01-02; null o el centinela 1901-01-01 = pendiente
- *  (misma lógica que el dashboard y los selects "no cobrado"). */
+ *  con una fecha >= 1901-01-02; null o el centinela 1901-01-01 = pendiente.
+ *  ⚠️ En el modelo nuevo una liquidación existe sólo si se **cobró**, así que
+ *  para el panel/wizard el predicado es `tieneCobroReal` del módulo puro
+ *  `lib/ingresos-trabajo.ts`; éste queda para el **guard de modalidad** de
+ *  `actions/trabajos.ts` (redacta el mensaje según si ya se cobró). */
 export function periodoCobrado(
   p: { fechaDeCobro?: Date | null } | null | undefined
 ): boolean {
   if (!p || !p.fechaDeCobro) return false;
   return isoDate(p.fechaDeCobro) >= "1901-01-02";
-}
-
-/** ¿El período ya comenzó? (`fechaDesde <= hoy`). */
-export function periodoComenzado(
-  p: { fechaDesde: Date | string },
-  hoyISO: string
-): boolean {
-  return isoDate(p.fechaDesde) <= hoyISO;
-}
-
-/**
- * ¿Se puede COBRAR el período? (según la modalidad y el estado del período).
- *
- * Decisión del usuario 2026-09-14 — **COBRO ADELANTADO solo para trabajos de
- * monto FIJO u HORAS FIJAS**, que no cargan jornadas ni tareas:
- *  · `fijo` / `horas_fijas` → se puede cobrar desde que EMPEZÓ (mientras el
- *    período está en curso y sin tocar sus fechas de apertura/cierre).
- *  · `horas_variables` / `por_tarea` → recién cuando el período CERRÓ
- *    (`fechaHasta < hoy`), como siempre: el monto se arma con las
- *    jornadas/tareas cargadas, así que cobrar antes no tiene sentido.
- *
- * Un período cobrado NUNCA se puede volver a cobrar (el `fechaDeCobro` es el
- * candado) y uno que todavía no empezó tampoco.
- */
-export function periodoCobrable(
-  p: {
-    fechaDesde: Date | string;
-    fechaHasta: Date | string;
-    fechaDeCobro?: Date | null;
-    trabajo?: { modalidadCobro?: string | null } | null;
-  },
-  hoyISO: string
-): boolean {
-  if (periodoCobrado(p)) return false;
-  if (!periodoComenzado(p, hoyISO)) return false;
-  const modalidad = p.trabajo?.modalidadCobro ?? "horas_variables";
-  // fijo/horas_fijas: adelantado permitido. Resto: hace falta que haya cerrado.
-  if (modalidadProrratea(modalidad)) return true;
-  return isoDate(p.fechaHasta) < hoyISO;
-}
-
-/**
- * ¿Fue un **COBRO ADELANTADO**? Sí: el período está cobrado y el cobro se
- * registró ANTES de su fecha de cierre (decisión del usuario 2026-09-14).
- *
- * Se usa para el reconocimiento de INGRESOS: en un cobro adelantado el período
- * aporta el **TOTAL** (`montoACobrar`) en el mes del cobro en lugar de
- * prorratearse día a día (el dinero entró ese mes). Si el cobro fue posterior al
- * cierre, el prorrateo ya suma el 100% y no se cambia nada.
- */
-export function cobroAdelantado(
-  p: { fechaHasta: Date | string; fechaDeCobro?: Date | null }
-): boolean {
-  if (!periodoCobrado(p) || !p.fechaDeCobro) return false;
-  return isoDate(p.fechaDeCobro) < isoDate(p.fechaHasta);
 }

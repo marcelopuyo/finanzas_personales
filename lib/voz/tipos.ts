@@ -9,10 +9,14 @@
  * Tipo de dato que un campo acepta por voz.
  *
  * 📌 Es **lo que decide qué paso del parser lo llena** (`parse-campos.ts`):
- * números (2) · fechas (3) · opciones (4) · resto a texto (5). Agregar un tipo al union
- * **no alcanza**: sin su paso, el campo no se llena **nunca** y falla en silencio.
+ * horas (`2.a`) · números (2) · fechas (3) · opciones (4) · resto a texto (5).
+ * Agregar un tipo al union **no alcanza**: sin su paso, el campo no se llena
+ * **nunca** y falla en silencio.
+ *
+ * ➕ `hora` (2026-09-27): lo pedía el flujo de **jornada/tarea** (`horaDesde`,
+ * `horaHasta`), que hasta ahora no se podía dictar. Ver `lib/voz/horas.ts`.
  */
-export type TipoCampoVoz = "texto" | "monto" | "fecha" | "opcion";
+export type TipoCampoVoz = "texto" | "monto" | "fecha" | "hora" | "opcion";
 
 /**
  * Catálogos con **vocabulario** soportado (R12: la granularidad es por catálogo).
@@ -261,6 +265,15 @@ export interface Intencion {
   soloConVerbo?: boolean;
   /** Si el destino necesita que el usuario elija una cuenta. */
   requiereCuenta?: boolean;
+  /**
+   * Carga: el **verbo alcanza solo**, sin exigir un número en la frase.
+   *
+   * 🔑 Es para los verbos que **no comparte nadie**: los del **trabajo**
+   * (`cobré`, `trabajé`, `hice`) no están en `VERBOS_GASTO` ni en los de las otras
+   * cargas, así que *"cobrá publix"* (sin monto) es una orden legítima. El guard de
+   * "verbo + monto" sigue vigente para el gasto y compañía.
+   */
+  verboSolo?: boolean;
   /**
    * La intención **deja el texto sobrante** para que la pantalla destino lo
    * parsee contra sus campos (hoy solo `cargar-gasto`, vía `lib/voz/handoff`).

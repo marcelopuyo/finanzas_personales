@@ -17,18 +17,17 @@ import { PrestamosActionsMenu } from "./components/prestamos-actions-menu";
 import { GastosActionsMenu } from "./components/gastos-actions-menu";
 import { GastosDetalle } from "./components/gastos-detalle";
 import { IngresosDetalle } from "./components/ingresos-detalle";
-import { PeriodosModal, type TipoPeriodos } from "./components/periodos-modal";
 import { PeriodosTrabajoLista } from "./components/periodos-trabajo-lista";
 import type { DashboardData } from "./dashboard-data";
 import { gastosEvolucionPor } from "./gastos-agrupacion";
 import {
+  aFuenteIngresos,
   evolucionIngresosPorMes,
   ingresosDelMesActual,
   ingresosEnRango,
 } from "./ingresos-helpers";
 import type { GastoOut } from "@/backend/src/queries/gastos";
-import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
-import { periodoCobrado } from "@/backend/src/lib/jornadas";
+import type { LiquidacionOut } from "@/backend/src/queries/trabajos";
 import { cn, numberToCurrency, todayLocalISODate } from "@/lib/utils";
 import { useMontado } from "@/lib/use-cliente";
 import { usePendingNav, usePrefetchNav } from "@/components/ui/nav-progress";
@@ -36,17 +35,13 @@ import { useTap } from "@/lib/tap";
 
 interface Props {
   data: DashboardData;
-  /** Popup de períodos a reabrir al montar ("cobrar" | "actuales"). Se usa al
-      volver desde la pantalla de un período (?periodos=...) para restaurar el
-      listado desde el que se entró. */
-  periodosInicial?: string;
 }
 
 const SIN_CATEGORIA = "Sin categoría";
 const SIN_CUENTA = "Sin cuenta";
-/** Destino del PANEL "Trabajo" completo (ver `DashboardClient`): cualquier toque
-    dentro del panel, salvo el menú ⋯, abre el CRUD de períodos. */
-const HREF_PERIODOS = "/cruds/periodos-trabajo?origen=dashboard";
+/** Destino del PANEL "Trabajo" completo (ver `DashboardClient`): la pantalla
+    `/trabajo`, con los pendientes por trabajo arriba y los cobrados abajo. */
+const HREF_TRABAJO = "/trabajo";
 const SIN_TRABAJO = "Sin trabajo";
 
 function toDateKey(v: string | Date | null | undefined): string {
@@ -55,7 +50,7 @@ function toDateKey(v: string | Date | null | undefined): string {
   return String(v).slice(0, 10);
 }
 
-export function DashboardClient({ data, periodosInicial }: Props) {
+export function DashboardClient({ data }: Props) {
   // ── Navegación del panel "Trabajo" (todo el panel, salvo el ⋯) ──────────
   // ⚠️ Se dispara con **`useTap`** (touch events + click), NO con `onClick`: en
   // iOS un toque sobre una zona grande puede no generar `click` (el navegador lo
@@ -63,17 +58,10 @@ export function DashboardClient({ data, periodosInicial }: Props) {
   // 2-3 veces. Ver `lib/tap.ts` y §118 de la bitácora.
   const { go: navGo } = usePendingNav();
   const prefetch = usePrefetchNav();
-  const abrirPeriodos = () => navGo(HREF_PERIODOS, "periodos");
-  const tap = useTap(abrirPeriodos);
+  const abrirTrabajo = () => navGo(HREF_TRABAJO, "trabajo");
+  const tap = useTap(abrirTrabajo);
   const [tabGastos, setTabGastos] = useState("resumen");
   const [tabIngresos, setTabIngresos] = useState("resumen");
-  // Popup de las tarjetas sintéticas de períodos (a cobrar / actuales). Si se
-  // volvió desde la pantalla de un período (periodosInicial) se abre directo.
-  const [periodosModal, setPeriodosModal] = useState<TipoPeriodos | null>(
-    periodosInicial === "cobrar" || periodosInicial === "actuales"
-      ? periodosInicial
-      : null
-  );
 
   // Fechas por defecto: primer día del mes actual → hoy
   const fechaPrimerDia = () => {
@@ -107,9 +95,14 @@ export function DashboardClient({ data, periodosInicial }: Props) {
   const [dFhIng, setDFhIng] = useState("");
 
   const todosLosGastos: GastoOut[] = data.gastosDetalle;
-  const todosLosIngresos: PeriodoTrabajoOut[] = data.ingresosDetalle;
-
-  const hoy = todayLocalISODate();
+  // Liquidaciones COBRADAS (el SSRP ya entrega sólo las cobradas).
+  const todosLosIngresos: LiquidacionOut[] = data.ingresosDetalle;
+  // Fuente del panel de ingresos: liquidaciones + propinas depositadas. El
+  // criterio (P1.a) vive en `ingresos-helpers`/`ingresos-trabajo`.
+  const fuenteIngresos = useMemo(
+    () => aFuenteIngresos(todosLosIngresos, data.propinas),
+    [todosLosIngresos, data.propinas]
+  );
 
   // ¿Se está visualizando el "mes actual" (sin filtros de fechas aplicados)?
   // Solo en ese caso se muestran las flechas de tendencia "vs mes anterior".
@@ -127,42 +120,12 @@ export function DashboardClient({ data, periodosInicial }: Props) {
     new Date(prevYear, prevMonth, 0).getDate()
   ).padStart(2, "0")}`;
 
-  // Listados de períodos para las tarjetas sintéticas del panel Trabajo
-  // ("cobrado" = tiene fecha de cobro real, según el helper del backend):
-  // - "Por cobrar": cerrados (fecha final < hoy) y no cobrados.
-  // - "Actuales": ya comenzados (desde <= hoy) y con fecha final >= hoy
-  //   (misma condición que la tarjeta del dashboard), cobrados O NO (el cobro
-  //   adelantado dejó períodos cobrados que siguen en curso).
-  // La tarjeta "Finalizados" no necesita listado acá: sólo navega al CRUD de
-  // períodos filtrado por los ya cobrados y terminados.
-  const periodosCobrar = useMemo(
-    () =>
-      todosLosIngresos
-        .filter((p) => !periodoCobrado(p) && toDateKey(p.fechaHasta) < hoy)
-        .sort((a, b) =>
-          toDateKey(b.fechaHasta).localeCompare(toDateKey(a.fechaHasta))
-        ),
-    [todosLosIngresos, hoy]
-  );
-
-  const periodosActuales = useMemo(
-    () =>
-      todosLosIngresos
-        .filter(
-          (p) =>
-            // Misma condición que la tarjeta "Actuales" del dashboard: ya
-            // comenzado (desde <= hoy) y no terminado (hasta >= hoy).
-            // ⚠️ Incluye los YA COBRADOS: con el COBRO ADELANTADO (decisión del
-            // usuario 2026-09-14) un período fijo/horas_fijas puede estar cobrado
-            // y seguir en curso; el panel lo sigue mostrando acá, con el tag
-            // "Cobrado" (ver periodos-trabajo-lista.tsx).
-            toDateKey(p.fechaHasta) >= hoy &&
-            toDateKey(p.fechaDesde) <= hoy
-        )
-        .sort((a, b) =>
-          toDateKey(a.fechaHasta).localeCompare(toDateKey(b.fechaHasta))
-        ),
-    [todosLosIngresos, hoy]
+  // Listado de la tarjeta "Por cobrar": ítems pendientes (jornadas/tareas sin
+  // liquidar) agrupados por trabajo. **"Actuales" ya no existe**: en el modelo
+  // nuevo no hay "período en curso" (la liquidación nace al cobrar) — P1.b.
+  const pendientes = useMemo(
+    () => data.itemsPendientes,
+    [data.itemsPendientes]
   );
 
   // Badges "Mes actual" de Gastos, Ingresos y Resultados. El servidor (Vercel,
@@ -191,9 +154,10 @@ export function DashboardClient({ data, periodosInicial }: Props) {
       if (f >= desde && f <= hasta) totalG += g.monto;
     });
 
-    // Badge "Mes actual" de Ingresos: jornadas/tareas del mes + prorrateo de
-    // fijo/horas_fijas contra el mes calendario completo (§8).
-    const totalI = ingresosDelMesActual(todosLosIngresos, hasta);
+    // Badge "Mes actual" de Ingresos: criterio ÚNICO (P1.a) — ítems de las
+    // liquidaciones cobradas del mes + prorrateo del `montoCobrado` en
+    // fijo/horas_fijas + propinas depositadas por la fecha de su movimiento.
+    const totalI = ingresosDelMesActual(fuenteIngresos, hasta);
     const iso = data.monedaPredeterminadaISO;
 
     return {
@@ -207,7 +171,7 @@ export function DashboardClient({ data, periodosInicial }: Props) {
   }, [
     montado,
     todosLosGastos,
-    todosLosIngresos,
+    fuenteIngresos,
     data.gastosTotal,
     data.ingresosMesActual,
     data.resultadosMesActual,
@@ -415,20 +379,26 @@ export function DashboardClient({ data, periodosInicial }: Props) {
     return r;
   }, [todosLosIngresos, selTra, selFdIng, selFhIng]);
 
-  // Histórico: solo trabajo (sin fechas)
-  const filteredIngresosSinFechaIng = useMemo(() => {
-    let r = todosLosIngresos;
-    if (selTra.length > 0)
-      r = r.filter((p) => selTra.includes(p.trabajo?.nombre || SIN_TRABAJO));
-    return r;
-  }, [todosLosIngresos, selTra]);
+  // Histórico: solo trabajo (sin fechas) — se filtra la FUENTE completa para que
+  // la evolución use el mismo criterio que el badge y el resumen.
+  const fuentePorTrabajo = useMemo(() => {
+    if (selTra.length === 0) return fuenteIngresos;
+    return {
+      liquidaciones: fuenteIngresos.liquidaciones.filter((l) =>
+        selTra.includes(l.trabajo)
+      ),
+      propinas: fuenteIngresos.propinas.filter((p) =>
+        selTra.includes(p.trabajo)
+      ),
+    };
+  }, [fuenteIngresos, selTra]);
 
-  // Resumen por trabajo: suma JORNADAS, TAREAS y prorrateo de fijo/horas_fijas
-  // cuya fecha cae en el rango elegido (la fecha afecta al resumen, el trabajo
-  // no). Con fechas vacías muestra todo.
+  // Resumen por trabajo: ítems de lo cobrado + prorrateo + propinas cuya fecha
+  // cae en el rango elegido (el trabajo NO filtra el resumen, igual que en
+  // Gastos: el filtro de trabajo aplica al detalle y al histórico).
   const filteredIngresosResumen = useMemo(() => {
     const rango = ingresosEnRango(
-      todosLosIngresos,
+      fuenteIngresos,
       selFdIng || undefined,
       selFhIng || undefined
     );
@@ -436,25 +406,22 @@ export function DashboardClient({ data, periodosInicial }: Props) {
       name,
       value,
     }));
-  }, [todosLosIngresos, selFdIng, selFhIng]);
+  }, [fuenteIngresos, selFdIng, selFhIng]);
 
-  // Totales del MES ANTERIOR por trabajo (jornadas + tareas + prorrateo) para
-  // las flechas de tendencia de ingresos.
+  // Totales del MES ANTERIOR por trabajo para las flechas de tendencia.
   const ingresosMesAnterior = useMemo(() => {
-    return ingresosEnRango(todosLosIngresos, prevInicioKey, prevFinKey).porTrabajo;
-  }, [todosLosIngresos, prevInicioKey, prevFinKey]);
+    return ingresosEnRango(fuenteIngresos, prevInicioKey, prevFinKey).porTrabajo;
+  }, [fuenteIngresos, prevInicioKey, prevFinKey]);
 
   const ingresosPrevTotal = useMemo(
     () => Array.from(ingresosMesAnterior.values()).reduce((a, b) => a + b, 0),
     [ingresosMesAnterior]
   );
 
-  // Histórico por mes (jornadas + tareas + prorrateo de fijo/horas_fijas) de
-  // los períodos filtrados por trabajo. `hoy` se pasa para que en horas_fijas el
-  // mes en curso se corte a la fecha (devengado hasta hoy).
+  // Histórico por mes con el MISMO criterio (P1.d) de los trabajos filtrados.
   const filteredIngresosEvolucion = useMemo(
-    () => evolucionIngresosPorMes(filteredIngresosSinFechaIng, hoy),
-    [filteredIngresosSinFechaIng, hoy]
+    () => evolucionIngresosPorMes(fuentePorTrabajo),
+    [fuentePorTrabajo]
   );
 
   const openIngFilters = () => {
@@ -584,36 +551,31 @@ export function DashboardClient({ data, periodosInicial }: Props) {
         </div>
       </div>
 
-      {/* Panel Trabajo — listado de períodos del trabajo (decision 2026-09-13):
-          una sola lista con chip de estado por fila (por cobrar / en curso) en
-          lugar de las tarjetas sintéticas. Los totales de cada grupo (arriba)
-          abren el popup con la lista completa del grupo. SIEMPRE visible:
-          aunque no haya períodos, permite gestionar trabajos (⋯).
+      {/* Panel Trabajo — ítems PENDIENTES de cobro (jornadas/tareas sin
+          liquidar) agrupados por trabajo. En el modelo nuevo **no hay "período
+          en curso"**: la liquidación nace al cobrar (P1/P1.b), así que el grupo
+          "Actuales"/"En curso" desapareció y el panel muestra sólo lo que falta
+          cobrar.
           ⚠️ **El PANEL ENTERO es el área de clic** (decisión del usuario
-          2026-09-17: antes solo navegaban las filas): cualquier punto —filas,
-          encabezados de grupo, título, márgenes— abre el CRUD completo de
-          períodos. El menú ⋯ queda EXCLUIDO porque se monta FUERA del área
-          clickeable (es un hermano que flota sobre la esquina) y las filas no
-          tienen ninguna señal visual de clic.
-          ⚠️ **Navegación por TOQUE** (2026-09-18): usa **`useTap`** (`lib/tap.ts`),
-          que dispara en `touchend` (tap) y en `click`, porque en iOS el primer
-          toque de una zona grande puede no generar `click` (el navegador lo toma
-          como scroll) ⇒ había que tocar 2-3 veces. `role="link"` + Enter
-          mantienen el acceso por teclado; `cursor-default`, `select-none` y
-          `-webkit-tap-highlight-color: transparent` lo dejan sin señal visual. */}
+          2026-09-17) y navega a la pantalla `/trabajo` (2026-09-26: antes llevaba
+          al CRUD de períodos, que se archivó con el rediseño) — ahí están los
+          pendientes por trabajo y, abajo, TODOS los cobrados. El menú ⋯ queda
+          EXCLUIDO porque se monta FUERA del área clickeable (es un hermano que
+          flota sobre la esquina). El toque usa `useTap` porque en iOS el primer
+          toque de una zona grande puede no generar `click` (§118). */}
       <div data-panel="trabajo" className="relative">
         <div
           role="link"
           tabIndex={0}
           {...tap}
           onKeyDown={(e) => {
-            if (e.key === "Enter") abrirPeriodos();
+            if (e.key === "Enter") abrirTrabajo();
           }}
           // Prefetch del destino al primer contacto: la llegada sigue siendo
           // instantánea.
-          onPointerEnter={() => prefetch(HREF_PERIODOS)}
-          onTouchStartCapture={() => prefetch(HREF_PERIODOS)}
-          className="rounded-lg border border-border bg-card p-4 cursor-default select-none [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] sm:p-5"
+          onPointerEnter={() => prefetch(HREF_TRABAJO)}
+          onTouchStartCapture={() => prefetch(HREF_TRABAJO)}
+          className="cursor-default select-none rounded-lg border border-border bg-card p-4 [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] sm:p-5"
         >
           {/* Encabezado: título a la izquierda (el ⋯ va FUERA de esta caja, ver
               abajo, para que su toque no dispare la navegación del panel). */}
@@ -621,8 +583,7 @@ export function DashboardClient({ data, periodosInicial }: Props) {
             <h2 className="text-[16px] font-semibold text-header">Trabajo</h2>
           </div>
           <PeriodosTrabajoLista
-            porCobrar={periodosCobrar}
-            enCurso={periodosActuales}
+            items={pendientes}
             currency={data.monedaPredeterminadaISO}
           />
         </div>
@@ -854,14 +815,6 @@ export function DashboardClient({ data, periodosInicial }: Props) {
           onChangeHasta={setDFhIng}
         />
       </Modal>
-
-      {/* Popup de las tarjetas sintéticas de períodos */}
-      <PeriodosModal
-        tipo={periodosModal}
-        data={periodosModal === "cobrar" ? periodosCobrar : periodosActuales}
-        currency={data.monedaPredeterminadaISO}
-        onClose={() => setPeriodosModal(null)}
-      />
     </div>
   );
 }

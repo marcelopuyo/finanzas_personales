@@ -4,6 +4,8 @@ import {
   getAllJornadasTrabajo,
   getAllPeriodosTrabajo,
   getAllTrabajos,
+  getItemsPendientesCobro,
+  getUltimosCobrosPorTrabajo,
 } from "@/backend/src/queries/trabajos";
 import { getPrestamosPendientes } from "@/backend/src/queries/prestamos";
 import {
@@ -31,6 +33,8 @@ export async function getMovimientoOptions(): Promise<MovimientoOptions> {
     gastos,
     categoriasGasto,
     jornadas,
+    itemsPendientes,
+    ultimosCobros,
   ] = await Promise.all([
     getAllCuentas(),
     getAllPeriodosTrabajo(),
@@ -39,6 +43,8 @@ export async function getMovimientoOptions(): Promise<MovimientoOptions> {
     getGastosPendientes(),
     getAllCategoriasGasto(),
     getAllJornadasTrabajo(),
+    getItemsPendientesCobro(),
+    getUltimosCobrosPorTrabajo(),
   ]);
 
   return {
@@ -46,6 +52,10 @@ export async function getMovimientoOptions(): Promise<MovimientoOptions> {
     // stepper (wizard y modo directo /movimientos/nuevo/<tipo>).
     cuentas: cuentas.filter((c) => !NOMBRES_CUENTAS_SINTETICAS.has(c.nombre)),
     trabajos,
+    // Último cobro de cada trabajo (precarga del monto en `fijo`/`horas_fijas`).
+    ultimosCobros,
+    // Jornadas/tareas SIN liquidar: es lo que ofrece el paso "Cobrar trabajo".
+    itemsPendientes,
     prestamos,
     gastos,
     categoriasGasto,

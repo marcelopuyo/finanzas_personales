@@ -207,7 +207,7 @@ out.push("-- ===== PERIODOS TRABAJO + JORNADAS =====");
 let ptIdx = 100;
 periodosTrabajo.forEach((pt) => {
   out.push(
-    `INSERT INTO periodo_trabajo (id, "fechaDesde", "fechaHasta", "montoACobrar", "fechaEstimadaCobro", "fechaDeCobro", eliminado, "trabajoId") VALUES (${ptIdx}, ${D(pt.desde)}, ${D(pt.hasta)}, ${N(pt.monto)}, ${D(pt.estCobro)}, ${D(pt.cobro ?? null)}, false, ${trabId(pt.trabajo)});`
+    `INSERT INTO periodo_trabajo (id, "fechaDesde", "fechaHasta", "montoCalculado", "fechaEstimadaCobro", "fechaDeCobro", eliminado, "trabajoId") VALUES (${ptIdx}, ${D(pt.desde)}, ${D(pt.hasta)}, ${N(pt.monto)}, ${D(pt.estCobro)}, ${D(pt.cobro ?? null)}, false, ${trabId(pt.trabajo)});`
   );
   const precioHora = trabajos.find((t) => t.nombre === pt.trabajo).precioHora;
   pt.jornadas.forEach((j) => {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useMovimientoStepper } from "./stepper-context";
 import {
   StepShell,
@@ -10,12 +11,16 @@ import {
   SelectField,
   formatFecha,
 } from "./ui";
-import { STEP_CONFIRMACION } from "./types";
+import { STEP_CONFIRMACION, type MovimientoData } from "./types";
+import { decimalToTime, timeToDecimal } from "@/lib/utils";
+import { useAliasDeCampo } from "@/components/voz/voz-provider";
 import {
-  decimalToTime,
-  numberToCurrency,
-  timeToDecimal,
-} from "@/lib/utils";
+  useRegistrarPantallaDictable,
+  type PantallaDictable,
+  type ValoresPantalla,
+} from "@/components/voz/dictado-pantalla";
+import { aplicarDictadoSimple, escribirEnPantalla } from "./dictado-comun";
+import { crearDictadoJornada } from "./dictado-trabajo";
 
 /**
  * Paso del wizard: cargar una nueva jornada de trabajo.
@@ -26,28 +31,88 @@ import {
 export function JornadaTrabajo() {
   const { data, handleSetData, navigateTo, options } = useMovimientoStepper();
 
-  // Solo trabajos/períodos de modalidad horas_variables admiten jornadas
-  // (2026-09-05). El resto (fijo/horas_fijas/por_tarea) no usa jornadas.
-  const periodosHoras = options.periodosTrabajo.filter(
-    (p) => (p.trabajo?.modalidadCobro ?? "horas_variables") === "horas_variables"
+  /**
+   * Solo trabajos de modalidad `horas_variables` admiten jornadas.
+   *
+   * ⚠️ **Memoizado a propósito**: `filter` devuelve un array **nuevo** en cada render
+   * y alimenta las dependencias de la config de voz ⇒ sin esto la pantalla se
+   * **re-registraba** ante el FAB en cada render y el wizard entraba en un bucle
+   * ("Maximum update depth exceeded", visto en el celular el 2026-09-27).
+   */
+  const trabajosHoras = useMemo(
+    () =>
+      options.trabajos.filter(
+        (t) => (t.modalidadCobro ?? "horas_variables") === "horas_variables"
+      ),
+    [options.trabajos]
   );
-  const trabajosHoras = options.trabajos.filter(
-    (t) => (t.modalidadCobro ?? "horas_variables") === "horas_variables"
+
+  /**
+   * **Dictado por voz (2026-09-27)**: la pantalla se declara dictable ante el FAB 🎤
+   * ("trabajé en publix el 25 de 9 a 17", "cargá una jornada de 13 a 17 con 100 de
+   * propina en billetera"). Usa las piezas compartidas de `dictado-comun.ts`
+   * (regla 7 + snapshot), igual que transferencia y ajuste.
+   */
+  const opcionesCuentaVoz = useMemo(
+    () => options.cuentas.map((c) => ({ value: String(c.id), label: c.nombre })),
+    [options.cuentas]
   );
+  const aliasCuenta = useAliasDeCampo("cuenta", opcionesCuentaVoz);
+  const configVoz = useMemo(() => {
+    const base = crearDictadoJornada({
+      trabajos: trabajosHoras.map((t) => ({ id: t.id, nombre: t.nombre })),
+      cuentas: options.cuentas.map((c) => ({ id: c.id, nombre: c.nombre })),
+    });
+    return {
+      ...base,
+      campos: base.campos.map((campo) =>
+        campo.campo === "cuentaPropina" ? { ...campo, alias: aliasCuenta } : campo
+      ),
+    };
+  }, [trabajosHoras, options.cuentas, aliasCuenta]);
+  // Los datos frescos sin recrear la pantalla a cada tecla (si no, el FAB
+  // re-registraría la pantalla en cada cambio de un campo).
+  const dataRef = useRef(data);
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+  const escribirVoz = useCallback(
+    (valores: ValoresPantalla) => {
+      handleSetData(valores as unknown as Partial<MovimientoData>);
+    },
+    [handleSetData]
+  );
+  const pantallaVoz = useMemo<PantallaDictable>(
+    () => ({
+      config: configVoz,
+      aplicar: (resultado) =>
+        aplicarDictadoSimple(
+          resultado,
+          configVoz,
+          dataRef.current as unknown as Record<string, unknown>,
+          escribirVoz
+        ),
+      escribir: (valores) =>
+        escribirEnPantalla(
+          valores,
+          dataRef.current as unknown as Record<string, unknown>,
+          escribirVoz
+        ),
+    }),
+    [configVoz, escribirVoz]
+  );
+  useRegistrarPantallaDictable(pantallaVoz);
 
   const horaValida =
     !!data.horaDesde && !!data.horaHasta && data.horaDesde < data.horaHasta;
   const requiereCuenta = data.montoPropina > 0;
-  // Con "crear período automático" se exige elegir el trabajo (no el período).
-  const periodoValido = data.crearPeriodoAutomatico
-    ? data.idTrabajo > 0
-    : data.periodoTrabajo > 0;
+  // El **trabajo** es el único vínculo: la jornada queda **pendiente de
+  // liquidar** (sin período) y se cobra después con la liquidación.
+  const trabajoValido = data.idTrabajo > 0;
 
-  // Trabajo efectivo de la jornada (período seleccionado o trabajo del período
-  // automático) para validar que no exista otra jornada con día/horas solapadas.
-  const trabajoNombre = data.crearPeriodoAutomatico
-    ? trabajosHoras.find((t) => t.id === data.idTrabajo)?.nombre
-    : periodosHoras.find((p) => p.id === data.periodoTrabajo)?.trabajo?.nombre;
+  const trabajoNombre = trabajosHoras.find(
+    (t) => t.id === data.idTrabajo
+  )?.nombre;
   const desdeNum = timeToDecimal(data.horaDesde);
   const hastaNum = timeToDecimal(data.horaHasta);
   const jornadaSolapada =
@@ -62,22 +127,11 @@ export function JornadaTrabajo() {
       : undefined;
   const haySolapamiento = !!jornadaSolapada;
 
-  // La fecha de la jornada debe caer dentro del período seleccionado.
-  const periodoSeleccionado = data.crearPeriodoAutomatico
-    ? undefined
-    : periodosHoras.find((p) => p.id === data.periodoTrabajo);
-  const fechaFueraDePeriodo =
-    !!data.fecha &&
-    !!periodoSeleccionado &&
-    (data.fecha < String(periodoSeleccionado.fechaDesde).slice(0, 10) ||
-      data.fecha > String(periodoSeleccionado.fechaHasta).slice(0, 10));
-
   const isValid =
     !!data.fecha &&
     horaValida &&
-    periodoValido &&
+    trabajoValido &&
     !haySolapamiento &&
-    !fechaFueraDePeriodo &&
     (!requiereCuenta || data.cuentaPropina > 0);
 
   return (
@@ -124,52 +178,17 @@ export function JornadaTrabajo() {
         onChange={(v) => handleSetData({ montoPropina: v })}
       />
 
-      {/* Select de período: incluye la opción "Cargar período automático".
-          Al elegirla se pide el TRABAJO (se creará un período de una sola
-          jornada); si no, se usa el período existente seleccionado. */}
+      {/* El **trabajo** es el único vínculo de la jornada: no hay período que
+          elegir (la liquidación nace al cobrar). */}
       <SelectField
-        label="Período de trabajo"
-        value={
-          data.crearPeriodoAutomatico
-            ? "auto"
-            : data.periodoTrabajo
-            ? String(data.periodoTrabajo)
-            : ""
-        }
-        onChange={(v) => {
-          if (v === "auto") {
-            handleSetData({ periodoTrabajo: 0, crearPeriodoAutomatico: true });
-          } else {
-            handleSetData({
-              periodoTrabajo: v ? Number(v) : 0,
-              crearPeriodoAutomatico: false,
-            });
-          }
-        }}
-        options={[
-          ...periodosHoras.map((p) => ({
-            value: String(p.id),
-            label: `${p.trabajo?.nombre ?? "Trabajo"}: ${formatFecha(
-              p.fechaDesde
-            )} al ${formatFecha(p.fechaHasta)} — ${numberToCurrency(
-              p.montoACobrar ?? 0
-            )}`,
-          })),
-          { value: "auto", label: "Cargar período automático" },
-        ]}
+        label="Trabajo"
+        value={data.idTrabajo ? String(data.idTrabajo) : ""}
+        onChange={(v) => handleSetData({ idTrabajo: Number(v) })}
+        options={trabajosHoras.map((t) => ({
+          value: String(t.id),
+          label: t.nombre,
+        }))}
       />
-
-      {data.crearPeriodoAutomatico && (
-        <SelectField
-          label="Trabajo"
-          value={data.idTrabajo ? String(data.idTrabajo) : ""}
-          onChange={(v) => handleSetData({ idTrabajo: Number(v) })}
-          options={trabajosHoras.map((t) => ({
-            value: String(t.id),
-            label: t.nombre,
-          }))}
-        />
-      )}
 
       {/* El select de cuenta se muestra SOLO si la propina es mayor que 0
           (si no hay propina no hay nada que depositar). */}
@@ -196,17 +215,6 @@ export function JornadaTrabajo() {
         </div>
       )}
 
-      {/* Aviso: la fecha de la jornada no cae dentro del período seleccionado
-          ("Siguiente" queda deshabilitado). */}
-      {fechaFueraDePeriodo && periodoSeleccionado && (
-        <div className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-[13px] text-danger">
-          La fecha {formatFecha(data.fecha)} no corresponde al período{" "}
-          {formatFecha(periodoSeleccionado.fechaDesde)} al{" "}
-          {formatFecha(periodoSeleccionado.fechaHasta)} de{" "}
-          {periodoSeleccionado.trabajo?.nombre}. Elegí otra fecha o un período
-          que la contenga.
-        </div>
-      )}
     </StepShell>
   );
 }

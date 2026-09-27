@@ -1,7 +1,17 @@
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
-import { PeriodoTrabajo } from "./periodo-trabajo.entity";
+import { Column, Entity, Index, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Liquidacion } from "./periodo-trabajo.entity";
+import { Trabajo } from "./trabajo.entity";
 
 @Entity({ name: "jornada_trabajo" })
+// Índice **parcial** de pendientes de liquidar (plan-liquidaciones.md): la tarjeta "Por cobrar" y la
+// selección del cobro filtran `periodoTrabajoId IS NULL` en cada carga y no había ningún índice.
+@Index("IDX_jornada_trabajo_pendiente", ["periodoTrabajo"], {
+  where: '"periodoTrabajoId" IS NULL',
+})
+// Índice **parcial** de "pendientes de ESTE trabajo": es la consulta de la pantalla de cobro.
+@Index("IDX_jornada_trabajo_pendientes_trabajo", ["trabajo"], {
+  where: '"periodoTrabajoId" IS NULL',
+})
 export class JornadaTrabajo {
   @PrimaryGeneratedColumn("uuid")
   id: string;
@@ -35,6 +45,16 @@ export class JornadaTrabajo {
   })
   eliminado: boolean;
 
-  @ManyToOne(() => PeriodoTrabajo)
-  periodoTrabajo: PeriodoTrabajo;
+  // ⚠️ **En el modelo nuevo la columna es NULLABLE**: `NULL` ⇒ **pendiente de liquidar** (la
+  // liquidación se crea recién al cobrar y le asigna los ítems). El tipo TS se relaja en la Fase 2.
+  @ManyToOne(() => Liquidacion, { nullable: true })
+  periodoTrabajo: Liquidacion;
+
+  /**
+   * Trabajo al que pertenece la jornada. En el modelo nuevo es el **único vínculo
+   * permanente**: el ítem puede estar pendiente (sin período) y el trabajo se necesita
+   * para listarlo y liquidarlo. Se completa siempre al crear la jornada.
+   */
+  @ManyToOne(() => Trabajo, { nullable: true, onDelete: "CASCADE" })
+  trabajo?: Trabajo;
 }

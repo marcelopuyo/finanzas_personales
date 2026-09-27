@@ -13,10 +13,13 @@ import { Briefcase, Ellipsis } from "lucide-react";
  * al hacer clic en cualquier punto, así que este menú se monta **fuera** del
  * `<Link>` del panel (ver `dashboard-client.tsx`).
  *
- * Solo gestiona TRABAJOS: los PERÍODOS se abren desde las propias tarjetas del
- * panel (Por cobrar / Actuales → popup del listado; Finalizados → CRUD filtrado
- * por los ya cobrados), así que la opción "Gestionar períodos" se quitó
- * (2026-09-10).
+ * Gestiona TRABAJOS. **Tiene UNA sola opción —"Gestionar trabajos"—** y es el
+ * **único** punto de entrada al CRUD de trabajos (pedido del usuario
+ * 2026-09-26): en `/trabajo` el ⋯ **se eliminó**, así que las acciones del
+ * circuito (cobrar / cargar jornada / cargar tarea) viven sólo en el **FAB ➕ de
+ * `/trabajo`** (`app/(app)/trabajo/components/acciones-fab.tsx`) y la gestión de
+ * trabajos sale de acá. La opción "Gestionar períodos" ya no existe: los
+ * períodos dejaron de ser algo que el usuario gestione (el CRUD se archivó).
  */
 export function TrabajosActionsMenu() {
   const [open, setOpen] = useState(false);
@@ -67,7 +70,7 @@ export function TrabajosActionsMenu() {
           className="absolute right-0 top-full z-20 mt-1 w-52 overflow-hidden rounded-lg border border-border bg-card shadow-lg"
         >
           <Link
-            href="/cruds/trabajos?origen=dashboard"
+            href={`/cruds/trabajos?origen=dashboard`}
             role="menuitem"
             onClick={() => setOpen(false)}
             className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] font-medium text-card-foreground transition-colors hover:bg-muted"

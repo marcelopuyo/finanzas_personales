@@ -2,7 +2,7 @@
 
 import { MovimientoProvider, useMovimientoStepper } from "./stepper/stepper-context";
 import { Selector } from "./stepper/selector";
-import { CobroSueldo } from "./stepper/cobro-sueldo";
+import { CobrarTrabajo } from "./stepper/cobrar-trabajo";
 import { PagoPrestamo } from "./stepper/pago-prestamo";
 import { AjusteCuenta } from "./stepper/ajuste-cuenta";
 import { PagoGasto } from "./stepper/pago-gasto";
@@ -15,7 +15,7 @@ import type { MovimientoInitial, MovimientoOptions } from "./stepper/types";
 
 const STEPS = [
   Selector,
-  CobroSueldo,
+  CobrarTrabajo,
   PagoPrestamo,
   AjusteCuenta,
   PagoGasto,

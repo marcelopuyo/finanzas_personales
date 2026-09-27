@@ -28,6 +28,29 @@ que no afecta al build ni al runtime.
 | `public/file.svg`, `globe.svg`, `next.svg`, `vercel.svg`, `window.svg` | SVGs de ejemplo que trae el starter de Next.js; no se referencian en ninguna página ni en `app/manifest.ts`. |
 | `backend/scripts/_shot-balance2.png` | Captura suelta de QA. |
 
+### Rediseño "períodos gestionados → liquidaciones" (2026-09-26)
+
+El usuario **deja de gestionar períodos**: la **liquidación nace al cobrar** y sólo
+existe como hecho del cobro (`DeepSeek/plan-liquidaciones.md`, decisiones P1/P1.b/P1.a.5).
+Los 3 CRUDs que administraban el circuito viejo quedaron **sin punto de entrada** (el
+panel "Trabajo" del dashboard ahora lista **ítems pendientes de cobro** y la carga de
+jornadas/tareas se hace desde el wizard de movimientos) ⇒ se archivan enteros.
+
+| Archivo | Motivo |
+| --- | --- |
+| `app/(app)/cruds/periodos-trabajo/**` | CRUD de períodos: en el modelo nuevo no hay nada que gestionar (el cobro crea la liquidación) y su acción "cobrar" quedó reemplazada por el paso **"Cobrar trabajo"** del wizard. |
+| `app/(app)/cruds/jornadas-trabajo/**` | CRUD de jornadas: la jornada se carga desde el wizard (nace **pendiente de liquidar**) y su edición se resuelve anulando/recargando. |
+| `app/(app)/cruds/tareas-trabajo/**` | Ídem tareas (`por_tarea`). |
+| `app/(app)/dashboard/components/periodos-modal.tsx` | Popup de las **tarjetas sintéticas** de períodos ("Por cobrar"/"Actuales"): las tarjetas ya no se renderizan y el modal quedó sin ningún disparador. |
+
+⚠️ **Al reponerlos** (no debería hacer falta): el circuito viejo de "período abierto" **ya no existe en el
+backend** — `cobrarSueldo` fue retirada, `actions/trabajos.ts` quedó **sólo con las acciones de TRABAJO**
+(alta/edición/baja) y los schemas de período/jornada/tarea se borraron de `validation/trabajos.ts`; tampoco
+existen `calcularMontoACobrarPorModalidad`, `encontrarPeriodoSuperpuesto`, `aporteProrrateado`,
+`cobroAdelantado`, `periodoCobrable` ni `periodoComenzado` ⇒ **habría que rehacer las acciones**, no sólo
+mover los archivos. Las páginas de `app/(app)/cruds/{periodos,jornadas,tareas}-trabajo/` son las únicas que
+importaban esas acciones (por eso están acá).
+
 ## Qué NO se archivó (a propósito)
 
 - **`backend/scripts/*.mjs`** (`migrate-to-pg.mjs`, `backfill-*.mjs`, `seed-admin.mjs`,

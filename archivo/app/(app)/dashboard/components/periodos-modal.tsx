@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Modal } from "@/components/ui/modal";
 import { DataTable } from "@/components/ui/data-table";
-import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
+import type { LiquidacionOut } from "@/backend/src/queries/trabajos";
 import { dateTimeToString, numberToCurrency } from "@/lib/utils";
 
 export type TipoPeriodos = "cobrar" | "actuales";
@@ -28,7 +28,7 @@ export function PeriodosModal({
   onClose,
 }: {
   tipo: TipoPeriodos | null;
-  data: PeriodoTrabajoOut[];
+  data: LiquidacionOut[];
   currency: string;
   onClose: () => void;
 }) {
@@ -44,7 +44,7 @@ export function PeriodosModal({
     onClose();
   };
 
-  const columnasBase: ColumnDef<PeriodoTrabajoOut>[] = [
+  const columnasBase: ColumnDef<LiquidacionOut>[] = [
     {
       accessorKey: "trabajo",
       header: "Trabajo",
@@ -94,7 +94,7 @@ export function PeriodosModal({
   // de gestión del período (allí viven el Cobrar y el alta de jornadas/tareas).
   const columns = columnasBase;
 
-  const total = data.reduce((acc, p) => acc + (p.montoACobrar || 0), 0);
+  const total = data.reduce((acc, p) => acc + (p.montoCalculado || 0), 0);
 
   return (
     <Modal

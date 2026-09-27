@@ -4,7 +4,7 @@
 // Espejo del flujo "Jornada trabajo", pero SIN propina ni depósito: se registra
 // la tarea (fecha/hora efectiva, descripción, horas informativas y monto ganado)
 // dentro de un período del trabajo por_tarea (existente o automático).
-import { useEffect } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useMovimientoStepper } from "./stepper-context";
 import {
   StepShell,
@@ -14,10 +14,16 @@ import {
   TextField,
   NumberField,
   SelectField,
-  formatFecha,
 } from "./ui";
-import { STEP_CONFIRMACION } from "./types";
-import { numberToCurrency, todayLocalISODate } from "@/lib/utils";
+import { STEP_CONFIRMACION, type MovimientoData } from "./types";
+import { todayLocalISODate } from "@/lib/utils";
+import {
+  useRegistrarPantallaDictable,
+  type PantallaDictable,
+  type ValoresPantalla,
+} from "@/components/voz/dictado-pantalla";
+import { aplicarDictadoSimple, escribirEnPantalla } from "./dictado-comun";
+import { crearDictadoTarea } from "./dictado-trabajo";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -44,17 +50,24 @@ export function CargarTarea() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Solo trabajos/períodos de modalidad por_tarea admiten tareas (2026-09-05).
-  const periodosPorTarea = options.periodosTrabajo.filter(
-    (p) => (p.trabajo?.modalidadCobro ?? "horas_variables") === "por_tarea"
-  );
-  const trabajosPorTarea = options.trabajos.filter(
-    (t) => (t.modalidadCobro ?? "horas_variables") === "por_tarea"
+  /**
+   * Solo trabajos de modalidad `por_tarea` admiten tareas.
+   *
+   * ⚠️ **Memoizado a propósito**: `filter` devuelve un array **nuevo** en cada render
+   * y alimenta las dependencias de la config de voz ⇒ sin esto la pantalla se
+   * **re-registraba** ante el FAB en cada render y el wizard entraba en un bucle
+   * ("Maximum update depth exceeded", visto en el celular el 2026-09-27).
+   */
+  const trabajosPorTarea = useMemo(
+    () =>
+      options.trabajos.filter(
+        (t) => (t.modalidadCobro ?? "horas_variables") === "por_tarea"
+      ),
+    [options.trabajos]
   );
 
-  const periodoValido = data.crearPeriodoAutomatico
-    ? data.idTrabajo > 0
-    : data.periodoTrabajo > 0;
+  // El **trabajo** es el único vínculo: la tarea nace pendiente de liquidar.
+  const trabajoValido = data.idTrabajo > 0;
   const horaValida = !!data.horaDesde;
   const montoValido = data.montoTarea > 0;
 
@@ -74,7 +87,53 @@ export function CargarTarea() {
     handleSetData({ fecha, horaDesde: hora });
   };
 
-  const isValid = !!data.fecha && horaValida && periodoValido && montoValido;
+  const isValid = !!data.fecha && horaValida && trabajoValido && montoValido;
+
+  /**
+   * **Dictado por voz (2026-09-27)**: la pantalla se declara dictable ante el FAB 🎤
+   * ("hice una tarea en labado autos de 3 horas por 400"). El trabajo se resuelve
+   * por su **nombre propio** (opciones del select) y por los sinónimos del flujo.
+   * Piezas compartidas de `dictado-comun.ts`, igual que transferencia y ajuste.
+   */
+  const configVoz = useMemo(
+    () =>
+      crearDictadoTarea({
+        trabajos: trabajosPorTarea.map((t) => ({ id: t.id, nombre: t.nombre })),
+        cuentas: [],
+      }),
+    [trabajosPorTarea]
+  );
+  // Los datos frescos sin recrear la pantalla a cada tecla.
+  const dataRef = useRef(data);
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+  const escribirVoz = useCallback(
+    (valores: ValoresPantalla) => {
+      handleSetData(valores as unknown as Partial<MovimientoData>);
+    },
+    [handleSetData]
+  );
+  const pantallaVoz = useMemo<PantallaDictable>(
+    () => ({
+      config: configVoz,
+      aplicar: (resultado) =>
+        aplicarDictadoSimple(
+          resultado,
+          configVoz,
+          dataRef.current as unknown as Record<string, unknown>,
+          escribirVoz
+        ),
+      escribir: (valores) =>
+        escribirEnPantalla(
+          valores,
+          dataRef.current as unknown as Record<string, unknown>,
+          escribirVoz
+        ),
+    }),
+    [configVoz, escribirVoz]
+  );
+  useRegistrarPantallaDictable(pantallaVoz);
 
   return (
     <StepShell
@@ -96,49 +155,17 @@ export function CargarTarea() {
         </div>
       )}
 
+      {/* El **trabajo** es el único vínculo de la tarea: no hay período que
+          elegir (la liquidación nace al cobrar). */}
       <SelectField
-        label="Período de trabajo"
-        value={
-          data.crearPeriodoAutomatico
-            ? "auto"
-            : data.periodoTrabajo
-            ? String(data.periodoTrabajo)
-            : ""
-        }
-        onChange={(v) => {
-          if (v === "auto") {
-            handleSetData({ periodoTrabajo: 0, crearPeriodoAutomatico: true });
-          } else {
-            handleSetData({
-              periodoTrabajo: v ? Number(v) : 0,
-              crearPeriodoAutomatico: false,
-            });
-          }
-        }}
-        options={[
-          ...periodosPorTarea.map((p) => ({
-            value: String(p.id),
-            label: `${p.trabajo?.nombre ?? "Trabajo"}: ${formatFecha(
-              p.fechaDesde
-            )} al ${formatFecha(p.fechaHasta)} — ${numberToCurrency(
-              p.montoACobrar ?? 0
-            )}`,
-          })),
-          { value: "auto", label: "Cargar período automático" },
-        ]}
+        label="Trabajo"
+        value={data.idTrabajo ? String(data.idTrabajo) : ""}
+        onChange={(v) => handleSetData({ idTrabajo: Number(v) })}
+        options={trabajosPorTarea.map((t) => ({
+          value: String(t.id),
+          label: t.nombre,
+        }))}
       />
-
-      {data.crearPeriodoAutomatico && (
-        <SelectField
-          label="Trabajo"
-          value={data.idTrabajo ? String(data.idTrabajo) : ""}
-          onChange={(v) => handleSetData({ idTrabajo: Number(v) })}
-          options={trabajosPorTarea.map((t) => ({
-            value: String(t.id),
-            label: t.nombre,
-          }))}
-        />
-      )}
 
       <div className="grid grid-cols-2 gap-3">
         <DateField

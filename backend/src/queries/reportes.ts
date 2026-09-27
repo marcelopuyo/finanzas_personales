@@ -2,12 +2,18 @@ import { IsNull, MoreThan, MoreThanOrEqual } from "typeorm";
 import { getDb } from "../db";
 import { getSessionUser, requireUserId } from "../lib/auth";
 import { convertir } from "../lib/cotizaciones";
-import { aporteProrrateado, cobroAdelantado, modalidadProrratea } from "../lib/jornadas";
+import {
+  aportesPorMes,
+  ymd,
+  SIN_TRABAJO,
+  type FuenteIngresos,
+} from "../lib/ingresos-trabajo";
 import { getPrestamosNetoEnPredeterminada } from "../lib/prestamos";
 import { Cuenta } from "../entities/cuenta.entity";
 import { Gasto } from "../entities/gasto.entity";
 import { HistoricoCuenta } from "../entities/historico-cuenta.entity";
-import { PeriodoTrabajo } from "../entities/periodo-trabajo.entity";
+import { Movimiento } from "../entities/movimiento.entity";
+import { Liquidacion } from "../entities/periodo-trabajo.entity";
 import { Prestamo } from "../entities/prestamo.entity";
 
 // ============================================================
@@ -166,113 +172,75 @@ function etiquetaDesdeYM(ym: string): string {
   return `${mes}-${y}`;
 }
 
-/** "YYYY-MM-DD" del último día del mes representado por "YYYY-MM". */
-function finMesISO(ym: string): string {
-  const [y, m] = ym.split("-").map(Number);
-  const ultimo = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  return `${ym}-${pad2(ultimo)}`;
-}
-
-/** Siguiente mes "YYYY-MM". */
-function mesSiguiente(ym: string): string {
-  const [y, m] = ym.split("-").map(Number);
-  const d = new Date(Date.UTC(y, m - 1, 1));
-  d.setUTCMonth(d.getUTCMonth() + 1);
-  return ymDeFecha(d);
-}
-
+/**
+ * Evolución de ingresos por mes con el **criterio único** (P1.a/P1.d): ítems de
+ * las liquidaciones COBRADAS por su fecha + prorrateo del `montoCobrado` en
+ * `fijo`/`horas_fijas` + propinas depositadas por la fecha de su movimiento.
+ * ⚠️ La regla vive en `lib/ingresos-trabajo.ts` (módulo puro) y es la MISMA que
+ * usa el panel: acá sólo se adaptan las entidades a esa estructura.
+ */
 export async function getEvolucionIngresos(): Promise<EvolucionItem[]> {
   const userId = await requireUserId();
   const ds = await getDb();
-  const periodos = await ds.getRepository(PeriodoTrabajo).find({
-    where: { trabajo: { usuario: { id: userId } }, eliminado: false },
-    order: { fechaDesde: "ASC" },
-    relations: { trabajo: true, jornadas: true, tareas: true },
-  });
+  const [liqs, propinas] = await Promise.all([
+    ds.getRepository(Liquidacion).find({
+      where: { trabajo: { usuario: { id: userId } }, eliminado: false },
+      order: { fechaDesde: "ASC" },
+      relations: { trabajo: true, jornadas: true, tareas: true },
+    }),
+    ds.getRepository(Movimiento).find({
+      where: {
+        cuenta: { usuario: { id: userId } },
+        concepto: { nombre: "Cobro Propina" },
+        eliminado: false,
+      },
+      relations: {
+        jornadaTrabajo: { trabajo: true, periodoTrabajo: { trabajo: true } },
+      },
+    }),
+  ]);
 
-  // Agrupa por "YYYY-MM" (ordenable) y convierte a etiqueta al final.
-  const agrupado: Record<string, number> = {};
-  const sumarKey = (ym: string, monto: number) => {
-    if (monto > 0) agrupado[ym] = (agrupado[ym] || 0) + monto;
+  const fuente: FuenteIngresos = {
+    liquidaciones: liqs.map((p) => {
+      const jornadas = (p.jornadas ?? []).filter((j) => !j.eliminado);
+      const tareas = (p.tareas ?? []).filter((t) => !t.eliminado);
+      const cobrada =
+        !!p.fechaDeCobro && new Date(p.fechaDeCobro).getFullYear() >= 1901;
+      return {
+        trabajo: p.trabajo?.nombre ?? SIN_TRABAJO,
+        fechaDesde: ymd(p.fechaDesde),
+        fechaHasta: ymd(p.fechaHasta),
+        // La fecha de cobro la necesita el criterio para el cobro ADELANTADO.
+        fechaDeCobro: ymd(p.fechaDeCobro),
+        modalidad: p.trabajo?.modalidadCobro ?? "horas_variables",
+        cobrada,
+        montoCobrado: p.montoCobrado ?? p.montoCalculado ?? 0,
+        items: [
+          ...jornadas.map((j) => ({
+            fecha: ymd(j.fechaJornada),
+            monto: j.montoJornada ?? 0,
+          })),
+          ...tareas.map((t) => ({
+            fecha: ymd(t.fechaTarea),
+            monto: t.montoTarea ?? 0,
+          })),
+        ],
+      };
+    }),
+    propinas: propinas.map((m) => ({
+      fecha: ymd(m.fecha),
+      monto: m.montoCuentaMonedaOrigen ?? 0,
+      trabajo:
+        m.jornadaTrabajo?.trabajo?.nombre ??
+        m.jornadaTrabajo?.periodoTrabajo?.trabajo?.nombre ??
+        SIN_TRABAJO,
+    })),
   };
 
-  for (const p of periodos) {
-    const modalidad = p.trabajo?.modalidadCobro ?? "horas_variables";
-    const jornadas = (p.jornadas ?? []).filter((j) => !j.eliminado);
-    const tareas = (p.tareas ?? []).filter((t) => !t.eliminado);
-
-    // Período CON JORNADAS → cuenta lo real por fecha de jornada (como hoy).
-    // (Un período pasado con jornadas no cambia su aporte aunque el trabajo se
-    // convierta después; discriminador robusto del §8.)
-    if (jornadas.length > 0) {
-      for (const j of jornadas) {
-        // Mediodía UTC: evita que fechas a medianoche (UTC) se corran al mes
-        // anterior en zonas horarias con offset negativo.
-        const d = new Date(j.fechaJornada);
-        d.setUTCHours(12, 0, 0, 0);
-        sumarKey(ymDeFecha(d), j.montoJornada + j.montoPropina);
-      }
-      continue;
-    }
-
-    // Período CON TAREAS (modalidad por_tarea) → cuenta lo real por mes de la
-    // FECHA LOCAL de la tarea (`fechaTarea`, decisión 2026-09-05): es la fecha
-    // que eligió el usuario (se guarda como `date`), sin corrimiento de zona.
-    if (tareas.length > 0) {
-      for (const t of tareas) {
-        // Mediodía UTC: evita que fechas a medianoche (UTC) se corran al mes
-        // anterior (misma técnica que las jornadas).
-        const d = new Date(t.fechaTarea);
-        d.setUTCHours(12, 0, 0, 0);
-        sumarKey(ymDeFecha(d), t.montoTarea);
-      }
-      continue;
-    }
-
-    // Período SIN hijos de fijo/horas_fijas → aporte PRORRATEADO por mes (§8).
-    // El mes EN CURSO se corta a HOY (a la fecha, decisión usuario 2026-09-05);
-    // los meses cerrados van completos.
-    if (modalidadProrratea(modalidad)) {
-      const monto = p.montoACobrar ?? 0;
-      if (monto <= 0) continue;
-      // COBRO ADELANTADO (decisión del usuario 2026-09-14): si el período se
-      // cobró ANTES de su fecha de cierre, el ingreso se reconoce COMPLETO en el
-      // mes del cobro (el dinero entró ese mes) y NO se prorratea — si no,
-      // quedaría reconocido a medias y el gráfico no mostraría el total cobrado.
-      if (cobroAdelantado(p)) {
-        sumarKey(ymDeFecha(p.fechaDeCobro as Date), monto);
-        continue;
-      }
-      const hoyKey = new Date().toISOString().slice(0, 10);
-      const hoyYM = hoyKey.slice(0, 7);
-      const desde = `${ymDeFecha(p.fechaDesde)}-${pad2(
-        new Date(p.fechaDesde).getUTCDate()
-      )}`;
-      const hasta = `${ymDeFecha(p.fechaHasta)}-${pad2(
-        new Date(p.fechaHasta).getUTCDate()
-      )}`;
-      let cursor = ymDeFecha(p.fechaDesde);
-      while (cursor <= ymDeFecha(p.fechaHasta)) {
-        const finMes = finMesISO(cursor);
-        const hastaMes =
-          cursor === hoyYM && hoyKey < finMes ? hoyKey : finMes;
-        const aporte = aporteProrrateado(
-          desde,
-          hasta,
-          monto,
-          `${cursor}-01`,
-          hastaMes
-        );
-        if (aporte > 0) sumarKey(cursor, aporte);
-        cursor = mesSiguiente(cursor);
-      }
-    }
-    // horas_variables / por_tarea sin hijos → aporte 0 (no prorratea).
-  }
-
-  return Object.keys(agrupado)
-    .sort()
-    .map((ym) => ({ periodo: etiquetaDesdeYM(ym), monto: agrupado[ym] }));
+  return [...aportesPorMes(fuente).entries()].map(([ym, monto]) => ({
+    periodo: etiquetaDesdeYM(ym),
+    monto,
+  }));
 }
 
 // ============================================================

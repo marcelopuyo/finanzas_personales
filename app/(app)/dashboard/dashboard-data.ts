@@ -7,9 +7,18 @@ import {
 } from "@/backend/src/queries/reportes";
 import {
   getAllPeriodosTrabajo,
-  type PeriodoTrabajoOut,
+  getItemsPendientesCobro,
+  getPropinasDepositadas,
+  type ItemPendienteOut,
+  type LiquidacionOut,
+  type PropinaDepositadaOut,
 } from "@/backend/src/queries/trabajos";
-import { ingresosDelMesActual, ingresosEnRango } from "./ingresos-helpers";
+import {
+  aFuenteIngresos,
+  ingresosDelMesActual,
+  ingresosEnRango,
+} from "./ingresos-helpers";
+import { tieneCobroReal } from "@/backend/src/lib/ingresos-trabajo";
 import type { GastoOut } from "@/backend/src/queries/gastos";
 import { getAllGastos } from "@/backend/src/queries/gastos";
 import { getSessionUser } from "@/backend/src/lib/auth";
@@ -29,8 +38,6 @@ export interface DashboardData {
     monedaISO?: string;
     /** Nombre del tipo de cuenta (para el icono de la tarjeta). */
     tipo?: string;
-    /** Tarjeta sintética con menú de acción(es) (Actuales → jornada/tarea/período). */
-    menuAccion?: ("jornada" | "cobro" | "tarea" | "periodo")[];
   }[];
   gastosResumen: {
     name: string;
@@ -40,7 +47,12 @@ export interface DashboardData {
   gastosTotal: string;
   gastosSaldo: string;
   gastosDetalle: GastoOut[];
-  ingresosDetalle: PeriodoTrabajoOut[];
+  /** Liquidaciones COBRADAS (el devengo de cada ítem lo resuelve `ingresos-helpers`). */
+  ingresosDetalle: LiquidacionOut[];
+  /** Ítems pendientes de cobro (jornadas/tareas sin liquidar): tarjeta "Por cobrar". */
+  itemsPendientes: ItemPendienteOut[];
+  /** Propinas depositadas: ingreso real imputado a la fecha de su movimiento (P1.a.3). */
+  propinas: PropinaDepositadaOut[];
   ingresosResumen: {
     name: string;
     value: number;
@@ -74,6 +86,8 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     evolIngresos,
     evolResultados,
     periodosTrabajo,
+    propinas,
+    itemsPendientes,
   ] = await Promise.all([
     getBalanceActual().catch(() => 0),
     getCuentasConEvolucion().catch(() => []),
@@ -82,6 +96,8 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     getEvolucionIngresos().catch(() => []),
     getEvolucionResultados().catch(() => []),
     getAllPeriodosTrabajo().catch(() => []),
+    getPropinasDepositadas().catch(() => []),
+    getItemsPendientesCobro().catch(() => []),
   ]);
 
   // Moneda predeterminada del usuario: se usa para formatear el balance actual
@@ -104,8 +120,6 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     monedaISO?: string;
     /** Nombre del tipo de cuenta (para el icono de la tarjeta). */
     tipo?: string;
-    /** Tarjeta sintética con menú de acción(es) (Actuales → jornada/tarea/período). */
-    menuAccion?: ("jornada" | "cobro" | "tarea" | "periodo")[];
   }[] = cuentasEvol.map((c) => ({
     id: c.id,
     title: c.nombreCuenta,
@@ -154,10 +168,12 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     }));
   })();
 
-  // --- Ingresos por trabajo (jornadas + tareas + prorrateo de fijo/horas_fijas) ---
+  // --- Ingresos por trabajo (criterio ÚNICO P1.a: ítems de lo cobrado +
+  // prorrateo de fijo/horas_fijas sobre el cobrado + propinas depositadas) ---
   // ⚠️ Estos totales son solo el FALLBACK SSR; el dashboard los recalcula en el
   // cliente (dashboard-client.tsx) con la fecha local del navegador.
-  const ingresosTotales = ingresosEnRango(periodosTrabajo);
+  const fuenteIngresos = aFuenteIngresos(periodosTrabajo, propinas);
+  const ingresosTotales = ingresosEnRango(fuenteIngresos);
   const ingresosResumen = Array.from(ingresosTotales.porTrabajo.entries()).map(
     ([name, value]) => ({ name, value })
   );
@@ -183,7 +199,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     2,
     "0"
   )}-${String(hoy.getDate()).padStart(2, "0")}`;
-  const totalMesActual = ingresosDelMesActual(periodosTrabajo, hoyKeyMes);
+  const totalMesActual = ingresosDelMesActual(fuenteIngresos, hoyKeyMes);
 
   // --- Resultado del mes actual (ingresos − gastos; FALLBACK SSR) ---
   // ⚠️ Igual que `ingresosMesActual`, es solo el fallback de SSR: se calcula
@@ -327,10 +343,17 @@ export async function fetchDashboardData(): Promise<DashboardData> {
       const fb = b.fechaPago ? new Date(b.fechaPago).getTime() : 0;
       return fb - fa;
     }),
-    ingresosDetalle: [...periodosTrabajo].sort(
-      (a, b) =>
-        new Date(b.fechaHasta).getTime() - new Date(a.fechaHasta).getTime()
-    ),
+    ingresosDetalle: periodosTrabajo
+      // Sólo liquidaciones COBRADAS: en el modelo nuevo la liquidación existe
+      // únicamente si hubo cobro (P1/P1.b) y el listado del panel no muestra
+      // pendientes (ésos viven en la tarjeta "Por cobrar").
+      .filter((p) => tieneCobroReal(p.fechaDeCobro))
+      .sort(
+        (a, b) =>
+          new Date(b.fechaHasta).getTime() - new Date(a.fechaHasta).getTime()
+      ),
+    itemsPendientes,
+    propinas,
     ingresosResumen,
     ingresosTotal: numberToCurrency(totalIngresos, monedaPredeterminadaISO),
     ingresosMesActual: numberToCurrency(totalMesActual, monedaPredeterminadaISO),

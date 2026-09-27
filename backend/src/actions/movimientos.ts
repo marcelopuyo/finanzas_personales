@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "crypto";
-import { EntityManager } from "typeorm";
+import { type EntityManager, In, IsNull, type Repository } from "typeorm";
 import type { z } from "zod";
 import { getDb } from "../db";
 import { requireUserId } from "../lib/auth";
@@ -11,33 +11,31 @@ import { Cuenta } from "../entities/cuenta.entity";
 import { Gasto } from "../entities/gasto.entity";
 import { JornadaTrabajo } from "../entities/jornada-trabajo.entity";
 import { Movimiento } from "../entities/movimiento.entity";
-import { PeriodoTrabajo } from "../entities/periodo-trabajo.entity";
+import { Liquidacion } from "../entities/periodo-trabajo.entity";
 import { Prestamo } from "../entities/prestamo.entity";
+import { TareaTrabajo } from "../entities/tarea-trabajo.entity";
 import { Trabajo } from "../entities/trabajo.entity";
 import { crearHistoricoCuenta, refresh } from "../lib/action-helpers";
 import {
-  calcularMontoACobrar,
   calcularMontoJornada,
   encontrarJornadaSuperpuesta,
-  encontrarPeriodoSuperpuesto,
   etiquetaModalidad,
-  fechaEnRango,
   formatearFechaDMA,
   formatearHora,
   modalidadAdmiteJornadas,
-  periodoCobrado,
-  periodoCobrable,
-  periodoComenzado,
+  modalidadAdmiteTareas,
 } from "../lib/jornadas";
 import { montoEnMonedaPredeterminada } from "../lib/cotizaciones";
 import {
+  cobrarTrabajoSchema,
+  editarJornadaSchema,
+  editarTareaSchema,
   jornadaStepperSchema,
   movimiento1Schema,
   movimiento2Schema,
   movimiento3Schema,
+  tareaStepperSchema,
 } from "../validation/movimientos";
-import { tareaTrabajoCreateSchema } from "../validation/trabajos";
-import { crearTareaTrabajo } from "./trabajos";
 
 // ---------------------------------------------------------------------------
 
@@ -69,14 +67,25 @@ async function buscarConceptosTransferencia(manager: EntityManager, motivo: stri
 }
 
 // ============================================================
-// 1) COBRO SUELDO
+// 1) **COBRAR TRABAJO** — crea la LIQUIDACIÓN + el movimiento
 // ============================================================
-export async function cobrarSueldo(input: z.infer<typeof movimiento1Schema>) {
+/**
+ * Plan-liquidaciones.md: el cobro **declara o selecciona** y crea la liquidación
+ * (que nace y queda cerrada) junto con el movimiento, todo en una transacción.
+ *
+ * - `fijo`         → el usuario declara rango + monto ⇒ `calculado = cobrado`.
+ * - `horas_fijas`  → declara rango + horas ⇒ `calculado = horas × precio` (snapshot).
+ * - `horas_variables` / `por_tarea` → **selecciona jornadas/tareas pendientes**:
+ *   el rango se deriva (min/max de sus fechas) y `calculado = Σ` de sus montos.
+ *
+ * Los ítems pasan a "liquidados" (se les asigna el período) y `montoCobrado` es el
+ * **mismo número** que `movimiento.montoCuentaMonedaOrigen` (nominal, no el convertido).
+ */
+export async function cobrarTrabajo(input: z.infer<typeof cobrarTrabajoSchema>) {
   const userId = await requireUserId();
-  const data = movimiento1Schema.parse(input);
-  if (!data.idPeriodoTrabajo) throw new Error("idPeriodoTrabajo es requerido");
+  const data = cobrarTrabajoSchema.parse(input);
 
-  // Conversión a la moneda predeterminada del usuario (fuera del tx).
+  // Conversión a la moneda predeterminada (fuera del tx).
   const montoPredeterminada = await montoEnMonedaPredeterminada(
     data.idCuenta,
     data.monto,
@@ -87,7 +96,9 @@ export async function cobrarSueldo(input: z.infer<typeof movimiento1Schema>) {
   await ds.transaction(async (manager) => {
     const cuentaRepo = manager.getRepository(Cuenta);
     const conceptoRepo = manager.getRepository(Concepto);
-    const periodoTrabajoRepo = manager.getRepository(PeriodoTrabajo);
+    const jornadaRepo = manager.getRepository(JornadaTrabajo);
+    const tareaRepo = manager.getRepository(TareaTrabajo);
+    const liqRepo = manager.getRepository(Liquidacion);
     const movRepo = manager.getRepository(Movimiento);
 
     const cuenta = await cuentaRepo.findOneBy({
@@ -99,41 +110,131 @@ export async function cobrarSueldo(input: z.infer<typeof movimiento1Schema>) {
     const concepto = await conceptoRepo.findOneBy({ nombre: "Cobro Sueldo" });
     if (!concepto) throw new Error("Concepto 'Cobro Sueldo' no encontrado");
 
-    const periodoTrabajo = await periodoTrabajoRepo.findOne({
-      where: { id: data.idPeriodoTrabajo, trabajo: { usuario: { id: userId } } },
-      // La modalidad decide si se admite el COBRO ADELANTADO (fijo/horas_fijas).
-      relations: { trabajo: true },
+    const trabajo = await manager.getRepository(Trabajo).findOneBy({
+      id: data.idTrabajo,
+      usuario: { id: userId },
     });
-    if (!periodoTrabajo) throw new Error(`PeriodoTrabajo con id ${data.idPeriodoTrabajo} no encontrado`);
+    if (!trabajo) {
+      throw new Error(`Trabajo con id ${data.idTrabajo} no encontrado`);
+    }
+    const modalidad = trabajo.modalidadCobro ?? "horas_variables";
+    // Las modalidades que liquidan ÍTEMS son `horas_variables` (jornadas) y
+    // `por_tarea` (tareas); `fijo`/`horas_fijas` declaran el período.
+    const admiteItems =
+      modalidad === "horas_variables" || modalidad === "por_tarea";
 
-    // Guards del cobro (decisión 2026-09-14). El período PUEDE cobrarse en
-    // curso (COBRO ADELANTADO, solo fijo/horas_fijas y sin tocar sus fechas),
-    // pero NUNCA dos veces ni antes de empezar:
-    const hoyKey = new Date().toISOString().slice(0, 10);
-    if (periodoCobrado(periodoTrabajo)) {
+    // --- Ítems pendientes SELECCIONADOS (deben ser del trabajo y estar libres) ---
+    const jornadas = data.idsJornadas.length
+      ? await jornadaRepo.find({
+          where: {
+            id: In(data.idsJornadas),
+            trabajo: { id: trabajo.id },
+            eliminado: false,
+            periodoTrabajo: IsNull(),
+          },
+        })
+      : [];
+    if (jornadas.length !== data.idsJornadas.length) {
       throw new Error(
-        `El período del ${formatearFechaDMA(periodoTrabajo.fechaDesde)} al ${formatearFechaDMA(periodoTrabajo.fechaHasta)} ya fue cobrado: no se puede volver a cobrar`
+        "Alguna jornada seleccionada no está pendiente o no pertenece a este trabajo"
       );
     }
-    if (!periodoComenzado(periodoTrabajo, hoyKey)) {
+    const tareas = data.idsTareas.length
+      ? await tareaRepo.find({
+          where: {
+            id: In(data.idsTareas),
+            trabajo: { id: trabajo.id },
+            eliminado: false,
+            periodoTrabajo: IsNull(),
+          },
+        })
+      : [];
+    if (tareas.length !== data.idsTareas.length) {
       throw new Error(
-        `El período del ${formatearFechaDMA(periodoTrabajo.fechaDesde)} al ${formatearFechaDMA(periodoTrabajo.fechaHasta)} todavía no comenzó: no se puede cobrar por adelantado`
-      );
-    }
-    if (!periodoCobrable(periodoTrabajo, hoyKey)) {
-      throw new Error(
-        `El período del ${formatearFechaDMA(periodoTrabajo.fechaDesde)} al ${formatearFechaDMA(periodoTrabajo.fechaHasta)} todavía no terminó: solo los trabajos de monto fijo u horas fijas pueden cobrarse por adelantado`
+        "Alguna tarea seleccionada no está pendiente o no pertenece a este trabajo"
       );
     }
 
+    // GUARD (2026-09-26): un cobro de `horas_variables`/`por_tarea` **exige ítems
+    // seleccionados** — no se puede cargar el pago sin jornadas/tareas. La UI ya
+    // deja "Siguiente" deshabilitado, pero el guard tiene que estar acá también
+    // (un POST directo o un cliente viejo no pueden saltearlo). Y al revés: las
+    // modalidades declaradas **no liquidan ítems**, así que no deben recibirlos.
+    const itemsSeleccionados = jornadas.length + tareas.length;
+    if (admiteItems && itemsSeleccionados === 0) {
+      throw new Error(
+        "Seleccioná al menos una jornada o tarea para cobrar"
+      );
+    }
+    if (!admiteItems && itemsSeleccionados > 0) {
+      throw new Error(
+        "Esta modalidad no liquida jornadas ni tareas: el cobro va sin ítems"
+      );
+    }
+
+    // --- Rango + monto CALCULADO, según modalidad ---
+    let fechaDesde = data.fechaDesde ?? "";
+    let fechaHasta = data.fechaHasta ?? "";
+    let montoCalculado = 0;
+    let horasPeriodo: number | undefined;
+    let precioHoraPeriodo: number | undefined;
+
+    if (modalidad === "fijo") {
+      if (!fechaDesde || !fechaHasta) {
+        throw new Error("Declará el rango del período");
+      }
+      // En `fijo` no hay cálculo: el calculado se copia del cobrado.
+      montoCalculado = data.monto;
+    } else if (modalidad === "horas_fijas") {
+      if (!fechaDesde || !fechaHasta) {
+        throw new Error("Declará el rango del período");
+      }
+      horasPeriodo = data.horasPeriodo ?? 0;
+      precioHoraPeriodo = trabajo.precioHora;
+      montoCalculado = Number((horasPeriodo * precioHoraPeriodo).toFixed(2));
+    } else {
+      const fechas = [
+        ...jornadas.map((j) => String(j.fechaJornada).slice(0, 10)),
+        ...tareas.map((t) => String(t.fechaTarea).slice(0, 10)),
+      ].sort();
+      // (El guard de arriba ya garantiza que hay al menos un ítem.)
+      fechaDesde = fechas[0];
+      fechaHasta = fechas[fechas.length - 1];
+      const totalJornadas = jornadas.reduce(
+        (s, j) => s + (j.montoJornada ?? 0),
+        0
+      );
+      const totalTareas = tareas.reduce((s, t) => s + (t.montoTarea ?? 0), 0);
+      montoCalculado = Number((totalJornadas + totalTareas).toFixed(2));
+    }
+
+    // --- La liquidación nace y queda CERRADA en este acto ---
+    const liquidacion = await liqRepo.save(
+      liqRepo.create({
+        fechaDesde: fechaDesde as unknown as Date,
+        fechaHasta: fechaHasta as unknown as Date,
+        montoCalculado,
+        montoCobrado: data.monto,
+        fechaDeCobro: data.fecha as unknown as Date,
+        horasPeriodo,
+        precioHoraPeriodo,
+        trabajo,
+      })
+    );
+
+    // --- Los ítems quedan liquidados (dejan de estar pendientes) ---
+    for (const jornada of jornadas) {
+      jornada.periodoTrabajo = liquidacion;
+      await jornadaRepo.save(jornada);
+    }
+    for (const tarea of tareas) {
+      tarea.periodoTrabajo = liquidacion;
+      await tareaRepo.save(tarea);
+    }
+
+    // --- Plata: el saldo se acredita y el movimiento lleva el MISMO número ---
     cuenta.saldo += data.monto;
     await cuentaRepo.save(cuenta);
-
-    // La fecha de cobro debe coincidir con la del movimiento (data.fecha).
-    // Antes se usaba `new Date()` (ahora del servidor) y podía diferir ±1 día
-    // de la fecha ingresada en el formulario (política de fechas 2026-08-05).
-    periodoTrabajo.fechaDeCobro = data.fecha as unknown as Date;
-    await periodoTrabajoRepo.save(periodoTrabajo);
 
     const mov = await movRepo.save(
       movRepo.create({
@@ -142,12 +243,10 @@ export async function cobrarSueldo(input: z.infer<typeof movimiento1Schema>) {
         montoCuentaMonedaOrigen: data.monto,
         cuenta,
         concepto,
-        // Vínculo al período cobrado: permite revertir el cobro limpiando el
-        // fechaDeCobro del período exacto.
-        periodoTrabajo,
+        // Vínculo a la liquidación: al anular se liberan los ítems (D4).
+        periodoTrabajo: liquidacion,
       })
     );
-
     await crearHistoricoCuenta(manager, cuenta, mov.id);
   });
 
@@ -523,108 +622,38 @@ export async function cargarJornadaTrabajo(
   const ds = await getDb();
   await ds.transaction(async (manager) => {
     const jornadaRepo = manager.getRepository(JornadaTrabajo);
-    const periodoTrabajoRepo = manager.getRepository(PeriodoTrabajo);
     const cuentaRepo = manager.getRepository(Cuenta);
     const conceptoRepo = manager.getRepository(Concepto);
     const movRepo = manager.getRepository(Movimiento);
 
-    // Período de trabajo: si se marcó "crear período automático" se genera un
-    // período de una sola jornada (fechaDesde = fechaHasta = fecha de la
-    // jornada); si no, se usa el período existente seleccionado por el usuario.
-    let periodo: PeriodoTrabajo | null = null;
-    let trabajoIdJornada: number;
-    let nombreTrabajoJornada = "";
-    if (data.crearPeriodoAutomatico) {
-      if (!data.idTrabajo) {
-        throw new Error(
-          "Seleccioná el trabajo para crear el período automático"
-        );
-      }
-      const trabajo = await manager.getRepository(Trabajo).findOneBy({
-        id: data.idTrabajo,
-        usuario: { id: userId },
-      });
-      if (!trabajo) {
-        throw new Error(`Trabajo con id ${data.idTrabajo} no encontrado`);
-      }
-      if (!modalidadAdmiteJornadas(trabajo.modalidadCobro ?? "horas_variables")) {
-        throw new Error(
-          `El trabajo "${trabajo.nombre}" no admite jornadas (modalidad ${etiquetaModalidad(
-            trabajo.modalidadCobro ?? "horas_variables"
-          )})`
-        );
-      }
-      trabajoIdJornada = trabajo.id;
-      nombreTrabajoJornada = trabajo.nombre;
-      // El período automático (de un día) no debe superponerse con otro del
-      // mismo trabajo.
-      const superpuestoAuto = await encontrarPeriodoSuperpuesto(
-        periodoTrabajoRepo,
-        trabajo.id,
-        data.fecha,
-        data.fecha
-      );
-      if (superpuestoAuto) {
-        throw new Error(
-          `El período automático se superpone con "${formatearFechaDMA(superpuestoAuto.fechaDesde)} al ${formatearFechaDMA(superpuestoAuto.fechaHasta)}" del trabajo "${trabajo.nombre}"`
-        );
-      }
-      const d = data.fecha as unknown as Date;
-      periodo = await periodoTrabajoRepo.save(
-        periodoTrabajoRepo.create({ fechaDesde: d, fechaHasta: d, trabajo })
-      );
-    } else {
-      if (!data.idPeriodo) {
-        throw new Error("Seleccioná el período de trabajo");
-      }
-      periodo = await periodoTrabajoRepo.findOne({
-        where: { id: data.idPeriodo, trabajo: { usuario: { id: userId } } },
-        relations: { trabajo: true },
-      });
-      if (!periodo) {
-        throw new Error(
-          `Período de trabajo con id ${data.idPeriodo} no encontrado`
-        );
-      }
-      // Un período ya cobrado no admite jornadas nuevas (histórico inmutable).
-      if (periodoCobrado(periodo)) {
-        throw new Error(
-          `El período del ${formatearFechaDMA(periodo.fechaDesde)} al ${formatearFechaDMA(periodo.fechaHasta)} ya fue cobrado: no se pueden cargar jornadas`
-        );
-      }
-      if (
-        !modalidadAdmiteJornadas(
-          periodo.trabajo?.modalidadCobro ?? "horas_variables"
-        )
-      ) {
-        throw new Error(
-          `El trabajo "${periodo.trabajo?.nombre ?? "?"}" no admite jornadas (modalidad ${etiquetaModalidad(
-            periodo.trabajo?.modalidadCobro ?? "horas_variables"
-          )})`
-        );
-      }
-      trabajoIdJornada = periodo.trabajo.id;
-      nombreTrabajoJornada = periodo.trabajo.nombre;
-      // El período seleccionado no debe superponerse con otro del mismo trabajo.
-      const superpuestoExistente = await encontrarPeriodoSuperpuesto(
-        periodoTrabajoRepo,
-        periodo.trabajo.id,
-        String(periodo.fechaDesde).slice(0, 10),
-        String(periodo.fechaHasta).slice(0, 10),
-        periodo.id
-      );
-      if (superpuestoExistente) {
-        throw new Error(
-          `El período seleccionado se superpone con "${formatearFechaDMA(superpuestoExistente.fechaDesde)} al ${formatearFechaDMA(superpuestoExistente.fechaHasta)}" del trabajo "${periodo.trabajo.nombre}"`
-        );
-      }
-      // La fecha de la jornada debe caer dentro del período seleccionado.
-      if (!fechaEnRango(data.fecha, periodo.fechaDesde, periodo.fechaHasta)) {
-        throw new Error(
-          `La fecha de la jornada (${formatearFechaDMA(data.fecha)}) no corresponde al período "${formatearFechaDMA(periodo.fechaDesde)} al ${formatearFechaDMA(periodo.fechaHasta)}" del trabajo "${periodo.trabajo.nombre}"`
-        );
-      }
+    // El **trabajo** es el único vínculo: la jornada nace **pendiente de
+    // liquidar** (`periodoTrabajoId = NULL`) y se le asigna una liquidación
+    // recién al cobrar (plan-liquidaciones.md). Ya no hay período que elegir,
+    // ni "período automático", ni validaciones de superposición.
+    const trabajo = await manager.getRepository(Trabajo).findOneBy({
+      id: data.idTrabajo,
+      usuario: { id: userId },
+    });
+    if (!trabajo) {
+      throw new Error(`Trabajo con id ${data.idTrabajo} no encontrado`);
     }
+    if (!modalidadAdmiteJornadas(trabajo.modalidadCobro ?? "horas_variables")) {
+      throw new Error(
+        `El trabajo "${trabajo.nombre}" no admite jornadas (modalidad ${etiquetaModalidad(
+          trabajo.modalidadCobro ?? "horas_variables"
+        )})`
+      );
+    }
+    // La jornada no puede ser anterior al inicio del trabajo.
+    if (
+      String(data.fecha).slice(0, 10) < String(trabajo.fechaInicio).slice(0, 10)
+    ) {
+      throw new Error(
+        `La fecha de la jornada (${formatearFechaDMA(data.fecha)}) es anterior al inicio del trabajo "${trabajo.nombre}" (${formatearFechaDMA(trabajo.fechaInicio)})`
+      );
+    }
+    const trabajoIdJornada = trabajo.id;
+    const nombreTrabajoJornada = trabajo.nombre;
 
     // No debe existir otra jornada del mismo trabajo que se superponga en el
     // mismo día y con horas solapadas.
@@ -641,11 +670,11 @@ export async function cargarJornadaTrabajo(
       );
     }
 
-    // 1. Crear la jornada (misma lógica que crearJornadaTrabajo del CRUD).
+    // Crear la jornada: **sin período** (queda pendiente de liquidar).
     const montoJornada = calcularMontoJornada(
       data.horaDesde,
       data.horaHasta,
-      periodo.trabajo.precioHora
+      trabajo.precioHora
     );
     const jornada = await jornadaRepo.save(
       jornadaRepo.create({
@@ -656,24 +685,13 @@ export async function cargarJornadaTrabajo(
         montoJornada,
         montoPropina: data.montoPropina ?? 0,
         // Snapshot del precio por hora al momento de la carga (se usa al editar).
-        precioHora: periodo.trabajo.precioHora,
-        periodoTrabajo: periodo,
+        precioHora: trabajo.precioHora,
+        // Vínculo directo al trabajo: el ítem nace **pendiente** (sin período).
+        trabajo,
       })
     );
 
-    // 2. Recalcular el monto a cobrar del período (SIN propina).
-    const periodoActualizado = await periodoTrabajoRepo.findOne({
-      where: { id: periodo.id },
-      relations: { jornadas: true },
-    });
-    if (periodoActualizado) {
-      periodoActualizado.montoACobrar = calcularMontoACobrar(
-        periodoActualizado.jornadas ?? []
-      );
-      await periodoTrabajoRepo.save(periodoActualizado);
-    }
-
-    // 3. Si hay propina, depositarla en la cuenta seleccionada.
+    // Si hay propina, depositarla en la cuenta seleccionada.
     if (propina > 0 && data.idCuenta) {
       const cuenta = await cuentaRepo.findOneBy({
         id: data.idCuenta,
@@ -716,12 +734,349 @@ export async function cargarJornadaTrabajo(
 // 6) CARGAR TAREA (wizard — modalidad 'por_tarea', SIN depósito)
 // ============================================================
 export async function cargarTareaTrabajo(
-  input: z.infer<typeof tareaTrabajoCreateSchema>
+  input: z.infer<typeof tareaStepperSchema>
 ) {
-  // Espejo del CRUD: crea la tarea dentro del período elegido (existente o
-  // automático). A diferencia de la jornada NO hay propina ni depósito a
-  // cuenta: la tarea solo registra el monto ganado; el ingreso se cobra con
-  // el período (cobrarSueldo).
-  await crearTareaTrabajo(input);
+  // A diferencia de la jornada NO hay propina ni depósito a cuenta: la tarea
+  // sólo registra el monto ganado. Nace **pendiente de liquidar** (sin período)
+  // y se cobra junto con la liquidación que la incluya.
+  const userId = await requireUserId();
+  const data = tareaStepperSchema.parse(input);
+
+  const ds = await getDb();
+  await ds.transaction(async (manager) => {
+    const trabajo = await manager.getRepository(Trabajo).findOneBy({
+      id: data.idTrabajo,
+      usuario: { id: userId },
+    });
+    if (!trabajo) {
+      throw new Error(`Trabajo con id ${data.idTrabajo} no encontrado`);
+    }
+    if (!modalidadAdmiteTareas(trabajo.modalidadCobro ?? "horas_variables")) {
+      throw new Error(
+        `El trabajo "${trabajo.nombre}" no admite tareas (modalidad ${etiquetaModalidad(
+          trabajo.modalidadCobro ?? "horas_variables"
+        )})`
+      );
+    }
+    // La tarea no puede ser anterior al inicio del trabajo.
+    if (
+      String(data.fechaTarea).slice(0, 10) <
+      String(trabajo.fechaInicio).slice(0, 10)
+    ) {
+      throw new Error(
+        `La fecha de la tarea (${formatearFechaDMA(data.fechaTarea)}) es anterior al inicio del trabajo "${trabajo.nombre}" (${formatearFechaDMA(trabajo.fechaInicio)})`
+      );
+    }
+
+    const tareaRepo = manager.getRepository(TareaTrabajo);
+    await tareaRepo.save(
+      tareaRepo.create({
+        fechaCarga: new Date(),
+        fechaHoraTarea: new Date(data.fechaHoraTarea),
+        fechaTarea: data.fechaTarea as unknown as Date,
+        descripcion: data.descripcion,
+        horasTarea: data.horasTarea,
+        montoTarea: data.montoTarea,
+        // Vínculo directo al trabajo: la tarea nace **pendiente** (sin período).
+        trabajo,
+      })
+    );
+  });
+
+  refresh();
+  return true;
+}
+
+// ============================================================
+// 9) EDITAR / ELIMINAR ítems PENDIENTES (jornadas y tareas)
+// ============================================================
+/**
+ * Mecanismo de corrección de los ítems **pendientes** (2026-09-26): los mismos
+ * ítems que lista la pantalla `/trabajo`, que dejó de tener formularios propios
+ * cuando se archivaron los CRUDs de jornadas/tareas (R3/R4).
+ *
+ * **Regla única** (plan-liquidaciones.md): un ítem **ya liquidado está
+ * CONGELADO**. La corrección de un ítem cobrado se hace **anulando el cobro**
+ * (que lo libera, lo vuelve a pendiente y soft-deletea la liquidación) y
+ * volviéndolo a cobrar. Por eso estas 4 acciones sólo aceptan pendientes.
+ *
+ * La propina es un **depósito real** en una cuenta (movimiento "Cobro Propina"):
+ * al editar se **revierte el depósito anterior y se vuelve a crear** con lo que
+ * quedó en el formulario (cubre cambiar monto, cambiar de cuenta o quitarla), y
+ * al eliminar la jornada se **revierte** (si no, quedaría plata depositada por
+ * una jornada inexistente). Mismo criterio que la rama de propina de
+ * `anularMovimiento`.
+ */
+
+/** Trabajo de un ítem: su **columna propia** (`trabajoId`, vínculo del modelo
+ *  nuevo) o —en los ítems viejos— el de su **período**. */
+function trabajoDeItem(item: {
+  trabajo?: Trabajo | null;
+  periodoTrabajo?: Liquidacion | null;
+}): Trabajo | null {
+  return item.trabajo ?? item.periodoTrabajo?.trabajo ?? null;
+}
+
+/** Guard de "congelado": un ítem con liquidación no se edita ni se elimina. */
+function exigirItemPendiente(
+  item: { periodoTrabajo?: Liquidacion | null },
+  que: string
+) {
+  if (item.periodoTrabajo) {
+    throw new Error(
+      `Esa ${que} ya está liquidada (cobrada): se corrige anulando el cobro y volviéndola a cobrar`
+    );
+  }
+}
+
+/**
+ * Revierte el depósito de propina de una jornada (si lo tiene): devuelve el
+ * saldo a la cuenta y **soft-deletea** su movimiento, como la rama de propina de
+ * `anularMovimiento`. El histórico de la cuenta se recalcula por running-sum
+ * sobre los movimientos activos, así que no hay que tocar `historico_cuenta`.
+ */
+async function revertirPropinaDeJornada(
+  manager: EntityManager,
+  movRepo: Repository<Movimiento>,
+  cuentaRepo: Repository<Cuenta>,
+  jornadaId: string
+) {
+  const mov = await movRepo.findOne({
+    where: { jornadaTrabajo: { id: jornadaId }, eliminado: false },
+    relations: { cuenta: true },
+  });
+  if (!mov?.cuenta) return;
+  mov.cuenta.saldo -= mov.montoCuentaMonedaOrigen;
+  await cuentaRepo.save(mov.cuenta);
+  await crearHistoricoCuenta(manager, mov.cuenta);
+  mov.eliminado = true;
+  await movRepo.save(mov);
+}
+
+/** Trae la jornada del usuario con su trabajo (propio o el de su período). */
+async function jornadaDelUsuario(manager: EntityManager, id: string, userId: number) {
+  const jornada = await manager.getRepository(JornadaTrabajo).findOne({
+    where: { id, eliminado: false },
+    relations: {
+      trabajo: { usuario: true },
+      periodoTrabajo: { trabajo: { usuario: true } },
+    },
+  });
+  const trabajo = jornada ? trabajoDeItem(jornada) : null;
+  if (!jornada || !trabajo || trabajo.usuario?.id !== userId) {
+    throw new Error("Jornada no encontrada");
+  }
+  return { jornada, trabajo };
+}
+
+/** Trae la tarea del usuario con su trabajo (propio o el de su período). */
+async function tareaDelUsuario(manager: EntityManager, id: string, userId: number) {
+  const tarea = await manager.getRepository(TareaTrabajo).findOne({
+    where: { id, eliminado: false },
+    relations: {
+      trabajo: { usuario: true },
+      periodoTrabajo: { trabajo: { usuario: true } },
+    },
+  });
+  const trabajo = tarea ? trabajoDeItem(tarea) : null;
+  if (!tarea || !trabajo || trabajo.usuario?.id !== userId) {
+    throw new Error("Tarea no encontrada");
+  }
+  return { tarea, trabajo };
+}
+
+export async function actualizarJornadaTrabajo(
+  id: string,
+  input: z.infer<typeof editarJornadaSchema>
+) {
+  const userId = await requireUserId();
+  const data = editarJornadaSchema.parse(input);
+  if (data.horaDesde >= data.horaHasta) {
+    throw new Error("La hora de fin debe ser posterior a la de inicio");
+  }
+  const propina = data.montoPropina ?? 0;
+  if (propina > 0 && !data.idCuenta) {
+    throw new Error("Seleccioná la cuenta para depositar la propina");
+  }
+  // Conversión a la moneda predeterminada fuera de la transacción (igual que el
+  // alta): el movimiento guarda el nominal en la moneda de la cuenta.
+  const propinaPredeterminada =
+    propina > 0 && data.idCuenta
+      ? await montoEnMonedaPredeterminada(
+          data.idCuenta,
+          propina,
+          new Date(data.fecha)
+        )
+      : propina;
+
+  const ds = await getDb();
+  await ds.transaction(async (manager) => {
+    const jornadaRepo = manager.getRepository(JornadaTrabajo);
+    const movRepo = manager.getRepository(Movimiento);
+    const cuentaRepo = manager.getRepository(Cuenta);
+    const conceptoRepo = manager.getRepository(Concepto);
+
+    const { jornada, trabajo } = await jornadaDelUsuario(manager, id, userId);
+    exigirItemPendiente(jornada, "jornada");
+    if (!modalidadAdmiteJornadas(trabajo.modalidadCobro ?? "horas_variables")) {
+      throw new Error(
+        `El trabajo "${trabajo.nombre}" no admite jornadas (modalidad ${etiquetaModalidad(
+          trabajo.modalidadCobro ?? "horas_variables"
+        )})`
+      );
+    }
+    // Mismos guards del alta: fecha >= inicio del trabajo y sin solapamiento con
+    // otra jornada del mismo trabajo (`excluirId` = esta misma).
+    if (
+      String(data.fecha).slice(0, 10) < String(trabajo.fechaInicio).slice(0, 10)
+    ) {
+      throw new Error(
+        `La fecha de la jornada (${formatearFechaDMA(data.fecha)}) es anterior al inicio del trabajo "${trabajo.nombre}" (${formatearFechaDMA(trabajo.fechaInicio)})`
+      );
+    }
+    const superpuesta = await encontrarJornadaSuperpuesta(
+      jornadaRepo,
+      trabajo.id,
+      data.fecha,
+      data.horaDesde,
+      data.horaHasta,
+      id
+    );
+    if (superpuesta) {
+      throw new Error(
+        `Ya existe una jornada de "${trabajo.nombre}" el ${formatearFechaDMA(data.fecha)} de ${formatearHora(superpuesta.horaDesde)} a ${formatearHora(superpuesta.horaHasta)} (horas superpuestas)`
+      );
+    }
+
+    // El monto se recalcula con el **precio congelado** de la jornada
+    // (`jornada.precioHora`, snapshot del alta): editar no re-valoriza jornadas
+    // viejas con el precio actual del trabajo.
+    jornada.fechaJornada = data.fecha as unknown as Date;
+    jornada.horaDesde = data.horaDesde;
+    jornada.horaHasta = data.horaHasta;
+    jornada.montoJornada = calcularMontoJornada(
+      data.horaDesde,
+      data.horaHasta,
+      jornada.precioHora ?? 0
+    );
+    jornada.montoPropina = propina;
+    await jornadaRepo.save(jornada);
+
+    // Propina: se revierte el depósito anterior y se crea de nuevo (si quedó
+    // alguna) con el monto/cuenta del formulario.
+    await revertirPropinaDeJornada(manager, movRepo, cuentaRepo, id);
+    if (propina > 0 && data.idCuenta) {
+      const cuenta = await cuentaRepo.findOneBy({
+        id: data.idCuenta,
+        usuario: { id: userId },
+      });
+      if (!cuenta) {
+        throw new Error(`Cuenta con id ${data.idCuenta} no encontrada`);
+      }
+      const concepto = await conceptoRepo.findOneBy({ nombre: "Cobro Propina" });
+      if (!concepto) {
+        throw new Error("Concepto 'Cobro Propina' no encontrado");
+      }
+
+      cuenta.saldo += propina;
+      await cuentaRepo.save(cuenta);
+
+      const mov = await movRepo.save(
+        movRepo.create({
+          fecha: data.fecha,
+          monto: propinaPredeterminada,
+          montoCuentaMonedaOrigen: propina,
+          cuenta,
+          concepto,
+          jornadaTrabajo: jornada,
+        })
+      );
+      await crearHistoricoCuenta(manager, cuenta, mov.id);
+    }
+  });
+
+  refresh();
+  return true;
+}
+
+export async function eliminarJornadaTrabajo(id: string) {
+  const userId = await requireUserId();
+  const ds = await getDb();
+  await ds.transaction(async (manager) => {
+    const jornadaRepo = manager.getRepository(JornadaTrabajo);
+    const movRepo = manager.getRepository(Movimiento);
+    const cuentaRepo = manager.getRepository(Cuenta);
+
+    const { jornada } = await jornadaDelUsuario(manager, id, userId);
+    exigirItemPendiente(jornada, "jornada");
+    // La propina depositada se revierte junto con la jornada.
+    await revertirPropinaDeJornada(manager, movRepo, cuentaRepo, id);
+    jornada.eliminado = true;
+    await jornadaRepo.save(jornada);
+  });
+
+  refresh();
+  return true;
+}
+
+export async function actualizarTareaTrabajo(
+  id: string,
+  input: z.infer<typeof editarTareaSchema>
+) {
+  const userId = await requireUserId();
+  const data = editarTareaSchema.parse(input);
+
+  const ds = await getDb();
+  await ds.transaction(async (manager) => {
+    const tareaRepo = manager.getRepository(TareaTrabajo);
+
+    const { tarea, trabajo } = await tareaDelUsuario(manager, id, userId);
+    exigirItemPendiente(tarea, "tarea");
+    if (!modalidadAdmiteTareas(trabajo.modalidadCobro ?? "horas_variables")) {
+      throw new Error(
+        `El trabajo "${trabajo.nombre}" no admite tareas (modalidad ${etiquetaModalidad(
+          trabajo.modalidadCobro ?? "horas_variables"
+        )})`
+      );
+    }
+    if (
+      String(data.fechaTarea).slice(0, 10) <
+      String(trabajo.fechaInicio).slice(0, 10)
+    ) {
+      throw new Error(
+        `La fecha de la tarea (${formatearFechaDMA(data.fechaTarea)}) es anterior al inicio del trabajo "${trabajo.nombre}" (${formatearFechaDMA(trabajo.fechaInicio)})`
+      );
+    }
+
+    // `undefined` en TypeORM significa "no tocar la columna": la descripción y
+    // las horas son nullable y el usuario puede **vaciarlas**, así que se asignan
+    // por una vista `string | null` (los tipos de la entidad quedaron estrechos).
+    const opcionales = tarea as unknown as {
+      descripcion: string | null;
+      horasTarea: number | null;
+    };
+    opcionales.descripcion = data.descripcion?.trim() || null;
+    opcionales.horasTarea = data.horasTarea ?? null;
+    tarea.fechaTarea = data.fechaTarea as unknown as Date;
+    tarea.fechaHoraTarea = new Date(data.fechaHoraTarea);
+    tarea.montoTarea = data.montoTarea;
+    await tareaRepo.save(tarea);
+  });
+
+  refresh();
+  return true;
+}
+
+export async function eliminarTareaTrabajo(id: string) {
+  const userId = await requireUserId();
+  const ds = await getDb();
+  await ds.transaction(async (manager) => {
+    const { tarea } = await tareaDelUsuario(manager, id, userId);
+    exigirItemPendiente(tarea, "tarea");
+    tarea.eliminado = true;
+    await manager.getRepository(TareaTrabajo).save(tarea);
+  });
+
+  refresh();
   return true;
 }

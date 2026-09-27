@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Banknote, CalendarClock, CalendarPlus, ListPlus } from "lucide-react";
 import { CrudTable } from "@/components/crud/CrudTable";
 import type { SwipeRowAction } from "@/components/crud/SwipeRowActions";
-import type { PeriodoTrabajoOut } from "@/backend/src/queries/trabajos";
+import type { LiquidacionOut } from "@/backend/src/queries/trabajos";
 import { eliminarPeriodoTrabajo } from "@/backend/src/actions/trabajos";
 import { periodoCobrable, periodoCobrado } from "@/backend/src/lib/jornadas";
 import { ActividadCell } from "@/app/(app)/dashboard/components/ingresos-detalle";
@@ -14,7 +14,7 @@ import { dateTimeToString, numberToCurrency, todayLocalISODate } from "@/lib/uti
 /** Un trabajo es "compatible" con el gráfico de actividad según su modalidad de
     cobro: horas_variables → jornadas · por_tarea → tareas. Los fijo/horas_fijas
     no admiten cargas de jornadas/tareas, así que no muestran gráfico (solo "—"). */
-function esCompatibleConActividad(p: PeriodoTrabajoOut): boolean {
+function esCompatibleConActividad(p: LiquidacionOut): boolean {
   if (!p.trabajo) return false;
   // Sin modalidad (registros previos a la migración) se asume horas_variables.
   const m = p.trabajo.modalidadCobro ?? "horas_variables";
@@ -23,7 +23,7 @@ function esCompatibleConActividad(p: PeriodoTrabajoOut): boolean {
 
 /** Total de actividad del período (jornadas+propina, o tareas). Lo usa la
     exportación a PDF de la columna de gráfico. */
-function totalActividad(p: PeriodoTrabajoOut): number {
+function totalActividad(p: LiquidacionOut): number {
   if ((p.jornadas?.length ?? 0) > 0)
     return (p.jornadas ?? []).reduce(
       (suma, j) => suma + (j.montoJornada || 0) + (j.montoPropina || 0),
@@ -40,7 +40,7 @@ function totalActividad(p: PeriodoTrabajoOut): number {
 // mantiene decreciente por "Desde" aunque "Trabajo" quede como 1ª columna.
 function periodoTrabajoColumns(
   currency: string
-): ColumnDef<PeriodoTrabajoOut>[] {
+): ColumnDef<LiquidacionOut>[] {
   return [
     {
       accessorFn: (r) => r.trabajo?.nombre ?? "",
@@ -78,7 +78,7 @@ function periodoTrabajoColumns(
       header: "Jornadas/Tareas",
       meta: {
         align: "center" as const,
-        exportValue: (row: PeriodoTrabajoOut) =>
+        exportValue: (row: LiquidacionOut) =>
           esCompatibleConActividad(row) && totalActividad(row) > 0
             ? numberToCurrency(totalActividad(row), currency)
             : "",
@@ -110,7 +110,7 @@ function fechaCortaDMY(v: Date | string): string {
 // tarjeta (~234px a 390px de viewport) y obligaba a scroll horizontal.
 function periodoTrabajoMobileColumns(
   currency: string
-): ColumnDef<PeriodoTrabajoOut>[] {
+): ColumnDef<LiquidacionOut>[] {
   return [
     {
       accessorFn: (r) => r.trabajo?.nombre ?? "",
@@ -145,7 +145,7 @@ function periodoTrabajoMobileColumns(
         </span>
       ),
       meta: {
-        exportValue: (row: PeriodoTrabajoOut) =>
+        exportValue: (row: LiquidacionOut) =>
           `${dateTimeToString(row.fechaDesde)} al ${dateTimeToString(
             row.fechaHasta
           )}`,
@@ -166,12 +166,12 @@ function periodoTrabajoMobileColumns(
     `montoACobrar` NO incluye la propina (decisión 2026-08-06: se deposita
     aparte en una cuenta), así que hay que sumarla para mostrar el total real
     (mismo criterio que los ingresos del panel "Resultados"). */
-function totalConPropina(p: PeriodoTrabajoOut): number {
+function totalConPropina(p: LiquidacionOut): number {
   const propina = (p.jornadas ?? []).reduce(
     (suma, j) => suma + (j.montoPropina || 0),
     0
   );
-  return (p.montoACobrar ?? 0) + propina;
+  return (p.montoCalculado ?? 0) + propina;
 }
 
 // Columnas de la vista "Períodos Finalizados" (decisión 2026-09-13): el nombre
@@ -179,7 +179,7 @@ function totalConPropina(p: PeriodoTrabajoOut): number {
 // único importe que se muestra es lo percibido (monto a cobrar + propina).
 function periodoFinalizadoColumns(
   currency: string
-): ColumnDef<PeriodoTrabajoOut>[] {
+): ColumnDef<LiquidacionOut>[] {
   return [
     {
       // Fusiona Trabajo + Desde + Hasta en una sola columna. El accessor expone
@@ -203,7 +203,7 @@ function periodoFinalizadoColumns(
         </div>
       ),
       meta: {
-        exportValue: (row: PeriodoTrabajoOut) =>
+        exportValue: (row: LiquidacionOut) =>
           `${row.trabajo?.nombre ?? "—"} (${dateTimeToString(
             row.fechaDesde
           )} al ${dateTimeToString(row.fechaHasta)})`,
@@ -233,7 +233,7 @@ function toDateKey(v: Date | string): string {
     ⚠️ `[&>td]:text-inherit` es necesario porque `DataTable` pinta cada `<td>` con
     `text-card-foreground` (propio); sin eso el color del `<tr>` no llega a las
     celdas. */
-function filaEstadoCls(p: PeriodoTrabajoOut): string {
+function filaEstadoCls(p: LiquidacionOut): string {
   if (periodoCobrado(p)) return "";
   const hoy = todayLocalISODate();
   const desde = toDateKey(p.fechaDesde);
@@ -244,7 +244,7 @@ function filaEstadoCls(p: PeriodoTrabajoOut): string {
 }
 
 interface Props {
-  initialData: PeriodoTrabajoOut[];
+  initialData: LiquidacionOut[];
   /** Origen de navegación (?origen=...). Si es "dashboard" se propaga al
       "+" (wizard de nuevo período) y al editar. La flecha volver al dashboard
       es SIEMPRE visible. */
@@ -299,7 +299,7 @@ export function PeriodosTrabajoListClient({
       que ESA acción se pinte como PÍLDORA ancha en vez de círculo, para que se
       distinga de Editar/Eliminar (como el botón verde de la captura que pasó el
       usuario). */
-  const accionesFila = (p: PeriodoTrabajoOut): SwipeRowAction[] => {
+  const accionesFila = (p: LiquidacionOut): SwipeRowAction[] => {
     if (periodoCobrado(p)) return [];
     if (periodoCobrable(p, todayLocalISODate())) {
       return [
@@ -378,7 +378,7 @@ export function PeriodosTrabajoListClient({
     [initialData, soloCobrados]
   );
   return (
-    <CrudTable<PeriodoTrabajoOut>
+    <CrudTable<LiquidacionOut>
       title={soloCobrados ? "Períodos Finalizados" : "Períodos de Trabajo"}
       columns={
         soloCobrados

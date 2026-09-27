@@ -70,25 +70,30 @@ export function StepShell({
 }
 
 /** Botones del wizard de movimientos. En modo directo: Cancelar (→ volverA si
- * viene, si no → dashboard) + Siguiente. En modo stepper: Atrás + Siguiente. */
+ * viene, si no → dashboard) + Siguiente. En modo stepper: Atrás + Siguiente.
+ * Con `atrasEnDirecto` el paso pide **también** "Atrás" en modo directo: lo usan
+ * los pasos con **sub-pasos internos** (hoy sólo "Cobrar trabajo", 2026-09-26),
+ * donde hay que poder volver a la pantalla anterior sin salir del wizard. */
 export function NavButtons({
   onBack,
   onNext,
   nextDisabled = false,
   nextLabel = "Siguiente",
   backLabel = "Atrás",
+  atrasEnDirecto = false,
 }: {
   onBack: () => void;
   onNext: () => void;
   nextDisabled?: boolean;
   nextLabel?: string;
   backLabel?: string;
+  atrasEnDirecto?: boolean;
 }) {
   const { direct, volverA } = useMovimientoStepper();
   const router = useRouter();
   return (
     <NavButtonsBase
-      onBack={direct ? undefined : onBack}
+      onBack={direct && !atrasEnDirecto ? undefined : onBack}
       onCancel={
         direct ? () => router.push(volverA ?? "/dashboard") : undefined
       }

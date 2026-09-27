@@ -106,6 +106,14 @@ type PreguntaCuenta = {
 /** Margen (px) alrededor de la franja del FAB para decidir si se corre. */
 const MARGEN_FRANJA = 8;
 
+/**
+ * Cuántos ejemplos ofrece la burbuja como máximo.
+ *
+ * ⚠️ Hay **una entrada por intención** (hoy 15): sin tope, la burbuja se hacía más
+ * alta que la pantalla del celular y su ✕ quedaba inalcanzable (2026-09-27).
+ */
+const MAX_EJEMPLOS = 10;
+
 /** ¿El destino de esta intención **es** la pantalla actual? (sin query) */
 function esMiPantallaDe(intencion: Intencion, ruta: string): boolean {
   return intencion.href().split("?")[0] === ruta;
@@ -403,6 +411,19 @@ export function VozFab() {
 
     if (intencion && !sinDato) {
       setDictado(null);
+      /**
+       * ⚠️ **No se navega a la pantalla en la que YA estamos**: `push` a la misma
+       * URL era un **no-op silencioso** y la orden se sentía "no hace nada" (QA en
+       * el celular, 2026-09-27: *"cargar jornada de trabajo"* estando en el paso de
+       * jornada). Acá se dice qué pasa y qué falta decir.
+       */
+      if (esMiPantallaDe(intencion, ruta)) {
+        setAviso({
+          escuchado: texto,
+          texto: `Esta es la pantalla de ${(intencion.etiqueta ?? "carga").toLowerCase()}: decime los datos y los anoto (por ejemplo «de 9 a 17»).`,
+        });
+        return;
+      }
       irA(intencion, resto, dato);
       return;
     }
@@ -816,7 +837,7 @@ export function VozFab() {
               Todavía no sé dónde queda «{preguntaNav.termino}».
             </p>
           )}
-          <div className="mt-2 flex flex-wrap gap-1.5">
+          <div className="mt-2 flex max-h-[45vh] flex-wrap gap-1.5 overflow-y-auto overscroll-contain">
             {preguntaNav.destinos.map((i, k) => (
               <BotonCandidato
                 key={i.id}
@@ -870,8 +891,13 @@ export function VozFab() {
           )}
 
           {ejemplos.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {ejemplos.map((e) => (
+            /* ⚠️ **Con tope y scroll** (QA en el celular, 2026-09-27): con una entrada
+               por intención (hoy 15) la burbuja crecía más alto que la pantalla y la
+               ✕ del encabezado quedaba **fuera del rango visible** ⇒ no se podía
+               cerrar. Se listan los primeros y el resto se scrollea **dentro** de la
+               burbuja, así el encabezado (y la ✕) siempre quedan a la vista. */
+            <div className="mt-2 flex max-h-[45vh] flex-wrap gap-1.5 overflow-y-auto overscroll-contain">
+              {ejemplos.slice(0, MAX_EJEMPLOS).map((e) => (
                 <EjemploVoz
                   key={e.id}
                   texto={e.texto}

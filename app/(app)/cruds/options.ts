@@ -5,7 +5,7 @@
 
 import { getAllTiposCuenta, getAllMonedas, getAllPersonas, getAllCuentas } from "@/backend/src/queries/maestros";
 import { getAllTarjetas, getAllPeriodosTarjeta, getAllMovimientosTarjeta } from "@/backend/src/queries/tarjetas";
-import { getAllTrabajos, getAllPeriodosTrabajo } from "@/backend/src/queries/trabajos";
+import { getAllTrabajos } from "@/backend/src/queries/trabajos";
 
 export async function fetchTiposCuenta() {
   const rows = await getAllTiposCuenta();
@@ -44,15 +44,6 @@ export async function fetchCuentasConSaldo() {
     .map((r) => ({ value: r.nombre, label: r.nombre }));
 }
 
-// Variante con value = ID (para la cuenta de propina de las jornadas).
-export async function fetchCuentasId() {
-  const rows = await getAllCuentas();
-  return rows.map((r) => ({
-    value: String(r.id),
-    label: r.moneda ? `${r.nombre} (${r.moneda.codigoISO})` : r.nombre,
-  }));
-}
-
 export async function fetchTarjetas() {
   const rows = await getAllTarjetas();
   return rows.map((r) => ({ value: r.nombre, label: r.nombre }));
@@ -66,98 +57,6 @@ export async function fetchPeriodosTarjeta() {
 export async function fetchTrabajos() {
   const rows = await getAllTrabajos();
   return rows.map((r) => ({ value: r.nombre, label: r.nombre }));
-}
-
-// Variante con value = ID (para el período automático de las jornadas).
-export async function fetchTrabajosId() {
-  const rows = await getAllTrabajos();
-  return rows.map((r) => ({ value: String(r.id), label: r.nombre }));
-}
-
-// ---- Filtros por modalidad de cobro (2026-09-05) ----
-
-/** Devuelve nombre + modalidadCobro de cada trabajo (para condicionales de UI). */
-export async function fetchTrabajosModalidad(): Promise<
-  { nombre: string; modalidadCobro: string }[]
-> {
-  const rows = await getAllTrabajos();
-  return rows.map((r) => ({
-    nombre: r.nombre,
-    modalidadCobro: r.modalidadCobro ?? "horas_variables",
-  }));
-}
-
-/** Trabajos que admiten JORNADAS (modalidad horas_variables) — value = ID. */
-export async function fetchTrabajosHorasVariablesId() {
-  const rows = await getAllTrabajos();
-  return rows
-    .filter((r) => (r.modalidadCobro ?? "horas_variables") === "horas_variables")
-    .map((r) => ({ value: String(r.id), label: r.nombre }));
-}
-
-/** Trabajos que admiten TAREAS (modalidad por_tarea) — value = ID. */
-export async function fetchTrabajosPorTareaId() {
-  const rows = await getAllTrabajos();
-  return rows
-    .filter((r) => (r.modalidadCobro ?? "horas_variables") === "por_tarea")
-    .map((r) => ({ value: String(r.id), label: r.nombre }));
-}
-
-/** Formatea "YYYY-MM-DD" (o Date) a "D/M/YYYY" sin problemas de zona horaria. */
-function formatFecha(value: string | Date): string {
-  let iso: string;
-  if (typeof value === "string") {
-    iso = value.slice(0, 10);
-  } else if (value instanceof Date && !isNaN(value.getTime())) {
-    iso = value.toISOString().slice(0, 10);
-  } else {
-    return String(value);
-  }
-  const [y, m, d] = iso.split("-");
-  if (!y || !m || !d) return iso;
-  return `${parseInt(d, 10)}/${parseInt(m, 10)}/${y}`;
-}
-
-export async function fetchPeriodosTrabajo() {
-  const rows = await getAllPeriodosTrabajo();
-  // Solo períodos SIN fecha de cobro (null o fecha centinela < 1901-01-02,
-  // misma lógica que el dashboard para "no cobrado").
-  return rows
-    .filter((r) => {
-      if (!r.fechaDeCobro) return true;
-      return new Date(r.fechaDeCobro) < new Date("1901-01-02");
-    })
-    .map((r) => ({
-      value: String(r.id),
-      label: `${r.trabajo?.nombre ?? "Trabajo"}: ${formatFecha(r.fechaDesde)} al ${formatFecha(r.fechaHasta)}`,
-    }));
-}
-
-/** Períodos (sin cobrar) cuyo trabajo es de la modalidad indicada. */
-async function fetchPeriodosTrabajoPorModalidad(modalidad: string) {
-  const rows = await getAllPeriodosTrabajo();
-  return rows
-    .filter(
-      (r) => (r.trabajo?.modalidadCobro ?? "horas_variables") === modalidad
-    )
-    .filter((r) => {
-      if (!r.fechaDeCobro) return true;
-      return new Date(r.fechaDeCobro) < new Date("1901-01-02");
-    })
-    .map((r) => ({
-      value: String(r.id),
-      label: `${r.trabajo?.nombre ?? "Trabajo"}: ${formatFecha(r.fechaDesde)} al ${formatFecha(r.fechaHasta)}`,
-    }));
-}
-
-/** Períodos de trabajos horas_variables (para cargar jornadas). */
-export async function fetchPeriodosTrabajoHorasVariables() {
-  return fetchPeriodosTrabajoPorModalidad("horas_variables");
-}
-
-/** Períodos de trabajos por_tarea (para cargar tareas). */
-export async function fetchPeriodosTrabajoPorTarea() {
-  return fetchPeriodosTrabajoPorModalidad("por_tarea");
 }
 
 // Para Movimientos Tarjeta (opciones de movimiento, solo lectura de ejemplo)

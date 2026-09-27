@@ -434,9 +434,10 @@ export function SelectField({
 }
 
 /**
- * Botones de navegación genéricos (context-free). Si viene `onCancel` muestra
- * un botón "Cancelar"; si no y viene `onBack`, un botón "Atrás"; si ninguno,
- * deja el hueco. A la derecha siempre el botón principal (`onNext`).
+ * Botones de navegación genéricos (context-free). A la izquierda se muestra el
+ * botón que corresponda: **los dos** ("Atrás" + "Cancelar") cuando el paso tiene
+ * sub-pasos internos y hay que poder retroceder sin salir (2026-09-26); si no,
+ * el de siempre. A la derecha siempre el botón principal (`onNext`).
  */
 export function NavButtons({
   onBack,
@@ -457,17 +458,19 @@ export function NavButtons({
 }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      {onCancel ? (
-        <button type="button" onClick={onCancel} className={btnOutline}>
-          {cancelLabel}
-        </button>
-      ) : onBack ? (
-        <button type="button" onClick={onBack} className={btnOutline}>
-          {backLabel}
-        </button>
-      ) : (
-        <span />
-      )}
+      <div className="flex items-center gap-2">
+        {onBack && (
+          <button type="button" onClick={onBack} className={btnOutline}>
+            {backLabel}
+          </button>
+        )}
+        {onCancel && (
+          <button type="button" onClick={onCancel} className={btnOutline}>
+            {cancelLabel}
+          </button>
+        )}
+        {!onBack && !onCancel && <span />}
+      </div>
       <button
         type="button"
         onClick={onNext}

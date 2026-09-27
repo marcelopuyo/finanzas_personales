@@ -3,14 +3,12 @@ import { z } from "zod";
 // Reemplaza a class-validator. Reglas equivalentes a los DTOs del backend NestJS.
 
 const dateString = z.string().min(1);
-// Fecha/hora efectiva de una tarea: "YYYY-MM-DDTHH:mm[:ss]" (datetime-local).
-const dateTimeString = z.string().min(1);
 
 // Modalidades de cobro de un trabajo (2026-09-04/05):
-//  - fijo:           monto por período, se carga junto con el período.
-//  - horas_fijas:    horas por período × precio por hora (snapshot).
-//  - horas_variables: jornadas (horas cargadas) × precio por hora + propina.
-//  - por_tarea:      cada tarea se carga con su propio monto (no por hora).
+//  - fijo:            monto por período, declarado al cobrar.
+//  - horas_fijas:     horas del período × precio por hora (snapshot al cobrar).
+//  - horas_variables: jornadas cargadas (la propina va aparte, por su depósito).
+//  - por_tarea:       cada tarea se carga con su propio monto (no por hora).
 export const MODALIDADES_COBRO = [
   "fijo",
   "horas_fijas",
@@ -23,6 +21,11 @@ export type ModalidadCobro = (typeof MODALIDADES_COBRO)[number];
 // `precioHora` es requerido SOLO para las modalidades por hora. En el CREATE,
 // si no llega modalidad se asume 'horas_variables' (comportamiento histórico,
 // exigía precio). En el UPDATE solo se exige cuando la modalidad viene explícita.
+//
+// ⚠️ Acá vivían los schemas de **período, jornada y tarea** del circuito viejo
+// (CRUDs archivados en `archivo/` con el rediseño de liquidaciones): la jornada y
+// la tarea ahora se cargan desde el wizard, con sus propios schemas en
+// `validation/movimientos.ts` (`jornadaStepperSchema` / `tareaStepperSchema`).
 const trabajoBase = z.object({
   nombre: z.string().min(1),
   fechaInicio: dateString,
@@ -60,59 +63,3 @@ export const trabajoCreateSchema = trabajoBase.superRefine((val, ctx) =>
 export const trabajoUpdateSchema = trabajoBase
   .partial()
   .superRefine((val, ctx) => requierePrecioSiPorHora(val, ctx, false));
-
-// ---- Período de trabajo ----
-// ⚠️ `fechaDeCobro` NO se acepta en el alta ni en la edición (decisión del
-// usuario 2026-09-14): es el resultado del COBRO real — lo setea `cobrarSueldo`
-// al crear el movimiento y solo `anularMovimiento` lo limpia. Así no queda un
-// período marcado como cobrado sin su ingreso correspondiente.
-export const periodoTrabajoCreateSchema = z.object({
-  fechaDesde: dateString,
-  fechaHasta: dateString,
-  // Modalidad 'fijo': monto cargado junto con el período.
-  montoACobrar: z.number().optional(),
-  // Modalidad 'horas_fijas': horas del período (el sistema calcula el monto).
-  horasPeriodo: z.number().optional(),
-  fechaEstimadaCobro: dateString.optional(),
-  nombreTrabajo: z.string().min(1), // nombre del trabajo
-});
-export const periodoTrabajoUpdateSchema = periodoTrabajoCreateSchema.partial();
-
-// ---- Jornada de trabajo ----
-export const jornadaTrabajoCreateSchema = z.object({
-  fechaJornada: dateString,
-  horaDesde: z.number(),
-  horaHasta: z.number(),
-  montoPropina: z.number().optional().default(0),
-  // idPeriodo es opcional: si llega crearPeriodoAutomatico = true se crea un
-  // período de una sola jornada (fechaDesde = fechaHasta = fecha) y NO se usa
-  // un período existente.
-  idPeriodo: z.number().optional(),
-  crearPeriodoAutomatico: z.boolean().optional().default(false),
-  idTrabajo: z.number().optional(),
-  // Cuenta donde se deposita la propina (requerida si montoPropina > 0).
-  idCuenta: z.number().optional(),
-});
-export const jornadaTrabajoUpdateSchema = jornadaTrabajoCreateSchema.partial();
-
-// ---- Tarea de trabajo (modalidad 'por_tarea') ----
-export const tareaTrabajoCreateSchema = z.object({
-  // Fecha/hora efectiva de la tarea (la carga el usuario).
-  fechaHoraTarea: dateTimeString,
-  // Fecha CALENDARIO LOCAL de la tarea ("YYYY-MM-DD", la que ve el usuario en
-  // el input). Se usa para agrupar/validar por la fecha local (decisión
-  // 2026-09-05); el instante exacto queda en fechaHoraTarea.
-  fechaTarea: dateString,
-  // Opcional, precargada con la fecha/hora y editable.
-  descripcion: z.string().optional(),
-  // Opcional INFORMATIVA (no afecta el monto).
-  horasTarea: z.number().positive().optional(),
-  // Monto ganado en la tarea (obligatorio > 0).
-  montoTarea: z.number().positive(),
-  // idPeriodo es opcional: si llega crearPeriodoAutomatico = true se crea un
-  // período de una sola tarea (fechaDesde = fechaHasta = fecha de la tarea).
-  idPeriodo: z.number().optional(),
-  crearPeriodoAutomatico: z.boolean().optional().default(false),
-  idTrabajo: z.number().optional(),
-});
-export const tareaTrabajoUpdateSchema = tareaTrabajoCreateSchema.partial();

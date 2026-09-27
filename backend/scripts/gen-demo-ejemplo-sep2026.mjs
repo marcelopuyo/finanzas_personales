@@ -201,7 +201,7 @@ gastos.forEach((g) => {
 out.push("\n-- ===== 3) PERÍODOS DE TRABAJO (agosto cobrado el 05-09; septiembre EN CURSO) =====");
 periodos.forEach((p) => {
   out.push(
-    `INSERT INTO periodo_trabajo (id, "fechaDesde", "fechaHasta", "montoACobrar", "fechaEstimadaCobro", "fechaDeCobro", eliminado, "trabajoId") ` +
+    `INSERT INTO periodo_trabajo (id, "fechaDesde", "fechaHasta", "montoCalculado", "fechaEstimadaCobro", "fechaDeCobro", eliminado, "trabajoId") ` +
       `VALUES (${p.id}, ${D(p.desde)}, ${D(p.hasta)}, ${N(p.montoACobrar)}, ${D(p.est)}, ${D(p.cobro ?? null)}, false, ${trabId(p.trabajo)}) ` +
       `ON CONFLICT (id) DO NOTHING;`
   );

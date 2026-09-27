@@ -5,6 +5,8 @@
  *
  * Orden de resolución (de lo determinista a lo heurístico):
  *   1. **Disparadores explícitos** ("descripción …", "monto …") — mandan sobre todo.
+ *   2.a **Horas** → el campo `hora` ("de 9 a 17", "a las 13"); va **antes** que los
+ *      números, si no "de 9 a 17" terminaría siendo un **monto**.
  *   2. **Números** → el campo `monto` (si hay varios, gana el mayor).
  *   3. **Fechas** → el campo `fecha`.
  *   4. **Opciones** → sinónimos declarados y después match difuso; si hay
@@ -17,6 +19,7 @@
 
 import { MARGEN_GANADOR, MAX_CANDIDATOS, MAX_TOKENS_TEXTO, RELLENO_INICIAL, UMBRAL_OPCION } from "./config";
 import { extraerFechas } from "./fechas";
+import { extraerHoras } from "./horas";
 import { extraerNumeros, numeroMayor } from "./numeros";
 import { norm, tokenizar } from "./normalizar";
 import { buscarAlias, buscarOpciones, buscarSinonimo } from "./opciones";
@@ -204,6 +207,39 @@ export function parsearCampos(texto: string, config: ConfigDictado): ResultadoDi
     for (let i = 0; i < N; i++) if (relleno.has(nrm[i])) marcar(i, i);
   }
 
+  // ── 2.a) HORAS ─────────────────────────────────────────────────────────────
+  // ⚠️ **Antes** que los números: en "de 9 a 17" los dos números son horas, no un
+  // monto. Sin este paso, el 17 terminaba en el campo `monto` (y el 9 también).
+  const camposHora = config.campos.filter((c) => c.tipo === "hora");
+  if (camposHora.length) {
+    for (const z of zonas) {
+      const esZonaHora = z.campo !== null && z.campo.tipo === "hora";
+      // Sólo interesan la zona libre y las de un campo `hora`.
+      if (z.campo !== null && !esZonaHora) continue;
+      const horas = extraerHoras(orig.slice(z.desde, z.hasta + 1));
+      if (!horas.length) continue;
+
+      if (esZonaHora && z.campo) {
+        // El campo fue nombrado ("desde las 9"): la primera hora de su zona.
+        const h = horas[0];
+        if (asignar(z.campo, h.hora, h.texto, "disparador", 1, true)) {
+          marcar(z.desde + h.desde, z.desde + h.hasta);
+        }
+        continue;
+      }
+
+      // Zona libre: se llenan los campos de hora **en el orden declarado** (el
+      // primero es el "desde"): "de 9 a 17" ⇒ desde 09:00 y hasta 17:00.
+      const destinos = camposHora.filter((c) => !asignado.has(c.campo));
+      for (let k = 0; k < horas.length && k < destinos.length; k++) {
+        const h = horas[k];
+        if (asignar(destinos[k], h.hora, h.texto, "numero", 1, false)) {
+          marcar(z.desde + h.desde, z.desde + h.hasta);
+        }
+      }
+    }
+  }
+
   // ── 2 y 3) Números y fechas ────────────────────────────────────────────────
   for (const z of zonas) {
     const tokensZona = orig.slice(z.desde, z.hasta + 1);
@@ -213,7 +249,18 @@ export function parsearCampos(texto: string, config: ConfigDictado): ResultadoDi
     // Números
     if ((z.campo === null && campoMonto) || montoDefault) {
       const campoDestino = z.campo ?? campoMonto;
-      const mejor = numeroMayor(extraerNumeros(tokensZona));
+      /**
+       * ⚠️ Se descartan los números que **son parte de una fecha** ("el **25** de 9 a
+       * 17"): si no, el 25 del día terminaba asignado al `monto` (bug encontrado al
+       * validar la jornada, 2026-09-27). Las fechas se resuelven igual más abajo.
+       */
+      const fechasDeZona = extraerFechas(tokensZona);
+      const soloMontos = extraerNumeros(tokensZona).filter(
+        (n) =>
+          !usado[z.desde + n.desde] &&
+          !fechasDeZona.some((f) => n.desde <= f.hasta && n.hasta >= f.desde)
+      );
+      const mejor = numeroMayor(soloMontos);
       if (campoDestino && mejor) {
         const origen: OrigenAsignacion = z.campo ? "disparador" : "numero";
         /**
@@ -247,7 +294,12 @@ export function parsearCampos(texto: string, config: ConfigDictado): ResultadoDi
     // Fechas
     if ((z.campo === null && campoFecha) || fechaDefault) {
       const campoDestino = z.campo ?? campoFecha;
-      const primera = extraerFechas(tokensZona)[0];
+      // ⚠️ Se compara el **último** token de la fecha (el número, el mes o el día):
+      // el primero puede ser un artículo ("**el** 25") que el relleno de la pantalla
+      // ya consumió, y eso no invalida la fecha.
+      const primera = extraerFechas(tokensZona).find(
+        (f) => !usado[z.desde + f.hasta]
+      );
       if (campoDestino && primera) {
         const origen: OrigenAsignacion = z.campo ? "disparador" : "fecha";
         if (

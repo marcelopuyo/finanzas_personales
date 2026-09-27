@@ -358,7 +358,18 @@ export function parsearIntencion(
   }
 
   // ── Pasada 1: NAVEGACIÓN (el sustantivo manda) ─────────────────────────────
+  /**
+   * 🔑 **Los verbos `verboSolo` de las cargas ganan a la navegación** (2026-09-27,
+   * QA en el celular): *"cobrar trabajo"* tiene el sustantivo `trabajo` del **panel**
+   * y, al ser una frase **corta**, la pasada de navegación se la llevaba antes de que
+   * la carga pudiera dispararse ⇒ el usuario pedía **cobrar** y terminaba en el panel
+   * del dashboard. Un verbo que alcanza solo (el de cobro) manda.
+   */
+  const verboSoloDeCarga = cargas.some(
+    (c) => c.verboSolo && c.verbos.some((v) => nrm.includes(v))
+  );
   for (const intencion of navegables) {
+    if (verboSoloDeCarga) break;
     const haySustantivo = nrm.some((t) => intencion.sustantivos.includes(t));
     if (!haySustantivo) continue;
     const hayVerbo = nrm.some((t) => intencion.verbos.includes(t));
@@ -441,7 +452,7 @@ export function parsearIntencion(
       if (carga.id === "cargar-gasto" && otraCosa) continue;
       const haySustantivo = nrm.some((t) => carga.sustantivos.includes(t));
       const hayVerbo = nrm.some((t) => carga.verbos.includes(t));
-      if (haySustantivo || (hayVerbo && hayMonto)) {
+      if (haySustantivo || (hayVerbo && (hayMonto || carga.verboSolo))) {
         return { intencion: carga, resto: restoDe(carga) };
       }
     }
