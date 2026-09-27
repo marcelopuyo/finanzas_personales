@@ -24,6 +24,13 @@ function fechaHoraLabel(value: string | Date): string {
   )}:${pad(d.getMinutes())}`;
 }
 
+/**
+ * Importe de la fila: **sólo el monto COBRADO** (2026-09-27). Antes, si el cobro
+ * había diferido del calculado, aparecía abajo un "calc. …" con lo que
+ * correspondía: se quitó por pedido del usuario (la fila queda más limpia).
+ * El `montoCalculado` se conserva únicamente como **respaldo** por si una
+ * liquidación no tuviera cobro (en el modelo nuevo nacen cobradas).
+ */
 function ImporteCell({
   montoCobrado,
   montoCalculado,
@@ -37,15 +44,7 @@ function ImporteCell({
 }) {
   const cobrado =
     !!fechaDeCobro && new Date(fechaDeCobro).getFullYear() >= 1901;
-  // El importe del panel es lo COBRADO (P1.a: el ingreso es lo que entró); si el
-  // cobro difirió del calculado (cobro parcial, P2), el calculado se muestra
-  // como referencia para que la diferencia quede a la vista.
   const monto = (cobrado ? montoCobrado : null) ?? montoCalculado ?? 0;
-  const difiere =
-    cobrado &&
-    montoCalculado != null &&
-    montoCobrado != null &&
-    Math.abs(montoCobrado - montoCalculado) > 0.005;
   return (
     <span
       className={cn(
@@ -54,11 +53,6 @@ function ImporteCell({
       )}
     >
       {numberToCurrency(monto, currency)}
-      {difiere && (
-        <span className="text-[10px] font-normal text-subtitle">
-          calc. {numberToCurrency(montoCalculado ?? 0, currency)}
-        </span>
-      )}
     </span>
   );
 }

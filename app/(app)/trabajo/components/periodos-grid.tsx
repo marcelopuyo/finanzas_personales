@@ -129,8 +129,6 @@ type Fila =
       subtitulo: string;
       monto: number;
       refFecha: string;
-      calculado: number;
-      difiere: boolean;
       liquidacion: LiquidacionOut;
     };
 
@@ -230,8 +228,11 @@ export function PeriodosGrid({
   const filas: Fila[] = [
     ...filasPendientes,
     ...cobrados.map((p): Fila => {
+      // El importe de la fila es lo COBRADO. El `montoCalculado` —lo que
+      // correspondía— ya NO se muestra (2026-09-27, pedido del usuario: se quitó
+      // la línea "calc. …" que salía en los cobros parciales); queda sólo como
+      // respaldo si faltara el cobrado.
       const monto = p.montoCobrado ?? p.montoCalculado ?? 0;
-      const calculado = p.montoCalculado ?? 0;
       const fechaCobro = diaMesLocal(p.fechaDeCobro);
       return {
         tipo: "cobrado",
@@ -240,8 +241,6 @@ export function PeriodosGrid({
         subtitulo: `${rangoCobrado(p)}${fechaCobro ? ` · cobrado ${fechaCobro}` : ""}`,
         monto,
         refFecha: isoFecha(p.fechaDeCobro ?? p.fechaHasta),
-        calculado,
-        difiere: Math.abs(monto - calculado) > 0.005,
         liquidacion: p,
       };
     }),
@@ -279,11 +278,6 @@ export function PeriodosGrid({
                   >
                     {numberToCurrency(f.monto, currency)}
                   </span>
-                  {f.tipo === "cobrado" && f.difiere && (
-                    <span className="block text-[10.5px] tabular-nums text-subtitle">
-                      calc. {numberToCurrency(f.calculado, currency)}
-                    </span>
-                  )}
                 </span>
                 <ChevronDown
                   className={cn(
