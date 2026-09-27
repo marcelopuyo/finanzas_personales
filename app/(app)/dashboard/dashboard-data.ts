@@ -2,23 +2,19 @@ import {
   getBalanceActual,
   getCuentasConEvolucion,
   getPrestamosPendientesReporte,
-  getEvolucionIngresos,
   getEvolucionResultados,
 } from "@/backend/src/queries/reportes";
 import {
   getAllPeriodosTrabajo,
   getItemsPendientesCobro,
-  getPropinasDepositadas,
   type ItemPendienteOut,
   type LiquidacionOut,
-  type PropinaDepositadaOut,
 } from "@/backend/src/queries/trabajos";
 import {
-  aFuenteIngresos,
   ingresosDelMesActual,
   ingresosEnRango,
 } from "./ingresos-helpers";
-import { tieneCobroReal } from "@/backend/src/lib/ingresos-trabajo";
+import { aFuenteIngresos, tieneCobroReal } from "@/backend/src/lib/ingresos-trabajo";
 import type { GastoOut } from "@/backend/src/queries/gastos";
 import { getAllGastos } from "@/backend/src/queries/gastos";
 import { getSessionUser } from "@/backend/src/lib/auth";
@@ -47,12 +43,13 @@ export interface DashboardData {
   gastosTotal: string;
   gastosSaldo: string;
   gastosDetalle: GastoOut[];
-  /** Liquidaciones COBRADAS (el devengo de cada ítem lo resuelve `ingresos-helpers`). */
+  /**
+   * Liquidaciones del usuario (con sus ítems). En el modelo nuevo **nacen
+   * cobradas**; el **devengo** de cada ítem lo resuelve `lib/ingresos-trabajo`.
+   */
   ingresosDetalle: LiquidacionOut[];
   /** Ítems pendientes de cobro (jornadas/tareas sin liquidar): tarjeta "Por cobrar". */
   itemsPendientes: ItemPendienteOut[];
-  /** Propinas depositadas: ingreso real imputado a la fecha de su movimiento (P1.a.3). */
-  propinas: PropinaDepositadaOut[];
   ingresosResumen: {
     name: string;
     value: number;
@@ -73,7 +70,6 @@ export interface DashboardData {
     data: Record<string, string | number>[];
     series: { key: string; detalle: string; currency: string; sentido: string }[];
   };
-  evolucionIngresos: { name: string; value: number }[];
   evolucionResultados: { name: string; value: number }[];
 }
 
@@ -83,20 +79,16 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     cuentasEvol,
     gastosTodos,
     prestamos,
-    evolIngresos,
     evolResultados,
     periodosTrabajo,
-    propinas,
     itemsPendientes,
   ] = await Promise.all([
     getBalanceActual().catch(() => 0),
     getCuentasConEvolucion().catch(() => []),
     getAllGastos().catch(() => [] as GastoOut[]),
     getPrestamosPendientesReporte().catch(() => []),
-    getEvolucionIngresos().catch(() => []),
     getEvolucionResultados().catch(() => []),
     getAllPeriodosTrabajo().catch(() => []),
-    getPropinasDepositadas().catch(() => []),
     getItemsPendientesCobro().catch(() => []),
   ]);
 
@@ -168,11 +160,11 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     }));
   })();
 
-  // --- Ingresos por trabajo (criterio ÚNICO P1.a: ítems de lo cobrado +
-  // prorrateo de fijo/horas_fijas sobre el cobrado + propinas depositadas) ---
+  // --- Ingresos por trabajo (criterio ÚNICO **DEVENGADO**: los ítems por su
+  // fecha —liquidados o pendientes— + prorrateo de fijo/horas_fijas) ---
   // ⚠️ Estos totales son solo el FALLBACK SSR; el dashboard los recalcula en el
   // cliente (dashboard-client.tsx) con la fecha local del navegador.
-  const fuenteIngresos = aFuenteIngresos(periodosTrabajo, propinas);
+  const fuenteIngresos = aFuenteIngresos(periodosTrabajo, itemsPendientes);
   const ingresosTotales = ingresosEnRango(fuenteIngresos);
   const ingresosResumen = Array.from(ingresosTotales.porTrabajo.entries()).map(
     ([name, value]) => ({ name, value })
@@ -316,13 +308,10 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   );
 
   // --- Evolución ---
-  // (La evolución de Gastos se calcula en el cliente por fecha de pago,
-  // agrupada por mes calendario; ver gastos-agrupacion.ts. Acá solo Ingresos y
-  // Resultados.)
-  const evolucionIngresos = evolIngresos.map((e) => ({
-    name: e.periodo,
-    value: e.monto,
-  }));
+  // La evolución de **Gastos** la agrupa el cliente por fecha de pago
+  // (`gastos-agrupacion.ts`) y la de **Ingresos** también la calcula el cliente
+  // desde la fuente devengado (`evolucionIngresosPorMes`): acá sólo queda
+  // "Resultados", que es una serie del backend.
 
   // Evolución de resultados: usa el endpoint del backend getEvolucionResultados
   // (misma lógica que el frontend original: una sola serie con el resultado neto por mes)
@@ -344,16 +333,15 @@ export async function fetchDashboardData(): Promise<DashboardData> {
       return fb - fa;
     }),
     ingresosDetalle: periodosTrabajo
-      // Sólo liquidaciones COBRADAS: en el modelo nuevo la liquidación existe
-      // únicamente si hubo cobro (P1/P1.b) y el listado del panel no muestra
-      // pendientes (ésos viven en la tarjeta "Por cobrar").
+      // Para el LISTADO del panel sólo las que tienen cobro real (en el modelo
+      // nuevo la liquidación existe únicamente si hubo cobro, P1/P1.b). El
+      // criterio de ingresos NO depende de esto: usa `periodosTrabajo` entero.
       .filter((p) => tieneCobroReal(p.fechaDeCobro))
       .sort(
         (a, b) =>
           new Date(b.fechaHasta).getTime() - new Date(a.fechaHasta).getTime()
       ),
     itemsPendientes,
-    propinas,
     ingresosResumen,
     ingresosTotal: numberToCurrency(totalIngresos, monedaPredeterminadaISO),
     ingresosMesActual: numberToCurrency(totalMesActual, monedaPredeterminadaISO),
@@ -363,7 +351,6 @@ export async function fetchDashboardData(): Promise<DashboardData> {
       data: prestamosChartData,
       series: prestamosChartSeries,
     },
-    evolucionIngresos,
     evolucionResultados,
   };
 }

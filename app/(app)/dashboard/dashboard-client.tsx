@@ -21,11 +21,11 @@ import { PeriodosTrabajoLista } from "./components/periodos-trabajo-lista";
 import type { DashboardData } from "./dashboard-data";
 import { gastosEvolucionPor } from "./gastos-agrupacion";
 import {
-  aFuenteIngresos,
   evolucionIngresosPorMes,
   ingresosDelMesActual,
   ingresosEnRango,
 } from "./ingresos-helpers";
+import { aFuenteIngresos } from "@/backend/src/lib/ingresos-trabajo";
 import type { GastoOut } from "@/backend/src/queries/gastos";
 import type { LiquidacionOut } from "@/backend/src/queries/trabajos";
 import { cn, numberToCurrency, todayLocalISODate } from "@/lib/utils";
@@ -95,13 +95,15 @@ export function DashboardClient({ data }: Props) {
   const [dFhIng, setDFhIng] = useState("");
 
   const todosLosGastos: GastoOut[] = data.gastosDetalle;
-  // Liquidaciones COBRADAS (el SSRP ya entrega sólo las cobradas).
+  // Liquidaciones del usuario con sus ítems (en el modelo nuevo nacen cobradas).
   const todosLosIngresos: LiquidacionOut[] = data.ingresosDetalle;
-  // Fuente del panel de ingresos: liquidaciones + propinas depositadas. El
-  // criterio (P1.a) vive en `ingresos-helpers`/`ingresos-trabajo`.
+  // Fuente del panel de ingresos (**criterio DEVENGADO**): liquidaciones + ítems
+  // pendientes de cobrar. El criterio vive en `lib/ingresos-trabajo`; acá se
+  // rearma para poder recalcular el badge con la fecha LOCAL del navegador
+  // (el SSR lo hace con la del servidor).
   const fuenteIngresos = useMemo(
-    () => aFuenteIngresos(todosLosIngresos, data.propinas),
-    [todosLosIngresos, data.propinas]
+    () => aFuenteIngresos(todosLosIngresos, data.itemsPendientes),
+    [todosLosIngresos, data.itemsPendientes]
   );
 
   // ¿Se está visualizando el "mes actual" (sin filtros de fechas aplicados)?
@@ -154,9 +156,9 @@ export function DashboardClient({ data }: Props) {
       if (f >= desde && f <= hasta) totalG += g.monto;
     });
 
-    // Badge "Mes actual" de Ingresos: criterio ÚNICO (P1.a) — ítems de las
-    // liquidaciones cobradas del mes + prorrateo del `montoCobrado` en
-    // fijo/horas_fijas + propinas depositadas por la fecha de su movimiento.
+    // Badge "Mes actual" de Ingresos: criterio ÚNICO **DEVENGADO** — ítems
+    // (jornadas/tareas, con su propina) por su fecha, estén liquidados o
+    // pendientes + prorrateo del rango en fijo/horas_fijas.
     const totalI = ingresosDelMesActual(fuenteIngresos, hasta);
     const iso = data.monedaPredeterminadaISO;
 
@@ -387,15 +389,16 @@ export function DashboardClient({ data }: Props) {
       liquidaciones: fuenteIngresos.liquidaciones.filter((l) =>
         selTra.includes(l.trabajo)
       ),
-      propinas: fuenteIngresos.propinas.filter((p) =>
-        selTra.includes(p.trabajo)
+      itemsPendientes: fuenteIngresos.itemsPendientes.filter((i) =>
+        selTra.includes(i.trabajo)
       ),
     };
   }, [fuenteIngresos, selTra]);
 
-  // Resumen por trabajo: ítems de lo cobrado + prorrateo + propinas cuya fecha
-  // cae en el rango elegido (el trabajo NO filtra el resumen, igual que en
-  // Gastos: el filtro de trabajo aplica al detalle y al histórico).
+  // Resumen por trabajo: lo DEVENGADO en el rango elegido (ítems por su fecha,
+  // liquidados o pendientes) + prorrateo de fijo/horas_fijas. El trabajo NO
+  // filtra el resumen, igual que en Gastos: ese filtro aplica al detalle y al
+  // histórico.
   const filteredIngresosResumen = useMemo(() => {
     const rango = ingresosEnRango(
       fuenteIngresos,

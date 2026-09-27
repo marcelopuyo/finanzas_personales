@@ -4,17 +4,15 @@ import { getSessionUser, requireUserId } from "../lib/auth";
 import { convertir } from "../lib/cotizaciones";
 import {
   aportesPorMes,
-  ymd,
-  SIN_TRABAJO,
-  type FuenteIngresos,
+  aFuenteIngresos,
 } from "../lib/ingresos-trabajo";
 import { getPrestamosNetoEnPredeterminada } from "../lib/prestamos";
 import { Cuenta } from "../entities/cuenta.entity";
 import { Gasto } from "../entities/gasto.entity";
 import { HistoricoCuenta } from "../entities/historico-cuenta.entity";
-import { Movimiento } from "../entities/movimiento.entity";
 import { Liquidacion } from "../entities/periodo-trabajo.entity";
 import { Prestamo } from "../entities/prestamo.entity";
+import { getItemsPendientesCobro } from "./trabajos";
 
 // ============================================================
 // Tipos de salida (coinciden con los DTOs del backend)
@@ -173,69 +171,25 @@ function etiquetaDesdeYM(ym: string): string {
 }
 
 /**
- * Evolución de ingresos por mes con el **criterio único** (P1.a/P1.d): ítems de
- * las liquidaciones COBRADAS por su fecha + prorrateo del `montoCobrado` en
- * `fijo`/`horas_fijas` + propinas depositadas por la fecha de su movimiento.
+ * Evolución de ingresos por mes con el **criterio único DEVENGADO** (P1.d):
+ * ítems (jornadas/tareas, **con su propina**) por la fecha del ítem —estén
+ * liquidados o pendientes— + prorrateo del rango en `fijo`/`horas_fijas`.
  * ⚠️ La regla vive en `lib/ingresos-trabajo.ts` (módulo puro) y es la MISMA que
  * usa el panel: acá sólo se adaptan las entidades a esa estructura.
  */
 export async function getEvolucionIngresos(): Promise<EvolucionItem[]> {
   const userId = await requireUserId();
   const ds = await getDb();
-  const [liqs, propinas] = await Promise.all([
+  const [liqs, itemsPendientes] = await Promise.all([
     ds.getRepository(Liquidacion).find({
       where: { trabajo: { usuario: { id: userId } }, eliminado: false },
       order: { fechaDesde: "ASC" },
       relations: { trabajo: true, jornadas: true, tareas: true },
     }),
-    ds.getRepository(Movimiento).find({
-      where: {
-        cuenta: { usuario: { id: userId } },
-        concepto: { nombre: "Cobro Propina" },
-        eliminado: false,
-      },
-      relations: {
-        jornadaTrabajo: { trabajo: true, periodoTrabajo: { trabajo: true } },
-      },
-    }),
+    getItemsPendientesCobro(),
   ]);
 
-  const fuente: FuenteIngresos = {
-    liquidaciones: liqs.map((p) => {
-      const jornadas = (p.jornadas ?? []).filter((j) => !j.eliminado);
-      const tareas = (p.tareas ?? []).filter((t) => !t.eliminado);
-      const cobrada =
-        !!p.fechaDeCobro && new Date(p.fechaDeCobro).getFullYear() >= 1901;
-      return {
-        trabajo: p.trabajo?.nombre ?? SIN_TRABAJO,
-        fechaDesde: ymd(p.fechaDesde),
-        fechaHasta: ymd(p.fechaHasta),
-        // La fecha de cobro la necesita el criterio para el cobro ADELANTADO.
-        fechaDeCobro: ymd(p.fechaDeCobro),
-        modalidad: p.trabajo?.modalidadCobro ?? "horas_variables",
-        cobrada,
-        montoCobrado: p.montoCobrado ?? p.montoCalculado ?? 0,
-        items: [
-          ...jornadas.map((j) => ({
-            fecha: ymd(j.fechaJornada),
-            monto: j.montoJornada ?? 0,
-          })),
-          ...tareas.map((t) => ({
-            fecha: ymd(t.fechaTarea),
-            monto: t.montoTarea ?? 0,
-          })),
-        ],
-      };
-    }),
-    propinas: propinas.map((m) => ({
-      fecha: ymd(m.fecha),
-      monto: m.montoCuentaMonedaOrigen ?? 0,
-      trabajo:
-        m.jornadaTrabajo?.trabajo?.nombre ??
-        m.jornadaTrabajo?.periodoTrabajo?.trabajo?.nombre ??
-        SIN_TRABAJO,
-    })),
-  };
+  const fuente = aFuenteIngresos(liqs, itemsPendientes);
 
   return [...aportesPorMes(fuente).entries()].map(([ym, monto]) => ({
     periodo: etiquetaDesdeYM(ym),

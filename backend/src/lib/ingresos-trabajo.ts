@@ -1,44 +1,35 @@
-// **Criterio ÚNICO de ingresos de trabajo** (decisión P1.a de
+// **Criterio ÚNICO de ingresos de trabajo — criterio DEVENGADO** (decisión del
+// usuario, 2026-09-27; **reemplaza el criterio de CAJA** de P1.a de
 // `DeepSeek/plan-liquidaciones.md`). Módulo **puro** (sin React ni BD): lo usan
 // el panel del dashboard (`app/(app)/dashboard/ingresos-helpers.ts`) y la query
 // del gráfico de evolución (`backend/src/queries/reportes.ts`) para que los **3
 // lectores** (badge del mes, ingresos por trabajo, evolución) no se
 // desincronicen nunca (P1.d).
 //
+// 🔑 **Qué cambió**: antes el ingreso era **lo COBRADO** (sólo los ítems de las
+// liquidaciones ya pagadas) ⇒ el mes en curso se veía incompleto hasta cobrar.
+// Ahora el ingreso es **lo DEVENGADO**: lo que se trabajó y ganó en el período,
+// se haya cobrado o no (lo que falta cobrar sigue viéndose, además, en la
+// tarjeta "Por cobrar").
+//
 // Reglas (una sola rama por liquidación):
-//  1. **Propina = ingreso REAL**, imputado a la **fecha de su MOVIMIENTO** de
-//     depósito ("Cobro Propina"), sin esperar la liquidación (P1.a.3).
-//  2. **Liquidación con ítems** (jornadas/tareas — incluye las legacy que
-//     tienen hijos): el ingreso son los **ítems**, cada uno por la **fecha del
-//     ítem** (devengo) y **completo** aunque el cobro haya sido parcial
-//     (P1.a.2 / P1.a.6).
-//  3. **Liquidación `fijo`/`horas_fijas` sin ítems**: si se cobró **antes de que
-//     terminara el rango** (cobro ADELANTADO) el dinero entró ese día ⇒ el
-//     **monto completo** se reconoce en el **mes de la fecha de cobro**; si no,
-//     **prorrateo del rango por días** sobre el `montoCobrado` (sin el corte
-//     "hasta hoy" del mes en curso).
-//  4. **Sin cobrar no hay ingreso**: una liquidación sin `fechaDeCobro` no
-//     aporta (el panel muestra lo cobrado; lo pendiente va a "Por cobrar").
+//  1. **Ítems (jornadas/tareas) = devengo por la FECHA DEL ÍTEM**, estén o no
+//     liquidados/cobrados: un ítem pendiente de cobro ya es ingreso de su mes.
+//  2. **Propina = parte del devengo de su jornada**: aporta en la **fecha de la
+//     jornada** (no en la del movimiento de depósito) y **aunque todavía no se
+//     haya depositado** en ninguna cuenta.
+//  3. **Liquidación `fijo`/`horas_fijas` (sin ítems)**: no hay ítem que devengar
+//     ⇒ **prorrateo del rango por días** sobre su monto. ⛔ Se retiró la regla de
+//     **cobro adelantado** del §173: era de *caja* (imputaba todo al mes del
+//     cobro) y contradice el devengo.
+//  4. **Anular = dejar de devengar**: una liquidación anulada no aporta, pero sus
+//     ítems —que vuelven a quedar pendientes— siguen contando por la regla 1.
 
 export const SIN_TRABAJO = "Sin trabajo";
 
 /** Meses que reconoce una modalidad sin ítems al prorratear. */
 export function esModalidadFija(modalidad: string): boolean {
   return modalidad === "fijo" || modalidad === "horas_fijas";
-}
-
-/**
- * ¿El cobro fue **ADELANTADO**? Sí: se cobró **antes de que terminara el rango**
- * (`fechaDeCobro < fechaHasta`).
- *
- * Decisión del usuario (2026-09-26, restaura la regla del §8 de
- * `plan-remodelacion-trabajo.md`): en un cobro adelantado el dinero **entró ese
- * día**, así que el monto completo se reconoce en el **mes de la fecha de cobro**
- * y **no** se prorratea. Alcance: sólo `fijo`/`horas_fijas` (las modalidades con
- * ítems se rigen por la fecha de cada ítem).
- */
-export function cobroAdelantado(l: LiquidacionIngreso): boolean {
-  return !!l.fechaDeCobro && !!l.fechaHasta && l.fechaDeCobro < l.fechaHasta;
 }
 
 /**
@@ -65,33 +56,108 @@ export interface ItemIngreso {
 export interface LiquidacionIngreso {
   /** Nombre del trabajo (agrupa el panel y el gráfico). */
   trabajo: string;
-  /** "YYYY-MM-DD" del rango de la liquidación. */
+  /** "YYYY-MM-DD" del rango de la liquidación (sólo prorratean `fijo`/`horas_fijas`). */
   fechaDesde: string;
   fechaHasta: string;
-  /** "YYYY-MM-DD" de la fecha de cobro ("" si no se cobró). */
-  fechaDeCobro: string;
   /** Modalidad del trabajo (`fijo`/`horas_fijas` prorratean; el resto no). */
   modalidad: string;
-  /** `true` si tiene `fechaDeCobro` real (centinela < 1901 = no cobrada). */
-  cobrada: boolean;
-  /** Monto realmente cobrado (nominal), con fallback al calculado. */
-  montoCobrado: number;
+  /** Monto de la liquidación (nominal cobrado, con fallback al calculado). */
+  monto: number;
   /** Ítems devengados (jornadas y/o tareas), ya sin los eliminados. */
   items: ItemIngreso[];
 }
 
-/** Depósito de propina real (movimiento "Cobro Propina"). */
-export interface PropinaIngreso {
-  /** "YYYY-MM-DD" del MOVIMIENTO (no de la jornada). */
-  fecha: string;
-  monto: number;
+/** Ítem devengado que **todavía no pertenece a ninguna liquidación**. */
+export interface ItemPendienteIngreso extends ItemIngreso {
+  /** Nombre del trabajo (agrupa el panel y el gráfico). */
   trabajo: string;
 }
 
 /** Fuente completa del panel de ingresos. */
 export interface FuenteIngresos {
   liquidaciones: LiquidacionIngreso[];
-  propinas: PropinaIngreso[];
+  itemsPendientes: ItemPendienteIngreso[];
+}
+
+// ---------------------------------------------------------------------------
+// Adaptador: entidades/DTOs → FuenteIngresos
+// ---------------------------------------------------------------------------
+// Los tipos de abajo son **estructurales** (no importan entidades ni queries) a
+// propósito: los cumplen tanto los DTO del panel (`LiquidacionOut`,
+// `ItemPendienteOut`) como las **entidades** que carga `queries/reportes.ts`.
+
+interface JornadaFuente {
+  fechaJornada: string | Date;
+  montoJornada?: number | null;
+  /** Propina de la jornada (misma fecha de devengo). */
+  montoPropina?: number | null;
+  eliminado?: boolean;
+}
+
+interface TareaFuente {
+  fechaTarea: string | Date;
+  montoTarea?: number | null;
+  eliminado?: boolean;
+}
+
+/** Forma mínima de una liquidación (entidad o DTO). */
+export interface LiquidacionFuente {
+  fechaDesde: string | Date;
+  fechaHasta: string | Date;
+  montoCobrado?: number | null;
+  montoCalculado?: number | null;
+  trabajo?: { nombre: string; modalidadCobro: string } | null;
+  jornadas?: JornadaFuente[] | null;
+  tareas?: TareaFuente[] | null;
+}
+
+/** Forma mínima de un ítem pendiente de liquidar (`ItemPendienteOut`). */
+export interface ItemPendienteFuente {
+  trabajoNombre?: string | null;
+  fecha: string | Date;
+  monto?: number | null;
+  montoPropina?: number | null;
+}
+
+/**
+ * Normaliza las dos fuentes (liquidaciones con sus ítems + ítems pendientes) a
+ * la estructura del cálculo.
+ *
+ * 🔑 La **propina de cada jornada se suma al monto de esa jornada**: se devenga
+ * con ella (regla 2) y así deja de depender del movimiento de depósito.
+ */
+export function aFuenteIngresos(
+  liquidaciones: LiquidacionFuente[],
+  itemsPendientes: ItemPendienteFuente[] = []
+): FuenteIngresos {
+  return {
+    liquidaciones: liquidaciones.map((l) => ({
+      trabajo: l.trabajo?.nombre ?? SIN_TRABAJO,
+      fechaDesde: ymd(l.fechaDesde),
+      fechaHasta: ymd(l.fechaHasta),
+      modalidad: l.trabajo?.modalidadCobro ?? "horas_variables",
+      monto: l.montoCobrado ?? l.montoCalculado ?? 0,
+      items: [
+        ...(l.jornadas ?? [])
+          .filter((j) => !j.eliminado)
+          .map((j) => ({
+            fecha: ymd(j.fechaJornada),
+            monto: (j.montoJornada ?? 0) + (j.montoPropina ?? 0),
+          })),
+        ...(l.tareas ?? [])
+          .filter((t) => !t.eliminado)
+          .map((t) => ({
+            fecha: ymd(t.fechaTarea),
+            monto: t.montoTarea ?? 0,
+          })),
+      ],
+    })),
+    itemsPendientes: itemsPendientes.map((i) => ({
+      trabajo: i.trabajoNombre ?? SIN_TRABAJO,
+      fecha: ymd(i.fecha),
+      monto: (i.monto ?? 0) + (i.montoPropina ?? 0),
+    })),
+  };
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -177,32 +243,27 @@ export function aportesEnRango(
   const enVentana = (f: string) =>
     (!desde || f >= desde) && (!hasta || f <= hasta) && !!f;
 
-  // 1) Propinas depositadas: ingreso real por la fecha de su movimiento.
-  for (const p of fuente.propinas) {
-    if (enVentana(p.fecha)) add(p.trabajo || SIN_TRABAJO, p.monto);
-  }
-
-  // 2) Liquidaciones COBRADAS (las no cobradas no aportan ingreso).
+  // 1) Ítems de las liquidaciones (jornadas/tareas): devengo por su FECHA, con
+  //    propina incluida (regla 1+2). No importa si la liquidación está cobrada.
   for (const l of fuente.liquidaciones) {
-    if (!l.cobrada) continue;
     if (l.items.length > 0) {
       for (const it of l.items) {
         if (enVentana(it.fecha)) add(l.trabajo, it.monto);
       }
       continue;
     }
+    // 2) `fijo`/`horas_fijas` (sin ítems): prorrateo del rango por días (regla 3).
     if (esModalidadFija(l.modalidad)) {
-      // Cobro ADELANTADO: el dinero entró el día del cobro ⇒ el monto completo
-      // se reconoce en su mes (no se prorratea).
-      if (cobroAdelantado(l)) {
-        if (enVentana(l.fechaDeCobro)) add(l.trabajo, l.montoCobrado);
-        continue;
-      }
       add(
         l.trabajo,
-        prorrateoPorDias(l.fechaDesde, l.fechaHasta, l.montoCobrado, desde, hasta)
+        prorrateoPorDias(l.fechaDesde, l.fechaHasta, l.monto, desde, hasta)
       );
     }
+  }
+
+  // 3) Ítems PENDIENTES de liquidar: ya son ingreso devengado (regla 1).
+  for (const it of fuente.itemsPendientes) {
+    if (enVentana(it.fecha)) add(it.trabajo, it.monto);
   }
   return { total, porTrabajo };
 }
@@ -227,19 +288,18 @@ export function ingresosDelMes(
 export function aportesPorMes(fuente: FuenteIngresos): Map<string, number> {
   const meses = new Set<string>();
   for (const l of fuente.liquidaciones) {
-    if (!l.cobrada) continue;
-    // Un cobro adelantado se reconocerá en el mes de SU fecha de cobro (que
-    // puede estar fuera del rango, ej.: rango de octubre cobrado en septiembre).
-    if (esModalidadFija(l.modalidad) && cobroAdelantado(l)) {
-      meses.add(ymDe(l.fechaDeCobro));
-    } else {
-      for (const m of mesesDelRango(l.fechaDesde || l.fechaHasta, l.fechaHasta)) {
+    // Los meses que toca el RANGO sólo importan cuando la liquidación no tiene
+    // ítems y hay que prorratearla (`fijo`/`horas_fijas`).
+    if (l.items.length === 0 && esModalidadFija(l.modalidad) && l.fechaDesde) {
+      for (const m of mesesDelRango(l.fechaDesde, l.fechaHasta)) {
         meses.add(m);
       }
     }
     for (const it of l.items) if (it.fecha) meses.add(ymDe(it.fecha));
   }
-  for (const p of fuente.propinas) if (p.fecha) meses.add(ymDe(p.fecha));
+  for (const it of fuente.itemsPendientes) {
+    if (it.fecha) meses.add(ymDe(it.fecha));
+  }
 
   const out = new Map<string, number>();
   for (const ym of [...meses].sort()) {

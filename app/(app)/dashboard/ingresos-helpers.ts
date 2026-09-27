@@ -1,62 +1,16 @@
-// Adaptador del panel de INGRESOS: traduce los datos del backend
-// (`LiquidacionOut` + propinas depositadas) a las estructuras del **criterio
-// único** de `backend/src/lib/ingresos-trabajo.ts` y expone los 3 lectores que
-// usa el dashboard (badge del mes, ingresos por trabajo, evolución).
+// Adaptador del panel de INGRESOS: expone los 3 lectores que usa el dashboard
+// (badge del mes, ingresos por trabajo, evolución) sobre el **criterio único
+// DEVENGADO** de `backend/src/lib/ingresos-trabajo.ts`.
 //
-// ⚠️ Acá NO hay reglas de negocio: todas viven en el módulo puro (P1.a). Este
-// archivo sólo mapea y da formato (lo comparten el SSR y el cliente).
+// ⚠️ Acá NO hay reglas de negocio (ni mapeo de datos): todo eso vive en el
+// módulo puro, que es el único lugar donde se define el criterio. Este archivo
+// sólo da formato a lo que devuelve (lo comparten el SSR y el cliente).
 import {
   aportesEnRango,
   aportesPorMes,
   ingresosDelMes,
-  tieneCobroReal,
-  ymd,
-  SIN_TRABAJO,
   type FuenteIngresos,
-  type LiquidacionIngreso,
-  type PropinaIngreso,
 } from "@/backend/src/lib/ingresos-trabajo";
-import type {
-  LiquidacionOut,
-  PropinaDepositadaOut,
-} from "@/backend/src/queries/trabajos";
-
-/**
- * Normaliza los datos del backend a la fuente del cálculo. Los `LiquidacionOut`
- * ya vienen con sus ítems sin los eliminados (`queries/trabajos.ts`).
- */
-export function aFuenteIngresos(
-  liquidaciones: LiquidacionOut[],
-  propinas: PropinaDepositadaOut[]
-): FuenteIngresos {
-  const liqs: LiquidacionIngreso[] = liquidaciones.map((p) => ({
-    trabajo: p.trabajo?.nombre ?? SIN_TRABAJO,
-    fechaDesde: ymd(p.fechaDesde),
-    fechaHasta: ymd(p.fechaHasta),
-    // La fecha de cobro la necesita el criterio para el cobro ADELANTADO.
-    fechaDeCobro: ymd(p.fechaDeCobro),
-    modalidad: p.trabajo?.modalidadCobro ?? "horas_variables",
-    cobrada: tieneCobroReal(p.fechaDeCobro),
-    // Prorrateo sobre lo COBRADO (P1.a.1), con fallback histórico al calculado.
-    montoCobrado: p.montoCobrado ?? p.montoCalculado ?? 0,
-    items: [
-      ...p.jornadas.map((j) => ({
-        fecha: ymd(j.fechaJornada),
-        monto: j.montoJornada || 0,
-      })),
-      ...p.tareas.map((t) => ({
-        fecha: ymd(t.fechaTarea),
-        monto: t.montoTarea || 0,
-      })),
-    ],
-  }));
-  const props: PropinaIngreso[] = propinas.map((p) => ({
-    fecha: p.fecha,
-    monto: p.monto,
-    trabajo: p.trabajo || SIN_TRABAJO,
-  }));
-  return { liquidaciones: liqs, propinas: props };
-}
 
 /**
  * Ingresos de la ventana [desde, hasta] (fechas inclusive, "YYYY-MM-DD"; sin

@@ -396,62 +396,12 @@ export async function getItemsPendientesCobro(): Promise<ItemPendienteOut[]> {
   );
 }
 
-// ============================================================
-// Propinas DEPOSITADAS (ingreso real, imputado a su movimiento)
-// ============================================================
-/**
- * Depósito de propina real: el movimiento con concepto *"Cobro Propina"* que
- * crea el wizard al cargar una jornada con propina.
- *
- * Desde P1.a.3 de `plan-liquidaciones.md` la propina es un **ingreso real** que
- * se imputa a la **fecha de SU MOVIMIENTO** (no a la fecha de la jornada): si
- * alguna vez se deposita otro día, el panel lo refleja. El monto es el
- * **nominal** (`montoCuentaMonedaOrigen`), espejo de `jornada.montoPropina`.
- * ⚠️ La propina **no** forma parte del circuito de liquidación (ahí cuentan sólo
- * las horas), así que sumarla acá **no** duplica nada.
- */
-export interface PropinaDepositadaOut {
-  id: string;
-  /** "YYYY-MM-DD" del movimiento de depósito (la fecha que rige el ingreso). */
-  fecha: string;
-  /** Monto nominal en la moneda de la cuenta. */
-  monto: number;
-  /** Trabajo de la jornada vinculada (agrupa el panel); `null` si no se pudo. */
-  trabajo: string | null;
-  /** Cuenta donde se depositó (informativo). */
-  cuenta: string | null;
-}
-
-export async function getPropinasDepositadas(): Promise<
-  PropinaDepositadaOut[]
-> {
-  const userId = await requireUserId();
-  const ds = await getDb();
-  const rows = await ds.getRepository(Movimiento).find({
-    where: {
-      cuenta: { usuario: { id: userId } },
-      concepto: { nombre: "Cobro Propina" },
-      eliminado: false,
-    },
-    relations: {
-      cuenta: true,
-      jornadaTrabajo: { trabajo: true, periodoTrabajo: { trabajo: true } },
-    },
-    order: { fecha: "DESC" },
-  });
-  return rows.map((m) => ({
-    id: m.id,
-    fecha: soloFecha(m.fecha),
-    monto: m.montoCuentaMonedaOrigen ?? 0,
-    // La jornada tiene `trabajoId` propio (R1); las jornadas viejas lo resuelven
-    // por su período.
-    trabajo:
-      m.jornadaTrabajo?.trabajo?.nombre ??
-      m.jornadaTrabajo?.periodoTrabajo?.trabajo?.nombre ??
-      null,
-    cuenta: m.cuenta?.nombre ?? null,
-  }));
-}
+// ⛔ Se retiró `getPropinasDepositadas()` (2026-09-27): la propina dejó de ser un
+// ingreso por MOVIMIENTO de depósito y pasó a ser **devengo de su jornada**
+// (`montoPropina` + `fechaJornada`), que arma el mismo módulo puro
+// (`lib/ingresos-trabajo.ts`) junto con el resto de los ítems. El depósito sigue
+// existiendo como operación (mueve el saldo de la cuenta), pero ya no es lo que
+// define cuándo se reconoce el ingreso.
 
 // ============================================================
 // Jornadas de trabajo
