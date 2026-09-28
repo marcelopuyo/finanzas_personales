@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# temporales de verificación (compilados de prueba: nunca versionar)
+/.fp-*/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

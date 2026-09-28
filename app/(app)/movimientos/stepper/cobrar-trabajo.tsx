@@ -408,6 +408,14 @@ export function CobrarTrabajo() {
               {data.fechaDesde && data.fechaHasta
                 ? ` · del ${formatFecha(data.fechaDesde)} al ${formatFecha(data.fechaHasta)}`
                 : ""}
+              {/* Suma de los montos TILDADOS (2026-09-27, pedido del usuario). Es el
+                  mismo número que el monto **calculado** (`seleccionDeItems.monto`),
+                  el que se precarga en la pantalla siguiente y el que muestra la
+                  confirmación: sale de un solo lugar. */}
+              {` · Total `}
+              <span className="font-medium text-card-foreground">
+                {numberToCurrency(calculado)}
+              </span>
             </p>
           )}
 
