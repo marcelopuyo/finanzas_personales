@@ -122,7 +122,7 @@ export function DataTable<TData, TValue>({
               <tr key={headerGroup.id} className="border-b border-border">
                 {headerGroup.headers.map((header) => {
                   const meta = header.column.columnDef.meta as
-                    | { align?: Align }
+                    | { align?: Align; className?: string }
                     | undefined;
                   const canSort = header.column.getCanSort();
                   const sorted = header.column.getIsSorted();
@@ -132,7 +132,8 @@ export function DataTable<TData, TValue>({
                       className={cn(
                         "whitespace-nowrap font-medium text-subtitle",
                         cellPad,
-                        alignClass(meta?.align)
+                        alignClass(meta?.align),
+                        meta?.className
                       )}
                     >
                       {header.isPlaceholder ? null : canSort ? (
@@ -195,7 +196,7 @@ export function DataTable<TData, TValue>({
               >
                 {row.getVisibleCells().map((cell) => {
                   const meta = cell.column.columnDef.meta as
-                    | { align?: Align }
+                    | { align?: Align; className?: string }
                     | undefined;
                   return (
                     <td
@@ -203,7 +204,8 @@ export function DataTable<TData, TValue>({
                       className={cn(
                         "text-card-foreground",
                         cellPad,
-                        alignClass(meta?.align)
+                        alignClass(meta?.align),
+                        meta?.className
                       )}
                     >
                       {flexRender(
@@ -223,7 +225,7 @@ export function DataTable<TData, TValue>({
                 <tr>
                   {footerGroup.headers.map((footer) => {
                     const meta = footer.column.columnDef.meta as
-                      | { align?: Align }
+                      | { align?: Align; className?: string }
                       | undefined;
                     return (
                       <td
@@ -231,7 +233,8 @@ export function DataTable<TData, TValue>({
                         className={cn(
                           "border-t border-border bg-muted/40 font-medium text-card-foreground",
                           cellPad,
-                          alignClass(meta?.align)
+                          alignClass(meta?.align),
+                          meta?.className
                         )}
                       >
                         {footer.isPlaceholder

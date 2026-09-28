@@ -35,26 +35,48 @@ function ImporteCell({
   montoCobrado,
   montoCalculado,
   fechaDeCobro,
+  propina,
   currency,
 }: {
   montoCobrado: number | null;
   montoCalculado: number | null;
   fechaDeCobro?: string | Date | null;
+  /** Propina de las jornadas de la liquidación (0 si no tiene). */
+  propina: number;
   currency: string;
 }) {
   const cobrado =
     !!fechaDeCobro && new Date(fechaDeCobro).getFullYear() >= 1901;
   const monto = (cobrado ? montoCobrado : null) ?? montoCalculado ?? 0;
   return (
-    <span
-      className={cn(
-        "inline-flex min-w-22 flex-col items-end rounded-full px-2 py-0.5 text-[12px] font-medium",
-        cobrado ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
+    <span className="inline-flex flex-col items-end gap-0.5">
+      <span
+        className={cn(
+          "inline-flex min-w-22 flex-col items-end rounded-full px-2 py-0.5 text-[12px] font-medium",
+          cobrado ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
+        )}
+      >
+        {numberToCurrency(monto, currency)}
+      </span>
+      {/* En MOBILE la columna "Propina" está oculta (`hidden sm:table-cell`), así
+          que la propina viaja acá como 2ª línea verde: la tabla no gana ancho. */}
+      {propina > 0.005 && (
+        <span className="text-[10px] font-medium tabular-nums text-success sm:hidden">
+          propina {numberToCurrency(propina, currency)}
+        </span>
       )}
-    >
-      {numberToCurrency(monto, currency)}
     </span>
   );
+}
+
+/**
+ * Σ de las propinas de las jornadas de la liquidación (las **tareas** no llevan
+ * propina). La propina es ingreso devengado de su jornada, pero **no** integra
+ * el monto de la liquidación (que liquida sólo las horas): por eso la columna
+ * "Propina" la muestra aparte del "Importe".
+ */
+export function propinaDeLiquidacion(p: LiquidacionOut): number {
+  return (p.jornadas ?? []).reduce((acc, j) => acc + (j.montoPropina ?? 0), 0);
 }
 
 export function ActividadCell({
@@ -144,6 +166,7 @@ export function ingresosDetalleColumns(
         montoCobrado={row.original.montoCobrado}
         montoCalculado={row.original.montoCalculado}
         fechaDeCobro={row.original.fechaDeCobro}
+        propina={propinaDeLiquidacion(row.original)}
         currency={currency}
       />
     ),
@@ -156,6 +179,34 @@ export function ingresosDetalleColumns(
         0
       );
       return numberToCurrency(total, currency);
+    },
+  },
+  {
+    // **Propina** de las jornadas de la liquidación (2026-09-27, pedido del
+    // usuario). Es parte del INGRESO devengado (entra en el badge del mes y en
+    // el Histórico por la fecha de su jornada) pero **no** del monto de la
+    // liquidación —ese liquida sólo las horas—, así que se muestra aparte y en
+    // verde, y sólo cuando existe.
+    id: "propina",
+    header: "Propina",
+    accessorFn: (row) => propinaDeLiquidacion(row),
+    // Sólo en `sm+`: en mobile la propina va como 2ª línea verde del Importe
+    // (`ImporteCell`), así la tabla no gana ancho en el celular.
+    meta: { align: "right", className: "hidden sm:table-cell" },
+    cell: ({ row }) => {
+      const propina = propinaDeLiquidacion(row.original);
+      if (propina <= 0.005) return <span className="text-subtitle">—</span>;
+      return (
+        <span className="text-[12px] font-medium tabular-nums text-success">
+          {numberToCurrency(propina, currency)}
+        </span>
+      );
+    },
+    footer: ({ table }) => {
+      const total = table
+        .getFilteredRowModel()
+        .rows.reduce((acc, row) => acc + propinaDeLiquidacion(row.original), 0);
+      return total > 0.005 ? numberToCurrency(total, currency) : "—";
     },
   },
   {
