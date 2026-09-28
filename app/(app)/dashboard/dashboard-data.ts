@@ -14,7 +14,14 @@ import {
   ingresosDelMesActual,
   ingresosEnRango,
 } from "./ingresos-helpers";
-import { aFuenteIngresos, tieneCobroReal } from "@/backend/src/lib/ingresos-trabajo";
+import {
+  aFuenteIngresos,
+  tieneCobroReal,
+} from "@/backend/src/lib/ingresos-trabajo";
+import {
+  estimarCobros,
+  type EstimacionTrabajo,
+} from "@/lib/cobros-estimados";
 import type { GastoOut } from "@/backend/src/queries/gastos";
 import { getAllGastos } from "@/backend/src/queries/gastos";
 import { getSessionUser } from "@/backend/src/lib/auth";
@@ -50,6 +57,13 @@ export interface DashboardData {
   ingresosDetalle: LiquidacionOut[];
   /** Ítems pendientes de cobro (jornadas/tareas sin liquidar): tarjeta "Por cobrar". */
   itemsPendientes: ItemPendienteOut[];
+  /**
+   * Ítems pendientes **repartidos en tandas estimadas** por trabajo (ventana
+   * inferida de sus liquidaciones anteriores): "por cobrar" (período ya
+   * cerrado) · "en curso" · "sin período estimado". Ver
+   * `DeepSeek/plan-cobros-estimados.md`.
+   */
+  cobrosEstimados: EstimacionTrabajo[];
   ingresosResumen: {
     name: string;
     value: number;
@@ -214,6 +228,22 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     monedaPredeterminadaISO
   );
 
+  // --- Tandas estimadas de cobro (plan-cobros-estimados.md, panel "Trabajo") ---
+  // La cadencia de cada trabajo se infiere de sus liquidaciones CERRADAS y los
+  // pendientes se reparten en ventanas: las que ya cerraron son "Por cobrar" y
+  // el resto "En curso" (o "Sin período estimado" si no hay cadencia).
+  // ⚠️ Se calcula en el SERVER con la fecha del servidor: el panel renderiza el
+  // MISMO objeto en SSR y en el cliente (nada que recalcular ⇒ sin desajuste de
+  // hidratación). El "hoy" sólo decide si una ventana ya cerró.
+  const liquidacionesCerradas = periodosTrabajo.filter((p) =>
+    tieneCobroReal(p.fechaDeCobro)
+  );
+  const cobrosEstimados = estimarCobros(
+    itemsPendientes,
+    liquidacionesCerradas,
+    hoyKeyMes
+  );
+
   // --- Préstamos pendientes (gráfico DIVERGENTE) ---
   // Cada préstamo entra con su SALDO pendiente **firmado** según el sentido:
   // `otorgado` (yo presté) → positivo (me deben, hacia arriba);
@@ -342,6 +372,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
           new Date(b.fechaHasta).getTime() - new Date(a.fechaHasta).getTime()
       ),
     itemsPendientes,
+    cobrosEstimados,
     ingresosResumen,
     ingresosTotal: numberToCurrency(totalIngresos, monedaPredeterminadaISO),
     ingresosMesActual: numberToCurrency(totalMesActual, monedaPredeterminadaISO),

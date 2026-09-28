@@ -122,14 +122,6 @@ export function DashboardClient({ data }: Props) {
     new Date(prevYear, prevMonth, 0).getDate()
   ).padStart(2, "0")}`;
 
-  // Listado de la tarjeta "Por cobrar": ítems pendientes (jornadas/tareas sin
-  // liquidar) agrupados por trabajo. **"Actuales" ya no existe**: en el modelo
-  // nuevo no hay "período en curso" (la liquidación nace al cobrar) — P1.b.
-  const pendientes = useMemo(
-    () => data.itemsPendientes,
-    [data.itemsPendientes]
-  );
-
   // Badges "Mes actual" de Gastos, Ingresos y Resultados. El servidor (Vercel,
   // UTC) los calcula con `new Date()` y en el límite de mes puede quedar ±1
   // día/mes adelantado respecto al usuario (ej. GMT-3 de noche el 31 → el
@@ -555,10 +547,10 @@ export function DashboardClient({ data }: Props) {
       </div>
 
       {/* Panel Trabajo — ítems PENDIENTES de cobro (jornadas/tareas sin
-          liquidar) agrupados por trabajo. En el modelo nuevo **no hay "período
-          en curso"**: la liquidación nace al cobrar (P1/P1.b), así que el grupo
-          "Actuales"/"En curso" desapareció y el panel muestra sólo lo que falta
-          cobrar.
+          liquidar) repartidos en las **tandas estimadas** de cada trabajo:
+          "Por cobrar" (la ventana ya cerró) · "En curso" · "Sin período
+          estimado" (decisión del usuario 2026-09-27, opción C del preview).
+          La inferencia la hace el server (`lib/cobros-estimados.ts`).
           ⚠️ **El PANEL ENTERO es el área de clic** (decisión del usuario
           2026-09-17) y navega a la pantalla `/trabajo` (2026-09-26: antes llevaba
           al CRUD de períodos, que se archivó con el rediseño) — ahí están los
@@ -586,7 +578,7 @@ export function DashboardClient({ data }: Props) {
             <h2 className="text-[16px] font-semibold text-header">Trabajo</h2>
           </div>
           <PeriodosTrabajoLista
-            items={pendientes}
+            estimaciones={data.cobrosEstimados}
             currency={data.monedaPredeterminadaISO}
           />
         </div>
