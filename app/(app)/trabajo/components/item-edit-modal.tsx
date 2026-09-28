@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
+import { DateFieldInput } from "@/components/ui/date-picker";
 import {
   actualizarJornadaTrabajo,
   actualizarTareaTrabajo,
@@ -140,18 +141,14 @@ export function ItemEditModal({
     >
       <div className="space-y-3">
         <div>
-          <label
-            htmlFor="item-fecha"
-            className="mb-1.5 block text-[13px] font-medium text-header"
-          >
+          <span className="mb-1.5 block text-[13px] font-medium text-header">
             {esJornada ? "Fecha" : "Fecha de la tarea"}
-          </label>
-          <input
-            id="item-fecha"
-            type="date"
+          </span>
+          <DateFieldInput
+            ariaLabel={esJornada ? "Fecha" : "Fecha de la tarea"}
             value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
-            className={inputCls}
+            onChange={setFecha}
+            buttonClassName={inputCls}
           />
         </div>
 

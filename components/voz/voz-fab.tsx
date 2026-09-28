@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Mic, Settings, Trash2, Undo2, X } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, isoADdMmAa } from "@/lib/utils";
 import { useTap } from "@/lib/tap";
 import { norm, tokenizar } from "@/lib/voz/normalizar";
 import { irAlPanel } from "@/lib/panel-scroll";
@@ -567,7 +567,7 @@ export function VozFab() {
   const campoDe = (nombre: string): CampoDictable | undefined =>
     buscarCampo(camposVigentes, nombre);
 
-  /** Valor presentable de una asignación (monto con $, fecha dd/mm/aaaa, etiqueta). */
+  /** Valor presentable de una asignación (monto con $, fecha dd-mm-aa, etiqueta). */
   const valorLindo = (a: Asignacion): string => {
     const campo = campoDe(a.campo);
     if (!campo) return String(a.valor);
@@ -575,8 +575,7 @@ export function VozFab() {
       return `$ ${Number(a.valor).toLocaleString("es-AR")}`;
     }
     if (campo.tipo === "fecha") {
-      const [y, m, d] = String(a.valor).split("-");
-      return `${d}/${m}/${y}`;
+      return isoADdMmAa(String(a.valor));
     }
     if (campo.tipo === "opcion") {
       const opcion = campo.opciones?.().find((o) => o.value === String(a.valor));

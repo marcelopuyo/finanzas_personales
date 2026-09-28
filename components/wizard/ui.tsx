@@ -6,6 +6,7 @@
 // (vía su `./ui`) y el wizard de alta de trabajos (`trabajo-wizard.tsx`).
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Combobox } from "@/components/ui/combobox";
+import { DateFieldInput } from "@/components/ui/date-picker";
 import { cn } from "@/lib/utils";
 
 export const inputCls =
@@ -138,6 +139,12 @@ export function TextField({
   );
 }
 
+/**
+ * Campo de fecha del wizard. Usa el **calendario propio** (`DateFieldInput`),
+ * NO un `<input type="date">` nativo: el nativo mostraba el formato del
+ * navegador (mm/dd/yyyy con el locale en inglés) y no se puede forzar por
+ * atributo ⇒ acá el formato es siempre el de la app, **dd-mm-aa** (§192).
+ */
 export function DateField({
   label,
   value,
@@ -149,11 +156,10 @@ export function DateField({
 }) {
   return (
     <Campo label={label}>
-      <input
-        type="date"
+      <DateFieldInput
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={inputCls}
+        onChange={onChange}
+        buttonClassName={inputCls}
       />
     </Campo>
   );

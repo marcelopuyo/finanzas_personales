@@ -4,7 +4,7 @@
  * Chip de un campo que el dictado completó ("Monto $ 3.500").
  *
  * Es **solo presentacional**: el valor "lindo" (la etiqueta de la opción, el monto
- * formateado, la fecha en dd/mm/aaaa) lo resuelve quien tiene la config.
+ * formateado, la fecha en dd-mm-aa) lo resuelve quien tiene la config.
  *
  * ⚠️ **Hoy sin consumidores** (2026-09-23): lo usaba `DictadoCampos`, el panel de
  * texto + "Interpretar" que se **retiró** con el replanteo de la voz (§14 del plan:

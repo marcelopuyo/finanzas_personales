@@ -31,10 +31,10 @@ function isoDate(v: Date | string): string {
   return String(v).slice(0, 10);
 }
 
-/** Formatea "YYYY-MM-DD" a "dd-mm-aaaa" para mensajes al usuario. */
+/** Formatea "YYYY-MM-DD" a **dd-mm-aa** (formato único de la app). */
 export function formatearFechaDMA(v: Date | string): string {
   const [y, m, d] = isoDate(v).split("-");
-  return `${d}-${m}-${y}`;
+  return `${d}-${m}-${y.slice(-2)}`;
 }
 
 /** Formatea hora HH.MM (ej. 17.3 = 17:30) a "HH:MM" para mensajes al usuario. */

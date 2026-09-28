@@ -13,7 +13,7 @@ import type {
   ItemPendienteOut,
   LiquidacionOut,
 } from "@/backend/src/queries/trabajos";
-import { numberToCurrency } from "@/lib/utils";
+import { dateTimeToString, numberToCurrency } from "@/lib/utils";
 import { obtenerItemEditable } from "./actions";
 import { AccionesFab } from "./components/acciones-fab";
 import { ItemEditModal } from "./components/item-edit-modal";
@@ -197,7 +197,7 @@ export function TrabajoClient({
       >
         <p className="text-[13px] leading-5 text-card-foreground">
           ¿Eliminar {aEliminar?.tipo === "jornada" ? "la jornada" : "la tarea"}{" "}
-          del {aEliminar?.fecha.split("-").reverse().join("/")}?{" "}
+          del {dateTimeToString(aEliminar?.fecha)}?{" "}
           {aEliminar?.montoPropina ? (
             <span className="text-subtitle">
               La propina depositada ({numberToCurrency(aEliminar.montoPropina, monedaISO)})

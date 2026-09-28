@@ -11,7 +11,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Check } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, dateTimeToString } from "@/lib/utils";
 import { crearTrabajo } from "@/backend/src/actions/trabajos";
 import {
   Campo,
@@ -308,7 +308,7 @@ export function TrabajoWizard({ origen }: { origen?: string }) {
             </div>
             <div className="flex justify-between">
               <span className="text-subtitle">Fecha de inicio</span>
-              <span className="text-header">{estado.fechaInicio}</span>
+              <span className="text-header">{dateTimeToString(estado.fechaInicio)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-subtitle">Tipo de pago</span>

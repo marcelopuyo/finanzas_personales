@@ -17,11 +17,17 @@ export function numberToCurrency(value: number, currency = "ARS"): string {
 }
 
 /**
- * Formatea una fecha ISO a string local (dd/mm/aaaa).
+ * "YYYY-MM-DD…" → "dd-mm-aa" cortando el string (nunca se parsea, así no hay
+ * corrimiento de día por zona horaria).
+ *
+ * **Formato ÚNICO de fecha de la app** (decisión del usuario, 2026-09-27): día
+ * primero y año de 2 dígitos. Lo usan tablas, grillas, PDF y los selectores.
  */
-export function dateToLocaleDateString(date: string | Date): string {
-  const d = typeof date === "string" ? new Date(date) : date;
-  return d.toLocaleDateString("es-ES");
+export function isoADdMmAa(iso?: string | null): string {
+  if (!iso) return "";
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  if (!y || !m || !d) return iso;
+  return `${d}-${m}-${y.slice(-2)}`;
 }
 /**
  * Convierte hora decimal (formato backend HH.MM, ej. 17.3 = 17:30) a string "HH:MM".
@@ -49,16 +55,19 @@ export function dateTimeToDate(date?: Date | string): Date {
 }
 
 /**
- * Convierte Date a string dd-mm-aaaa.
- * Las fechas llegan como medianoche UTC desde SQL Server: se formatean con
- * partes UTC para evitar el corrimiento de día por zona horaria.
+ * Convierte una fecha a **"dd-mm-aa"**, el formato ÚNICO de la app.
+ *
+ * - Un **string** ISO se corta tal cual (`isoADdMmAa`): nunca se parsea.
+ * - Un **Date** (columnas `date` que llegan como medianoche UTC) se formatea
+ *   con partes UTC para evitar el corrimiento de día por zona horaria.
  */
 export function dateTimeToString(date?: Date | string): string {
   if (!date) return "";
-  const param = new Date(date);
-  const anio = param.getUTCFullYear();
-  const mes = String(param.getUTCMonth() + 1).padStart(2, "0");
-  const dia = String(param.getUTCDate()).padStart(2, "0");
+  if (typeof date === "string") return isoADdMmAa(date);
+  if (Number.isNaN(date.getTime())) return "";
+  const anio = String(date.getUTCFullYear()).slice(-2);
+  const mes = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const dia = String(date.getUTCDate()).padStart(2, "0");
   return `${dia}-${mes}-${anio}`;
 }
 

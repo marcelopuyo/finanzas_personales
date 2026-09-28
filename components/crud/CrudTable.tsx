@@ -20,7 +20,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import { cn, numberToCurrency } from "@/lib/utils";
+import { cn, dateTimeToString, numberToCurrency } from "@/lib/utils";
 
 interface CrudTableProps<T, TId = number> {
   title: string;
@@ -419,6 +419,10 @@ export function CrudTable<T, TId = number>({
             if (meta?.isCurrency) return numberToCurrency(Number(raw(item)) || 0, currency);
             const v = raw(item);
             if (v === null || v === undefined) return "";
+            // Fechas: al PDF van con el formato de la app (dd-mm-aa). Sin esto,
+            // una columna de fecha sin `exportValue` salía como el `String(Date)`
+            // del navegador ("Mon Sep 28 2026 …", en inglés).
+            if (v instanceof Date) return dateTimeToString(v);
             if (typeof v === "object") return JSON.stringify(v);
             return String(v);
           },

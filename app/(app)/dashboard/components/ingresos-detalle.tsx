@@ -15,11 +15,11 @@ function formatCobroDate(value?: string | Date): string {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** Formatea un instante (fecha/hora efectiva de una tarea) a "dd/mm hh:mm" LOCAL. */
+/** Formatea un instante (fecha/hora efectiva de una tarea) a "dd-mm hh:mm" LOCAL. */
 function fechaHoraLabel(value: string | Date): string {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "";
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(
+  return `${pad(d.getDate())}-${pad(d.getMonth() + 1)} ${pad(
     d.getHours()
   )}:${pad(d.getMinutes())}`;
 }

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { DateFieldInput } from "@/components/ui/date-picker";
 import { QuickCreateModal } from "@/components/ui/quick-create-modal";
 import type { ZodSchema } from "zod";
 
@@ -285,6 +286,23 @@ export function CrudForm({
                       onChange={(checked) =>
                         controllerField.onChange(checked ? "true" : "false")
                       }
+                    />
+                  )}
+                />
+              ) : field.type === "date" ? (
+                /* Fecha con el **calendario propio** (2026-09-27): el
+                   `<input type="date">` nativo mostraba el formato del
+                   navegador (mm/dd/yyyy en locale inglés) y no se puede forzar.
+                   `clearable` mantiene la posibilidad de dejarla vacía. */
+                <Controller
+                  name={field.name}
+                  control={control}
+                  render={({ field: controllerField }) => (
+                    <DateFieldInput
+                      value={(controllerField.value as string) ?? ""}
+                      onChange={controllerField.onChange}
+                      buttonClassName={inputClasses}
+                      clearable
                     />
                   )}
                 />

@@ -10,7 +10,7 @@ import {
   renombrarCredencialWebauthn,
 } from "@/backend/src/actions/webauthn";
 import type { CredencialWebauthnOut } from "@/backend/src/queries/webauthn";
-import { dateToLocaleDateString } from "@/lib/utils";
+import { dateTimeToString } from "@/lib/utils";
 import { activarBiometria, estadoBiometria } from "@/lib/webauthn-client";
 import type { EstadoBiometria, MotivoBiometria } from "@/lib/webauthn-client";
 
@@ -153,9 +153,9 @@ export function PasskeysSection({
                     {c.deviceType === "multiDevice"
                       ? "Passkey sincronizada"
                       : "Solo este dispositivo"}{" "}
-                    · agregada el {dateToLocaleDateString(c.creadoEn)}
+                    · agregada el {dateTimeToString(c.creadoEn)}
                     {c.ultimoUsoEn
-                      ? ` · último uso ${dateToLocaleDateString(c.ultimoUsoEn)}`
+                      ? ` · último uso ${dateTimeToString(c.ultimoUsoEn)}`
                       : ""}
                   </p>
                 </div>

@@ -18,20 +18,20 @@ const PRELOAD_PX = 240;
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** "dd/mm" de una fecha del backend (columnas `date`: medianoche UTC). */
+/** "dd-mm" de una fecha del backend (columnas `date`: medianoche UTC). */
 function diaMes(v: Date | string): string {
   const iso =
     v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10);
   const [, m, d] = iso.split("-");
-  return `${d}/${m}`;
+  return `${d}-${m}`;
 }
 
-/** "dd/mm" del instante de cobro (LOCAL: es un `timestamptz`). */
+/** "dd-mm" del instante de cobro (LOCAL: es un `timestamptz`). */
 function diaMesLocal(v: Date | string | null): string {
   if (!v) return "";
   const d = new Date(v);
   if (Number.isNaN(d.getTime()) || d.getFullYear() < 1901) return "";
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
+  return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}`;
 }
 
 /** "YYYY-MM-DD" de una fecha del backend (para ordenar). */
@@ -41,20 +41,20 @@ function isoFecha(v: Date | string): string {
     : String(v).slice(0, 10);
 }
 
-/** Rango de fechas de un grupo pendiente: "20/09" o "24/09 → 26/09". */
+/** Rango de fechas de un grupo pendiente: "20-09" o "24-09 → 26-09". */
 function rangoPendiente(fechas: string[]): string {
   const ordenadas = [...fechas].sort();
   const desde = ordenadas[0];
   const hasta = ordenadas[ordenadas.length - 1];
   if (desde === hasta) return diaMes(desde);
-  const anioDesde = desde.slice(0, 4);
-  const anioHasta = hasta.slice(0, 4);
+  const anioDesde = desde.slice(2, 4);
+  const anioHasta = hasta.slice(2, 4);
   return anioDesde === anioHasta
     ? `${diaMes(desde)} → ${diaMes(hasta)}`
-    : `${diaMes(desde)}/${anioDesde} → ${diaMes(hasta)}/${anioHasta}`;
+    : `${diaMes(desde)}-${anioDesde} → ${diaMes(hasta)}-${anioHasta}`;
 }
 
-/** Rango de una liquidación: "25/09" si el período empieza y termina el mismo día. */
+/** Rango de una liquidación: "25-09" si el período empieza y termina el mismo día. */
 function rangoCobrado(p: LiquidacionOut): string {
   const desde = diaMes(p.fechaDesde);
   const hasta = diaMes(p.fechaHasta);

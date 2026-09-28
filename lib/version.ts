@@ -20,7 +20,7 @@ export const APP_BUILD_ID = process.env.NEXT_PUBLIC_APP_BUILD_ID ?? "sin-version
 export const APP_BUILT_AT = process.env.NEXT_PUBLIC_APP_BUILT_AT ?? "";
 
 /**
- * Fecha del build en dd/mm/aaaa.
+ * Fecha del build en **dd-mm-aa** (formato único de la app).
  *
  * Se corta el string ISO a mano (sin `new Date()` + `toLocaleDateString`): el
  * valor es un literal del build, así que el servidor y el cliente tienen que
@@ -28,10 +28,10 @@ export const APP_BUILT_AT = process.env.NEXT_PUBLIC_APP_BUILT_AT ?? "";
  */
 export function appBuiltAtDate(): string {
   const [year, month, day] = (APP_BUILT_AT.slice(0, 10) || "").split("-");
-  return year && month && day ? `${day}/${month}/${year}` : "";
+  return year && month && day ? `${day}-${month}-${year.slice(-2)}` : "";
 }
 
-/** Texto para mostrar en la UI: "v1.0.0 · a3f1c08 · 15/09/2026". */
+/** Texto para mostrar en la UI: "v1.0.0 · a3f1c08 · 15-09-26". */
 export function versionLabel(): string {
   return [APP_VERSION, APP_COMMIT, appBuiltAtDate()].filter(Boolean).join(" · ");
 }
