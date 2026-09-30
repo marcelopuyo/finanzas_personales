@@ -17,11 +17,12 @@ const DIAS_VISIBLES = 3;
 /**
  * Pestaña **Detalle** del panel Gastos (2026-09-30).
  *
- * Antes era una **grilla** de 5 columnas (y en mobile obligaba a scroll
- * horizontal). Ahora muestra **tarjetas** de los gastos de los **últimos 3 días**
- * —el actual + 2 consecutivos hacia atrás—, agrupadas por día, y al pie el
- * enlace **"Ver más gastos"** que lleva a la pantalla `/gastos` (lista completa,
- * con búsqueda y scroll infinito).
+ * Muestra **una tarjeta por gasto** de los **últimos 3 días** —el actual + 2
+ * consecutivos hacia atrás— en **orden cronológico** (el más reciente primero) y
+ * **sin separadores de día**: cada tarjeta lleva su **fecha**, su **categoría** y
+ * la **cuenta** con la que se pagó, así el listado se entiende sin agrupar.
+ * Al pie, el enlace **"Ver más gastos"** → `/gastos` (lista completa, con búsqueda
+ * y scroll infinito).
  *
  * Decisiones con el usuario: esta pestaña **no** lleva badge "Mes actual", ni
  * Filtros, ni buscador (la búsqueda vive en la pantalla completa).
@@ -43,50 +44,30 @@ export function GastosTarjetas({
   const montado = useMontado();
   const hoy = montado ? todayLocalISODate() : hoyServidor;
 
-  /** Gastos de los últimos `DIAS_VISIBLES` días, agrupados y ordenados por día. */
-  const grupos = useMemo(() => {
+  /** Gastos de los últimos `DIAS_VISIBLES` días, del más reciente al más viejo. */
+  const gastos = useMemo(() => {
     const desde = diasAntes(hoy, DIAS_VISIBLES - 1);
-    const porDia = new Map<string, GastoOut[]>();
-    for (const g of data) {
-      const f = ymd(g.fechaPago);
-      // Los pendientes (sin fechaPago) quedan afuera, igual que en los paneles.
-      if (!f || f < desde || f > hoy) continue;
-      const lista = porDia.get(f);
-      if (lista) lista.push(g);
-      else porDia.set(f, [g]);
-    }
-    // Del día más reciente al más viejo (dentro del día se respeta el orden que
-    // ya viene: fechaPago DESC).
-    return Array.from(porDia.entries()).sort(([a], [b]) => (a < b ? 1 : -1));
+    return data
+      .filter((g) => {
+        const f = ymd(g.fechaPago);
+        // Los pendientes (sin fechaPago) quedan afuera, igual que en los paneles.
+        return !!f && f >= desde && f <= hoy;
+      })
+      .sort((a, b) => ymd(b.fechaPago).localeCompare(ymd(a.fechaPago)));
   }, [data, hoy]);
 
   return (
-    <div className="space-y-4">
-      {grupos.length === 0 ? (
+    <div className="space-y-3">
+      {gastos.length === 0 ? (
         <p className="py-6 text-center text-[13px] text-subtitle">
           No hay gastos de hoy ni de los 2 días anteriores.
         </p>
       ) : (
-        grupos.map(([dia, gastos]) => {
-          const totalDia = gastos.reduce((acc, g) => acc + (Number(g.monto) || 0), 0);
-          return (
-            <div key={dia} className="space-y-2">
-              <div className="flex items-baseline justify-between gap-2">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-subtitle">
-                  {etiquetaDia(dia, hoy)}
-                </p>
-                <p className="text-[11px] font-medium tabular-nums text-subtitle">
-                  {numberToCurrency(totalDia, currency)}
-                </p>
-              </div>
-              <ul className="space-y-2">
-                {gastos.map((g) => (
-                  <GastoCard key={g.id} gasto={g} currency={currency} />
-                ))}
-              </ul>
-            </div>
-          );
-        })
+        <ul className="space-y-2">
+          {gastos.map((g) => (
+            <GastoCard key={g.id} gasto={g} currency={currency} />
+          ))}
+        </ul>
       )}
 
       {/* Punto de entrada a la lista completa (con búsqueda y scroll infinito). */}
@@ -101,18 +82,33 @@ export function GastosTarjetas({
   );
 }
 
-/** Tarjeta de un gasto: descripción + importe y, debajo, categoría · cuenta. */function GastoCard({ gasto, currency }: { gasto: GastoOut; currency: string }) {
+/**
+ * Tarjeta de un gasto del panel.
+ *
+ *   · Línea 1 → descripción (se recorta con `…` si no entra) | **monto**.
+ *   · Línea 2 → **fecha** en un chip (`30-09-26`) + **categoría · cuenta**.
+ *
+ * El monto vive en su propia columna a la derecha (no se recorta nunca). La fecha
+ * va en un chip para que se distinga de la categoría/cuenta de un vistazo.
+ */
+function GastoCard({ gasto, currency }: { gasto: GastoOut; currency: string }) {
+  const fecha = ymd(gasto.fechaPago);
+  const categoria = gasto.categoria?.nombre ?? "Sin categoría";
   return (
     <li className="rounded-[10px] border border-border bg-muted px-3 py-2.5">
       <div className="flex items-start gap-2.5">
-        <div className="min-w-0 flex-1 space-y-0.5">
+        <div className="min-w-0 flex-1 space-y-1">
           <p className="truncate text-[13.5px] font-semibold leading-4.5 text-card-foreground">
             {gasto.descripcion || "Sin descripción"}
           </p>
-          <p className="truncate text-[11px] leading-3.5 text-subtitle">
-            {[gasto.categoria?.nombre ?? "Sin categoría", gasto.cuenta]
-              .filter(Boolean)
-              .join(" · ")}
+          <p className="flex items-center gap-1.5 text-[11px] leading-4 text-subtitle">
+            <span className="shrink-0 rounded-md border border-border bg-card px-1.5 py-px font-medium tabular-nums text-card-foreground">
+              {fecha ? dateTimeToString(fecha) : "sin fecha"}
+            </span>
+            <span className="truncate">
+              {categoria}
+              {gasto.cuenta ? ` · ${gasto.cuenta}` : ""}
+            </span>
           </p>
         </div>
         <p className="shrink-0 text-[14.5px] font-semibold leading-4.5 tabular-nums text-card-foreground">
@@ -135,11 +131,4 @@ function diasAntes(iso: string, n: number): string {
   const dt = new Date(Date.UTC(y, m - 1, d));
   dt.setUTCDate(dt.getUTCDate() - n);
   return dt.toISOString().slice(0, 10);
-}
-
-/** Rótulo del grupo: "Hoy" · "Ayer" · la fecha (`dd-mm-aa`). */
-function etiquetaDia(iso: string, hoy: string): string {
-  if (iso === hoy) return "Hoy";
-  if (iso === diasAntes(hoy, 1)) return "Ayer";
-  return dateTimeToString(iso);
 }
