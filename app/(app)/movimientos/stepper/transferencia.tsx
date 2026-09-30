@@ -9,7 +9,12 @@ import {
   SelectField,
   NumberField,
 } from "./ui";
-import { MOTIVOS_TRANSFERENCIA, STEP_CONFIRMACION, type MovimientoData } from "./types";
+import {
+  MOTIVOS_TRANSFERENCIA,
+  MOTIVO_TRANSFERENCIA_MAX,
+  STEP_CONFIRMACION,
+  type MovimientoData,
+} from "./types";
 import { convertirMontoParaUI } from "@/backend/src/actions/cotizaciones";
 import { crearDictadoTransferencia } from "./dictado-transferencia";
 import { aplicarDictadoSimple, escribirEnPantalla } from "./dictado-comun";
@@ -24,6 +29,15 @@ export function Transferencia() {
   const { data, handleSetData, navigateTo, options } = useMovimientoStepper();
   // El destino se autocomputa hasta que el usuario lo edita manualmente.
   const [destinoEditado, setDestinoEditado] = useState(false);
+
+  // Motivos propios escritos por el usuario. Viven SÓLO en el estado del paso
+  // (no se persisten como catálogo: el texto viaja por movimiento en
+  // `movimiento.motivo`, plan-motivo-personalizado-transferencia.md).
+  const [motivosPropios, setMotivosPropios] = useState<string[]>([]);
+  const motivos = useMemo(
+    () => [...MOTIVOS_TRANSFERENCIA, ...motivosPropios],
+    [motivosPropios]
+  );
 
   const isValid =
     !!data.motivo &&
@@ -172,10 +186,28 @@ export function Transferencia() {
           label="Motivo"
           value={data.motivo}
           onChange={(v) => handleSetData({ motivo: v })}
-          options={MOTIVOS_TRANSFERENCIA.map((m) => ({
-            value: m,
-            label: m,
-          }))}
+          options={motivos.map((m) => ({ value: m, label: m }))}
+          placeholder="Seleccionar o escribir…"
+          createLabel="Usar otro motivo"
+          createLabelFor={(q) =>
+            `Usar «${q.trim().slice(0, MOTIVO_TRANSFERENCIA_MAX)}»`
+          }
+          searchPlaceholder="Buscar o escribir…"
+          onCreate={(prefill) => {
+            const texto = prefill.trim().slice(0, MOTIVO_TRANSFERENCIA_MAX);
+            if (!texto) return;
+            // Un texto igual a un preset se comporta como preset (usa su par de
+            // conceptos específico) y no se duplica la opción.
+            const esPreset = (MOTIVOS_TRANSFERENCIA as readonly string[]).includes(
+              texto
+            );
+            if (!esPreset) {
+              setMotivosPropios((prev) =>
+                prev.includes(texto) ? prev : [...prev, texto]
+              );
+            }
+            handleSetData({ motivo: texto });
+          }}
         />
       </div>
 

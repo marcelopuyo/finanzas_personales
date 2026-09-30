@@ -389,6 +389,8 @@ export function SelectField({
   disabled = false,
   onCreate,
   createLabel,
+  createLabelFor,
+  searchPlaceholder,
 }: {
   label: string;
   value: string;
@@ -402,6 +404,10 @@ export function SelectField({
   onCreate?: (prefill: string) => void;
   /** Texto de la fila de alta rápida (p. ej. "Nueva categoría"). */
   createLabel?: string;
+  /** Si viene, la fila de alta muestra el texto buscado (ej. `Usar «Peaje»`). */
+  createLabelFor?: (query: string) => string;
+  /** Placeholder del buscador del combobox. */
+  searchPlaceholder?: string;
 }) {
   // Con alta rápida se usa el Combobox compartido: un <select> nativo no puede
   // mostrar una acción dentro de la lista.
@@ -416,6 +422,8 @@ export function SelectField({
           disabled={disabled}
           onCreate={onCreate}
           createLabel={createLabel}
+          createLabelFor={createLabelFor}
+          searchPlaceholder={searchPlaceholder}
         />
       </Campo>
     );

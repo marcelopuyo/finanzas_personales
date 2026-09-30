@@ -30,6 +30,10 @@ interface ComboboxProps {
   onCreate?: (prefill: string) => void;
   /** Texto de la fila de alta rápida (default "Nueva opción"). */
   createLabel?: string;
+  /** Si viene, la fila de alta muestra el texto buscado (ej. `Usar «Peaje»`). */
+  createLabelFor?: (query: string) => string;
+  /** Placeholder del buscador (default "Buscar..."). */
+  searchPlaceholder?: string;
 }
 
 /**
@@ -51,6 +55,8 @@ export function Combobox({
   searchKey,
   onCreate,
   createLabel = "Nueva opción",
+  createLabelFor,
+  searchPlaceholder,
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -129,7 +135,7 @@ export function Combobox({
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar..."
+              placeholder={searchPlaceholder ?? "Buscar..."}
               className="w-full bg-transparent text-[13px] text-card-foreground placeholder:text-subtitle focus:outline-none"
             />
           </div>
@@ -178,7 +184,9 @@ export function Combobox({
               className="flex w-full items-center gap-2 border-t border-border px-3 py-2 text-left text-[13px] font-medium text-primary transition-colors hover:bg-muted"
             >
               <Plus className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{createLabel}</span>
+              <span className="truncate">
+                {createLabelFor ? createLabelFor(query.trim()) : createLabel}
+              </span>
             </button>
           )}
         </div>

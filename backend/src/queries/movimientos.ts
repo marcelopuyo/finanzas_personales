@@ -150,7 +150,9 @@ export async function getHistorialMovimientosCuenta(
       monto: m.montoCuentaMonedaOrigen,
       // Equivalente en la moneda predeterminada del usuario (secundario).
       montoPredeterminada: m.monto,
-      motivo: desc ? desc : (m.concepto?.nombre ?? ""),
+      // `motivo` primero (preset o texto propio); si no, la descripción del
+      // gasto y, por último, el nombre del concepto (filas legacy sin `motivo`).
+      motivo: m.motivo ?? (desc ? desc : (m.concepto?.nombre ?? "")),
       categoria: m.concepto?.categoria ?? null,
       saldoPosterior: saldo,
     });

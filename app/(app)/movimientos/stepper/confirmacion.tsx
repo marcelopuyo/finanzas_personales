@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Save, X, ArrowLeft } from "lucide-react";
 import { useMovimientoStepper } from "./stepper-context";
 import { StepShell, Fila, formatFecha } from "./ui";
-import { CONCEPTO_STEP, MOTIVOS_TRANSFERENCIA, type MovimientoConcepto } from "./types";
+import { CONCEPTO_STEP, type MovimientoConcepto } from "./types";
 import { numberToCurrency, timeToDecimal } from "@/lib/utils";
 import { fraseContraparte } from "@/lib/prestamos";
 import {
@@ -283,7 +283,7 @@ export function Confirmacion() {
         case "Transferencia":
           await transferir({
             fecha: data.fecha,
-            motivo: data.motivo as (typeof MOTIVOS_TRANSFERENCIA)[number],
+            motivo: data.motivo,
             montoOrigen: data.montoOrigen,
             idCuentaOrigen: data.cuentaOrigen,
             montoDestino: data.montoDestino,

@@ -235,13 +235,15 @@ export function VozFab() {
 
   // Al cambiar de ruta el FAB vuelve a mostrarse YA (ajuste DURANTE el render,
   // sin `setState` en un efecto): la página nueva no tiene por qué heredar el
-  // "hacerse a un lado" de la anterior. También se **descarta el último dictado**
-  // (era de la pantalla anterior: no sirve para la vía B de esta).
+  // "hacerse a un lado" de la anterior.
+  // ⚠️ El **último dictado** también se descarta al cambiar de ruta, pero eso lo
+  // hace `VozPantallaProvider` (es **su** estado): tocarlo desde acá hacía que
+  // React avisara *"Cannot update a component (`VozPantallaProvider`) while
+  // rendering a different component (`VozFab`)"* en cada navegación (2026-09-30).
   const [rutaDelCeder, setRutaDelCeder] = useState(ruta);
   if (rutaDelCeder !== ruta) {
     setRutaDelCeder(ruta);
     setCeder(false);
-    setDictado(null);
     // Las preguntas de navegación eran de la pantalla anterior.
     setPreguntaNav(null);
     setPreguntaCuenta(null);

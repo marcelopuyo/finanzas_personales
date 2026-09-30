@@ -55,7 +55,11 @@ async function buscarConceptosTransferencia(manager: EntityManager, motivo: stri
     Deposito: ["Deposito Ingreso", "Deposito Egreso"],
     Extraccion: ["Extraccion Ingreso", "Extraccion Egreso"],
   };
-  const [nombreIngreso, nombreEgreso] = pares[motivo] ?? ["", ""];
+  // Un motivo personalizado (texto libre) no tiene par propio ⇒ se usa el
+  // GENÉRICO: el concepto sólo aporta la categoría (el signo); el texto del
+  // motivo vive en `movimiento.motivo`.
+  const [nombreIngreso, nombreEgreso] =
+    pares[motivo] ?? ["Transferencia Ingreso", "Transferencia Egreso"];
 
   const conceptoIngreso = await repo.findOneBy({ nombre: nombreIngreso });
   if (!conceptoIngreso) throw new Error(`Concepto "${nombreIngreso}" no encontrado`);
@@ -518,6 +522,8 @@ export async function gastoDirecto(input: z.infer<typeof movimiento3Schema>) {
 export async function transferir(input: z.infer<typeof movimiento2Schema>) {
   const userId = await requireUserId();
   const data = movimiento2Schema.parse(input);
+  // Texto normalizado (preset o motivo propio): se guarda en los 2 movimientos.
+  const motivo = data.motivo.trim();
   if (!data.idCuentaOrigen || !data.idCuentaDestino)
     throw new Error("idCuentaOrigen e idCuentaDestino son requeridos");
   if (!data.montoOrigen || !data.montoDestino)
@@ -574,6 +580,7 @@ export async function transferir(input: z.infer<typeof movimiento2Schema>) {
         cuenta: cuentaOrigen,
         concepto: conceptoEgreso,
         grupoId,
+        motivo,
       })
     );
 
@@ -585,6 +592,7 @@ export async function transferir(input: z.infer<typeof movimiento2Schema>) {
         cuenta: cuentaDestino,
         concepto: conceptoIngreso,
         grupoId,
+        motivo,
       })
     );
 

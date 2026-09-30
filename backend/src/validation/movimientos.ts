@@ -2,13 +2,24 @@ import { z } from "zod";
 
 // Reemplaza a class-validator. Reglas equivalentes a los DTOs del backend NestJS.
 
-export const motivoMovimientoSchema = z.enum([
+/** Motivos de transferencia "de fábrica" (cada uno tiene su par propio de
+ * conceptos en `buscarConceptosTransferencia`). Debe coincidir con los presets
+ * de la UI en `app/(app)/movimientos/stepper/types.ts`. */
+export const MOTIVOS_TRANSFERENCIA = [
   "Transferencia",
   "Compra Dolares",
   "Venta Dolares",
   "Extraccion",
   "Deposito",
-]);
+] as const;
+
+/**
+ * Motivo de transferencia: un preset **o** un texto libre escrito por el usuario
+ * (`plan-motivo-personalizado-transferencia.md`). Ya **no** es un enum candado:
+ * el texto se guarda en `movimiento.motivo` y el concepto sólo aporta la
+ * categoría (el signo). Máximo 60 caracteres (mismo tope que la columna).
+ */
+export const motivoTransferenciaSchema = z.string().trim().min(1).max(60);
 
 const dateString = z.string().min(1);
 
@@ -29,7 +40,7 @@ export const movimiento2Schema = z.object({
   idCuentaOrigen: z.number().optional(),
   montoDestino: z.number().optional(),
   idCuentaDestino: z.number().optional(),
-  motivo: motivoMovimientoSchema,
+  motivo: motivoTransferenciaSchema,
 });
 
 // Movimiento tipo 3 — GastoDirecto

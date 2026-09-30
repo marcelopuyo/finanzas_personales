@@ -10,6 +10,7 @@ import {
   type ReactNode,
   type SetStateAction,
 } from "react";
+import { usePathname } from "next/navigation";
 import type {
   CampoDictable,
   ConfigDictado,
@@ -84,8 +85,27 @@ interface Contexto {
 const ContextoPantalla = createContext<Contexto | null>(null);
 
 export function VozPantallaProvider({ children }: { children: ReactNode }) {
+  const ruta = usePathname();
   const [pantalla, setPantalla] = useState<PantallaDictable | null>(null);
   const [ultimo, setUltimo] = useState<UltimoDictado | null>(null);
+  /**
+   * Al cambiar de ruta se **descarta** el último dictado: era de la pantalla
+   * anterior y no sirve para la **vía B** (aprender la corrección al guardar)
+   * de la nueva.
+   *
+   * 🔑 Se ajusta el **propio** estado durante el render (patrón admitido por
+   * React, el mismo que el FAB usa para su estado). **No** lo puede hacer el FAB:
+   * un hijo no puede tocar el estado del provider en su render —React avisaba
+   * *"Cannot update a component (`VozPantallaProvider`) while rendering a
+   * different component (`VozFab`)"* en **cada navegación** (2026-09-30)— y
+   * resolverlo con un `useEffect` lo marca el lint del proyecto
+   * (`react-hooks/set-state-in-effect`).
+   */
+  const [rutaDelUltimo, setRutaDelUltimo] = useState(ruta);
+  if (rutaDelUltimo !== ruta) {
+    setRutaDelUltimo(ruta);
+    setUltimo(null);
+  }
   const valor = useMemo<Contexto>(
     () => ({ pantalla, registrar: setPantalla, ultimo, setUltimo }),
     [pantalla, ultimo]
