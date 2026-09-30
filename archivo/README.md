@@ -27,6 +27,7 @@ que no afecta al build ni al runtime.
 | `temp_sidebar.txt` | Copia de trabajo del sidebar anterior (código viejo, no es parte del build). |
 | `public/file.svg`, `globe.svg`, `next.svg`, `vercel.svg`, `window.svg` | SVGs de ejemplo que trae el starter de Next.js; no se referencian en ninguna página ni en `app/manifest.ts`. |
 | `backend/scripts/_shot-balance2.png` | Captura suelta de QA. |
+| `app/(app)/dashboard/components/gastos-detalle.tsx` | `GastosDetalle` (grilla `DataTable` del panel **Gastos → Detalle**) + `gastosDetalleColumns`. La pestaña pasó a **tarjetas de los últimos 3 días** (`gastos-tarjetas.tsx`) y el buscador + la lista completa viven en la pantalla **`/gastos`** (2026-09-30). |
 
 ### Rediseño "períodos gestionados → liquidaciones" (2026-09-26)
 

@@ -2,7 +2,6 @@ import {
   ChartSkeleton,
   ListSkeleton,
   Skeleton,
-  TableSkeleton,
 } from "@/components/ui/skeleton";
 
 /**
@@ -56,9 +55,10 @@ export default function Loading() {
       <ChartSkeleton />
       <ChartSkeleton />
 
-      {/* Detalle (tabla) */}
+      {/* Detalle de Gastos: TARJETAS de los últimos 3 días (2026-09-30) */}
       <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
-        <TableSkeleton rows={4} />
+        <Skeleton className="mb-3 h-4 w-24 bg-border" />
+        <ListSkeleton rows={3} />
       </div>
     </div>
   );

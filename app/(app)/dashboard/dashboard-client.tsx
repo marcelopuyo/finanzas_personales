@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useMemo, useState } from "react";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal } from "lucide-react";
 import { StatBadge } from "@/components/ui/stat-badge";
 import { Tabs } from "@/components/ui/tabs";
 import { Modal } from "@/components/ui/modal";
@@ -15,7 +15,7 @@ import { EvolutionChart } from "./components/line-chart";
 import { PrestamosChart } from "./components/prestamos-chart";
 import { PrestamosActionsMenu } from "./components/prestamos-actions-menu";
 import { GastosActionsMenu } from "./components/gastos-actions-menu";
-import { GastosDetalle } from "./components/gastos-detalle";
+import { GastosTarjetas } from "./components/gastos-tarjetas";
 import {
   IngresosDetalle,
   type FilaDetalleIngresos,
@@ -83,10 +83,6 @@ export function DashboardClient({ data }: Props) {
   const [dCta, setDCta] = useState<string[]>([]);
   const [dFd, setDFd] = useState(fechaPrimerDia);
   const [dFh, setDFh] = useState(fechaHoy);
-  // Búsqueda de la tab "Detalle" de Gastos: el ícono vive junto al botón
-  // "Filtros" (primera fila) y abre/cierra el input de búsqueda.
-  const [busquedaGastos, setBusquedaGastos] = useState("");
-  const [busquedaGastosOpen, setBusquedaGastosOpen] = useState(false);
 
   // Filtros de Ingresos (trabajo + fechas)
   const [selTra, setSelTra] = useState<string[]>([]);
@@ -175,17 +171,6 @@ export function DashboardClient({ data }: Props) {
     data.resultadosMesActual,
     data.monedaPredeterminadaISO,
   ]);
-
-  const filteredGastos = useMemo(() => {
-    let r = todosLosGastos;
-    if (selCat.length > 0)
-      r = r.filter((g) => selCat.includes(g.categoria?.nombre || SIN_CATEGORIA));
-    if (selCta.length > 0)
-      r = r.filter((g) => selCta.includes(g.cuenta || SIN_CUENTA));
-    if (selFd) r = r.filter((g) => toDateKey(g.fechaPago) >= selFd);
-    if (selFh) r = r.filter((g) => toDateKey(g.fechaPago) <= selFh);
-    return r;
-  }, [todosLosGastos, selCat, selCta, selFd, selFh]);
 
   // filteredGastos pero SIN el filtro de categoría (para el panel Resumen)
   const filteredSinCat = useMemo(() => {
@@ -310,40 +295,6 @@ export function DashboardClient({ data }: Props) {
           {activeFilters}
         </span>
       )}
-    </button>
-  );
-
-  // Botón de búsqueda de la tab "Detalle" de Gastos: solo el ícono, con el mismo
-  // estilo pill del botón "Filtros" en tono gris. Alterna el input expandido.
-  const toggleBusquedaGastos = () => {
-    // Al CERRAR se limpia el texto: la grilla vuelve a mostrar TODOS los gastos
-    // del panel (si no, quedaría filtrada sin que se vea el input de búsqueda).
-    if (busquedaGastosOpen) setBusquedaGastos("");
-    setBusquedaGastosOpen(!busquedaGastosOpen);
-  };
-  // ⚠️ `useTap` (touch events + click), NO `onClick`: en iOS el toque de una zona
-  // chica puede no generar `click` y el botón "no responde" (lección §119).
-  // Además el mismo handler se comparte con las dos copias del botón (mobile y
-  // desktop), de las cuales sólo una está visible.
-  const tapBusquedaGastos = useTap(toggleBusquedaGastos);
-  const gastoSearchBtn = (className?: string) => (
-    <button
-      type="button"
-      {...tapBusquedaGastos}
-      aria-label={
-        busquedaGastosOpen ? "Cerrar búsqueda de gastos" : "Buscar gastos"
-      }
-      aria-expanded={busquedaGastosOpen}
-      title={busquedaGastosOpen ? "Cerrar búsqueda" : "Buscar"}
-      className={cn(
-        // Alto fijo h-8 (32px): mismo que "Filtros" y los Tabs. En mobile es un
-        // botón CUADRADO (w-8, sin padding) para que la fila 2 del panel Gastos
-        // entre en una sola línea a 320px; en desktop vuelve a ser píldora.
-        "inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-muted text-card-foreground transition-colors hover:bg-card sm:w-auto sm:px-3",
-        className
-      )}
-    >
-      <Search className="h-3.5 w-3.5" />
     </button>
   );
 
@@ -487,16 +438,15 @@ export function DashboardClient({ data }: Props) {
     />
   );
 
-  // Acciones de la cabecera de "Gastos" (Filtros + pestañas + ⋯, más el botón de
-  // Búsqueda en la pestaña Detalle). En mobile el grupo ocupa todo el ancho del
-  // panel y el ⋯ se pega al BORDE DERECHO con `ml-auto`, así queda en la misma
-  // posición esté o no el botón de búsqueda; en desktop van todos en línea, a la
-  // derecha del badge (`sm:w-auto` / `sm:ml-0`).
-  const gastosHeaderActions = (buscar = false) => (
+  // Acciones de la cabecera de "Gastos" (Filtros + pestañas + ⋯). En mobile el
+  // grupo ocupa todo el ancho del panel y el ⋯ se pega al BORDE DERECHO con
+  // `ml-auto`; en desktop van todos en línea, a la derecha del badge
+  // (`sm:w-auto` / `sm:ml-0`).
+  // ⚠️ La pestaña **Detalle** no lleva Filtros (2026-09-30): muestra los últimos
+  // 3 días en tarjetas, sin filtrar y sin buscador.
+  const gastosHeaderActions = (conFiltros = true) => (
     <div className="flex w-full items-center gap-1 sm:w-auto sm:gap-2">
-      {buscar && gastoSearchBtn("sm:hidden")}
-      {filterBtn("hidden sm:inline-flex")}
-      {buscar && gastoSearchBtn("hidden sm:inline-flex")}
+      {conFiltros && filterBtn("hidden sm:inline-flex")}
       {gastosTabs}
       <div className="ml-auto sm:ml-0">
         <GastosActionsMenu />
@@ -630,28 +580,18 @@ export function DashboardClient({ data }: Props) {
         />
       ) : tabGastos === "detalle" ? (
         <div className="rounded-lg border border-border bg-card p-5">
-          {/* Cabecera de "Gastos" (mobile, < sm): fila 1 = título + badge +
-              Filtros; fila 2 = Búsqueda + pestañas + ⋯ (el ⋯ siempre pegado al
-              borde derecho, esté o no el botón de búsqueda). En desktop (sm+)
-              todo va en una sola fila, con Filtros/Búsqueda/pestañas/⋯ a la
-              derecha del badge. Los botones son los mismos: cada uno se muestra
-              sólo en la fila que le corresponde (`sm:hidden` /
-              `hidden sm:inline-flex`). */}
+          {/* Cabecera de "Gastos → Detalle": SOLO título + pestañas + ⋯. Esta
+              pestaña muestra los últimos 3 días en TARJETAS (2026-09-30) y no
+              filtra: por eso NO lleva badge "Mes actual", ni Filtros, ni
+              buscador (la búsqueda vive en la pantalla "Ver más gastos"). */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-[16px] font-semibold text-header">Gastos</h3>
-              <StatBadge label="Mes actual" value={badges.gastos} />
-              {filterBtn("sm:hidden")}
-            </div>
-            {gastosHeaderActions(true)}
+            <h3 className="text-[16px] font-semibold text-header">Gastos</h3>
+            {gastosHeaderActions(false)}
           </div>
-          <GastosDetalle
-            data={filteredGastos}
-            total={todosLosGastos.length}
+          <GastosTarjetas
+            data={todosLosGastos}
+            hoyServidor={data.hoyServidor}
             currency={data.monedaPredeterminadaISO}
-            search={busquedaGastos}
-            onSearchChange={setBusquedaGastos}
-            searchOpen={busquedaGastosOpen}
           />
         </div>
       ) : (

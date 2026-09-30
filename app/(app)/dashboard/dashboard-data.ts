@@ -51,6 +51,14 @@ export interface DashboardData {
   gastosSaldo: string;
   gastosDetalle: GastoOut[];
   /**
+   * "Hoy" del **servidor** (`"YYYY-MM-DD"`): es solo el valor de la PRIMERA
+   * pintada del panel *Gastos → Detalle* (tarjetas de los últimos 3 días). El
+   * cliente lo recalcula con la fecha **local** del navegador tras el montaje
+   * (mismo criterio que los badges "Mes actual"), así el HTML del server y la
+   * hidratación coinciden.
+   */
+  hoyServidor: string;
+  /**
    * Liquidaciones del usuario (con sus ítems). En el modelo nuevo **nacen
    * cobradas**; el **devengo** de cada ítem lo resuelve `lib/ingresos-trabajo`.
    */
@@ -353,6 +361,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   return {
     balance,
     monedaPredeterminadaISO,
+    hoyServidor: hoyKey,
     cuentas,
     gastosResumen,
     gastosTotal: numberToCurrency(montoTotalGastos, monedaPredeterminadaISO),

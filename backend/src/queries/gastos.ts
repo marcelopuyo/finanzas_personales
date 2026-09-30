@@ -214,3 +214,89 @@ export async function getUltimoGastoPorDescripcion(
   };
 }
 
+// ============================================================
+// Listado paginado — pantalla "Todos los gastos" (`/gastos`)
+// ============================================================
+
+/** Una "tanda" de gastos (scroll infinito de `/gastos`). */
+export interface GastosPagina {
+  rows: GastoOut[];
+  /** Total de gastos que cumplen la búsqueda (sin recortar). */
+  total: number;
+  /** Quedan gastos MÁS VIEJOS que el último de `rows`. */
+  hayMas: boolean;
+}
+
+export interface GastosPaginaOpciones {
+  offset?: number;
+  limit?: number;
+  /** Texto a buscar (descripción, categoría o cuenta de pago). */
+  search?: string;
+}
+
+/** Tope de filas por pedido: el tamaño de página lo propone el cliente. */
+const MAX_GASTOS_LIMIT = 100;
+
+/**
+ * Ventana del listado de gastos (2026-09-30), para el **scroll infinito** de la
+ * pantalla `/gastos` (el "Ver más gastos" del Detalle del dashboard).
+ *
+ * A diferencia del historial de una cuenta acá **no** hay saldos corridos ⇒ la
+ * página se resuelve en la propia consulta (`skip`/`take`); el cliente nunca
+ * recibe la lista completa de una. El join a `categoria` es **ManyToOne** (no
+ * una colección), así que TypeORM no agrega `DISTINCT` y `skip`/`take` es seguro.
+ *
+ * - **Orden**: más recientes primero por `fechaPago` (`NULLS LAST`: los gastos
+ *   sin pagar quedan al final) y, a igual fecha, por vencimiento.
+ * - **`search`**: mismo alcance que tenía la búsqueda del Detalle del dashboard
+ *   (descripción · categoría · **cuenta** con la que se pagó).
+ */
+export async function getGastosPaginado({
+  offset = 0,
+  limit = 20,
+  search = "",
+}: GastosPaginaOpciones = {}): Promise<GastosPagina> {
+  const userId = await requireUserId();
+  const ds = await getDb();
+
+  const desde = Math.max(0, Math.floor(offset));
+  const cuantos = Math.min(Math.max(1, Math.floor(limit)), MAX_GASTOS_LIMIT);
+  // `%`, `_` y `\` del texto buscado se ESCAPAN: si no, actuarían como comodines.
+  const q = search.trim().replace(/[\\%_]/g, (c) => `\\${c}`);
+
+  const qb = ds
+    .getRepository(Gasto)
+    .createQueryBuilder("g")
+    .leftJoinAndSelect("g.categoria", "categoria")
+    .where("g.eliminado = :eliminado", { eliminado: false })
+    .andWhere('g."usuarioId" = :userId', { userId })
+    .orderBy("g.fechaPago", "DESC", "NULLS LAST")
+    .addOrderBy("g.fechaVencimiento", "DESC", "NULLS LAST")
+    .addOrderBy("g.id", "ASC");
+
+  if (q) {
+    qb.andWhere(
+      `(g.descripcion ILIKE :q
+        OR categoria.nombre ILIKE :q
+        OR EXISTS (
+             SELECT 1 FROM movimiento m
+             JOIN cuenta cu ON cu.id = m."cuentaId"
+            WHERE m."gastoId" = g.id AND m.eliminado = false
+              AND cu.nombre ILIKE :q
+           ))`,
+      { q: `%${q}%` }
+    );
+  }
+
+  const [rows, total] = await qb.skip(desde).take(cuantos).getManyAndCount();
+  const mapped = rows.map(mapGasto);
+  const cuentas = await resolveCuentas(ds, mapped.map((g) => g.id));
+  const conCuenta = mapped.map((g) => withCuenta(g, cuentas));
+
+  return {
+    rows: conCuenta,
+    total,
+    hayMas: desde + conCuenta.length < total,
+  };
+}
+
