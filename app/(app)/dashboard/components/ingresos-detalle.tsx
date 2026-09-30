@@ -4,7 +4,6 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
 import type { LiquidacionOut } from "@/backend/src/queries/trabajos";
 import { cn, dateTimeToString, numberToCurrency } from "@/lib/utils";
-import { etiquetaConteoItems } from "@/lib/trabajo-texto";
 import type { GrupoPendienteIngresos } from "../ingresos-pendientes";
 import { SparkLineChart } from "./sparkline-chart";
 
@@ -129,6 +128,87 @@ export function propinaDeFila(fila: FilaDetalleIngresos): number {
   return esCobrado(fila) ? propinaDeLiquidacion(fila.liq) : fila.grupo.propina;
 }
 
+/** Barra del sparkline de la columna "Jornadas/Tareas" (una por ítem). */
+export interface BarraActividad {
+  /** Etiqueta del tooltip (el sparkline formatea las ISO a `dd-mm-aa`). */
+  label: string;
+  /** Valor de la barra: en las **jornadas** incluye la propina. */
+  monto: number;
+}
+
+/** Sparkline de la columna "Jornadas/Tareas" (barras proporcionales). */
+export function SparkActividad({
+  barras,
+  currency,
+}: {
+  barras: BarraActividad[];
+  currency: string;
+}) {
+  if (barras.length === 0) return <span className="text-subtitle">—</span>;
+  return (
+    <SparkLineChart
+      variant="bar"
+      data={barras.map((b) => b.monto)}
+      labels={barras.map((b) => b.label)}
+      currency={currency}
+    />
+  );
+}
+
+/**
+ * Barras de un período con ítems. Discriminador §8: si tiene **jornadas** se
+ * grafican las jornadas (incl. históricos tras una conversión); si no, las
+ * **tareas** (`por_tarea`). El valor de cada jornada incluye su **propina**.
+ */
+function barrasDeItems(
+  jornadas?: LiquidacionOut["jornadas"],
+  tareas?: LiquidacionOut["tareas"]
+): BarraActividad[] {
+  const jornadasSorted = (jornadas ?? [])
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(a.fechaJornada).getTime() - new Date(b.fechaJornada).getTime()
+    );
+  if (jornadasSorted.length > 0) {
+    return jornadasSorted.map((j) => ({
+      label: dateTimeToString(j.fechaJornada),
+      monto: (j.montoJornada || 0) + (j.montoPropina || 0),
+    }));
+  }
+  return (tareas ?? [])
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(a.fechaHoraTarea).getTime() -
+        new Date(b.fechaHoraTarea).getTime()
+    )
+    .map((t) => ({ label: fechaHoraLabel(t.fechaHoraTarea), monto: t.montoTarea || 0 }));
+}
+
+/** Barras de una **liquidación** (fila cobrada del Detalle). */
+export function barrasDeLiquidacion(l: LiquidacionOut): BarraActividad[] {
+  return barrasDeItems(l.jornadas, l.tareas);
+}
+
+/**
+ * Barras de un **grupo PENDIENTE** (fila "Sin cobrar" del Detalle): una por
+ * ítem sin liquidar, por su fecha (2026-09-30 — pedido del usuario: esas filas
+ * también muestran el **sparkline**, igual que las cobradas).
+ */
+export function barrasDeGrupoPendiente(
+  g: GrupoPendienteIngresos
+): BarraActividad[] {
+  return g.items
+    .slice()
+    .sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0))
+    .map((i) => ({
+      label: dateTimeToString(i.fecha),
+      monto: i.tipo === "jornada" ? i.monto + i.propina : i.monto,
+    }));
+}
+
+/** Celda de actividad de una **liquidación** (se mantiene por compatibilidad). */
 export function ActividadCell({
   jornadas,
   tareas,
@@ -138,40 +218,8 @@ export function ActividadCell({
   tareas?: LiquidacionOut["tareas"];
   currency: string;
 }) {
-  // Discriminador §8: si el período tiene JORNADAS se grafican las jornadas
-  // (incl. históricos tras una conversión); si no, las TAREAS (por_tarea).
-  const jornadasSorted = (jornadas || [])
-    .slice()
-    .sort(
-      (a, b) =>
-        new Date(a.fechaJornada).getTime() - new Date(b.fechaJornada).getTime()
-    );
-  if (jornadasSorted.length === 0) {
-    const tareasSorted = (tareas || [])
-      .slice()
-      .sort(
-        (a, b) =>
-          new Date(a.fechaHoraTarea).getTime() -
-          new Date(b.fechaHoraTarea).getTime()
-      );
-    if (tareasSorted.length === 0)
-      return <span className="text-subtitle">—</span>;
-    return (
-      <SparkLineChart
-        variant="bar"
-        data={tareasSorted.map((t) => t.montoTarea || 0)}
-        labels={tareasSorted.map((t) => fechaHoraLabel(t.fechaHoraTarea))}
-        currency={currency}
-      />
-    );
-  }
   return (
-    <SparkLineChart
-      variant="bar"
-      data={jornadasSorted.map((j) => (j.montoJornada || 0) + (j.montoPropina || 0))}
-      labels={jornadasSorted.map((j) => dateTimeToString(j.fechaJornada))}
-      currency={currency}
-    />
+    <SparkActividad barras={barrasDeItems(jornadas, tareas)} currency={currency} />
   );
 }
 
@@ -312,14 +360,12 @@ export function ingresosDetalleColumns(
           currency={currency}
         />
       ) : (
-        // Un pendiente no tiene liquidación que graficar: se muestra el conteo
-        // (misma etiqueta que la grilla de `/trabajo`).
-        <span className="text-[12px] text-subtitle">
-          {etiquetaConteoItems(
-            row.original.grupo.jornadas,
-            row.original.grupo.tareas
-          )}
-        </span>
+        // Un pendiente no tiene liquidación: se grafica **una barra por ítem sin
+        // liquidar**, el mismo sparkline que las filas cobradas.
+        <SparkActividad
+          barras={barrasDeGrupoPendiente(row.original.grupo)}
+          currency={currency}
+        />
       ),
   },
   ];

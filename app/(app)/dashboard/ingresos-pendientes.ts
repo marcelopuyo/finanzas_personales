@@ -12,6 +12,17 @@
 import type { ItemPendienteOut } from "@/backend/src/queries/trabajos";
 import { SIN_TRABAJO, ymd } from "@/backend/src/lib/ingresos-trabajo";
 
+/** Un ítem del grupo (jornada o tarea sin liquidar), para el sparkline. */
+export interface ItemGrupoPendiente {
+  /** "YYYY-MM-DD" de la fecha local del ítem. */
+  fecha: string;
+  /** Monto del ítem **sin** propina (jornada: `montoJornada` · tarea: `montoTarea`). */
+  monto: number;
+  /** Propina de la jornada (0 en las tareas). */
+  propina: number;
+  tipo: "jornada" | "tarea";
+}
+
 /** Un trabajo con ítems sin liquidar: una fila del Detalle de Ingresos. */
 export interface GrupoPendienteIngresos {
   /** Clave estable de la fila (`pendiente:<id|nombre>`). */
@@ -27,6 +38,9 @@ export interface GrupoPendienteIngresos {
   propina: number;
   jornadas: number;
   tareas: number;
+  /** Ítems del grupo (sin ordenar): alimentan el sparkline de la columna
+   *  "Jornadas/Tareas", igual que en las filas cobradas. */
+  items: ItemGrupoPendiente[];
 }
 
 /**
@@ -54,6 +68,14 @@ export function agruparPendientes(
         propina: i.montoPropina ?? 0,
         jornadas: i.tipo === "jornada" ? 1 : 0,
         tareas: i.tipo === "tarea" ? 1 : 0,
+        items: [
+          {
+            fecha,
+            monto: i.monto ?? 0,
+            propina: i.montoPropina ?? 0,
+            tipo: i.tipo,
+          },
+        ],
       });
       return;
     }
@@ -61,6 +83,12 @@ export function agruparPendientes(
     if (fecha > grupo.fechaHasta) grupo.fechaHasta = fecha;
     grupo.monto += i.monto ?? 0;
     grupo.propina += i.montoPropina ?? 0;
+    grupo.items.push({
+      fecha,
+      monto: i.monto ?? 0,
+      propina: i.montoPropina ?? 0,
+      tipo: i.tipo,
+    });
     if (i.tipo === "jornada") grupo.jornadas += 1;
     else grupo.tareas += 1;
   });
