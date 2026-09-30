@@ -3,6 +3,7 @@
 import { CalendarClock } from "lucide-react";
 import type { BloqueCobro, EstimacionTrabajo } from "@/lib/cobros-estimados";
 import { cn, numberToCurrency } from "@/lib/utils";
+import { etiquetaConteoItems } from "@/lib/trabajo-texto";
 
 /** "dd-mm" de una fecha "YYYY-MM-DD" (se corta el string: nunca se parsea, así
  *  no hay corrimiento de día por zona horaria). */
@@ -24,11 +25,7 @@ function rangoFechas(desde: string, hasta: string): string {
 
 /** "3 jornadas", "1 tarea" o "1 jornada y 2 tareas" (un bloque puede mezclar). */
 function conteo(b: BloqueCobro): string {
-  const partes: string[] = [];
-  if (b.jornadas)
-    partes.push(`${b.jornadas} ${b.jornadas === 1 ? "jornada" : "jornadas"}`);
-  if (b.tareas) partes.push(`${b.tareas} ${b.tareas === 1 ? "tarea" : "tareas"}`);
-  return partes.join(" y ");
+  return etiquetaConteoItems(b.jornadas, b.tareas);
 }
 
 type SeccionId = "porCobrar" | "enCurso" | "sinPeriodo";

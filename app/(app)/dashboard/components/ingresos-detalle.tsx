@@ -4,9 +4,11 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
 import type { LiquidacionOut } from "@/backend/src/queries/trabajos";
 import { cn, dateTimeToString, numberToCurrency } from "@/lib/utils";
+import { etiquetaConteoItems } from "@/lib/trabajo-texto";
+import type { GrupoPendienteIngresos } from "../ingresos-pendientes";
 import { SparkLineChart } from "./sparkline-chart";
 
-function formatCobroDate(value?: string | Date): string {
+function formatCobroDate(value?: string | Date | null): string {
   if (!value) return "—";
   const d = new Date(value);
   if (d.getFullYear() < 1901) return "—";
@@ -79,6 +81,54 @@ export function propinaDeLiquidacion(p: LiquidacionOut): number {
   return (p.jornadas ?? []).reduce((acc, j) => acc + (j.montoPropina ?? 0), 0);
 }
 
+/**
+ * Fila del **Detalle de Ingresos**. El listado mezcla las dos cosas que existen
+ * en el circuito (pedido del usuario, 2026-09-30):
+ *
+ *  · **`cobrado`**   → una **liquidación** (nace sólo cuando hubo cobro).
+ *  · **`pendiente`** → un **grupo de ítems sin liquidar de un mismo trabajo**:
+ *    lo trabajado que todavía no entró. Va con el **monto en ROJO** y la
+ *    aclaración "Sin cobrar", así las últimas jornadas se ven en el Detalle
+ *    aunque su período no se haya cerrado/cobrado todavía.
+ *
+ * ⚠️ El **Total del pie suma sólo lo COBRADO** (por eso el rótulo "Total
+ * cobrado"): los pendientes son parte del *devengo* del mes (dona y badge,
+ * §190) y de la tarjeta "Por cobrar", pero no de este listado de cobros.
+ */
+export type FilaDetalleIngresos =
+  | { tipo: "cobrado"; liq: LiquidacionOut }
+  | { tipo: "pendiente"; grupo: GrupoPendienteIngresos };
+
+const esCobrado = (fila: FilaDetalleIngresos) => fila.tipo === "cobrado";
+
+/** "YYYY-MM-DD" de una fecha (la liquidación viene con `Date`). */
+function isoDeFecha(v: string | Date): string {
+  return v instanceof Date
+    ? v.toISOString().slice(0, 10)
+    : String(v).slice(0, 10);
+}
+
+/** Inicio del rango de la fila (es el accessor de la columna "Período"). */
+function fechaDesdeDe(fila: FilaDetalleIngresos): string {
+  return esCobrado(fila) ? isoDeFecha(fila.liq.fechaDesde) : fila.grupo.fechaDesde;
+}
+
+/** Fin del rango de la fila. */
+function fechaHastaDe(fila: FilaDetalleIngresos): string {
+  return esCobrado(fila) ? isoDeFecha(fila.liq.fechaHasta) : fila.grupo.fechaHasta;
+}
+
+/** Monto de la fila: lo cobrado (liquidación) o lo pendiente del grupo. */
+function montoDeFila(fila: FilaDetalleIngresos): number {
+  if (!esCobrado(fila)) return fila.grupo.monto;
+  return fila.liq.montoCobrado ?? fila.liq.montoCalculado ?? 0;
+}
+
+/** Propina de la fila (Σ de las jornadas de la liquidación o del grupo pendiente). */
+export function propinaDeFila(fila: FilaDetalleIngresos): number {
+  return esCobrado(fila) ? propinaDeLiquidacion(fila.liq) : fila.grupo.propina;
+}
+
 export function ActividadCell({
   jornadas,
   tareas,
@@ -127,14 +177,17 @@ export function ActividadCell({
 
 export function ingresosDetalleColumns(
   currency: string
-): ColumnDef<LiquidacionOut>[] {
+): ColumnDef<FilaDetalleIngresos>[] {
   return [
   {
-    accessorFn: (row) => row.trabajo?.nombre ?? "",
     id: "trabajo",
     header: "Trabajo",
+    accessorFn: (row) =>
+      esCobrado(row) ? row.liq.trabajo?.nombre ?? "" : row.grupo.trabajo,
     cell: ({ getValue }) => (getValue<string>() ? getValue<string>() : "-"),
-    footer: "Total",
+    // El rótulo aclara el criterio: el listado ya no es sólo de liquidaciones
+    // (abajo entran los grupos pendientes) y el Total NO los suma.
+    footer: "Total cobrado",
   },
   {
     // "Desde" y "Hasta" fusionadas en una sola columna (P1.e): en el modelo nuevo
@@ -144,40 +197,56 @@ export function ingresosDetalleColumns(
     // texto "dd-mm-aaaa al ...").
     id: "periodo",
     header: "Período",
-    accessorFn: (row) => row.fechaDesde,
+    accessorFn: (row) => fechaDesdeDe(row),
     sortingFn: (a, b) =>
-      new Date(a.original.fechaDesde).getTime() -
-      new Date(b.original.fechaDesde).getTime(),
+      fechaDesdeDe(a.original).localeCompare(fechaDesdeDe(b.original)),
     meta: { align: "center" },
-    cell: ({ row }) =>
-      `${dateTimeToString(row.original.fechaDesde)} al ${dateTimeToString(
-        row.original.fechaHasta
-      )}`,
+    cell: ({ row }) => {
+      const desde = fechaDesdeDe(row.original);
+      const hasta = fechaHastaDe(row.original);
+      // Un grupo de un solo día (o un período de un día) se muestra con una
+      // sola fecha, sin el " al " repetido.
+      return desde === hasta
+        ? dateTimeToString(desde)
+        : `${dateTimeToString(desde)} al ${dateTimeToString(hasta)}`;
+    },
   },
   {
     // `id` explícito (no `accessorKey: "montoACobrar"`, que ya no existe): el
     // orden sigue funcionando sobre el monto realmente cobrado.
     id: "importe",
-    accessorFn: (row) => row.montoCobrado ?? row.montoCalculado ?? 0,
+    accessorFn: (row) => montoDeFila(row),
     header: "Importe",
     meta: { align: "right" },
     cell: ({ row }) => (
+      // `ImporteCell` ya pinta en ROJO (`bg-danger/10 text-danger`) lo que no
+      // tiene cobro real: un grupo pendiente entra directo por esa rama.
       <ImporteCell
-        montoCobrado={row.original.montoCobrado}
-        montoCalculado={row.original.montoCalculado}
-        fechaDeCobro={row.original.fechaDeCobro}
-        propina={propinaDeLiquidacion(row.original)}
+        montoCobrado={
+          esCobrado(row.original) ? row.original.liq.montoCobrado : null
+        }
+        montoCalculado={
+          esCobrado(row.original)
+            ? row.original.liq.montoCalculado
+            : row.original.grupo.monto
+        }
+        fechaDeCobro={
+          esCobrado(row.original) ? row.original.liq.fechaDeCobro : null
+        }
+        propina={propinaDeFila(row.original)}
         currency={currency}
       />
     ),
     footer: ({ table }) => {
-      const rows = table.getFilteredRowModel().rows;
-      const total = rows.reduce(
-        (acc, row) =>
-          acc +
-          ((row.original.montoCobrado ?? row.original.montoCalculado) || 0),
-        0
-      );
+      // Sólo lo COBRADO: los pendientes se listan (en rojo) pero no integran el
+      // total del listado de cobros.
+      const total = table
+        .getFilteredRowModel()
+        .rows.reduce(
+          (acc, row) =>
+            acc + (esCobrado(row.original) ? montoDeFila(row.original) : 0),
+          0
+        );
       return numberToCurrency(total, currency);
     },
   },
@@ -189,12 +258,12 @@ export function ingresosDetalleColumns(
     // verde, y sólo cuando existe.
     id: "propina",
     header: "Propina",
-    accessorFn: (row) => propinaDeLiquidacion(row),
+    accessorFn: (row) => propinaDeFila(row),
     // Sólo en `sm+`: en mobile la propina va como 2ª línea verde del Importe
     // (`ImporteCell`), así la tabla no gana ancho en el celular.
     meta: { align: "right", className: "hidden sm:table-cell" },
     cell: ({ row }) => {
-      const propina = propinaDeLiquidacion(row.original);
+      const propina = propinaDeFila(row.original);
       if (propina <= 0.005) return <span className="text-subtitle">—</span>;
       return (
         <span className="text-[12px] font-medium tabular-nums text-success">
@@ -202,10 +271,12 @@ export function ingresosDetalleColumns(
         </span>
       );
     },
+    // La propina es el total de la COLUMNA (cobrados + pendientes): es el
+    // devengo de las jornadas mostradas, no un subtotal del cobro.
     footer: ({ table }) => {
       const total = table
         .getFilteredRowModel()
-        .rows.reduce((acc, row) => acc + propinaDeLiquidacion(row.original), 0);
+        .rows.reduce((acc, row) => acc + propinaDeFila(row.original), 0);
       return total > 0.005 ? numberToCurrency(total, currency) : "—";
     },
   },
@@ -213,10 +284,19 @@ export function ingresosDetalleColumns(
     // La liquidación se muestra con su RANGO (columna Período) **además** de la
     // fecha de cobro (P1.e). La vieja columna "Estimación Cobro" se quitó: en el
     // modelo nuevo `fechaEstimadaCobro` no se carga (P1.c).
-    accessorKey: "fechaDeCobro",
+    id: "cobrado",
     header: "Cobrado",
+    accessorFn: (row) =>
+      esCobrado(row) && row.liq.fechaDeCobro
+        ? isoDeFecha(row.liq.fechaDeCobro)
+        : "",
     meta: { align: "center" },
-    cell: ({ getValue }) => formatCobroDate(getValue<string | Date>()),
+    cell: ({ row }) =>
+      esCobrado(row.original) ? (
+        formatCobroDate(row.original.liq.fechaDeCobro)
+      ) : (
+        <span className="text-[12px] font-medium text-danger">Sin cobrar</span>
+      ),
   },
   {
     id: "actividad",
@@ -224,28 +304,38 @@ export function ingresosDetalleColumns(
     // La columna del sparkline NO navega al período: el gráfico solo muestra el
     // tooltip de cada barra.
     meta: { align: "center" },
-    cell: ({ row }) => (
-      <ActividadCell
-        jornadas={row.original.jornadas}
-        tareas={row.original.tareas}
-        currency={currency}
-      />
-    ),
+    cell: ({ row }) =>
+      esCobrado(row.original) ? (
+        <ActividadCell
+          jornadas={row.original.liq.jornadas}
+          tareas={row.original.liq.tareas}
+          currency={currency}
+        />
+      ) : (
+        // Un pendiente no tiene liquidación que graficar: se muestra el conteo
+        // (misma etiqueta que la grilla de `/trabajo`).
+        <span className="text-[12px] text-subtitle">
+          {etiquetaConteoItems(
+            row.original.grupo.jornadas,
+            row.original.grupo.tareas
+          )}
+        </span>
+      ),
   },
   ];
 }
 
 export function IngresosDetalle({
-  data,
+  filas,
   currency,
 }: {
-  data: LiquidacionOut[];
+  filas: FilaDetalleIngresos[];
   currency: string;
 }) {
   return (
     <DataTable
       columns={ingresosDetalleColumns(currency)}
-      data={data}
+      data={filas}
       pageSize={5}
       // Por defecto se ordena por el período más reciente (fecha desde DESC).
       initialSorting={[{ id: "periodo", desc: true }]}

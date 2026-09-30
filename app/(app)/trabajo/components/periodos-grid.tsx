@@ -9,6 +9,7 @@ import type {
   LiquidacionOut,
 } from "@/backend/src/queries/trabajos";
 import { cn, decimalToTime, numberToCurrency } from "@/lib/utils";
+import { etiquetaConteoItems } from "@/lib/trabajo-texto";
 import { getLiquidacionesCobradasPaginaAction } from "../actions";
 
 /** Filas por tanda del scroll infinito (el backend acota el valor a 1..100). */
@@ -61,15 +62,10 @@ function rangoCobrado(p: LiquidacionOut): string {
   return desde === hasta ? desde : `${desde} → ${hasta}`;
 }
 
-/** "3 jornadas", "1 tarea" o "1 jornada y 2 tareas". */
+/** "3 jornadas", "1 tarea" o "1 jornada y 2 tareas" (etiqueta compartida). */
 function conteo(lista: ItemPendienteOut[]): string {
   const jornadas = lista.filter((i) => i.tipo === "jornada").length;
-  const tareas = lista.length - jornadas;
-  const partes: string[] = [];
-  if (jornadas)
-    partes.push(`${jornadas} ${jornadas === 1 ? "jornada" : "jornadas"}`);
-  if (tareas) partes.push(`${tareas} ${tareas === 1 ? "tarea" : "tareas"}`);
-  return partes.join(" y ");
+  return etiquetaConteoItems(jornadas, lista.length - jornadas);
 }
 
 /** "HH:MM" de una hora decimal del backend (`HH.MM`, ej. 17.3 = 17:30). */

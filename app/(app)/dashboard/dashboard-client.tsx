@@ -16,7 +16,10 @@ import { PrestamosChart } from "./components/prestamos-chart";
 import { PrestamosActionsMenu } from "./components/prestamos-actions-menu";
 import { GastosActionsMenu } from "./components/gastos-actions-menu";
 import { GastosDetalle } from "./components/gastos-detalle";
-import { IngresosDetalle } from "./components/ingresos-detalle";
+import {
+  IngresosDetalle,
+  type FilaDetalleIngresos,
+} from "./components/ingresos-detalle";
 import { PeriodosTrabajoLista } from "./components/periodos-trabajo-lista";
 import type { DashboardData } from "./dashboard-data";
 import { gastosEvolucionPor } from "./gastos-agrupacion";
@@ -25,6 +28,7 @@ import {
   ingresosDelMesActual,
   ingresosEnRango,
 } from "./ingresos-helpers";
+import { agruparPendientes } from "./ingresos-pendientes";
 import { aFuenteIngresos } from "@/backend/src/lib/ingresos-trabajo";
 import type { GastoOut } from "@/backend/src/queries/gastos";
 import type { LiquidacionOut } from "@/backend/src/queries/trabajos";
@@ -347,31 +351,47 @@ export function DashboardClient({ data }: Props) {
   const activeIngFilters =
     selTra.length + (selFdIng ? 1 : 0) + (selFhIng ? 1 : 0);
 
+  // Opciones del filtro "Trabajo": los de las liquidaciones **y** los de los
+  // ítems pendientes (si no, un trabajo que todavía no cobró nada no se podría
+  // filtrar aunque sus jornadas ya se estén mostrando en el Detalle).
   const trabajos = useMemo(
     () =>
       [
-        ...new Set(todosLosIngresos.map((p) => p.trabajo?.nombre || SIN_TRABAJO)),
+        ...new Set([
+          ...todosLosIngresos.map((p) => p.trabajo?.nombre || SIN_TRABAJO),
+          ...data.itemsPendientes.map((i) => i.trabajoNombre || SIN_TRABAJO),
+        ]),
       ].sort(),
-    [todosLosIngresos]
+    [todosLosIngresos, data.itemsPendientes]
   );
 
-  // Detalle: trabajo + fechas. Los períodos abarcan un rango [fechaDesde,
-  // fechaHasta], así que se filtra por SOLAPAMIENTO con el rango elegido (no
-  // solo por la columna "desde"): un período que comenzó el mes pasado pero
-  // sigue vigente este mes (fechaHasta >= inicio) debe verse en el detalle.
-  const filteredIngresos = useMemo(() => {
-    let r = todosLosIngresos;
-    if (selTra.length > 0)
-      r = r.filter((p) => selTra.includes(p.trabajo?.nombre || SIN_TRABAJO));
-    if (selFdIng || selFhIng) {
-      r = r.filter(
-        (p) =>
-          (!selFdIng || toDateKey(p.fechaHasta) >= selFdIng) &&
-          (!selFhIng || toDateKey(p.fechaDesde) <= selFhIng)
-      );
-    }
-    return r;
-  }, [todosLosIngresos, selTra, selFdIng, selFhIng]);
+  // Detalle: filas **cobradas + pendientes** (pedido del usuario, 2026-09-30).
+  // Arriba de todo se arman las dos partes con el MISMO filtro:
+  //  · el trabajo elegido (si hay),
+  //  · y el rango de fechas por SOLAPAMIENTO (no sólo por la columna "desde"):
+  //    un período que empezó el mes pasado pero sigue vigente este mes
+  //    (`fechaHasta >= inicio`) tiene que verse.
+  const filteredIngresos = useMemo<FilaDetalleIngresos[]>(() => {
+    const enRango = (desde: string, hasta: string) =>
+      (!selFdIng || hasta >= selFdIng) && (!selFhIng || desde <= selFhIng);
+
+    const cobrados: FilaDetalleIngresos[] = todosLosIngresos
+      .filter((p) => selTra.length === 0 || selTra.includes(p.trabajo?.nombre || SIN_TRABAJO))
+      .filter((p) => enRango(toDateKey(p.fechaDesde), toDateKey(p.fechaHasta)))
+      .map((liq) => ({ tipo: "cobrado", liq }));
+
+    // Los ítems **pendientes** (jornadas/tareas sin liquidar) agrupados por
+    // trabajo: es lo que deja ver las últimas jornadas en el Detalle antes de
+    // que se cobren. Se pintan en rojo con "Sin cobrar" y NO entran al Total.
+    const pendientes: FilaDetalleIngresos[] = agruparPendientes(
+      data.itemsPendientes
+    )
+      .filter((g) => selTra.length === 0 || selTra.includes(g.trabajo))
+      .filter((g) => enRango(g.fechaDesde, g.fechaHasta))
+      .map((grupo) => ({ tipo: "pendiente", grupo }));
+
+    return [...cobrados, ...pendientes];
+  }, [todosLosIngresos, data.itemsPendientes, selTra, selFdIng, selFhIng]);
 
   // Histórico: solo trabajo (sin fechas) — se filtra la FUENTE completa para que
   // la evolución use el mismo criterio que el badge y el resumen.
@@ -673,7 +693,7 @@ export function DashboardClient({ data }: Props) {
             <div className="flex items-center gap-2">{ingFilterBtn("hidden sm:inline-flex")}{ingresosTabs}</div>
           </div>
           <IngresosDetalle
-            data={filteredIngresos}
+            filas={filteredIngresos}
             currency={data.monedaPredeterminadaISO}
           />
         </div>
