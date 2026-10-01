@@ -216,8 +216,13 @@ export function mesesDelRango(desde: string, hasta: string): string[] {
   const fin = ymDe(hasta);
   while (cursor <= fin) {
     out.push(cursor);
+    // ⚠️ `m` viene **1-based** del string ("2026-09" → 9) y el mes de `Date.UTC`
+    // es **0-based** ⇒ hay que restarle 1 ANTES de construir la fecha. Sin el
+    // `- 1` el cursor saltaba 2 meses por vuelta y `mesesDelRango` **salteaba el
+    // mes siguiente** (bug del prorrateo de `fijo`/`horas_fijas` detectado en el
+    // test sintético `.fp-devengo/`, 2026-10-01).
     const [y, m] = cursor.split("-").map(Number);
-    const d = new Date(Date.UTC(y, m, 1));
+    const d = new Date(Date.UTC(y, m - 1, 1));
     d.setUTCMonth(d.getUTCMonth() + 1);
     cursor = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}`;
   }
