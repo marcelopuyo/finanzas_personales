@@ -19,6 +19,7 @@
 
 import type { LiquidacionOut } from "@/backend/src/queries/trabajos";
 import { ymd } from "@/backend/src/lib/ingresos-trabajo";
+import { dateTimeToString } from "@/lib/utils";
 import type { GrupoPendienteIngresos } from "../ingresos-pendientes";
 
 /** Una fila del Detalle de Ingresos: una liquidación cobrada o un grupo pendiente. */
@@ -81,4 +82,87 @@ export function itemsDeFila(fila: FilaDetalleIngresos): {
   return esCobrado(fila)
     ? { jornadas: fila.liq.jornadas?.length ?? 0, tareas: fila.liq.tareas?.length ?? 0 }
     : { jornadas: fila.grupo.jornadas, tareas: fila.grupo.tareas };
+}
+
+// ─────────────────────────────────────────────────────────────
+// Sparkline de la fila ("Jornadas/Tareas" del Detalle)
+// ─────────────────────────────────────────────────────────────
+
+/** Etiqueta del tooltip de una barra. */
+export interface BarraActividad {
+  /** Fecha del ítem: en las jornadas "YYYY-MM-DD" (el sparkline la formatea a
+   *  `dd-mm-aa`) y en las tareas "YYYY-MM-DD hh:mm" (se muestra tal cual). */
+  label: string;
+  /** Valor de la barra: en las **jornadas** incluye la propina. */
+  monto: number;
+}
+
+/** Formatea un instante (fecha/hora efectiva de una tarea) a "dd-mm hh:mm" LOCAL. */
+function fechaHoraLabel(value: string | Date): string {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}-${pad(d.getMonth() + 1)} ${pad(
+    d.getHours()
+  )}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * Barras de un período con ítems. Discriminador §8: si tiene **jornadas** se
+ * grafican las jornadas (incl. históricos tras una conversión); si no, las
+ * **tareas** (`por_tarea`). El valor de cada jornada incluye su **propina**.
+ */
+function barrasDeItems(
+  jornadas?: LiquidacionOut["jornadas"],
+  tareas?: LiquidacionOut["tareas"]
+): BarraActividad[] {
+  const jornadasSorted = (jornadas ?? [])
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(a.fechaJornada).getTime() - new Date(b.fechaJornada).getTime()
+    );
+  if (jornadasSorted.length > 0) {
+    return jornadasSorted.map((j) => ({
+      label: dateTimeToString(j.fechaJornada),
+      monto: (j.montoJornada || 0) + (j.montoPropina || 0),
+    }));
+  }
+  return (tareas ?? [])
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(a.fechaHoraTarea).getTime() -
+        new Date(b.fechaHoraTarea).getTime()
+    )
+    .map((t) => ({
+      label: fechaHoraLabel(t.fechaHoraTarea),
+      monto: t.montoTarea || 0,
+    }));
+}
+
+/**
+ * Barras de un **grupo PENDIENTE** (fila "Sin cobrar"): una por ítem sin
+ * liquidar, por su fecha (2026-09-30 — pedido del usuario: esas filas también
+ * muestran el **sparkline**, igual que las cobradas).
+ */
+function barrasDeGrupoPendiente(g: GrupoPendienteIngresos): BarraActividad[] {
+  return g.items
+    .slice()
+    .sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0))
+    .map((i) => ({
+      label: dateTimeToString(i.fecha),
+      monto: i.tipo === "jornada" ? i.monto + i.propina : i.monto,
+    }));
+}
+
+/**
+ * Barras del sparkline de una fila, sea **liquidación** (una barra por jornada —
+ * con su propina — o por tarea) o **grupo pendiente** (una barra por ítem sin
+ * liquidar). Mismo gráfico que la columna "Jornadas/Tareas" de la grilla vieja.
+ */
+export function barrasDeFila(fila: FilaDetalleIngresos): BarraActividad[] {
+  return esCobrado(fila)
+    ? barrasDeItems(fila.liq.jornadas, fila.liq.tareas)
+    : barrasDeGrupoPendiente(fila.grupo);
 }

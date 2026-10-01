@@ -13,7 +13,9 @@ import {
 import { etiquetaConteoItems, rangoFechas } from "@/lib/trabajo-texto";
 import { useMontado } from "@/lib/use-cliente";
 import { agruparPendientes } from "../ingresos-pendientes";
+import { SparkLineChart } from "./sparkline-chart";
 import {
+  barrasDeFila,
   esCobrado,
   fechaCobroDe,
   fechaDesdeDe,
@@ -22,11 +24,12 @@ import {
   montoDeFila,
   propinaDeFila,
   trabajoDeFila,
+  type BarraActividad,
   type FilaDetalleIngresos,
 } from "./ingresos-filas";
 
-/** Meses que muestra el panel: el actual + 2 consecutivos hacia atrás. */
-const MESES_VISIBLES = 3;
+/** Meses que muestra el panel: el actual + 1 consecutivo hacia atrás. */
+const MESES_VISIBLES = 2;
 
 /** Pantalla "Períodos de trabajo" (mismo destino que el panel Trabajo del dashboard). */
 const HREF_TRABAJO = "/trabajo";
@@ -35,11 +38,12 @@ const HREF_TRABAJO = "/trabajo";
  * Pestaña **Detalle** del panel Ingresos (2026-09-30, pedido del usuario:
  * "lo mismo que en Gastos").
  *
- * Muestra **una tarjeta por período** los **últimos 3 meses** —el actual + 2
- * consecutivos hacia atrás—, de la más reciente a la más vieja y **sin agrupar
+ * Muestra **una tarjeta por período** los **últimos 2 meses** —el actual + 1
+ * consecutivo hacia atrás—, de la más reciente a la más vieja y **sin agrupar
  * por mes**: cada tarjeta lleva su **rango de fechas**, su **trabajo**, el
- * **conteo de ítems** y el estado del cobro. Entran las dos cosas que existen en
- * el circuito (igual que el Detalle de siempre):
+ * **conteo de ítems**, el estado del cobro y el **sparkline** de sus jornadas/
+ * tareas (el mismo gráfico que tenía la grilla vieja). Entran las dos cosas que
+ * existen en el circuito (igual que el Detalle de siempre):
  *
  *  · **liquidaciones** (cobradas) → monto en **verde** + "Cobrado dd-mm-aa";
  *  · **grupos pendientes** (jornadas/tareas sin liquidar) → monto en **rojo** +
@@ -48,9 +52,9 @@ const HREF_TRABAJO = "/trabajo";
  * Al pie, el enlace **"Ver más períodos"** → `/trabajo` (la pantalla completa:
  * pendientes arriba y cobrados con scroll infinito).
  *
- * ⚠️ La ventana de 3 meses es **fija**: no depende de los Filtros del panel
- * (ese es el criterio de Gastos, cuyo Detalle tampoco los lleva). Los Filtros de
- * Ingresos siguen aplicando al Resumen y al Histórico, y al listado completo.
+ * ⚠️ La ventana es **fija**: no depende de los Filtros del panel (ese es el
+ * criterio de Gastos, cuyo Detalle tampoco los lleva). Los Filtros de Ingresos
+ * siguen aplicando al Resumen y al Histórico, y al listado completo.
  */
 export function IngresosTarjetas({
   liquidaciones,
@@ -84,7 +88,7 @@ export function IngresosTarjetas({
       itemsPendientes
     ).map((grupo) => ({ tipo: "pendiente", grupo }));
     return [...cobrados, ...pendientes]
-      // "Dentro de los últimos 3 meses" por **solapamiento**: un período que
+      // "Dentro de los últimos 2 meses" por **solapamiento**: un período que
       // empezó antes pero sigue/terminó dentro de la ventana también entra
       // (si no, el período en curso de un `fijo` quedaría afuera).
       .filter((f) => fechaHastaDe(f) >= corte)
@@ -98,7 +102,7 @@ export function IngresosTarjetas({
     <div className="space-y-3">
       {filas.length === 0 ? (
         <p className="py-6 text-center text-[13px] text-subtitle">
-          No hay períodos en los últimos 3 meses.
+          No hay períodos en los últimos 2 meses.
         </p>
       ) : (
         <ul className="space-y-2">
@@ -130,6 +134,9 @@ export function IngresosTarjetas({
  *   · Línea 1 → **trabajo** (se recorta con `…` si no entra) | **monto**.
  *   · Línea 2 → **rango de fechas** en un chip (`28-09 → 30-09`) +
  *     **conteo de ítems · estado del cobro** (`3 jornadas · Cobrado 30-09-26`).
+ *   · Línea 3 → **sparkline** de las jornadas (con su propina) / tareas del
+ *     período: una barra por ítem, con el tooltip de fecha + monto (es el mismo
+ *     gráfico que tenía la columna "Jornadas/Tareas" de la grilla vieja).
  *
  * La línea 2 usa **todo el ancho** de la tarjeta (el monto no se lo come) y el
  * rango va en el formato corto del circuito de Trabajo (`rangoFechas`, el mismo
@@ -155,6 +162,7 @@ function PeriodoCard({
 
   const fechaCobro = fechaCobroDe(fila);
   const propina = propinaDeFila(fila);
+  const barras = barrasDeFila(fila);
 
   return (
     <li className="rounded-[10px] border border-border bg-muted px-3 py-2.5">
@@ -193,7 +201,36 @@ function PeriodoCard({
           )}
         </span>
       </p>
+      <SparkActividad barras={barras} currency={currency} />
     </li>
+  );
+}
+
+/**
+ * Sparkline de la tarjeta: el `SparkLineChart` en variante **barras** —una por
+ * ítem, con el tooltip de fecha + monto—, con el **ancho acotado según la
+ * cantidad de barras**: el chart estira (`preserveAspectRatio="none"` + `w-full`),
+ * así que sin tope una fila de 2 ítems quedaría con barras enormes. Sin ítems no
+ * se renderiza nada.
+ */
+function SparkActividad({
+  barras,
+  currency,
+}: {
+  barras: BarraActividad[];
+  currency: string;
+}) {
+  if (barras.length === 0) return null;
+  const ancho = Math.min(240, Math.max(56, barras.length * 18));
+  return (
+    <div style={{ width: ancho }} className="max-w-full pt-0.5">
+      <SparkLineChart
+        variant="bar"
+        data={barras.map((b) => b.monto)}
+        labels={barras.map((b) => b.label)}
+        currency={currency}
+      />
+    </div>
   );
 }
 
