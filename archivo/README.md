@@ -53,8 +53,30 @@ existen `calcularMontoACobrarPorModalidad`, `encontrarPeriodoSuperpuesto`, `apor
 mover los archivos. Las páginas de `app/(app)/cruds/{periodos,jornadas,tareas}-trabajo/` son las únicas que
 importaban esas acciones (por eso están acá).
 
-## Qué NO se archivó (a propósito)
+### CRUDs sin punto de entrada (2026-10-01)
 
+Estos 5 CRUDs quedaron **funcionales pero sin ningún acceso en la UI** (ni menú, ni tarjeta, ni enlace):
+verificado con búsqueda de referencias, **nada fuera de su propia carpeta los menciona** (cada uno se
+auto-referencia con `cancelHref`/`createHref`/`editHref`). Decisión del usuario (2026-10-01): moverlos a
+`archivo/` para que **no se mezclen con el código de producción** — se **conservan** (no se borran) y
+reponerlos es mover la carpeta de vuelta.
+
+| Archivo | Motivo |
+| --- | --- |
+| `app/(app)/cruds/gastos/**` | Lista/alta/edición de gastos. El alta real es el **wizard** (`/movimientos/nuevo/gasto`) y el listado es la pestaña **Detalle** del panel Gastos + la pantalla **`/gastos`**. |
+| `app/(app)/cruds/tarjetas/**` | CRUD de tarjetas (nombre, banco, cuenta). No hay ninguna pantalla de tarjetas en la app. |
+| `app/(app)/cruds/periodos-tarjeta/**` | CRUD de períodos de tarjeta (sin uso en la UI). |
+| `app/(app)/cruds/movimientos-tarjeta/**` | CRUD de movimientos de tarjeta (sin uso en la UI). |
+| `app/(app)/cruds/inflacion/**` | CRUD de índices de inflación (el cálculo/consulta de inflación sigue vivo en el backend). |
+
+ℹ️ **Helpers que quedaron sin consumidores en `app/(app)/cruds/options.ts`** (archivo **vivo**, que siguen
+usando cuentas/personas/préstamos): `fetchTarjetas()`, `fetchPeriodosTarjeta()` y
+`fetchMovimientosTarjetaOptions()` (los 2 primeros los usaban estos CRUDs) + `fetchTrabajos()`, que **ya
+estaba sin consumidores vivos** desde el rediseño de liquidaciones. **Se dejaron a propósito** (el usuario
+todavía no aprobó quitarlos): si se repone un CRUD hay que reponer su helper; si se confirma que no vuelven,
+se pueden borrar los 4 sin tocar nada más.
+
+## Qué NO se archivó (a propósito)
 - **`backend/scripts/*.mjs`** (`migrate-to-pg.mjs`, `backfill-*.mjs`, `seed-admin.mjs`,
   `test-db.mjs`, `gen-demo-ejemplo.mjs`): son herramientas de operación. La bitácora
   (`DeepSeek/bitacora.backend.md` §514) marca `mssql` + `migrate-to-pg.mjs` como
