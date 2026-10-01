@@ -446,10 +446,10 @@ export function DashboardClient({ data }: Props) {
   // con `ml-auto`). En desktop van todos en UNA fila, a la derecha del badge
   // (`sm:w-auto`): Filtros · pestañas · ⋯.
   //
-  // ⚠️ La pestaña **Detalle** no tiene badge ni Filtros (decisión del usuario,
-  // 2026-09-30) pero **sí** el ⋯ en el ángulo superior derecho: mismo esqueleto de
+  // ⚠️ La pestaña **Detalle** no tiene Filtros (la búsqueda vive en la pantalla
+  // "Ver más gastos"), pero **sí** el badge "Mes actual" y el ⋯: mismo esqueleto de
   // dos filas que las otras dos (si no, el ⋯ saltaba a la fila 2 al cambiar de
-  // pestaña).
+  // pestaña y el badge desaparecía).
   const gastosHeaderActions = (conFiltros = true) => (
     <div className="flex w-full items-center gap-1 sm:w-auto sm:gap-2">
       {conFiltros && filterBtn("hidden sm:inline-flex")}
@@ -475,14 +475,17 @@ export function DashboardClient({ data }: Props) {
   );
 
   /**
-   * Fila 1 en **mobile** para la pestaña **Detalle**: el título del panel + el ⋯
-   * en el ángulo superior derecho. Es la MISMA fila que arman Resumen/Histórico
-   * (título + badge + ⋯, dentro del gráfico) así el ⋯ **no se mueve** al cambiar de
-   * pestaña. En desktop vuelve a shrink-to-fit y el ⋯ lo pone `gastosHeaderActions`.
+   * Fila 1 en **mobile** para la pestaña **Detalle**: el título del panel + el
+   * badge "Mes actual" + el ⋯ en el ángulo superior derecho. Es la MISMA fila que
+   * arman Resumen/Histórico (título + badge + ⋯, dentro del gráfico) así que **ni el
+   * badge ni el ⋯ se mueven** al cambiar de pestaña (mismo valor de `badges.gastos`:
+   * gastos con `fechaPago` dentro del mes en curso). En desktop vuelve a
+   * shrink-to-fit y el ⋯ lo pone `gastosHeaderActions`.
    */
   const gastosFilaTitulo = (
     <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
       <h3 className="text-[16px] font-semibold text-header">Gastos</h3>
+      <StatBadge label="Mes actual" value={badges.gastos} />
       {gastosMenuMobile}
     </div>
   );
@@ -614,11 +617,11 @@ export function DashboardClient({ data }: Props) {
       ) : tabGastos === "detalle" ? (
         <div className="rounded-lg border border-border bg-card p-5">
           {/* Cabecera de "Gastos → Detalle": MISMA estructura de dos filas que
-              Resumen/Histórico (fila 1 = título + ⋯ en el ángulo superior derecho;
-              fila 2 = pestañas) para que el ⋯ no se mueva al cambiar de pestaña.
-              Esta pestaña NO lleva badge "Mes actual", ni Filtros, ni buscador: el
-              Detalle muestra los últimos 3 días en tarjetas (2026-09-30) y la
-              búsqueda vive en la pantalla "Ver más gastos". */}
+              Resumen/Histórico (fila 1 = título + badge "Mes actual" + ⋯ en el ángulo
+              superior derecho; fila 2 = pestañas) para que ni el badge ni el ⋯ se
+              muevan al cambiar de pestaña. Esta pestaña NO lleva Filtros ni
+              buscador: el Detalle muestra los últimos 3 días en tarjetas
+              (2026-09-30) y la búsqueda vive en la pantalla "Ver más gastos". */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             {gastosFilaTitulo}
             {gastosHeaderActions(false)}
