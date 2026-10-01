@@ -669,20 +669,21 @@ export function DashboardClient({ data }: Props) {
       )}
       </div>
 
-      {/* El ancla de **Resultados** existe sólo si hay datos: si se pide el panel
-          y no está, el dashboard no scrollea a ningún lado. */}
-      {data.evolucionResultados.length > 0 && (
-        <div data-panel="resultados">
-        <EvolutionChart
-          title="Resultados"
-          badge={<StatBadge label="Mes actual" value={badges.resultados} />}
-          data={data.evolucionResultados}
-          color="var(--primary)"
-          area
-          currency={data.monedaPredeterminadaISO}
-        />
-        </div>
-      )}
+      {/* Panel **Resultados**: se renderiza SIEMPRE (decisión del usuario
+          2026-10-01) — si no hay datos, `EvolutionChart` muestra su estado vacío
+          ("Sin datos disponibles") con su título y su badge. Así el ancla de voz
+          `data-panel="resultados"` **existe siempre** (antes, sin datos, el
+          panel no se montaba y el scroll a ese panel no tenía destino). */}
+      <div data-panel="resultados">
+      <EvolutionChart
+        title="Resultados"
+        badge={<StatBadge label="Mes actual" value={badges.resultados} />}
+        data={data.evolucionResultados}
+        color="var(--primary)"
+        area
+        currency={data.monedaPredeterminadaISO}
+      />
+      </div>
 
       {/* Panel de préstamos: se muestra SIEMPRE (también sin préstamos
           cargados; en ese caso PrestamosChart muestra su estado vacío). */}
