@@ -28,6 +28,7 @@ que no afecta al build ni al runtime.
 | `public/file.svg`, `globe.svg`, `next.svg`, `vercel.svg`, `window.svg` | SVGs de ejemplo que trae el starter de Next.js; no se referencian en ninguna página ni en `app/manifest.ts`. |
 | `backend/scripts/_shot-balance2.png` | Captura suelta de QA. |
 | `app/(app)/dashboard/components/gastos-detalle.tsx` | `GastosDetalle` (grilla `DataTable` del panel **Gastos → Detalle**) + `gastosDetalleColumns`. La pestaña pasó a **tarjetas de los últimos 3 días** (`gastos-tarjetas.tsx`) y el buscador + la lista completa viven en la pantalla **`/gastos`** (2026-09-30). |
+| `app/(app)/dashboard/components/ingresos-detalle.tsx` | `IngresosDetalle` (grilla `DataTable` del panel **Ingresos → Detalle**, con el sparkline de jornadas/tareas) + `ingresosDetalleColumns` y sus helpers. La pestaña pasó a **tarjetas de los últimos 3 meses** (`ingresos-tarjetas.tsx`, con el modelo de fila en `ingresos-filas.ts`) y la lista completa es la pantalla **`/trabajo`** (2026-09-30). ⚠️ Su otro consumidor era `ActividadCell`, que sólo usaba el `list-client.tsx` **archivado** de `periodos-trabajo` ⇒ si algún día se repone ese CRUD, hay que reponer los dos juntos. |
 
 ### Rediseño "períodos gestionados → liquidaciones" (2026-09-26)
 

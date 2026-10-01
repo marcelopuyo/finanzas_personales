@@ -22,8 +22,8 @@ interface TooltipState {
 /**
  * Formatea el label del tooltip cuando es una fecha ISO ("2026-09-10", con o
  * sin hora) al formato de la app: "10-09-26". Los labels que ya vienen
- * formateados (ej. `ingresos-detalle` usa `dateTimeToString`) se muestran tal
- * cual: si no matchea el patrón ISO, se devuelve el original.
+ * formateados (los llamadores usan `dateTimeToString`) se muestran tal cual: si
+ * no matchea el patrón ISO, se devuelve el original.
  */
 function labelTooltip(label: string): string {
   const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(label);

@@ -3,25 +3,11 @@
 import { CalendarClock } from "lucide-react";
 import type { BloqueCobro, EstimacionTrabajo } from "@/lib/cobros-estimados";
 import { cn, numberToCurrency } from "@/lib/utils";
-import { etiquetaConteoItems } from "@/lib/trabajo-texto";
-
-/** "dd-mm" de una fecha "YYYY-MM-DD" (se corta el string: nunca se parsea, así
- *  no hay corrimiento de día por zona horaria). */
-function corta(iso: string): string {
-  const [, mes, dia] = iso.split("-");
-  return `${dia}-${mes}`;
-}
-
-/** Rango del bloque: "20-09", "24-09 → 26-09" o con el año si el rango lo cruza. */
-function rangoFechas(desde: string, hasta: string): string {
-  if (!desde) return "";
-  if (desde === hasta) return corta(desde);
-  const anioDesde = desde.slice(2, 4);
-  const anioHasta = hasta.slice(2, 4);
-  return anioDesde === anioHasta
-    ? `${corta(desde)} → ${corta(hasta)}`
-    : `${corta(desde)}-${anioDesde} → ${corta(hasta)}-${anioHasta}`;
-}
+import {
+  corta,
+  etiquetaConteoItems,
+  rangoFechas,
+} from "@/lib/trabajo-texto";
 
 /** "3 jornadas", "1 tarea" o "1 jornada y 2 tareas" (un bloque puede mezclar). */
 function conteo(b: BloqueCobro): string {

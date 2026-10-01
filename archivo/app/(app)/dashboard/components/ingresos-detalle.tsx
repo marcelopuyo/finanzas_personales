@@ -4,8 +4,8 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
 import type { LiquidacionOut } from "@/backend/src/queries/trabajos";
 import { cn, dateTimeToString, numberToCurrency } from "@/lib/utils";
-import type { GrupoPendienteIngresos } from "../ingresos-pendientes";
-import { SparkLineChart } from "./sparkline-chart";
+import type { GrupoPendienteIngresos } from "@/app/(app)/dashboard/ingresos-pendientes";
+import { SparkLineChart } from "@/app/(app)/dashboard/components/sparkline-chart";
 
 function formatCobroDate(value?: string | Date | null): string {
   if (!value) return "—";

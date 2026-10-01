@@ -16,10 +16,7 @@ import { PrestamosChart } from "./components/prestamos-chart";
 import { PrestamosActionsMenu } from "./components/prestamos-actions-menu";
 import { GastosActionsMenu } from "./components/gastos-actions-menu";
 import { GastosTarjetas } from "./components/gastos-tarjetas";
-import {
-  IngresosDetalle,
-  type FilaDetalleIngresos,
-} from "./components/ingresos-detalle";
+import { IngresosTarjetas } from "./components/ingresos-tarjetas";
 import { PeriodosTrabajoLista } from "./components/periodos-trabajo-lista";
 import type { DashboardData } from "./dashboard-data";
 import { gastosEvolucionPor } from "./gastos-agrupacion";
@@ -28,7 +25,6 @@ import {
   ingresosDelMesActual,
   ingresosEnRango,
 } from "./ingresos-helpers";
-import { agruparPendientes } from "./ingresos-pendientes";
 import { aFuenteIngresos } from "@/backend/src/lib/ingresos-trabajo";
 import type { GastoOut } from "@/backend/src/queries/gastos";
 import type { LiquidacionOut } from "@/backend/src/queries/trabajos";
@@ -316,33 +312,12 @@ export function DashboardClient({ data }: Props) {
     [todosLosIngresos, data.itemsPendientes]
   );
 
-  // Detalle: filas **cobradas + pendientes** (pedido del usuario, 2026-09-30).
-  // Arriba de todo se arman las dos partes con el MISMO filtro:
-  //  · el trabajo elegido (si hay),
-  //  · y el rango de fechas por SOLAPAMIENTO (no sólo por la columna "desde"):
-  //    un período que empezó el mes pasado pero sigue vigente este mes
-  //    (`fechaHasta >= inicio`) tiene que verse.
-  const filteredIngresos = useMemo<FilaDetalleIngresos[]>(() => {
-    const enRango = (desde: string, hasta: string) =>
-      (!selFdIng || hasta >= selFdIng) && (!selFhIng || desde <= selFhIng);
-
-    const cobrados: FilaDetalleIngresos[] = todosLosIngresos
-      .filter((p) => selTra.length === 0 || selTra.includes(p.trabajo?.nombre || SIN_TRABAJO))
-      .filter((p) => enRango(toDateKey(p.fechaDesde), toDateKey(p.fechaHasta)))
-      .map((liq) => ({ tipo: "cobrado", liq }));
-
-    // Los ítems **pendientes** (jornadas/tareas sin liquidar) agrupados por
-    // trabajo: es lo que deja ver las últimas jornadas en el Detalle antes de
-    // que se cobren. Se pintan en rojo con "Sin cobrar" y NO entran al Total.
-    const pendientes: FilaDetalleIngresos[] = agruparPendientes(
-      data.itemsPendientes
-    )
-      .filter((g) => selTra.length === 0 || selTra.includes(g.trabajo))
-      .filter((g) => enRango(g.fechaDesde, g.fechaHasta))
-      .map((grupo) => ({ tipo: "pendiente", grupo }));
-
-    return [...cobrados, ...pendientes];
-  }, [todosLosIngresos, data.itemsPendientes, selTra, selFdIng, selFhIng]);
+  // Detalle: las **tarjetas** (2026-09-30, pedido del usuario: "lo mismo que en
+  // Gastos") arman sus filas DENTRO de `IngresosTarjetas` a partir de las dos
+  // fuentes completas (`todosLosIngresos` + `data.itemsPendientes`) y su propia
+  // **ventana de 3 meses**, igual que las tarjetas de Gastos: la ventana es fija
+  // y NO depende de los Filtros del panel (que siguen aplicando al Resumen y al
+  // Histórico, y al listado completo de `/trabajo`).
 
   // Histórico: solo trabajo (sin fechas) — se filtra la FUENTE completa para que
   // la evolución use el mismo criterio que el badge y el resumen.
@@ -662,16 +637,22 @@ export function DashboardClient({ data }: Props) {
         />
       ) : tabIngresos === "detalle" ? (
         <div className="rounded-lg border border-border bg-card p-5">
+          {/* Cabecera de "Ingresos → Detalle": MISMA estructura de dos filas que
+              Resumen/Histórico (fila 1 = título + badge "Mes actual"; fila 2 =
+              pestañas) para que el badge no se mueva al cambiar de pestaña. Esta
+              pestaña NO lleva Filtros (la ventana de 3 meses es fija): los
+              Filtros de Ingresos siguen en Resumen e Histórico. */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-[16px] font-semibold text-header">Ingresos</h3>
               <StatBadge label="Mes actual" value={badges.ingresos} />
-              {ingFilterBtn("sm:hidden")}
             </div>
-            <div className="flex items-center gap-2">{ingFilterBtn("hidden sm:inline-flex")}{ingresosTabs}</div>
+            <div className="flex items-center gap-2">{ingresosTabs}</div>
           </div>
-          <IngresosDetalle
-            filas={filteredIngresos}
+          <IngresosTarjetas
+            liquidaciones={todosLosIngresos}
+            itemsPendientes={data.itemsPendientes}
+            hoyServidor={data.hoyServidor}
             currency={data.monedaPredeterminadaISO}
           />
         </div>
