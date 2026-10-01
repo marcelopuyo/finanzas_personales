@@ -441,35 +441,49 @@ export function DashboardClient({ data }: Props) {
   // Acciones de la cabecera de "Gastos".
   //
   // En MOBILE el panel tiene DOS filas: fila 1 = título + badge + **⋯** (en el
-  // ángulo superior derecho; el ⋯ lo aporta el `badge`, ver `gastosMenuMobile`) y
-  // fila 2 = pestañas + **Filtros** (pegado al borde derecho con `ml-auto`).
-  // En desktop van todos en UNA fila, a la derecha del badge (`sm:w-auto`):
-  // Filtros · pestañas · ⋯.
+  // ángulo superior derecho; el ⋯ lo aporta la propia fila del título, ver
+  // `gastosMenuMobile`) y fila 2 = pestañas + **Filtros** (pegado al borde derecho
+  // con `ml-auto`). En desktop van todos en UNA fila, a la derecha del badge
+  // (`sm:w-auto`): Filtros · pestañas · ⋯.
   //
-  // ⚠️ La pestaña **Detalle** no tiene badge ni Filtros (2026-09-30): ahí el ⋯
-  // viaja en la misma fila que las pestañas (`menuEnFila`).
-  const gastosHeaderActions = ({
-    conFiltros = true,
-    menuEnFila = false,
-  }: { conFiltros?: boolean; menuEnFila?: boolean } = {}) => (
+  // ⚠️ La pestaña **Detalle** no tiene badge ni Filtros (decisión del usuario,
+  // 2026-09-30) pero **sí** el ⋯ en el ángulo superior derecho: mismo esqueleto de
+  // dos filas que las otras dos (si no, el ⋯ saltaba a la fila 2 al cambiar de
+  // pestaña).
+  const gastosHeaderActions = (conFiltros = true) => (
     <div className="flex w-full items-center gap-1 sm:w-auto sm:gap-2">
       {conFiltros && filterBtn("hidden sm:inline-flex")}
       {gastosTabs}
       {conFiltros && filterBtn("ml-auto sm:hidden")}
-      <div className={cn("ml-auto", menuEnFila ? "flex" : "hidden sm:flex")}>
+      {/* En mobile el ⋯ vive en la fila 1 (ver `gastosMenuMobile`). */}
+      <div className="ml-auto hidden sm:flex">
         <GastosActionsMenu />
       </div>
     </div>
   );
 
   /**
-   * ⋯ del panel Gastos en **MOBILE**: vive en la **fila 1**, alineado a la derecha
-   * (lo recibe el `badge` del panel). En desktop el ⋯ va con las pestañas, así que
+   * ⋯ del panel Gastos en **MOBILE**: va en la **fila 1**, pegado al borde derecho.
+   * Lo aporta el `badge` en Resumen/Histórico (esa fila la arma el gráfico) y
+   * `gastosFilaTitulo` en Detalle. En desktop el ⋯ viaja con las pestañas, así que
    * esta copia se oculta (`sm:hidden`).
    */
   const gastosMenuMobile = (
     <div className="ml-auto flex items-center sm:hidden">
       <GastosActionsMenu />
+    </div>
+  );
+
+  /**
+   * Fila 1 en **mobile** para la pestaña **Detalle**: el título del panel + el ⋯
+   * en el ángulo superior derecho. Es la MISMA fila que arman Resumen/Histórico
+   * (título + badge + ⋯, dentro del gráfico) así el ⋯ **no se mueve** al cambiar de
+   * pestaña. En desktop vuelve a shrink-to-fit y el ⋯ lo pone `gastosHeaderActions`.
+   */
+  const gastosFilaTitulo = (
+    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+      <h3 className="text-[16px] font-semibold text-header">Gastos</h3>
+      {gastosMenuMobile}
     </div>
   );
 
@@ -599,13 +613,15 @@ export function DashboardClient({ data }: Props) {
         />
       ) : tabGastos === "detalle" ? (
         <div className="rounded-lg border border-border bg-card p-5">
-          {/* Cabecera de "Gastos → Detalle": SOLO título + pestañas + ⋯. Esta
-              pestaña muestra los últimos 3 días en TARJETAS (2026-09-30) y no
-              filtra: por eso NO lleva badge "Mes actual", ni Filtros, ni
-              buscador (la búsqueda vive en la pantalla "Ver más gastos"). */}
+          {/* Cabecera de "Gastos → Detalle": MISMA estructura de dos filas que
+              Resumen/Histórico (fila 1 = título + ⋯ en el ángulo superior derecho;
+              fila 2 = pestañas) para que el ⋯ no se mueva al cambiar de pestaña.
+              Esta pestaña NO lleva badge "Mes actual", ni Filtros, ni buscador: el
+              Detalle muestra los últimos 3 días en tarjetas (2026-09-30) y la
+              búsqueda vive en la pantalla "Ver más gastos". */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-            <h3 className="text-[16px] font-semibold text-header">Gastos</h3>
-            {gastosHeaderActions({ conFiltros: false, menuEnFila: true })}
+            {gastosFilaTitulo}
+            {gastosHeaderActions(false)}
           </div>
           <GastosTarjetas
             data={todosLosGastos}
