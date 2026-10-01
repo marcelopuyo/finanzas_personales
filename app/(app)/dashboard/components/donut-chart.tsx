@@ -147,7 +147,10 @@ export function DonutChart({
   const touchReset = useHideTooltipOnTouch();
   const header = (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-      <div className="flex flex-wrap items-center gap-2">
+      {/* En MOBILE este grupo ocupa todo el ancho del panel: así lo que se alinee
+          a la derecha dentro del `badge` (hoy: el botón ⋯ del panel Gastos) queda
+          pegado al borde superior derecho. En desktop vuelve a shrink-to-fit. */}
+      <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
         <h3 className="text-[16px] font-semibold text-header">{title}</h3>
         {badge}
       </div>

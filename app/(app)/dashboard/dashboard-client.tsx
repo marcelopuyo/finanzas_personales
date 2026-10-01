@@ -438,19 +438,38 @@ export function DashboardClient({ data }: Props) {
     />
   );
 
-  // Acciones de la cabecera de "Gastos" (Filtros + pestañas + ⋯). En mobile el
-  // grupo ocupa todo el ancho del panel y el ⋯ se pega al BORDE DERECHO con
-  // `ml-auto`; en desktop van todos en línea, a la derecha del badge
-  // (`sm:w-auto` / `sm:ml-0`).
-  // ⚠️ La pestaña **Detalle** no lleva Filtros (2026-09-30): muestra los últimos
-  // 3 días en tarjetas, sin filtrar y sin buscador.
-  const gastosHeaderActions = (conFiltros = true) => (
+  // Acciones de la cabecera de "Gastos".
+  //
+  // En MOBILE el panel tiene DOS filas: fila 1 = título + badge + **⋯** (en el
+  // ángulo superior derecho; el ⋯ lo aporta el `badge`, ver `gastosMenuMobile`) y
+  // fila 2 = pestañas + **Filtros** (pegado al borde derecho con `ml-auto`).
+  // En desktop van todos en UNA fila, a la derecha del badge (`sm:w-auto`):
+  // Filtros · pestañas · ⋯.
+  //
+  // ⚠️ La pestaña **Detalle** no tiene badge ni Filtros (2026-09-30): ahí el ⋯
+  // viaja en la misma fila que las pestañas (`menuEnFila`).
+  const gastosHeaderActions = ({
+    conFiltros = true,
+    menuEnFila = false,
+  }: { conFiltros?: boolean; menuEnFila?: boolean } = {}) => (
     <div className="flex w-full items-center gap-1 sm:w-auto sm:gap-2">
       {conFiltros && filterBtn("hidden sm:inline-flex")}
       {gastosTabs}
-      <div className="ml-auto sm:ml-0">
+      {conFiltros && filterBtn("ml-auto sm:hidden")}
+      <div className={cn("ml-auto", menuEnFila ? "flex" : "hidden sm:flex")}>
         <GastosActionsMenu />
       </div>
+    </div>
+  );
+
+  /**
+   * ⋯ del panel Gastos en **MOBILE**: vive en la **fila 1**, alineado a la derecha
+   * (lo recibe el `badge` del panel). En desktop el ⋯ va con las pestañas, así que
+   * esta copia se oculta (`sm:hidden`).
+   */
+  const gastosMenuMobile = (
+    <div className="ml-auto flex items-center sm:hidden">
+      <GastosActionsMenu />
     </div>
   );
 
@@ -567,7 +586,7 @@ export function DashboardClient({ data }: Props) {
         <DonutChart
           title="Gastos"
           action={gastosHeaderActions()}
-          badge={<><StatBadge label="Mes actual" value={badges.gastos} />{filterBtn("sm:hidden")}</>}
+          badge={<><StatBadge label="Mes actual" value={badges.gastos} />{gastosMenuMobile}</>}
           currency={data.monedaPredeterminadaISO}
           data={filteredResumen.map((g) => ({
             name: g.name,
@@ -586,7 +605,7 @@ export function DashboardClient({ data }: Props) {
               buscador (la búsqueda vive en la pantalla "Ver más gastos"). */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <h3 className="text-[16px] font-semibold text-header">Gastos</h3>
-            {gastosHeaderActions(false)}
+            {gastosHeaderActions({ conFiltros: false, menuEnFila: true })}
           </div>
           <GastosTarjetas
             data={todosLosGastos}
@@ -598,7 +617,7 @@ export function DashboardClient({ data }: Props) {
         <EvolutionChart
           title="Gastos"
           action={gastosHeaderActions()}
-          badge={<><StatBadge label="Mes actual" value={badges.gastos} />{filterBtn("sm:hidden")}</>}
+          badge={<><StatBadge label="Mes actual" value={badges.gastos} />{gastosMenuMobile}</>}
           currency={data.monedaPredeterminadaISO}
           data={filteredEvolucion}
           color="var(--primary)"
