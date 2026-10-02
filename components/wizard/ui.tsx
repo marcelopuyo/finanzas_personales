@@ -216,12 +216,24 @@ export function AutoCompleteField({
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Token para descartar respuestas obsoletas de búsquedas previas.
   const token = useRef(0);
+  // ¿El último cambio de `value` vino de que el usuario **escribió**? Solo en ese
+  // caso se abre el desplegable. Si el valor cambia por fuera (al **remontar** el
+  // paso con un valor ya cargado —p. ej. volviendo desde la Confirmación— o al
+  // dictar por voz), la lista se abría sola y quedaba abierta (bug 2026-10-01).
+  const buscarPorUsuario = useRef(false);
 
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
     const termino = value.trim();
     const miToken = ++token.current;
+    // Se **consume** el flag: rige solo para el cambio de valor que disparó este
+    // efecto (el siguiente cambio, si no vuelve a escribir, no abre la lista).
+    const porUsuario = buscarPorUsuario.current;
+    buscarPorUsuario.current = false;
     timer.current = setTimeout(() => {
+      // Cambio de valor sin interacción del usuario (remontaje del paso, dictado,
+      // selección de una sugerencia) ⇒ no buscar ni abrir la lista.
+      if (!porUsuario) return;
       if (termino.length < minChars) {
         setSugerencias([]);
         setAbierto(false);
@@ -255,7 +267,11 @@ export function AutoCompleteField({
       <input
         type="text"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          // Marca que el cambio lo hizo el usuario ⇒ sí se puede abrir la lista.
+          buscarPorUsuario.current = true;
+          onChange(e.target.value);
+        }}
         onBlur={() => setAbierto(false)}
         placeholder={placeholder}
         className={inputCls}
