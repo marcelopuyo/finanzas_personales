@@ -139,23 +139,21 @@ export function InicioPanel({ data, historialInicial }: InicioPanelProps) {
         ))}
       </div>
 
-      <div className="mt-3 flex items-center justify-between">
-        <span className="flex items-center gap-1.5">
-          {Array.from({ length: totalTarjetas }).map((_, i) => (
-            <i
-              key={i}
-              aria-hidden="true"
-              className={
-                i === indice
-                  ? "block h-1.5 w-4.5 rounded-full bg-primary"
-                  : "block h-1.5 w-1.5 rounded-full bg-border"
-              }
-            />
-          ))}
-        </span>
-        <span className="text-[11px] text-subtitle">
-          {indice + 1} de {totalTarjetas}
-        </span>
+      {/* Puntos del carrusel: **centrados** y **sin contador "m de n"**
+          (2026-10-02, pedido del usuario: la posición se lee por el punto
+          ancho, el recuento era ruido). */}
+      <div className="mt-3 flex items-center justify-center gap-1.5">
+        {Array.from({ length: totalTarjetas }).map((_, i) => (
+          <i
+            key={i}
+            aria-hidden="true"
+            className={
+              i === indice
+                ? "block h-1.5 w-4.5 rounded-full bg-primary"
+                : "block h-1.5 w-1.5 rounded-full bg-border"
+            }
+          />
+        ))}
       </div>
 
       {cuentas.length === 0 && (
