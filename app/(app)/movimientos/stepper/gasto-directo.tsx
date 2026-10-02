@@ -88,7 +88,11 @@ export function GastoDirecto() {
         return;
       }
       const patch: Partial<MovimientoData> = {};
-      if (ultimo.monto > 0) patch.montoOrigen = ultimo.monto;
+      // El **monto** solo se copia si el campo está vacío/0: si el usuario ya
+      // cargó un monto mayor que 0, se **respeta** (el héroe manda; pedido
+      // 2026-10-01). El resto de lo implícito sigue completando lo que falta.
+      const respetaMonto = ultimo.monto > 0 && data.montoOrigen > 0;
+      if (ultimo.monto > 0 && !respetaMonto) patch.montoOrigen = ultimo.monto;
       // Solo si esa categoría sigue existiendo (podría estar eliminada).
       if (
         ultimo.categoriaId &&
@@ -97,11 +101,18 @@ export function GastoDirecto() {
         patch.idCategoriaGasto = ultimo.categoriaId;
       }
       if (Object.keys(patch).length === 0) {
-        toast.info("Ese gasto no tiene categoría ni monto para copiar");
+        toast.info(
+          respetaMonto
+            ? "Se respetó el monto que ya cargaste"
+            : "Ese gasto no tiene categoría ni monto para copiar"
+        );
         return;
       }
       handleSetData(patch);
-      toast.success(`Se completó con el último gasto "${descripcion}"`);
+      toast.success(
+        `Se completó con el último gasto "${descripcion}"` +
+          (respetaMonto ? " (se respetó tu monto)" : "")
+      );
     } catch {
       toast.error("No se pudo recuperar el último gasto");
     } finally {
