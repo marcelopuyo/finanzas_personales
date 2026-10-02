@@ -9,12 +9,12 @@ import {
   SelectField,
   NumberField,
 } from "./ui";
+import { STEP_CONFIRMACION, type MovimientoData } from "./types";
 import {
   MOTIVOS_TRANSFERENCIA,
-  MOTIVO_TRANSFERENCIA_MAX,
-  STEP_CONFIRMACION,
-  type MovimientoData,
-} from "./types";
+  esMotivoPreset,
+  motivoTransferenciaFinal,
+} from "@/lib/motivos-transferencia";
 import { convertirMontoParaUI } from "@/backend/src/actions/cotizaciones";
 import { crearDictadoTransferencia } from "./dictado-transferencia";
 import { aplicarDictadoSimple, escribirEnPantalla } from "./dictado-comun";
@@ -189,19 +189,18 @@ export function Transferencia() {
           options={motivos.map((m) => ({ value: m, label: m }))}
           placeholder="Seleccionar o escribir…"
           createLabel="Usar otro motivo"
-          createLabelFor={(q) =>
-            `Usar «${q.trim().slice(0, MOTIVO_TRANSFERENCIA_MAX)}»`
-          }
+          createLabelFor={(q) => `Usar «${motivoTransferenciaFinal(q)}»`}
           searchPlaceholder="Buscar o escribir…"
           onCreate={(prefill) => {
-            const texto = prefill.trim().slice(0, MOTIVO_TRANSFERENCIA_MAX);
+            // Motivo FINAL: los presets se guardan tal cual y los motivos
+            // escritos a mano con el prefijo "Transf - " (lo resuelve el helper
+            // compartido `lib/motivos-transferencia.ts`, que el backend vuelve a
+            // aplicar al persistir).
+            const texto = motivoTransferenciaFinal(prefill);
             if (!texto) return;
             // Un texto igual a un preset se comporta como preset (usa su par de
             // conceptos específico) y no se duplica la opción.
-            const esPreset = (MOTIVOS_TRANSFERENCIA as readonly string[]).includes(
-              texto
-            );
-            if (!esPreset) {
+            if (!esMotivoPreset(texto)) {
               setMotivosPropios((prev) =>
                 prev.includes(texto) ? prev : [...prev, texto]
               );

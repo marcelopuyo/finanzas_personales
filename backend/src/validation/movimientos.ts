@@ -2,16 +2,9 @@ import { z } from "zod";
 
 // Reemplaza a class-validator. Reglas equivalentes a los DTOs del backend NestJS.
 
-/** Motivos de transferencia "de fábrica" (cada uno tiene su par propio de
- * conceptos en `buscarConceptosTransferencia`). Debe coincidir con los presets
- * de la UI en `app/(app)/movimientos/stepper/types.ts`. */
-export const MOTIVOS_TRANSFERENCIA = [
-  "Transferencia",
-  "Compra Dolares",
-  "Venta Dolares",
-  "Extraccion",
-  "Deposito",
-] as const;
+// Los presets de motivo viven en el módulo compartido `lib/motivos-transferencia.ts`
+// (los usan la UI, la voz y el action `transferir`). Se re-exportan por compatibilidad.
+export { MOTIVOS_TRANSFERENCIA } from "../../../lib/motivos-transferencia";
 
 /**
  * Motivo de transferencia: un preset **o** un texto libre escrito por el usuario

@@ -26,6 +26,7 @@ import {
   modalidadAdmiteTareas,
 } from "../lib/jornadas";
 import { montoEnMonedaPredeterminada } from "../lib/cotizaciones";
+import { motivoTransferenciaFinal } from "../../../lib/motivos-transferencia";
 import {
   cobrarTrabajoSchema,
   editarJornadaSchema,
@@ -523,7 +524,9 @@ export async function transferir(input: z.infer<typeof movimiento2Schema>) {
   const userId = await requireUserId();
   const data = movimiento2Schema.parse(input);
   // Texto normalizado (preset o motivo propio): se guarda en los 2 movimientos.
-  const motivo = data.motivo.trim();
+  // Los **presets** se guardan tal cual y los **motivos escritos a mano** con el
+  // prefijo `Transf - ` (helper idempotente, el mismo que usa la UI al mostrar).
+  const motivo = motivoTransferenciaFinal(data.motivo);
   if (!data.idCuentaOrigen || !data.idCuentaDestino)
     throw new Error("idCuentaOrigen e idCuentaDestino son requeridos");
   if (!data.montoOrigen || !data.montoDestino)

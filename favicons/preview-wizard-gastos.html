@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Preview · Wizard de GASTO DIRECTO (5 opciones)</title>
+<style>
+  :root{
+    --bg:#151517; --card:#353638; --border:#3e3f42; --primary:#4c6ef5;
+    --muted:#1e1e20; --header:#ffffff; --subtitle:#808185; --label:#9a9b9e;
+    --fg:#e2e4f0; --hair:#2b2b2e;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:#0c0c0d; color:#e8e8ea;
+    font-family:"SF Pro Display",-apple-system,BlinkMacSystemFont,Inter,"Segoe UI",Roboto,sans-serif;
+    padding:28px 20px 60px;
+  }
+  h1.pag{font-size:18px;font-weight:600;margin:0 0 4px}
+  p.pag{font-size:13px;color:#9a9b9e;margin:0 0 26px;max-width:900px;line-height:1.5}
+  .grid{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+  .variant{width:390px}
+  .vhead{font-size:13px;font-weight:600;margin:0 0 4px;color:#fff}
+  .vsub{font-size:11.5px;color:#8b8c90;margin:0 0 12px;line-height:1.4;min-height:32px}
+
+  /* ── marco de teléfono ── */
+  .phone{width:390px;background:var(--bg);border:.5px solid #3e3f42;border-radius:20px;overflow:hidden;box-shadow:0 10px 30px #0008}
+  .topbar{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid #262629}
+  .logo{font-size:13px;color:#c9cacd;letter-spacing:.2px}
+  .avatar{width:28px;height:28px;border-radius:50%;background:#414346;display:grid;place-items:center;font-size:12px;color:#d8d8da}
+  .screen{padding:20px 16px 24px}
+
+  /* ── tipografía / componentes ── */
+  .h1{font-size:18px;font-weight:600;color:var(--header);margin:0 0 2px}
+  .h2{font-size:15px;font-weight:600;color:var(--header);margin:0 0 16px}
+  .step{font-size:13px;color:var(--subtitle);margin:0 0 10px}
+  .bar{height:6px;border-radius:99px;background:var(--muted);overflow:hidden;margin:0 0 16px}
+  .bar>i{display:block;height:100%;width:66%;background:var(--primary);border-radius:99px}
+  .card{border:1px solid var(--border);border-radius:10px;background:var(--card);padding:20px}
+  .f{margin-bottom:16px}
+  .f:last-child{margin-bottom:0}
+  .f>label{display:block;font-size:13px;font-weight:500;color:var(--header);margin-bottom:6px}
+  .in{background:var(--muted);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--fg)}
+  .in.ph{color:#6f7075}
+  .cta{margin-top:16px;width:100%;background:var(--primary);color:#fff;border:0;border-radius:9px;padding:13px;font-size:13px;font-weight:600}
+  .cta.ghost{background:transparent;color:var(--subtitle);border:1px solid var(--border);margin-top:8px}
+
+  /* dots de paso */
+  .dots{display:flex;gap:6px;justify-content:center;margin:0 0 18px}
+  .dots i{width:6px;height:6px;border-radius:99px;background:#4a4a4e}
+  .dots i.on{width:20px;background:var(--primary)}
+
+  /* back row */
+  .backrow{display:flex;align-items:center;gap:10px;margin:0 0 16px}
+  .back{width:30px;height:30px;border-radius:8px;background:var(--muted);border:1px solid var(--border);display:grid;place-items:center;color:var(--subtitle);font-size:15px}
+  .backrow .t{font-size:16px;font-weight:600;color:var(--header)}
+  .backrow .x{margin-left:auto;font-size:12px;color:var(--subtitle)}
+
+  /* eyebrow */
+  .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--subtitle);margin:0 0 10px;font-weight:600}
+
+  /* inset grouped */
+  .group{border:1px solid var(--border);border-radius:12px;background:var(--card);overflow:hidden}
+  .group .row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 16px;border-bottom:1px solid var(--hair)}
+  .group .row:last-child{border-bottom:0}
+  .row .k{font-size:14px;color:var(--fg);flex:0 0 auto}
+  .row .v{font-size:14px;color:var(--subtitle);display:flex;align-items:center;gap:8px;min-width:0}
+  .row .v strong{color:var(--header);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chev{color:#6d6e72;font-size:14px}
+
+  /* sticky cta */
+  .dock{margin-top:16px;padding-top:14px;border-top:1px solid var(--hair);display:flex;flex-direction:column;gap:8px}
+
+  /* sheet */
+  .sheetwrap{background:#0b0b0c;position:relative;padding-top:110px}
+  .sheetwrap .behind{position:absolute;inset:0;background:#151517;opacity:.35}
+  .sheet{position:relative;background:var(--bg);border-radius:22px 22px 0 0;border-top:1px solid #3e3f42;padding:10px 16px 24px;box-shadow:0 -12px 30px #000a}
+  .grabber{width:38px;height:5px;border-radius:99px;background:#4a4a4e;margin:0 auto 14px}
+
+  /* hero monto */
+  .hero{margin:6px 0 18px;text-align:center}
+  .hero .amt{font-size:34px;font-weight:600;color:var(--header);letter-spacing:-.5px}
+  .hero .sub{font-size:12px;color:var(--subtitle);margin-top:6px}
+  .chips{display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap}
+  .chip{font-size:11.5px;color:var(--subtitle);border:1px solid var(--border);background:var(--muted);border-radius:99px;padding:4px 10px}
+
+  .notas{list-style:none;padding:0;margin:12px 0 0;font-size:12px;color:#a9aaae;line-height:1.55}
+  .notas li{margin-bottom:5px;padding-left:14px;position:relative}
+  .notas li:before{content:"·";position:absolute;left:2px;color:var(--primary);font-weight:700}
+  .tag{display:inline-block;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;border-radius:5px;padding:2px 7px;margin-left:8px;vertical-align:middle}
+  .tag.rec{background:color-mix(in srgb,var(--primary) 22%,transparent);color:#b9c4ff}
+  .tag.min{background:#ffffff14;color:#c9cacd}
+</style>
+</head>
+<body>
+
+<h1 class="pag">Wizard de GASTO DIRECTO · las 5 opciones</h1>
+<p class="pag">
+  Mismo ejemplo en todas (paso 2 de <strong>Gasto directo</strong>). Campos reales del flujo:
+  <strong>Descripción</strong> (con autocompletado) · <strong>Fecha</strong> · <strong>Cuenta</strong> · <strong>Monto</strong> ·
+  <strong>Categoría de gasto</strong> (con alta rápida). Tema oscuro real de la app; es un archivo descartable.
+</p>
+
+<div class="grid">
+
+  <!-- ═══════════ ACTUAL ═══════════ -->
+  <section class="variant">
+    <h3 class="vhead">Actual</h3>
+    <p class="vsub">Título 18px fuera de la tarjeta + instrucción 15px dentro. Los campos (13px) quedan como lo menos importante.</p>
+    <div class="phone">
+      <div class="topbar"><span class="logo">finanzas personales</span><span class="avatar">M</span></div>
+      <div class="screen">
+        <h1 class="h1">Gasto directo</h1>
+        <p class="step">Paso 2 de 3</p>
+        <div class="bar"><i></i></div>
+        <div class="card">
+          <h2 class="h2">Por favor ingrese la información del gasto directo:</h2>
+          <div class="f"><label>Descripción</label><div class="in">Supermercado</div></div>
+          <div class="f"><label>Fecha</label><div class="in">01/10/2026</div></div>
+          <div class="f"><label>Cuenta</label><div class="in">Billetera (USD)</div></div>
+          <div class="f"><label>Monto</label><div class="in">3.500,00</div></div>
+          <div class="f"><label>Categoría de gasto</label><div class="in">Alimentacion</div></div>
+        </div>
+        <button class="cta">Siguiente</button>
+        <button class="cta ghost">Atrás</button>
+      </div>
+    </div>
+    <ul class="notas">
+      <li>Dos títulos compitiendo (h1 + h2) y, en modo directo, <strong>dicen lo mismo</strong>.</li>
+      <li>La instrucción es la fuente más grande de la pantalla.</li>
+      <li>Copy largo y repetido en cada paso.</li>
+      <li>El CTA queda abajo, en el flujo (zona media del pulgar solo si scrolleás).</li>
+    </ul>
+  </section>
+
+  <!-- ═══════════ A ═══════════ -->
+  <section class="variant">
+    <h3 class="vhead">A · Compacto + jerarquía corregida <span class="tag min">bajo riesgo</span></h3>
+    <p class="vsub">Mismo flujo de 3 pasos, pero el título baja a "header de pantalla" y los campos pasan a ser los protagonistas.</p>
+    <div class="phone">
+      <div class="topbar"><span class="logo">finanzas personales</span><span class="avatar">M</span></div>
+      <div class="screen">
+        <div class="backrow"><span class="back">‹</span><span class="t">Gasto directo</span><span class="x">2/3</span></div>
+        <div class="dots"><i class="on"></i><i class="on"></i><i></i></div>
+        <div class="card">
+          <div class="f"><label>Descripción</label><div class="in">Supermercado</div></div>
+          <div class="f"><label>Fecha</label><div class="in">01/10/2026</div></div>
+          <div class="f"><label>Cuenta</label><div class="in">Billetera (USD)</div></div>
+          <div class="f"><label>Monto</label><div class="in">3.500,00</div></div>
+          <div class="f"><label>Categoría de gasto</label><div class="in">Alimentacion</div></div>
+        </div>
+        <button class="cta">Siguiente</button>
+        <button class="cta ghost">Atrás</button>
+      </div>
+    </div>
+    <ul class="notas">
+      <li><strong>Se elimina el h1 de página</strong>; el nombre de la operación pasa a la fila de "atrás".</li>
+      <li>El paso se muestra con <strong>3 puntos</strong> (sin "Paso 2 de 3" en texto).</li>
+      <li><strong>Sin instrucción</strong>: los labels alcanzan. Nada más grande que los campos.</li>
+      <li>Cambio chico y de bajo riesgo: se toca solo el `StepShell`, no los pasos.</li>
+    </ul>
+  </section>
+
+  <!-- ═══════════ B ═══════════ -->
+  <section class="variant">
+    <h3 class="vhead">B · "Inset grouped" iOS + CTA fija <span class="tag rec">recomendada</span></h3>
+    <p class="vsub">Formulario como lista agrupada (label izquierda, valor derecha, hairlines) + botón primario anclado en la zona del pulgar.</p>
+    <div class="phone">
+      <div class="topbar"><span class="logo">finanzas personales</span><span class="avatar">M</span></div>
+      <div class="screen">
+        <div class="backrow"><span class="back">‹</span><span class="t">Gasto directo</span></div>
+        <div class="eyebrow">Datos del gasto</div>
+        <div class="group">
+          <div class="row"><span class="k">Descripción</span><span class="v"><strong>Supermercado</strong></span></div>
+          <div class="row"><span class="k">Fecha</span><span class="v"><strong>01-10-26</strong><span class="chev">›</span></span></div>
+          <div class="row"><span class="k">Cuenta</span><span class="v"><strong>Billetera</strong> USD<span class="chev">›</span></span></div>
+          <div class="row"><span class="k">Monto</span><span class="v"><strong>US$ 3.500,00</strong></span></div>
+          <div class="row"><span class="k">Categoría</span><span class="v"><strong>Alimentacion</strong><span class="chev">›</span></span></div>
+        </div>
+        <div class="dock">
+          <button class="cta">Siguiente</button>
+          <button class="cta ghost">Atrás</button>
+        </div>
+      </div>
+    </div>
+    <ul class="notas">
+      <li>Estándar <strong>"inset grouped"</strong> de iOS: denso, escaneable, sin ruido.</li>
+      <li>Label 14px <span style="opacity:.6">(sin repetir el nombre del campo 2 veces)</span>.</li>
+      <li><strong>CTA anclado abajo</strong> (pulgar) con separador; el resto scrollea.</li>
+      <li>El monto se ve ya formateado como moneda en la fila.</li>
+    </ul>
+  </section>
+
+  <!-- ═══════════ C ═══════════ -->
+  <section class="variant">
+    <h3 class="vhead">C · Wizard como "sheet"</h3>
+    <p class="vsub">El paso 2 se abre como hoja sobre el resumen (grabber, esquinas redondeadas, arrastrar para cancelar), como en las apps de banca.</p>
+    <div class="phone">
+      <div class="topbar"><span class="logo">finanzas personales</span><span class="avatar">M</span></div>
+      <div class="sheetwrap">
+        <div class="behind"></div>
+        <div class="sheet">
+          <div class="grabber"></div>
+          <div class="backrow"><span class="t" style="font-size:15px">Nuevo gasto</span><span class="x">2/3</span></div>
+          <div class="dots"><i class="on"></i><i class="on"></i><i></i></div>
+          <div class="f"><label>Descripción</label><div class="in">Supermercado</div></div>
+          <div class="f"><label>Fecha</label><div class="in">01/10/2026</div></div>
+          <div class="f"><label>Cuenta</label><div class="in">Billetera (USD)</div></div>
+          <div class="f"><label>Monto</label><div class="in">3.500,00</div></div>
+          <div class="f"><label>Categoría de gasto</label><div class="in">Alimentacion</div></div>
+          <button class="cta">Siguiente</button>
+        </div>
+      </div>
+    </div>
+    <ul class="notas">
+      <li>Coherente con los <strong>sheets de acciones de cuenta</strong> que ya usa la app.</li>
+      <li>Hace que las operaciones cortas se sientan <strong>livianas y nativas</strong>.</li>
+      <li>Más trabajo de implementación (overlay, foco, teclado, safe-area).</li>
+      <li>Con 5 campos el sheet queda alto: evaluar que el teclado no lo tape.</li>
+    </ul>
+  </section>
+
+  <!-- ═══════════ D ═══════════ -->
+  <section class="variant">
+    <h3 class="vhead">D · Monto protagonista (fintech)</h3>
+    <p class="vsub">El monto es el héroe (grande y centrado); el resto son filas secundarias. Es la tendencia de Wise/Revolut/Cash App.</p>
+    <div class="phone">
+      <div class="topbar"><span class="logo">finanzas personales</span><span class="avatar">M</span></div>
+      <div class="screen">
+        <div class="backrow"><span class="back">‹</span><span class="t">Gasto directo</span></div>
+        <div class="hero">
+          <div class="amt">US$ 3.500,00</div>
+          <div class="sub">Monto</div>
+          <div class="chips"><span class="chip">Billetera</span><span class="chip">Alimentacion</span></div>
+        </div>
+        <div class="group">
+          <div class="row"><span class="k">Descripción</span><span class="v"><strong>Supermercado</strong><span class="chev">›</span></span></div>
+          <div class="row"><span class="k">Fecha</span><span class="v"><strong>01-10-26</strong><span class="chev">›</span></span></div>
+          <div class="row"><span class="k">Cuenta</span><span class="v"><strong>Billetera</strong> USD<span class="chev">›</span></span></div>
+          <div class="row"><span class="k">Categoría</span><span class="v"><strong>Alimentacion</strong><span class="chev">›</span></span></div>
+        </div>
+        <div class="dock"><button class="cta">Siguiente</button></div>
+      </div>
+    </div>
+    <ul class="notas">
+      <li>Prioriza la acción más común: <strong>escribir el monto</strong>.</li>
+      <li>Ideal si más adelante se agrega <strong>teclado numérico propio</strong>.</li>
+      <li>La <strong>Descripción</strong> queda como fila (el autocompletado sigue disponible al tocarla).</li>
+      <li>Más ambiciosa: conviene si justifica el rediseño de los 3 flujos.</li>
+    </ul>
+  </section>
+
+</div>
+
+</body>
+</html>

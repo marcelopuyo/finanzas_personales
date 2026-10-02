@@ -26,7 +26,7 @@
 import { VOZ_LANG } from "@/lib/voz/config";
 import type { ConfigDictado } from "@/lib/voz/tipos";
 import { ENLACES_ORDEN } from "./dictado-comun";
-import { MOTIVOS_TRANSFERENCIA } from "./types";
+import { MOTIVOS_TRANSFERENCIA } from "@/lib/motivos-transferencia";
 
 /** Lo mínimo que la config necesita de las opciones del wizard. */
 export interface OpcionesDictadoTransferencia {

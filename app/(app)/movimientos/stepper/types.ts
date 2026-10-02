@@ -156,17 +156,6 @@ export const CONCEPTO_TITULO_PAGINA: Record<MovimientoConcepto, string> = {
   CargarTarea: "Carga de tarea",
 };
 
-/** Motivos posibles de transferencia (presets compartidos con la validación del
- * backend: `MOTIVOS_TRANSFERENCIA` en `backend/src/validation/movimientos.ts`).
- * El usuario también puede escribir un motivo propio (texto libre). */
-export const MOTIVOS_TRANSFERENCIA = [
-  "Transferencia",
-  "Compra Dolares",
-  "Venta Dolares",
-  "Extraccion",
-  "Deposito",
-] as const;
-
-/** Tope del motivo de transferencia (preset o texto propio): mismo `max(60)` de
- * `motivoTransferenciaSchema` (backend) y de la columna `movimiento.motivo`. */
-export const MOTIVO_TRANSFERENCIA_MAX = 60;
+// ⚠️ Los motivos de transferencia (presets + el prefijo `Transf - ` de los
+// personalizados) viven en el módulo compartido `@/lib/motivos-transferencia`
+// (los usan la UI, la voz y el backend).

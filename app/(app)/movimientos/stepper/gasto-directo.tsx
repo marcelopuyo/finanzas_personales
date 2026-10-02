@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { ArrowLeft } from "lucide-react";
 import { useMovimientoStepper } from "./stepper-context";
 import {
-  StepShell,
-  NavButtons,
   DateField,
   SelectField,
   NumberField,
@@ -24,7 +24,7 @@ import {
   type PantallaDictable,
   type ValoresPantalla,
 } from "@/components/voz/dictado-pantalla";
-import { todayLocalISODate } from "@/lib/utils";
+import { numberToCurrency, todayLocalISODate } from "@/lib/utils";
 import type { CampoDictable } from "@/lib/voz/tipos";
 
 /**
@@ -48,9 +48,22 @@ function tieneValorEn(
   return true;
 }
 
+/** Símbolo de la moneda (ej. `US$`, `$`) a partir del código ISO 4217. */
+function simboloMoneda(iso: string): string {
+  return numberToCurrency(0, iso).replace(/[0-9.,\s\u00a0]/g, "");
+}
+
 export function GastoDirecto() {
-  const { data, handleSetData, navigateTo, options, addCategoriaGasto } =
-    useMovimientoStepper();
+  const {
+    data,
+    handleSetData,
+    navigateTo,
+    options,
+    addCategoriaGasto,
+    direct,
+    volverA,
+  } = useMovimientoStepper();
+  const router = useRouter();
   // Alta rápida (opción A): texto buscado con el que abre el modal de categoría
   // nueva (null = cerrado).
   const [nuevaCategoria, setNuevaCategoria] = useState<string | null>(null);
@@ -274,61 +287,123 @@ export function GastoDirecto() {
   // ℹ️ La **vía B** (aprender la corrección) se mudó al paso de confirmación
   // (2026-09-24): se aprende **al guardar con éxito**, no al tocar Siguiente.
 
+  // ── Layout "fintech" (diseño D, 2026-10-01) ────────────────────────────────
+  // Datos derivados para el héroe (monto) y los chips.
+  const cuentaSel = options.cuentas.find((c) => c.id === data.cuentaOrigen);
+  const categoriaSel = options.categoriasGasto.find(
+    (c) => c.id === data.idCategoriaGasto
+  );
+  const isoCuenta = cuentaSel?.moneda?.codigoISO ?? "";
+  const simbolo = isoCuenta ? simboloMoneda(isoCuenta) : "";
+  // El `‹` del encabezado hace lo mismo que el "Atrás"/"Cancelar" del pie:
+  // en modo directo cancela (vuelve a `volverA`/dashboard), si no, al selector.
+  const volver = () =>
+    direct ? router.push(volverA ?? "/dashboard") : navigateTo(0);
+
   return (
-    <StepShell
-      title="Por favor ingrese la información del gasto directo:"
-      step={2}
-      total={3}
-      footer={
-        <NavButtons
-          onBack={() => navigateTo(0)}
-          onNext={() => navigateTo(STEP_CONFIRMACION)}
-          nextDisabled={!isValid}
+    <div className="mx-auto max-w-xl py-4">
+      {/* Encabezado: solo "Gasto" (no "Gasto directo"). */}
+      <div className="mb-5 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={volver}
+          aria-label={direct ? "Cancelar" : "Atrás"}
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-border bg-muted text-subtitle transition-colors hover:text-header"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <h1 className="text-[17px] font-semibold text-header">Gasto</h1>
+        {!direct && (
+          <span className="ml-auto text-[12px] text-subtitle">2/3</span>
+        )}
+      </div>
+
+      {/* Monto: protagonista de la pantalla. */}
+      <div className="mb-5">
+        <div className="flex items-baseline justify-center gap-2">
+          {simbolo && (
+            <span className="text-[20px] font-medium text-subtitle">
+              {simbolo}
+            </span>
+          )}
+          <NumberField
+            hero
+            label="Monto"
+            value={data.montoOrigen}
+            onChange={(v) => handleSetData({ montoOrigen: v })}
+          />
+        </div>
+        <p className="mt-2 text-center text-[12px] text-subtitle">
+          Monto{isoCuenta ? ` · ${isoCuenta}` : ""}
+        </p>
+        {(cuentaSel || categoriaSel) && (
+          <div className="mt-3 flex flex-wrap justify-center gap-2">
+            {cuentaSel && (
+              <span className="rounded-full border border-border bg-muted px-2.5 py-1 text-[11.5px] text-subtitle">
+                {cuentaSel.nombre}
+              </span>
+            )}
+            {categoriaSel && (
+              <span className="rounded-full border border-border bg-muted px-2.5 py-1 text-[11.5px] text-subtitle">
+                {categoriaSel.nombre}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Campos secundarios, agrupados en una sola tarjeta. */}
+      <div className="space-y-4 rounded-xl border border-border bg-card p-4">
+        <AutoCompleteField
+          label="Descripción"
+          value={data.descripcion}
+          onChange={(v) => handleSetData({ descripcion: v })}
+          buscar={buscarDescripcionesGastoAction}
+          onSelect={handleDescripcionElegida}
+          placeholder="Ej: Supermercado"
         />
-      }
-    >
-      <AutoCompleteField
-        label="Descripción"
-        value={data.descripcion}
-        onChange={(v) => handleSetData({ descripcion: v })}
-        buscar={buscarDescripcionesGastoAction}
-        onSelect={handleDescripcionElegida}
-        placeholder="Ej: Supermercado"
-      />
 
-      <DateField
-        label="Fecha"
-        value={data.fecha}
-        onChange={(v) => handleSetData({ fecha: v })}
-      />
+        <DateField
+          label="Fecha"
+          value={data.fecha}
+          onChange={(v) => handleSetData({ fecha: v })}
+        />
 
-      <SelectField
-        label="Cuenta"
-        value={data.cuentaOrigen ? String(data.cuentaOrigen) : ""}
-        onChange={(v) => handleSetData({ cuentaOrigen: Number(v) })}
-        options={options.cuentas.map((c) => ({
-          value: String(c.id),
-          label: c.moneda ? `${c.nombre} (${c.moneda.codigoISO})` : c.nombre,
-        }))}
-      />
+        <SelectField
+          label="Cuenta"
+          value={data.cuentaOrigen ? String(data.cuentaOrigen) : ""}
+          onChange={(v) => handleSetData({ cuentaOrigen: Number(v) })}
+          options={options.cuentas.map((c) => ({
+            value: String(c.id),
+            label: c.moneda ? `${c.nombre} (${c.moneda.codigoISO})` : c.nombre,
+          }))}
+        />
 
-      <NumberField
-        label="Monto"
-        value={data.montoOrigen}
-        onChange={(v) => handleSetData({ montoOrigen: v })}
-      />
+        <SelectField
+          label="Categoría de gasto"
+          value={data.idCategoriaGasto ? String(data.idCategoriaGasto) : ""}
+          onChange={(v) => handleSetData({ idCategoriaGasto: Number(v) })}
+          options={options.categoriasGasto.map((c) => ({
+            value: String(c.id),
+            label: c.nombre,
+          }))}
+          onCreate={setNuevaCategoria}
+          createLabel="Nueva categoría"
+        />
+      </div>
 
-      <SelectField
-        label="Categoría de gasto"
-        value={data.idCategoriaGasto ? String(data.idCategoriaGasto) : ""}
-        onChange={(v) => handleSetData({ idCategoriaGasto: Number(v) })}
-        options={options.categoriasGasto.map((c) => ({
-          value: String(c.id),
-          label: c.nombre,
-        }))}
-        onCreate={setNuevaCategoria}
-        createLabel="Nueva categoría"
-      />
+      {/* Acción principal en la zona del pulgar. `data-pie-accion` hace que el
+          FAB de voz se corra a un lado cuando este pie entra en su franja. */}
+      <div className="mt-4" data-pie-accion="">
+        <button
+          type="button"
+          onClick={() => navigateTo(STEP_CONFIRMACION)}
+          disabled={!isValid}
+          className="w-full rounded-xl bg-primary px-4 py-3.5 text-[15px] font-semibold text-primary-foreground transition-opacity hover:enabled:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Siguiente
+        </button>
+      </div>
 
       {/* Alta rápida de la categoría sin salir del wizard. Los movimientos
           guardan la categoría por ID, así que se agrega a las opciones del
@@ -362,6 +437,6 @@ export function GastoDirecto() {
         show={buscandoUltimo}
         message="Buscando el último gasto..."
       />
-    </StepShell>
+    </div>
   );
 }

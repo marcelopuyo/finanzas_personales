@@ -293,12 +293,17 @@ export function NumberField({
   onChange,
   allowNegative = false,
   placeholder,
+  hero = false,
 }: {
   label: string;
   value: number;
   onChange: (v: number) => void;
   allowNegative?: boolean;
   placeholder?: string;
+  /** Variante **héroe**: input grande y centrado, **sin label**. El llamador
+   *  ubica el rótulo y el símbolo de moneda (la usa el wizard de gasto, diseño D
+   *  `2026-10-01`). Default: `false` ⇒ comportamiento de siempre. */
+  hero?: boolean;
 }) {
   // `type="text"` + `inputMode="decimal"`: en móvil `type="number"` no muestra
   // la tecla de separador decimal (iOS y algunos Android según el locale).
@@ -349,6 +354,21 @@ export function NumberField({
       onChange(textToNumber(negative));
     }
   };
+
+  if (hero) {
+    return (
+      <input
+        type="text"
+        inputMode="decimal"
+        autoComplete="off"
+        aria-label={label}
+        value={text}
+        onChange={(e) => handleChange(e.target.value)}
+        placeholder={placeholder ?? "0"}
+        className="w-[200px] max-w-full bg-transparent text-center text-[34px] font-semibold leading-none tracking-tight text-header placeholder:text-subtitle/50 focus:outline-none"
+      />
+    );
+  }
 
   return (
     <Campo label={label}>
