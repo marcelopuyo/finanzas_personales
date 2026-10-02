@@ -191,7 +191,7 @@ export function PrestamosListClient({ initialData, origen, embebido = false }: P
   );
   return (
     <CrudTable<PrestamoOut, string>
-      title="Préstamos"
+      title={embebido ? "Listado" : "Préstamos"}
       columns={columns}
       trailingColumns={pagarColumn}
       initialData={initialData}

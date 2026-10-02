@@ -26,13 +26,21 @@ export interface DonutCompare {
 }
 
 interface DonutChartProps {
-  title: string;
+  /** Título del panel. Opcional si se pasa `encabezado`. */
+  title?: string;
   data: DonutDatum[];
   /** Código ISO para formatear los montos (default ARS). */
   currency?: string;
   className?: string;
   action?: ReactNode;
   badge?: ReactNode;
+  /**
+   * **Reemplaza TODO el encabezado del panel** (mismo criterio que `line-chart.tsx`,
+   * 2026-10-01 · `rediseno-ui`): el rediseño deja dentro del panel solo su selector
+   * de pestañas y mueve título/badge/Filtros/⋯ a una **fila suelta arriba**. Con
+   * `null` el panel no pinta ningún encabezado.
+   */
+  encabezado?: ReactNode;
   /** Comparación vs el período anterior: muestra flechas de tendencia en el
    * total y en la leyenda (solo cuando se visualiza el mes actual). */
   compare?: DonutCompare | null;
@@ -140,12 +148,16 @@ export function DonutChart({
   className = "",
   action,
   badge,
+  encabezado,
   compare,
   invertTrend = false,
 }: DonutChartProps) {
   // El tooltip se oculta al levantar el dedo en mobile (ver el hook).
   const touchReset = useHideTooltipOnTouch();
-  const header = (
+  const header =
+    encabezado !== undefined ? (
+      encabezado
+    ) : (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       {/* En MOBILE este grupo ocupa todo el ancho del panel: así lo que se alinee
           a la derecha dentro del `badge` (hoy: el botón ⋯ del panel Gastos) queda

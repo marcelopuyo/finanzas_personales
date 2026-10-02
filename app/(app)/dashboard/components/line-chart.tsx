@@ -17,7 +17,8 @@ import { ChartTooltip } from "./chart-tooltip";
 import { useHideTooltipOnTouch } from "./use-hide-tooltip-on-touch";
 
 interface EvolutionChartProps {
-  title: string;
+  /** Título del panel. Opcional si se pasa `encabezado`. */
+  title?: string;
   data: { name: string; value: number }[];
   color?: string;
   height?: number;
@@ -27,6 +28,13 @@ interface EvolutionChartProps {
   area?: boolean;
   /** Código ISO para formatear el tooltip (default ARS). */
   currency?: string;
+  /**
+   * **Reemplaza TODO el encabezado del panel** (2026-10-01, `rediseno-ui`): el
+   * rediseño deja dentro del panel solo su **selector de pestañas**, y el título,
+   * el badge, los Filtros y el ⋯ pasan a una **fila suelta arriba de la pantalla**
+   * (`dashboard-client.tsx`). Con `null` el panel no pinta ningún encabezado.
+   */
+  encabezado?: ReactNode;
 }
 
 export function EvolutionChart({
@@ -39,10 +47,14 @@ export function EvolutionChart({
   badge,
   area = false,
   currency,
+  encabezado,
 }: EvolutionChartProps) {
   // El tooltip se oculta al levantar el dedo en mobile (ver el hook).
   const touchReset = useHideTooltipOnTouch();
-  const header = (
+  const header =
+    encabezado !== undefined ? (
+      encabezado
+    ) : (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       {/* En MOBILE este grupo ocupa todo el ancho del panel: así lo que se alinee
           a la derecha dentro del `badge` (hoy: el botón ⋯ del panel Gastos) queda

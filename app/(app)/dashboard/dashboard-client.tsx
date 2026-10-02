@@ -462,41 +462,28 @@ export function DashboardClient({ data, solo }: Props) {
     />
   );
 
-  // Acciones de la cabecera de "Gastos".
-  //
-  // En MOBILE el panel tiene DOS filas: fila 1 = título + badge + **⋯** (en el
-  // ángulo superior derecho; el ⋯ lo aporta la propia fila del título, ver
-  // `gastosMenuMobile`) y fila 2 = pestañas + **Filtros** (pegado al borde derecho
-  // con `ml-auto`). En desktop van todos en UNA fila, a la derecha del badge
-  // (`sm:w-auto`): Filtros · pestañas · ⋯.
-  //
-  // ⚠️ La pestaña **Detalle** no tiene Filtros (la búsqueda vive en la pantalla
-  // "Ver más gastos"), pero **sí** el badge "Mes actual" y el ⋯: mismo esqueleto de
-  // dos filas que las otras dos (si no, el ⋯ saltaba a la fila 2 al cambiar de
-  // pestaña y el badge desaparecía).
-  const gastosHeaderActions = (conFiltros = true) => (
-    <div className="flex w-full items-center gap-1 sm:w-auto sm:gap-2">
-      {conFiltros && filterBtn("hidden sm:inline-flex")}
-      {gastosTabs}
-      {conFiltros && filterBtn("ml-auto sm:hidden")}
-      {/* En mobile el ⋯ vive en la fila 1 (ver `gastosMenuMobile`). */}
-      <div className="ml-auto hidden sm:flex">
+  /**
+   * **Encabezado de la pantalla Gastos** (filosofía del rediseño, 2026-10-01): el
+   * título, el badge del mes, los Filtros y el ⋯ van en **una fila suelta ARRIBA,
+   * fuera del panel**. Después viene el panel de gráficos (con su selector de
+   * pestañas adentro) y, más abajo, el listado (ver `gastosFilaTitulo`).
+   *
+   * ⚠️ Antes todo esto vivía DENTRO del panel (`gastosHeaderActions`) y en mobile
+   * se repartía en dos filas. Ahora hay una sola fila y un solo juego de controles.
+   */
+  const gastosEncabezado = (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <h1 className="text-[18px] font-semibold text-header">Gastos</h1>
+      <StatBadge label="Mes actual" value={badges.gastos} />
+      <div className="ml-auto flex items-center gap-1.5">
+        {filterBtn()}
         <GastosActionsMenu />
       </div>
     </div>
   );
 
-  /**
-   * ⋯ del panel Gastos en **MOBILE**: va en la **fila 1**, pegado al borde derecho.
-   * Lo aporta el `badge` en Resumen/Histórico (esa fila la arma el gráfico) y
-   * `gastosFilaTitulo` en Detalle. En desktop el ⋯ viaja con las pestañas, así que
-   * esta copia se oculta (`sm:hidden`).
-   */
-  const gastosMenuMobile = (
-    <div className="ml-auto flex items-center sm:hidden">
-      <GastosActionsMenu />
-    </div>
-  );
+  /** Selector de pestañas del panel de gráficos (va DENTRO del panel). */
+  const gastosPanelTabs = <div className="mb-4">{gastosTabs}</div>;
 
   /**
    * Encabezado de la sección **"Últimos gastos"** (el listado que va debajo del
@@ -622,12 +609,11 @@ export function DashboardClient({ data, solo }: Props) {
       {/* Gastos Section — filtro compartido. El ancla de voz (`?panel=gastos`) va
           en un wrapper: las 3 vistas (Resumen/Detalle/Histórico) se excluyen. */}
       <Solo visible={ver("gastos")}>
+      {gastosEncabezado}
       <div data-panel="gastos">
       {tabGastos === "resumen" ? (
         <DonutChart
-          title="Gastos"
-          action={gastosHeaderActions()}
-          badge={<><StatBadge label="Mes actual" value={badges.gastos} />{gastosMenuMobile}</>}
+          encabezado={gastosPanelTabs}
           currency={data.monedaPredeterminadaISO}
           data={filteredResumen.map((g) => ({
             name: g.name,
@@ -640,9 +626,7 @@ export function DashboardClient({ data, solo }: Props) {
         />
       ) : (
         <EvolutionChart
-          title="Gastos"
-          action={gastosHeaderActions()}
-          badge={<><StatBadge label="Mes actual" value={badges.gastos} />{gastosMenuMobile}</>}
+          encabezado={gastosPanelTabs}
           currency={data.monedaPredeterminadaISO}
           data={filteredEvolucion}
           color="var(--primary)"
@@ -727,10 +711,14 @@ export function DashboardClient({ data, solo }: Props) {
           `data-panel="resultados"` **existe siempre** (antes, sin datos, el
           panel no se montaba y el scroll a ese panel no tenía destino). */}
       <Solo visible={ver("resultados")}>
+      {/* Encabezado suelto arriba (filosofía del rediseño, 2026-10-01). */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h1 className="text-[18px] font-semibold text-header">Resultados</h1>
+        <StatBadge label="Mes actual" value={badges.resultados} />
+      </div>
       <div data-panel="resultados">
       <EvolutionChart
-        title="Resultados"
-        badge={<StatBadge label="Mes actual" value={badges.resultados} />}
+        encabezado={null}
         data={data.evolucionResultados}
         color="var(--primary)"
         area
@@ -742,23 +730,25 @@ export function DashboardClient({ data, solo }: Props) {
       {/* Panel de préstamos: se muestra SIEMPRE (también sin préstamos
           cargados; en ese caso PrestamosChart muestra su estado vacío). */}
       <Solo visible={ver("prestamos")}>
+      {/* Encabezado suelto arriba: título + saldos netos + ⋯. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h1 className="text-[18px] font-semibold text-header">Préstamos</h1>
+        {data.prestamosTotales.map((t) => (
+          <StatBadge
+            key={t.currency}
+            label={`Saldo neto (${t.currency})`}
+            value={t.value}
+          />
+        ))}
+        <div className="ml-auto flex items-center gap-1.5">
+          <PrestamosActionsMenu />
+        </div>
+      </div>
       <div data-panel="prestamos">
       <PrestamosChart
-        title="Préstamos Pendientes"
-        badge={
-          <div className="flex flex-wrap items-center gap-2">
-            {data.prestamosTotales.map((t) => (
-              <StatBadge
-                key={t.currency}
-                label={`Saldo neto (${t.currency})`}
-                value={t.value}
-              />
-            ))}
-          </div>
-        }
+        encabezado={null}
         data={data.prestamosChart.data}
         series={data.prestamosChart.series}
-        action={<PrestamosActionsMenu />}
       />
       </div>
       </Solo>

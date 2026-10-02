@@ -29,7 +29,8 @@ export interface PrestamoSerie {
 }
 
 interface PrestamosChartProps {
-  title: string;
+  /** Título del panel. Opcional si se pasa `encabezado`. */
+  title?: string;
   data: Record<string, string | number>[];
   series: PrestamoSerie[];
   height?: number;
@@ -37,6 +38,12 @@ interface PrestamosChartProps {
   badge?: ReactNode;
   /** Acción (menú) alineada a la derecha del encabezado del panel. */
   action?: ReactNode;
+  /**
+   * **Reemplaza TODO el encabezado del panel** (mismo criterio que
+   * `line-chart.tsx`, 2026-10-01 · `rediseno-ui`). Con `null`, el panel no pinta
+   * ningún encabezado.
+   */
+  encabezado?: ReactNode;
 }
 
 /**
@@ -109,10 +116,14 @@ export function PrestamosChart({
   className = "",
   badge,
   action,
+  encabezado,
 }: PrestamosChartProps) {
   // El tooltip se oculta al levantar el dedo en mobile (ver el hook).
   const touchReset = useHideTooltipOnTouch();
-  const header = (
+  const header =
+    encabezado !== undefined ? (
+      encabezado
+    ) : (
     <div className="relative mb-4 pr-8">
       {/* El título + badges pueden ocupar varias líneas en mobile; el menú (⋮)
           se ancla SIEMPRE al ángulo superior derecho del panel. */}
