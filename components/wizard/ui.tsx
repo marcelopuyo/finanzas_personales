@@ -7,12 +7,14 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Combobox } from "@/components/ui/combobox";
 import { DateFieldInput } from "@/components/ui/date-picker";
-import { cn } from "@/lib/utils";
+import { cn, isoADdMmAa } from "@/lib/utils";
 
 export const inputCls =
   "w-full rounded-md border border-border bg-card px-3 py-2 text-[13px] text-card-foreground placeholder:text-subtitle focus:outline-none focus:ring-2 focus:ring-primary/40";
 
-/** Convierte "YYYY-MM-DD" (o Date) a "D/M/YYYY" sin problemas de zona horaria. */
+/** Convierte "YYYY-MM-DD" (o Date) a **`dd-mm-aa`** sin problemas de zona horaria.
+ *  Formato ÚNICO de la app (convención §192): antes devolvía `d/m/aaaa`, que dejaba
+ *  al paso de Confirmación fuera de la convención. */
 export function formatFecha(value: string | Date | null | undefined): string {
   if (!value) return "";
   let iso: string;
@@ -23,9 +25,7 @@ export function formatFecha(value: string | Date | null | undefined): string {
   } else {
     return String(value);
   }
-  const [y, m, d] = iso.split("-");
-  if (!y || !m || !d) return iso;
-  return `${parseInt(d, 10)}/${parseInt(m, 10)}/${y}`;
+  return isoADdMmAa(iso);
 }
 
 const btnOutline =
