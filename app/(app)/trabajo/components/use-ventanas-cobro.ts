@@ -9,7 +9,7 @@ import {
 } from "@/lib/cobros-estimados";
 import { useMontado } from "@/lib/use-cliente";
 import { todayLocalISODate } from "@/lib/utils";
-import type { VentanaCobro } from "./periodos-grid";
+import type { FechaCobroEstimada } from "./periodos-grid";
 
 /**
  * **Ventanas de cobro por trabajo**, calculadas con la fecha **LOCAL** del
@@ -24,9 +24,9 @@ import type { VentanaCobro } from "./periodos-grid";
  * se usa el valor del server ⇒ sin desajuste) y solo si la fecha local difiere de
  * la del server.
  *
- * Devuelve un mapa **trabajo → ventanas** para las fichas de la grilla
- * (`PeriodosGrid`). Un trabajo puede caer en más de una ventana (ítems cerrados +
- * ítems en curso).
+ * Devuelve, por trabajo, la **fecha estimada de cobro** (opción A, 2026-10-02) más
+ * el **total cobrable ahora** (Σ de los bloques `porCobrar`), para la línea
+ * "Por cobrar" del resumen de `TrabajoClient`.
  */
 export function useVentanasCobro({
   estimacionesSSR,
@@ -42,7 +42,7 @@ export function useVentanasCobro({
   items: ItemPendienteFuente[];
   /** Liquidaciones con COBRO REAL (las "cerradas" que usa la inferencia). */
   liquidaciones: LiquidacionCerradaFuente[];
-}): Record<string, VentanaCobro[]> {
+}): { fechas: Record<string, FechaCobroEstimada>; totalPorCobrar: number } {
   const montado = useMontado();
 
   const estimaciones = useMemo(() => {
@@ -53,16 +53,22 @@ export function useVentanasCobro({
   }, [montado, hoyServidor, estimacionesSSR, items, liquidaciones]);
 
   return useMemo(() => {
-    const mapa: Record<string, VentanaCobro[]> = {};
+    const fechas: Record<string, FechaCobroEstimada> = {};
+    let totalPorCobrar = 0;
     for (const e of estimaciones) {
-      for (const id of ["porCobrar", "enCurso", "sinPeriodo"] as const) {
-        const bloque = e[id];
-        if (!bloque) continue;
-        const actuales = mapa[bloque.trabajo] ?? [];
-        if (!actuales.includes(id)) actuales.push(id);
-        mapa[bloque.trabajo] = actuales;
+      // Total cobrable AHORA: Σ de los ítems cuya ventana ya cerró. Los bloques
+      // vienen **partidos por ventana** ⇒ el monto es exacto aunque el trabajo
+      // tenga también ítems en curso (el caso Atlas).
+      totalPorCobrar += e.porCobrar?.monto ?? 0;
+      // Opción A (2026-10-02): manda la ventana **en curso/futura** ("cobro
+      // estimado"); si no hay, se muestra la ya cerrada ("venció el"). Sin
+      // cadencia (`sinPeriodo`) no hay fecha ⇒ no se muestra nada.
+      if (e.enCurso?.cierre) {
+        fechas[e.trabajo] = { tipo: "enCurso", cierre: e.enCurso.cierre };
+      } else if (e.porCobrar?.cierre) {
+        fechas[e.trabajo] = { tipo: "porCobrar", cierre: e.porCobrar.cierre };
       }
     }
-    return mapa;
+    return { fechas, totalPorCobrar };
   }, [estimaciones]);
 }

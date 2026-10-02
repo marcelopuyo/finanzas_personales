@@ -8,7 +8,7 @@ import type {
   ItemPendienteOut,
   LiquidacionOut,
 } from "@/backend/src/queries/trabajos";
-import { cn, decimalToTime, numberToCurrency } from "@/lib/utils";
+import { cn, decimalToTime, isoADdMmAa, numberToCurrency } from "@/lib/utils";
 import { etiquetaConteoItems } from "@/lib/trabajo-texto";
 import { getLiquidacionesCobradasPaginaAction } from "../actions";
 
@@ -109,29 +109,24 @@ function detalleItem(i: ItemPendienteOut): string {
  *   respaldo. No hay paginador.
  */
 /**
- * **Ventana estimada de cobro** de un trabajo. La calcula el **server**
- * (`lib/cobros-estimados.ts` → `data.cobrosEstimados`) y viaja hasta acá para que
- * cada fila de pendientes pueda decir si ya es cobrable, si su ventana sigue
- * abierta o si no se pudo inferir. (2026-10-01, rama `rediseno-ui`: antes esto
- * vivía en un panel aparte con el resumen de tandas.)
+ * **Fecha estimada de cobro** de un trabajo (2026-10-02). Reemplaza al chip de
+ * ventana ("Por cobrar / En curso / Sin período"): la clasificación sigue
+ * deduciéndose de la fecha, pero mostrando **cuándo** cierra o venció la ventana.
+ *
+ * - `enCurso` ⇒ la ventana todavía está abierta ⇒ `"cobro estimado dd-mm-aa"`
+ *   (**ámbar**, mismo lenguaje del antiguo chip "En curso").
+ * - `porCobrar` ⇒ la ventana ya cerró (cobrable ahora) ⇒ `"venció el dd-mm-aa"`
+ *   (**verde**).
+ *
+ * La calcula `useVentanasCobro` (con la fecha **local** del navegador) a partir de
+ * `lib/cobros-estimados.ts`. Los trabajos **sin cadencia** no tienen fecha ⇒ no se
+ * muestra nada (opción A, decisión del usuario).
  */
-export type VentanaCobro = "porCobrar" | "enCurso" | "sinPeriodo";
-
-/** Ficha de cada ventana: etiqueta + clases del chip. */
-const CHIP_VENTANA: Record<VentanaCobro, { etiqueta: string; clase: string }> = {
-  porCobrar: {
-    etiqueta: "Por cobrar",
-    clase: "border-success/45 bg-success/10 text-success",
-  },
-  enCurso: {
-    etiqueta: "En curso",
-    clase: "border-warning/45 bg-warning/10 text-warning",
-  },
-  sinPeriodo: {
-    etiqueta: "Sin período",
-    clase: "border-border bg-muted text-subtitle",
-  },
-};
+export interface FechaCobroEstimada {
+  tipo: "enCurso" | "porCobrar";
+  /** Fin de la ventana estimada ("YYYY-MM-DD"). */
+  cierre: string;
+}
 
 type Fila =
   | {
@@ -142,8 +137,8 @@ type Fila =
       monto: number;
       refFecha: string;
       lista: ItemPendienteOut[];
-      /** Ventanas estimadas en las que cae este trabajo (fichas de la fila). */
-      ventanas?: VentanaCobro[];
+      /** Fecha estimada de cobro (reemplaza al chip de ventana). */
+      fecha?: FechaCobroEstimada;
     }
   | {
       tipo: "cobrado";
@@ -160,7 +155,7 @@ export function PeriodosGrid({
   cobradosIniciales,
   hayMasCobrados,
   currency,
-  ventanas,
+  fechasCobro,
   onEditar,
   onEliminar,
 }: {
@@ -171,11 +166,8 @@ export function PeriodosGrid({
   hayMasCobrados: boolean;
   /** ISO 4217 de la moneda predeterminada del usuario. */
   currency: string;
-  /**
-   * **Ventana estimada por trabajo** (opcional): clave = nombre del trabajo.
-   * Un trabajo puede caer en más de una (ítems ya cobrables + otros en curso).
-   */
-  ventanas?: Record<string, VentanaCobro[]>;
+  /** **Fecha estimada de cobro por trabajo** (clave = nombre del trabajo). */
+  fechasCobro?: Record<string, FechaCobroEstimada>;
   /** Abre el formulario de edición de un ítem pendiente. */
   onEditar?: (item: ItemPendienteOut) => void;
   /** Pide confirmación para eliminar un ítem pendiente. */
@@ -242,7 +234,7 @@ export function PeriodosGrid({
       tipo: "pendiente",
       key: `p:${trabajo}`,
       titulo: trabajo,
-      ventanas: ventanas?.[trabajo],
+      fecha: fechasCobro?.[trabajo],
       subtitulo: `${conteo(lista)} · ${rangoPendiente(fechas)}`,
       monto: lista.reduce((acc, i) => acc + (i.monto || 0), 0),
       // La fecha más reciente del grupo ordena a los pendientes entre sí.
@@ -290,25 +282,28 @@ export function PeriodosGrid({
                 className="flex w-full items-start gap-2.5 py-2.5 text-left [-webkit-tap-highlight-color:transparent]"
               >
                 <span className="min-w-0 flex-1">
-                  {/* Título + las **fichas de ventana**: dicen si el trabajo ya es
-                      cobrable, si su ventana sigue abierta o si no se pudo inferir
-                      (antes vivían en un panel aparte, ver §212.f). */}
+                  {/* Título + la **fecha estimada de cobro**: dice cuándo cierra
+                      la ventana (ámbar) o cuándo venció (verde). Reemplaza al
+                      chip de ventana (2026-10-02). */}
                   <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
                     <span className="text-[13.5px] font-semibold break-words text-header">
                       {f.titulo}
                     </span>
-                    {f.tipo === "pendiente" &&
-                      f.ventanas?.map((v) => (
-                        <span
-                          key={v}
-                          className={cn(
-                            "inline-flex shrink-0 items-center rounded-full border px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide",
-                            CHIP_VENTANA[v].clase
-                          )}
-                        >
-                          {CHIP_VENTANA[v].etiqueta}
-                        </span>
-                      ))}
+                    {f.tipo === "pendiente" && f.fecha && (
+                      <span
+                        className={cn(
+                          "shrink-0 text-[10.5px] font-medium whitespace-nowrap",
+                          f.fecha.tipo === "enCurso"
+                            ? "text-warning"
+                            : "text-success"
+                        )}
+                      >
+                        {f.fecha.tipo === "enCurso"
+                          ? "cobro estimado "
+                          : "venció el "}
+                        {isoADdMmAa(f.fecha.cierre)}
+                      </span>
+                    )}
                   </span>
                   <span className="mt-0.5 block text-[11px] leading-[15px] text-subtitle">
                     {f.subtitulo}

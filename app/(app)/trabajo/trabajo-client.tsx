@@ -88,8 +88,9 @@ export function TrabajoClient({
 }) {
   const { go } = usePendingNav();
 
-  /** Fichas de ventana por trabajo: se recalculan con la fecha **local** (§211). */
-  const ventanas = useVentanasCobro({
+  /** Fecha estimada de cobro por trabajo + total cobrable: se recalculan con la
+      fecha **local** del navegador (§211). */
+  const { fechas: fechasCobro, totalPorCobrar } = useVentanasCobro({
     estimacionesSSR,
     hoyServidor,
     items: pendientes,
@@ -162,15 +163,28 @@ export function TrabajoClient({
           único dato que la grilla no muestra en conjunto. ⚠️ Dice "Pendiente" y
           NO "Por cobrar" para no chocar con las fichas de ventana de cada fila
           (donde "Por cobrar" = ventana ya cerrada ⇒ cobrable ahora). */}
-      <div className="mb-2 flex flex-wrap items-baseline gap-x-2 text-[12.5px] text-subtitle">
-        <span>
-          Pendiente{" "}
-          <span className="font-semibold tabular-nums text-success">
-            {numberToCurrency(totalPendiente, monedaISO)}
+      <div className="mb-2 flex flex-col gap-1 text-[12.5px] text-subtitle">
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <span>
+            Pendiente{" "}
+            <span className="font-semibold tabular-nums text-success">
+              {numberToCurrency(totalPendiente, monedaISO)}
+            </span>
+            {pendientes.length > 0 && <> · {pendientes.length} ítems</>}
           </span>
-          {pendientes.length > 0 && <> · {pendientes.length} ítems</>}
-        </span>
-        <span className="ml-auto">{totalCobrados} cobrados</span>
+          <span className="ml-auto">{totalCobrados} cobrados</span>
+        </div>
+        {/* Segunda línea: lo que ya se puede cobrar **ahora** (Σ de los ítems
+            cuya ventana estimada cerró). Verde = plata pendiente, mismo criterio
+            que el monto "Pendiente" y que el de las filas. Solo si hay algo. */}
+        {totalPorCobrar > 0 && (
+          <div>
+            Por cobrar{" "}
+            <span className="font-semibold tabular-nums text-success">
+              {numberToCurrency(totalPorCobrar, monedaISO)}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* UNA sola grilla: primero los pendientes (monto verde) y después las
@@ -186,7 +200,7 @@ export function TrabajoClient({
           cobradosIniciales={cobradosIniciales}
           hayMasCobrados={hayMasCobrados}
           currency={monedaISO}
-          ventanas={ventanas}
+          fechasCobro={fechasCobro}
           onEditar={(i) => void abrirEdicion(i)}
           onEliminar={setAEliminar}
         />
