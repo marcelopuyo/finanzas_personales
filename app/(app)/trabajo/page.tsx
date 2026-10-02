@@ -1,50 +1,13 @@
-import { getItemsPendientesCobro, getLiquidacionesCobradasPaginado } from "@/backend/src/queries/trabajos";
-import { getAllCuentas } from "@/backend/src/queries/maestros";
-import { getSessionUser } from "@/backend/src/lib/auth";
-import { TrabajoClient } from "./trabajo-client";
-
-/** Filas por tanda del scroll infinito (la consulta acota el valor a 1..100). */
-const PAGE = 20;
+import { redirect } from "next/navigation";
 
 /**
- * Pantalla **"Períodos de trabajo"** (`/trabajo`) — el destino del panel
- * "Trabajo" del dashboard.
+ * **`/trabajo` dejó de ser una pantalla propia** (2026-10-01, rama `rediseno-ui`):
+ * su grilla (pendientes por trabajo + cobradas con scroll infinito) es ahora el
+ * **listado unificado de la pantalla Ingresos**, debajo del panel de gráficos.
  *
- * En el modelo nuevo (plan-liquidaciones.md) el usuario ya no gestiona períodos:
- * la pantalla muestra **una sola grilla** (decisión del usuario 2026-09-26) con
- * las dos cosas que existen en el circuito —, **primero los pendientes**
- * (jornadas/tareas sin liquidar, agrupadas por trabajo) y **después las
- * liquidaciones cobradas** —, con el **mismo diseño de fila** y el color del
- * monto como única diferencia (verde = falta cobrar, blanco = cobrado).
- *
- * Las cobradas se cargan **por tandas** (scroll infinito): acá se resuelve la
- * primera y el cliente pide el resto con `getLiquidacionesCobradasPaginaAction`.
- *
- * Las acciones de carga (jornada/tarea, gestionar trabajos) viven en el menú ⋯
- * del encabezado y el cobro se hace desde el wizard.
+ * La ruta se mantiene como **redirección** para no romper enlaces guardados ni las
+ * órdenes de voz que apuntan a los períodos de trabajo.
  */
-export default async function TrabajoPage() {
-  const [pendientes, primeraPagina, cuentas, sessionUser] = await Promise.all([
-    getItemsPendientesCobro().catch(() => []),
-    // Primera tanda de liquidaciones COBRADAS (fecha de cobro DESC).
-    getLiquidacionesCobradasPaginado(0, PAGE).catch(() => ({
-      filas: [],
-      hayMas: false,
-      total: 0,
-    })),
-    // Cuentas para el select del depósito de propina del formulario de edición.
-    getAllCuentas().catch(() => []),
-    getSessionUser(),
-  ]);
-
-  return (
-    <TrabajoClient
-      pendientes={pendientes}
-      cobradosIniciales={primeraPagina.filas}
-      hayMasCobrados={primeraPagina.hayMas}
-      totalCobrados={primeraPagina.total}
-      cuentas={cuentas.map((c) => ({ id: c.id, nombre: c.nombre }))}
-      monedaISO={sessionUser?.monedaPredeterminada?.codigoISO ?? "USD"}
-    />
-  );
+export default function TrabajoRedirect() {
+  redirect("/dashboard/ingresos");
 }

@@ -2,6 +2,11 @@
 
 import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
+import { useVentanasCobro } from "./components/use-ventanas-cobro";
+import type {
+  EstimacionTrabajo,
+  LiquidacionCerradaFuente,
+} from "@/lib/cobros-estimados";
 import { toast } from "sonner";
 import { usePendingNav } from "@/components/ui/nav-progress";
 import { Modal } from "@/components/ui/modal";
@@ -47,6 +52,10 @@ export function TrabajoClient({
   totalCobrados,
   cuentas,
   monedaISO,
+  embebido = false,
+  estimacionesSSR,
+  hoyServidor,
+  ingresosDetalle,
 }: {
   pendientes: ItemPendienteOut[];
   /** Primera tanda de cobradas (el resto llega con el scroll infinito). */
@@ -59,8 +68,33 @@ export function TrabajoClient({
   cuentas: { id: number; nombre: string }[];
   /** ISO 4217 de la moneda predeterminada del usuario. */
   monedaISO: string;
+  /**
+   * **Modo embebido** (2026-10-01, rama `rediseno-ui`): la pantalla de Ingresos
+   * muestra esta grilla como **listado unificado debajo de su panel de gráficos**
+   * ⇒ se omite la cabecera (volver + título) y el padding de pantalla.
+   */
+  embebido?: boolean;
+  /**
+   * **Reparto de los pendientes en ventanas** (por cobrar · en curso · sin período).
+   * ⚠️ Igual que los badges (§211): el server (Vercel, **UTC**) lo calcula con SU
+   * fecha, así que se **recalcula en el cliente** con la fecha local del navegador
+   * (`useVentanasCobro`) para no adelantar el cambio de ventana.
+   */
+  estimacionesSSR?: EstimacionTrabajo[];
+  /** "Hoy" del server (`YYYY-MM-DD`), para saber si hace falta recalcular. */
+  hoyServidor?: string;
+  /** Liquidaciones con cobro real (las "cerradas" que usa la inferencia). */
+  ingresosDetalle?: LiquidacionCerradaFuente[];
 }) {
   const { go } = usePendingNav();
+
+  /** Fichas de ventana por trabajo: se recalculan con la fecha **local** (§211). */
+  const ventanas = useVentanasCobro({
+    estimacionesSSR,
+    hoyServidor,
+    items: pendientes,
+    liquidaciones: ingresosDetalle ?? [],
+  });
   const totalPendiente = pendientes.reduce((acc, i) => acc + (i.monto || 0), 0);
   // Ítem que se está editando: se pide COMPLETO recién al abrir el modal (la
   // lista de la pantalla no trae la hora de la tarea ni la cuenta de la propina).
@@ -102,29 +136,35 @@ export function TrabajoClient({
   };
 
   return (
-    <div className="mx-auto max-w-5xl pb-24 pt-4 lg:pt-0">
-      {/* Encabezado: volver + título. **Sin ⋯**: "Gestionar trabajos" se maneja
-          desde el panel "Trabajo" del dashboard y las acciones del circuito
-          viven en el FAB ➕ (abajo a la derecha). */}
-      <div className="mb-4 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => go("/dashboard", "back")}
-          className="rounded-lg p-1.5 text-subtitle transition-colors hover:bg-muted hover:text-header"
-          aria-label="Volver"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <h1 className="min-w-0 truncate text-[18px] font-semibold text-header">
-          Períodos de trabajo
-        </h1>
-      </div>
+    <div className={embebido ? undefined : "mx-auto max-w-5xl pb-24 pt-4 lg:pt-0"}>
+      {!embebido && (
+        <>
+          {/* Encabezado: volver + título. **Sin ⋯**: "Gestionar trabajos" se maneja
+              desde el ⋯ de la sección de trabajo en Ingresos y las acciones del
+              circuito viven en el FAB ➕ (abajo a la derecha). */}
+          <div className="mb-4 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => go("/dashboard", "back")}
+              className="rounded-lg p-1.5 text-subtitle transition-colors hover:bg-muted hover:text-header"
+              aria-label="Volver"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <h1 className="min-w-0 truncate text-[18px] font-semibold text-header">
+              Períodos de trabajo
+            </h1>
+          </div>
+        </>
+      )}
 
       {/* Resumen de una línea (no es un panel): el total que falta cobrar es el
-          único dato que la grilla no muestra en conjunto. */}
+          único dato que la grilla no muestra en conjunto. ⚠️ Dice "Pendiente" y
+          NO "Por cobrar" para no chocar con las fichas de ventana de cada fila
+          (donde "Por cobrar" = ventana ya cerrada ⇒ cobrable ahora). */}
       <div className="mb-2 flex flex-wrap items-baseline gap-x-2 text-[12.5px] text-subtitle">
         <span>
-          Por cobrar{" "}
+          Pendiente{" "}
           <span className="font-semibold tabular-nums text-success">
             {numberToCurrency(totalPendiente, monedaISO)}
           </span>
@@ -146,6 +186,7 @@ export function TrabajoClient({
           cobradosIniciales={cobradosIniciales}
           hayMasCobrados={hayMasCobrados}
           currency={monedaISO}
+          ventanas={ventanas}
           onEditar={(i) => void abrirEdicion(i)}
           onEliminar={setAEliminar}
         />

@@ -108,6 +108,31 @@ function detalleItem(i: ItemPendienteOut): string {
  *   centinela, mismo patrón que `/cuentas/[id]`), con un botón "Cargar más" de
  *   respaldo. No hay paginador.
  */
+/**
+ * **Ventana estimada de cobro** de un trabajo. La calcula el **server**
+ * (`lib/cobros-estimados.ts` → `data.cobrosEstimados`) y viaja hasta acá para que
+ * cada fila de pendientes pueda decir si ya es cobrable, si su ventana sigue
+ * abierta o si no se pudo inferir. (2026-10-01, rama `rediseno-ui`: antes esto
+ * vivía en un panel aparte con el resumen de tandas.)
+ */
+export type VentanaCobro = "porCobrar" | "enCurso" | "sinPeriodo";
+
+/** Ficha de cada ventana: etiqueta + clases del chip. */
+const CHIP_VENTANA: Record<VentanaCobro, { etiqueta: string; clase: string }> = {
+  porCobrar: {
+    etiqueta: "Por cobrar",
+    clase: "border-success/45 bg-success/10 text-success",
+  },
+  enCurso: {
+    etiqueta: "En curso",
+    clase: "border-warning/45 bg-warning/10 text-warning",
+  },
+  sinPeriodo: {
+    etiqueta: "Sin período",
+    clase: "border-border bg-muted text-subtitle",
+  },
+};
+
 type Fila =
   | {
       tipo: "pendiente";
@@ -117,6 +142,8 @@ type Fila =
       monto: number;
       refFecha: string;
       lista: ItemPendienteOut[];
+      /** Ventanas estimadas en las que cae este trabajo (fichas de la fila). */
+      ventanas?: VentanaCobro[];
     }
   | {
       tipo: "cobrado";
@@ -133,6 +160,7 @@ export function PeriodosGrid({
   cobradosIniciales,
   hayMasCobrados,
   currency,
+  ventanas,
   onEditar,
   onEliminar,
 }: {
@@ -143,6 +171,11 @@ export function PeriodosGrid({
   hayMasCobrados: boolean;
   /** ISO 4217 de la moneda predeterminada del usuario. */
   currency: string;
+  /**
+   * **Ventana estimada por trabajo** (opcional): clave = nombre del trabajo.
+   * Un trabajo puede caer en más de una (ítems ya cobrables + otros en curso).
+   */
+  ventanas?: Record<string, VentanaCobro[]>;
   /** Abre el formulario de edición de un ítem pendiente. */
   onEditar?: (item: ItemPendienteOut) => void;
   /** Pide confirmación para eliminar un ítem pendiente. */
@@ -209,6 +242,7 @@ export function PeriodosGrid({
       tipo: "pendiente",
       key: `p:${trabajo}`,
       titulo: trabajo,
+      ventanas: ventanas?.[trabajo],
       subtitulo: `${conteo(lista)} · ${rangoPendiente(fechas)}`,
       monto: lista.reduce((acc, i) => acc + (i.monto || 0), 0),
       // La fecha más reciente del grupo ordena a los pendientes entre sí.
@@ -244,7 +278,7 @@ export function PeriodosGrid({
 
   return (
     <>
-      <div className="rounded-lg border border-border bg-card px-3">
+      <div className="rounded-2xl border border-border bg-card px-3">
         {filas.map((f) => {
           const isAbierta = abierta === f.key;
           return (
@@ -256,8 +290,25 @@ export function PeriodosGrid({
                 className="flex w-full items-start gap-2.5 py-2.5 text-left [-webkit-tap-highlight-color:transparent]"
               >
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[13.5px] font-semibold break-words text-header">
-                    {f.titulo}
+                  {/* Título + las **fichas de ventana**: dicen si el trabajo ya es
+                      cobrable, si su ventana sigue abierta o si no se pudo inferir
+                      (antes vivían en un panel aparte, ver §212.f). */}
+                  <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                    <span className="text-[13.5px] font-semibold break-words text-header">
+                      {f.titulo}
+                    </span>
+                    {f.tipo === "pendiente" &&
+                      f.ventanas?.map((v) => (
+                        <span
+                          key={v}
+                          className={cn(
+                            "inline-flex shrink-0 items-center rounded-full border px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide",
+                            CHIP_VENTANA[v].clase
+                          )}
+                        >
+                          {CHIP_VENTANA[v].etiqueta}
+                        </span>
+                      ))}
                   </span>
                   <span className="mt-0.5 block text-[11px] leading-[15px] text-subtitle">
                     {f.subtitulo}

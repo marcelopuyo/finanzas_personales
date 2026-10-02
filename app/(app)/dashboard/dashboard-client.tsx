@@ -16,8 +16,6 @@ import { PrestamosChart } from "./components/prestamos-chart";
 import { PrestamosActionsMenu } from "./components/prestamos-actions-menu";
 import { GastosActionsMenu } from "./components/gastos-actions-menu";
 import { GastosTarjetas } from "./components/gastos-tarjetas";
-import { IngresosTarjetas } from "./components/ingresos-tarjetas";
-import { PeriodosTrabajoLista } from "./components/periodos-trabajo-lista";
 import type { DashboardData } from "./dashboard-data";
 import { gastosEvolucionPor } from "./gastos-agrupacion";
 import {
@@ -29,10 +27,8 @@ import { aFuenteIngresos } from "@/backend/src/lib/ingresos-trabajo";
 import type { GastoOut } from "@/backend/src/queries/gastos";
 import type { LiquidacionOut } from "@/backend/src/queries/trabajos";
 import { cn, numberToCurrency, todayLocalISODate } from "@/lib/utils";
-import { estimarCobros } from "@/lib/cobros-estimados";
 import { useMontado } from "@/lib/use-cliente";
-import { usePendingNav, usePrefetchNav } from "@/components/ui/nav-progress";
-import { useTap } from "@/lib/tap";
+import { usePendingNav } from "@/components/ui/nav-progress";
 
 /**
  * Vista (pantalla) que se está pintando. Sin `solo` se pintan **todas**, que es el
@@ -63,9 +59,6 @@ function Solo({
 
 const SIN_CATEGORIA = "Sin categoría";
 const SIN_CUENTA = "Sin cuenta";
-/** Destino del PANEL "Trabajo" completo (ver `DashboardClient`): la pantalla
-    `/trabajo`, con los pendientes por trabajo arriba y los cobrados abajo. */
-const HREF_TRABAJO = "/trabajo";
 const SIN_TRABAJO = "Sin trabajo";
 
 function toDateKey(v: string | Date | null | undefined): string {
@@ -78,15 +71,8 @@ export function DashboardClient({ data, solo }: Props) {
   /** ¿Se pinta esta vista? (sin `solo` se pintan todas) */
   const ver = (...vistas: Vista[]) => solo === undefined || vistas.includes(solo);
 
-  // ── Navegación del panel "Trabajo" (todo el panel, salvo el ⋯) ──────────
-  // ⚠️ Se dispara con **`useTap`** (touch events + click), NO con `onClick`: en
-  // iOS un toque sobre una zona grande puede no generar `click` (el navegador lo
-  // clasifica como scroll y lo descarta) y la acción se perdía ⇒ había que tocar
-  // 2-3 veces. Ver `lib/tap.ts` y §118 de la bitácora.
+  /** Navegación con feedback (barra de progreso global). */
   const { go: navGo } = usePendingNav();
-  const prefetch = usePrefetchNav();
-  const abrirTrabajo = () => navGo(HREF_TRABAJO, "trabajo");
-  const tap = useTap(abrirTrabajo);
   const [tabGastos, setTabGastos] = useState("resumen");
   const [tabIngresos, setTabIngresos] = useState("resumen");
 
@@ -195,26 +181,10 @@ export function DashboardClient({ data, solo }: Props) {
     data.monedaPredeterminadaISO,
   ]);
 
-  // Reparto de los pendientes en "Por cobrar / En curso / Sin período estimado".
-  // ⚠️ Igual que los badges: el servidor (Vercel, **UTC**) lo calcula con SU
-  // fecha, que en la tarde-noche ya es la del día siguiente respecto al usuario
-  // (ej. 21:00 en GMT-4 ⇒ el server está en el día siguiente) ⇒ una ventana que
-  // cierra mañana aparecía HOY en "Por cobrar". Con `montado` se recalcula con
-  // la fecha **LOCAL** del navegador (en SSR/hidratación se usa el valor del
-  // servidor ⇒ sin desajuste). `ingresosDetalle` ya son las liquidaciones con
-  // cobro real (= las "cerradas" que usa la inferencia de cadencia).
-  const estimaciones = useMemo(() => {
-    if (!montado) return data.cobrosEstimados;
-    const hoyLocal = todayLocalISODate();
-    if (hoyLocal === data.hoyServidor) return data.cobrosEstimados;
-    return estimarCobros(data.itemsPendientes, data.ingresosDetalle, hoyLocal);
-  }, [
-    montado,
-    data.cobrosEstimados,
-    data.hoyServidor,
-    data.itemsPendientes,
-    data.ingresosDetalle,
-  ]);
+  // ⚠️ El reparto de los pendientes en "Por cobrar / En curso / Sin período" se
+  // movió a `TrabajoClient` (`useVentanasCobro`, 2026-10-01): ahora viaja como
+  // **ficha dentro de cada fila de la grilla** de Ingresos, y allí se recalcula con
+  // la fecha **LOCAL** del navegador (fix de §211).
 
   // filteredGastos pero SIN el filtro de categoría (para el panel Resumen)
   const filteredSinCat = useMemo(() => {
@@ -497,14 +467,50 @@ export function DashboardClient({ data, solo }: Props) {
 
   const ingresosTabs = (
     <Tabs
+      // Sin la pestaña "Detalle" (2026-10-01, `rediseno-ui`): ese listado se UNIFICÓ
+      // en la sección de abajo, junto con el panel "Trabajo" y la grilla de
+      // `/trabajo` (replanteo de la pantalla Ingresos).
       tabs={[
         { id: "resumen", label: "Resumen" },
-        { id: "detalle", label: "Detalle" },
         { id: "historico", label: "Histórico" },
       ]}
       activeTab={tabIngresos}
       onTabChange={setTabIngresos}
     />
+  );
+
+  /** Selector de pestañas del panel de gráficos de Ingresos (adentro, a la derecha). */
+  const ingresosPanelTabs = (
+    <div className="mb-4 flex justify-end">{ingresosTabs}</div>
+  );
+
+  /**
+   * **Encabezado de la pantalla Ingresos** (fila suelta, dentro de su panel):
+   * título + badge del mes + Filtros + ⋯ — mismo criterio que Gastos.
+   */
+  const ingresosEncabezado = (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-border bg-card px-4 py-3">
+      <h1 className="text-[18px] font-semibold text-header">Ingresos</h1>
+      <StatBadge label="Mes actual" value={badges.ingresos} />
+      <div className="ml-auto flex items-center gap-1.5">
+        {ingFilterBtn()}
+      </div>
+    </div>
+  );
+
+  /**
+   * **Encabezado de la sección del listado unificado de Ingresos**: solo el título
+   * y el **⋯** de acciones del circuito. Las **ventanas de cobro** dejaron de ser un
+   * panel aparte: ahora viajan como **fichas dentro de cada fila de la grilla**
+   * (2026-10-01, fusión pedida por el usuario) ⇒ ver `periodos-grid.tsx`.
+   */
+  const ingresosSeccion = (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <h2 className="text-[16px] font-semibold text-header">Trabajo</h2>
+      <div className="ml-auto flex items-center gap-1.5">
+        <TrabajosActionsMenu />
+      </div>
+    </div>
   );
 
   return (
@@ -561,52 +567,6 @@ export function DashboardClient({ data, solo }: Props) {
       </div>
       </Solo>
 
-      {/* Panel Trabajo — ítems PENDIENTES de cobro (jornadas/tareas sin
-          liquidar) repartidos en las **tandas estimadas** de cada trabajo:
-          "Por cobrar" (la ventana ya cerró) · "En curso" · "Sin período
-          estimado" (decisión del usuario 2026-09-27, opción C del preview).
-          La inferencia la hace el server (`lib/cobros-estimados.ts`).
-          ⚠️ **El PANEL ENTERO es el área de clic** (decisión del usuario
-          2026-09-17) y navega a la pantalla `/trabajo` (2026-09-26: antes llevaba
-          al CRUD de períodos, que se archivó con el rediseño) — ahí están los
-          pendientes por trabajo y, abajo, TODOS los cobrados. El menú ⋯ queda
-          EXCLUIDO porque se monta FUERA del área clickeable (es un hermano que
-          flota sobre la esquina). El toque usa `useTap` porque en iOS el primer
-          toque de una zona grande puede no generar `click` (§118). */}
-      <Solo visible={ver("ingresos")}>
-      <div data-panel="trabajo" className="relative">
-        <div
-          role="link"
-          tabIndex={0}
-          {...tap}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") abrirTrabajo();
-          }}
-          // Prefetch del destino al primer contacto: la llegada sigue siendo
-          // instantánea.
-          onPointerEnter={() => prefetch(HREF_TRABAJO)}
-          onTouchStartCapture={() => prefetch(HREF_TRABAJO)}
-          className="cursor-default select-none rounded-2xl border border-border bg-card p-4 [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] sm:p-5"
-        >
-          {/* Encabezado: título a la izquierda (el ⋯ va FUERA de esta caja, ver
-              abajo, para que su toque no dispare la navegación del panel). */}
-          <div className="mb-3 pr-8">
-            <h2 className="text-[16px] font-semibold text-header">Trabajo</h2>
-          </div>
-          <PeriodosTrabajoLista
-            estimaciones={estimaciones}
-            currency={data.monedaPredeterminadaISO}
-          />
-        </div>
-        {/* Menú ⋯ del panel: HERMANO de la caja clickeable (no hijo) y flotando
-            sobre su esquina superior derecha, alineado con el padding del panel.
-            Así el toque del menú nunca forma parte de la navegación del panel. */}
-        <div className="absolute right-4 top-4 z-10 flex items-center sm:right-5 sm:top-5">
-          <TrabajosActionsMenu />
-        </div>
-      </div>
-      </Solo>
-
       {/* Gastos Section — filtro compartido. El ancla de voz (`?panel=gastos`) va
           en un wrapper: las 3 vistas (Resumen/Detalle/Histórico) se excluyen. */}
       <Solo visible={ver("gastos")}>
@@ -655,14 +615,12 @@ export function DashboardClient({ data, solo }: Props) {
       </div>
       </Solo>
 
-      {/* Ingresos Section — filtro compartido (mismo criterio de ancla). */}
       <Solo visible={ver("ingresos")}>
+      {ingresosEncabezado}
       <div data-panel="ingresos">
       {tabIngresos === "resumen" ? (
         <DonutChart
-          title="Ingresos"
-          action={<div className="flex items-center gap-2">{ingFilterBtn("hidden sm:inline-flex")}{ingresosTabs}</div>}
-          badge={<><StatBadge label="Mes actual" value={badges.ingresos} />{ingFilterBtn("sm:hidden")}</>}
+          encabezado={ingresosPanelTabs}
           currency={data.monedaPredeterminadaISO}
           data={filteredIngresosResumen.map((i) => ({ name: i.name, value: i.value }))}
           invertTrend
@@ -671,32 +629,9 @@ export function DashboardClient({ data, solo }: Props) {
             prevByName: Object.fromEntries(ingresosMesAnterior),
           } : null}
         />
-      ) : tabIngresos === "detalle" ? (
-        <div className="rounded-lg border border-border bg-card p-5">
-          {/* Cabecera de "Ingresos → Detalle": MISMA estructura de dos filas que
-              Resumen/Histórico (fila 1 = título + badge "Mes actual"; fila 2 =
-              pestañas) para que el badge no se mueva al cambiar de pestaña. Esta
-              pestaña NO lleva Filtros (la ventana de 3 meses es fija): los
-              Filtros de Ingresos siguen en Resumen e Histórico. */}
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-[16px] font-semibold text-header">Ingresos</h3>
-              <StatBadge label="Mes actual" value={badges.ingresos} />
-            </div>
-            <div className="flex items-center gap-2">{ingresosTabs}</div>
-          </div>
-          <IngresosTarjetas
-            liquidaciones={todosLosIngresos}
-            itemsPendientes={data.itemsPendientes}
-            hoyServidor={data.hoyServidor}
-            currency={data.monedaPredeterminadaISO}
-          />
-        </div>
       ) : (
         <EvolutionChart
-          title="Ingresos"
-          action={<div className="flex items-center gap-2">{ingFilterBtn("hidden sm:inline-flex")}{ingresosTabs}</div>}
-          badge={<><StatBadge label="Mes actual" value={badges.ingresos} />{ingFilterBtn("sm:hidden")}</>}
+          encabezado={ingresosPanelTabs}
           data={filteredIngresosEvolucion}
           color="var(--primary)"
           area
@@ -704,6 +639,7 @@ export function DashboardClient({ data, solo }: Props) {
         />
       )}
       </div>
+      {ingresosSeccion}
       </Solo>
 
       {/* Panel **Resultados**: se renderiza SIEMPRE (decisión del usuario
