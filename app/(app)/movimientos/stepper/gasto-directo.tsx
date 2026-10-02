@@ -62,6 +62,7 @@ export function GastoDirecto() {
     addCategoriaGasto,
     direct,
     volverA,
+    resetData,
   } = useMovimientoStepper();
   const router = useRouter();
   // Alta rápida (opción A): texto buscado con el que abre el modal de categoría
@@ -288,17 +289,18 @@ export function GastoDirecto() {
   // (2026-09-24): se aprende **al guardar con éxito**, no al tocar Siguiente.
 
   // ── Layout "fintech" (diseño D, 2026-10-01) ────────────────────────────────
-  // Datos derivados para el héroe (monto) y los chips.
-  const cuentaSel = options.cuentas.find((c) => c.id === data.cuentaOrigen);
-  const categoriaSel = options.categoriasGasto.find(
-    (c) => c.id === data.idCategoriaGasto
-  );
-  const isoCuenta = cuentaSel?.moneda?.codigoISO ?? "";
+  // Moneda de la cuenta elegida: da el símbolo del héroe (monto).
+  const isoCuenta =
+    options.cuentas.find((c) => c.id === data.cuentaOrigen)?.moneda?.codigoISO ??
+    "";
   const simbolo = isoCuenta ? simboloMoneda(isoCuenta) : "";
-  // El `‹` del encabezado hace lo mismo que el "Atrás"/"Cancelar" del pie:
-  // en modo directo cancela (vuelve a `volverA`/dashboard), si no, al selector.
-  const volver = () =>
-    direct ? router.push(volverA ?? "/dashboard") : navigateTo(0);
+  // El `‹` del encabezado **siempre cancela y sale** del wizard (decisión del
+  // usuario 2026-10-01): va al origen (`volverA`) o al dashboard. En modo
+  // stepper se resetean los datos para que el wizard arranque limpio.
+  const volver = () => {
+    if (!direct) resetData();
+    router.push(volverA ?? "/dashboard");
+  };
 
   return (
     <div className="mx-auto max-w-xl py-4">
@@ -307,7 +309,7 @@ export function GastoDirecto() {
         <button
           type="button"
           onClick={volver}
-          aria-label={direct ? "Cancelar" : "Atrás"}
+          aria-label="Cancelar"
           className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-border bg-muted text-subtitle transition-colors hover:text-header"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -336,20 +338,6 @@ export function GastoDirecto() {
         <p className="mt-2 text-center text-[12px] text-subtitle">
           Monto{isoCuenta ? ` · ${isoCuenta}` : ""}
         </p>
-        {(cuentaSel || categoriaSel) && (
-          <div className="mt-3 flex flex-wrap justify-center gap-2">
-            {cuentaSel && (
-              <span className="rounded-full border border-border bg-muted px-2.5 py-1 text-[11.5px] text-subtitle">
-                {cuentaSel.nombre}
-              </span>
-            )}
-            {categoriaSel && (
-              <span className="rounded-full border border-border bg-muted px-2.5 py-1 text-[11.5px] text-subtitle">
-                {categoriaSel.nombre}
-              </span>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Campos secundarios, agrupados en una sola tarjeta. */}
