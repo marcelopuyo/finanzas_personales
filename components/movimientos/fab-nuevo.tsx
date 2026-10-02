@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Receipt, Send, Settings2 } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { usePrefetchNav } from "@/components/ui/nav-progress";
-import { useTap } from "@/lib/tap";
 
 /**
  * **FAB "+"** (2026-10-01, rama `rediseno-ui`) — la entrada al registro.
@@ -28,7 +27,6 @@ export function FabNuevo({ cuentaId }: { cuentaId?: number }) {
   const router = useRouter();
   const prefetch = usePrefetchNav();
   const [open, setOpen] = useState(false);
-  const tap = useTap(() => setOpen(true));
 
   /** URL del wizard en modo directo, con el concepto y el rol de la cuenta. */
   const hrefWizard = (tipo: string, param: "cuenta" | "origen") =>
@@ -50,7 +48,7 @@ export function FabNuevo({ cuentaId }: { cuentaId?: number }) {
     <>
       <button
         type="button"
-        {...tap}
+        onClick={() => setOpen(true)}
         data-fab-nuevo=""
         aria-label="Nuevo movimiento"
         title="Nuevo movimiento"

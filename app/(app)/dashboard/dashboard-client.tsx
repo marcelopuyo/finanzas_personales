@@ -499,19 +499,12 @@ export function DashboardClient({ data, solo }: Props) {
   );
 
   /**
-   * Fila 1 en **mobile** para la pestaña **Detalle**: el título del panel + el
-   * badge "Mes actual" + el ⋯ en el ángulo superior derecho. Es la MISMA fila que
-   * arman Resumen/Histórico (título + badge + ⋯, dentro del gráfico) así que **ni el
-   * badge ni el ⋯ se mueven** al cambiar de pestaña (mismo valor de `badges.gastos`:
-   * gastos con `fechaPago` dentro del mes en curso). En desktop vuelve a
-   * shrink-to-fit y el ⋯ lo pone `gastosHeaderActions`.
+   * Encabezado de la sección **"Últimos gastos"** (el listado que va debajo del
+   * panel). ⚠️ NO reusa el título/badge/pestañas del panel: si los repite, la
+   * pantalla se ve como un panel duplicado (defecto del primer armado).
    */
   const gastosFilaTitulo = (
-    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-      <h3 className="text-[16px] font-semibold text-header">Gastos</h3>
-      <StatBadge label="Mes actual" value={badges.gastos} />
-      {gastosMenuMobile}
-    </div>
+    <h2 className="text-[16px] font-semibold text-header">Últimos gastos</h2>
   );
 
   const ingresosTabs = (
@@ -666,9 +659,8 @@ export function DashboardClient({ data, solo }: Props) {
           ⚠️ No lleva Filtros ni buscador: el listado muestra los últimos 3 días en
           tarjetas y la búsqueda vive en "Ver más gastos" (`/gastos`). */}
       <div className="mt-6 rounded-lg border border-border bg-card p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           {gastosFilaTitulo}
-          {gastosHeaderActions(false)}
         </div>
         <GastosTarjetas
           data={todosLosGastos}

@@ -15,7 +15,6 @@ import {
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
 import { usePrefetchNav } from "@/components/ui/nav-progress";
-import { useTap } from "@/lib/tap";
 
 /**
  * **Barra inferior de navegación** (2026-10-01, rama `rediseno-ui`) — reemplaza la
@@ -72,7 +71,6 @@ export default function BottomNav() {
   const prefetch = usePrefetchNav();
   /** Popup del botón "Más" (no navega: es un disparador). */
   const [abierto, setAbierto] = useState(false);
-  const tap = useTap(() => setAbierto(true));
   /** ¿Estamos en alguna de las pantallas que cuelgan de "Más"? */
   const masActivo = OPCIONES_MAS.some((o) => ruta.startsWith(o.href));
 
@@ -108,10 +106,12 @@ export default function BottomNav() {
       })}
 
       {/* 5º botón: **popup**, no pantalla. Queda marcado como activo cuando
-          estamos en alguna de sus opciones (ej. /dashboard/prestamos). */}
+          estamos en alguna de sus opciones (ej. /dashboard/prestamos).
+          ⚠️ `onClick` plano (no `useTap`): es un botón chico y así responde a
+          cualquier click, incluido el del mouse en escritorio. */}
       <button
         type="button"
-        {...tap}
+        onClick={() => setAbierto(true)}
         aria-haspopup="dialog"
         aria-expanded={abierto}
         className={cn(
