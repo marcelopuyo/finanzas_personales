@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { numberToCurrency } from "@/lib/utils";
 import { AccountCard } from "./account-card";
 import { BalanceCard } from "./balance-card";
@@ -45,6 +45,38 @@ const PAGINA_VACIA: HistorialPagina = { rows: [], total: 0, hayMas: true };
 /** Paso del carrusel en px: ancho de la tarjeta (286) + separación (12, `gap-3`). */
 const PASO = 286 + 12;
 
+/**
+ * Clave de `sessionStorage` con la **tarjeta en foco** del carrusel de Inicio
+ * (`"0"` = Balance, 1..N = cuenta). Es **por pestaña** y sobrevive al remontaje de
+ * la pantalla ⇒ al volver del wizard de un gasto/transferencia/ajuste el carrusel
+ * arranca en la MISMA cuenta con la que se entró.
+ *
+ * 🐞 2026-10-02 (reporte del usuario): el FAB abre el wizard y éste sale con
+ * `router.push("/dashboard")` ⇒ `InicioPanel` se **remonta** con `foco = 0` y
+ * siempre aparecía la tarjeta de **Balance**, perdiendo la cuenta elegida.
+ */
+const CLAVE_FOCO = "fp_inicio_foco";
+
+/** Tarjeta guardada (`0` = Balance si no hay nada o si el storage está bloqueado). */
+function leerFocoGuardado(): number {
+  try {
+    const n = Number(sessionStorage.getItem(CLAVE_FOCO));
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch {
+    // Modo privado / storage deshabilitado: se arranca en Balance.
+    return 0;
+  }
+}
+
+/** Guarda la tarjeta en foco (mejor esfuerzo: si falla, no es crítico). */
+function guardarFoco(indice: number) {
+  try {
+    sessionStorage.setItem(CLAVE_FOCO, String(indice));
+  } catch {
+    /* sin sessionStorage simplemente no se restaura */
+  }
+}
+
 interface InicioPanelProps {
   data: DashboardData;
   /** Primera tanda del historial de la **primera** cuenta, resuelta en el server. */
@@ -59,6 +91,8 @@ export function InicioPanel({ data, historialInicial }: InicioPanelProps) {
   );
   const [foco, setFoco] = useState(0);
   const trackRef = useRef<HTMLDivElement | null>(null);
+  /** ¿Ya se intentó restaurar la tarjeta guardada? (una sola vez por montaje). */
+  const restauradoRef = useRef(false);
 
   /**
    * Tarjetas del carrusel: la **0 es el Balance Actual** (siempre la primera, la
@@ -70,8 +104,35 @@ export function InicioPanel({ data, historialInicial }: InicioPanelProps) {
   const cuenta = indice === 0 ? undefined : cuentas[indice - 1];
 
   /**
+   * Ref del track del carrusel: guarda el nodo **y restaura la tarjeta en foco**
+   * guardada en `sessionStorage`.
+   *
+   * 🔑 Va en un **ref callback** (fase de commit) y no en un efecto por dos razones:
+   * 1. `sessionStorage` no existe en el server ⇒ leerlo en el render sería un
+   *    desajuste de hidratación.
+   * 2. El `scrollLeft` queda aplicado **antes del primer pintado** (no se llega a
+   *    ver la tarjeta de Balance un instante).
+   *
+   * El índice se recorta a las tarjetas existentes: si la lista de cuentas cambió,
+   * el navegador limita el scroll solo y `onScroll` corrige el foco.
+   */
+  const montarTrack = useCallback(
+    (node: HTMLDivElement | null) => {
+      trackRef.current = node;
+      if (!node || restauradoRef.current) return;
+      restauradoRef.current = true;
+      const i = Math.min(leerFocoGuardado(), totalTarjetas - 1);
+      if (i <= 0) return;
+      node.scrollLeft = i * PASO;
+      setFoco(i);
+    },
+    [totalTarjetas]
+  );
+
+  /**
    * Índice enfocado a partir del scroll del carrusel. Se calcula en el propio
-   * handler (no en un efecto) y solo se llama a `setFoco` cuando **cambia**.
+   * handler (no en un efecto) y solo se llama a `setFoco` cuando **cambia**; al
+   * cambiar queda **guardado en la sesión** para poder volver a esa tarjeta.
    */
   const onScroll = () => {
     const el = trackRef.current;
@@ -80,7 +141,9 @@ export function InicioPanel({ data, historialInicial }: InicioPanelProps) {
       0,
       Math.min(totalTarjetas - 1, Math.round(el.scrollLeft / PASO))
     );
-    if (i !== foco) setFoco(i);
+    if (i === foco) return;
+    setFoco(i);
+    guardarFoco(i);
   };
 
   /**
@@ -114,7 +177,7 @@ export function InicioPanel({ data, historialInicial }: InicioPanelProps) {
           La PRIMERA tarjeta es el **Balance Actual** (la de entrada) y después
           vienen las cuentas en su orden configurado. */}
       <div
-        ref={trackRef}
+        ref={montarTrack}
         onScroll={onScroll}
         className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 scroll-pl-4 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >

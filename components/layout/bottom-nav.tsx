@@ -7,9 +7,9 @@ import {
   BarChart3,
   Briefcase,
   ChevronRight,
-  Ellipsis,
   HandCoins,
   Home,
+  Menu,
   Receipt,
 } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
@@ -107,6 +107,9 @@ export default function BottomNav() {
 
       {/* 5º botón: **popup**, no pantalla. Queda marcado como activo cuando
           estamos en alguna de sus opciones (ej. /dashboard/prestamos).
+          🔑 El icono es **3 líneas apiladas (hamburguesa)** y no el ⋯ elíptico
+          horizontal (decisión del usuario, 2026-10-02): se lee como "menú de
+          opciones" en el mismo lenguaje que el ⋯ de los encabezados de panel.
           ⚠️ `onClick` plano (no `useTap`): es un botón chico y así responde a
           cualquier click, incluido el del mouse en escritorio. */}
       <button
@@ -119,7 +122,7 @@ export default function BottomNav() {
           masActivo ? "text-primary" : "text-subtitle hover:text-header"
         )}
       >
-        <Ellipsis className="h-[21px] w-[21px]" />
+        <Menu className="h-[21px] w-[21px]" />
         <span className="text-[10px] leading-none">Más</span>
       </button>
     </nav>
