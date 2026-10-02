@@ -310,6 +310,7 @@ export function NumberField({
   allowNegative = false,
   placeholder,
   hero = false,
+  heroPrefix,
 }: {
   label: string;
   value: number;
@@ -317,9 +318,11 @@ export function NumberField({
   allowNegative?: boolean;
   placeholder?: string;
   /** Variante **héroe**: input grande y centrado, **sin label**. El llamador
-   *  ubica el rótulo y el símbolo de moneda (la usa el wizard de gasto, diseño D
+   *  ubica el rótulo (la usan los wizards de gasto/transferencia/ajuste, diseño D
    *  `2026-10-01`). Default: `false` ⇒ comportamiento de siempre. */
   hero?: boolean;
+  /** Símbolo de moneda que se muestra a la izquierda del héroe (ej. `US$`). */
+  heroPrefix?: string;
 }) {
   // `type="text"` + `inputMode="decimal"`: en móvil `type="number"` no muestra
   // la tecla de separador decimal (iOS y algunos Android según el locale).
@@ -373,16 +376,36 @@ export function NumberField({
 
   if (hero) {
     return (
-      <input
-        type="text"
-        inputMode="decimal"
-        autoComplete="off"
-        aria-label={label}
-        value={text}
-        onChange={(e) => handleChange(e.target.value)}
-        placeholder={placeholder ?? "0"}
-        className="w-[200px] max-w-full bg-transparent text-center text-[34px] font-semibold leading-none tracking-tight text-header placeholder:text-subtitle/50 focus:outline-none"
-      />
+      <div className="flex items-center justify-center gap-2">
+        {heroPrefix && (
+          <span className="text-[20px] font-medium text-subtitle">
+            {heroPrefix}
+          </span>
+        )}
+        <input
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
+          aria-label={label}
+          value={text}
+          onChange={(e) => handleChange(e.target.value)}
+          placeholder={placeholder ?? "0"}
+          className="w-45 max-w-full bg-transparent text-center text-[34px] font-semibold leading-none tracking-tight text-header placeholder:text-subtitle/50 focus:outline-none"
+        />
+        {allowNegative && (
+          <button
+            type="button"
+            onClick={toggleSign}
+            aria-label={
+              text.startsWith("-") ? "Cambiar a positivo" : "Cambiar a negativo"
+            }
+            title="+/−"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-border bg-muted text-[16px] font-semibold text-card-foreground transition-colors hover:bg-muted/70"
+          >
+            {text.startsWith("-") ? "+" : "−"}
+          </button>
+        )}
+      </div>
     );
   }
 

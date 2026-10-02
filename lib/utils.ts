@@ -16,6 +16,12 @@ export function numberToCurrency(value: number, currency = "ARS"): string {
   });
 }
 
+/** Símbolo de una moneda (ej. `US$`, `$`) a partir del código ISO 4217: se
+ *  formatea 0 y se quitan dígitos, separadores y espacios. */
+export function simboloMoneda(iso: string): string {
+  return numberToCurrency(0, iso).replace(/[0-9.,\s\u00a0]/g, "");
+}
+
 /**
  * "YYYY-MM-DD…" → "dd-mm-aa" cortando el string (nunca se parsea, así no hay
  * corrimiento de día por zona horaria).

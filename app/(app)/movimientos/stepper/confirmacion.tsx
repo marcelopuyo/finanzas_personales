@@ -6,6 +6,12 @@ import { toast } from "sonner";
 import { Save, X, ArrowLeft } from "lucide-react";
 import { useMovimientoStepper } from "./stepper-context";
 import { StepShell, Fila, formatFecha } from "./ui";
+import {
+  StepShellFintech,
+  HeroeFintech,
+  BotonPrincipal,
+  BotonSecundario,
+} from "./ui";
 import { CONCEPTO_STEP, type MovimientoConcepto } from "./types";
 import { numberToCurrency, timeToDecimal } from "@/lib/utils";
 import { fraseContraparte } from "@/lib/prestamos";
@@ -355,82 +361,59 @@ export function Confirmacion() {
     }
   };
 
-  // Acciones del pie (las comparten el layout nuevo del gasto y el de siempre).
+  // Acción del pie compartida por el layout nuevo y el de siempre.
   const irAtras = () => navigateTo(concepto ? CONCEPTO_STEP[concepto] : 0);
-  const cancelar = () => {
-    if (!direct) resetData();
-    router.push(volverA ?? "/dashboard");
-  };
-  const btnSecundario =
-    "inline-flex items-center justify-center gap-1.5 rounded-xl border border-border px-4 py-3 text-[14px] font-medium text-subtitle transition-colors hover:bg-muted hover:text-header disabled:opacity-50";
 
-  // ── Confirmación "fintech" del GASTO (coherente con el paso 2, §210) ───────
-  // Solo Gasto directo: el resto de los movimientos sigue con el `StepShell`.
-  if (concepto === "GastoDirecto") {
-    const iso = cuentaISO(data.cuentaOrigen);
-    const filasSinMonto = filas.filter((f) => f.label !== "Monto");
+  // ── Confirmación "fintech" (coherente con el paso 2, §210) ─────────────
+  // Gasto, Transferencia y Ajuste: héroe con el monto + resumen en filas +
+  // acciones apiladas. El resto de los movimientos sigue con el `StepShell`.
+  if (
+    concepto === "GastoDirecto" ||
+    concepto === "Transferencia" ||
+    concepto === "AjusteCuenta"
+  ) {
+    const etiquetaHeroe =
+      concepto === "Transferencia" ? "Monto origen" : "Monto";
+    const isoHeroe = cuentaISO(data.cuentaOrigen);
+    // El ajuste distingue el sentido con el signo (igual que en la fila).
+    const valorHeroe = `${
+      concepto === "AjusteCuenta" && data.montoOrigen > 0 ? "+" : ""
+    }${numberToCurrency(data.montoOrigen, isoHeroe)}`;
+    const filasResumen = filas.filter((f) => f.label !== etiquetaHeroe);
     return (
-      <div className="mx-auto max-w-xl py-4">
-        <div className="mb-5 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={cancelar}
-            disabled={submitting}
-            aria-label="Cancelar"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-border bg-muted text-subtitle transition-colors hover:text-header disabled:opacity-50"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <h1 className="text-[17px] font-semibold text-header">Confirmar</h1>
-          {!direct && (
-            <span className="ml-auto text-[12px] text-subtitle">3/3</span>
-          )}
-        </div>
-
-        {/* Monto protagonista (solo lectura, mismo lenguaje que el paso 2). */}
-        <div className="mb-5">
-          <div className="text-center text-[34px] font-semibold leading-none tracking-tight text-header">
-            {numberToCurrency(data.montoOrigen, iso)}
-          </div>
-          <p className="mt-2 text-center text-[12px] text-subtitle">
-            Monto · {iso}
-          </p>
-        </div>
-
-        {/* Resumen en filas label/valor. */}
-        {filasSinMonto.length > 0 && (
+      <StepShellFintech
+        titulo="Confirmar"
+        step={3}
+        total={3}
+        cancelDisabled={submitting}
+        heroe={
+          <HeroeFintech etiqueta={`${etiquetaHeroe} · ${isoHeroe}`}>
+            <p className="text-center text-[34px] font-semibold leading-none tracking-tight text-header">
+              {valorHeroe}
+            </p>
+          </HeroeFintech>
+        }
+        footer={
+          <>
+            <BotonPrincipal onClick={guardar} disabled={submitting}>
+              <Save className="h-4 w-4" />
+              {submitting ? "Guardando..." : "Guardar"}
+            </BotonPrincipal>
+            <BotonSecundario onClick={irAtras} disabled={submitting}>
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Atrás
+            </BotonSecundario>
+          </>
+        }
+      >
+        {filasResumen.length > 0 && (
           <div className="rounded-xl border border-border bg-card px-4 py-1">
-            {filasSinMonto.map((f) => (
+            {filasResumen.map((f) => (
               <Fila key={f.label} label={f.label} value={f.value} />
             ))}
           </div>
         )}
-
-        {/* Acciones apiladas: primaria full-width + "Atrás" (volver al paso de
-            datos para editar). **Sin "Cancelar"**: esa función la cumple el `‹`
-            de la cabecera (decisión del usuario 2026-10-01). Mantiene
-            `data-pie-accion` para el FAB de voz. */}
-        <div className="mt-4 space-y-2" data-pie-accion="">
-          <button
-            type="button"
-            onClick={guardar}
-            disabled={submitting}
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-3.5 text-[15px] font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
-          >
-            <Save className="h-4 w-4" />
-            {submitting ? "Guardando..." : "Guardar"}
-          </button>
-          <button
-            type="button"
-            onClick={irAtras}
-            disabled={submitting}
-            className={`${btnSecundario} w-full`}
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Atrás
-          </button>
-        </div>
-      </div>
+      </StepShellFintech>
     );
   }
 

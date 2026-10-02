@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMovimientoStepper } from "./stepper-context";
 import {
-  StepShell,
-  NavButtons,
+  StepShellFintech,
+  HeroeFintech,
+  BotonPrincipal,
   DateField,
   SelectField,
   NumberField,
@@ -16,6 +17,7 @@ import {
   motivoTransferenciaFinal,
 } from "@/lib/motivos-transferencia";
 import { convertirMontoParaUI } from "@/backend/src/actions/cotizaciones";
+import { simboloMoneda } from "@/lib/utils";
 import { crearDictadoTransferencia } from "./dictado-transferencia";
 import { aplicarDictadoSimple, escribirEnPantalla } from "./dictado-comun";
 import { useAliasDeCampo } from "@/components/voz/voz-provider";
@@ -163,90 +165,100 @@ export function Transferencia() {
   useRegistrarPantallaDictable(pantalla);
 
   return (
-    <StepShell
-      title="Por favor ingrese la información de la transferencia:"
+    <StepShellFintech
+      titulo="Transferencia"
       step={2}
       total={3}
+      heroe={
+        <HeroeFintech
+          etiqueta={`Monto origen${cuentaOrigen ? ` · ${monedaOrigenISO}` : ""}`}
+        >
+          <NumberField
+            hero
+            heroPrefix={cuentaOrigen ? simboloMoneda(monedaOrigenISO) : ""}
+            label="Monto origen"
+            value={data.montoOrigen}
+            onChange={(v) => handleSetData({ montoOrigen: v })}
+          />
+        </HeroeFintech>
+      }
       footer={
-        <NavButtons
-          onBack={() => navigateTo(0)}
-          onNext={() => navigateTo(STEP_CONFIRMACION)}
-          nextDisabled={!isValid}
-        />
+        <BotonPrincipal
+          onClick={() => navigateTo(STEP_CONFIRMACION)}
+          disabled={!isValid}
+        >
+          Siguiente
+        </BotonPrincipal>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <DateField
-          label="Fecha"
-          value={data.fecha}
-          onChange={(v) => handleSetData({ fecha: v })}
+      <div className="space-y-4 rounded-xl border border-border bg-card p-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <DateField
+            label="Fecha"
+            value={data.fecha}
+            onChange={(v) => handleSetData({ fecha: v })}
+          />
+
+          <SelectField
+            label="Motivo"
+            value={data.motivo}
+            onChange={(v) => handleSetData({ motivo: v })}
+            options={motivos.map((m) => ({ value: m, label: m }))}
+            placeholder="Seleccionar o escribir…"
+            createLabel="Usar otro motivo"
+            createLabelFor={(q) => `Usar «${motivoTransferenciaFinal(q)}»`}
+            searchPlaceholder="Buscar o escribir…"
+            onCreate={(prefill) => {
+              // Motivo FINAL: los presets se guardan tal cual y los motivos
+              // escritos a mano con el prefijo "Transf - " (lo resuelve el helper
+              // compartido `lib/motivos-transferencia.ts`, que el backend vuelve a
+              // aplicar al persistir).
+              const texto = motivoTransferenciaFinal(prefill);
+              if (!texto) return;
+              // Un texto igual a un preset se comporta como preset (usa su par de
+              // conceptos específico) y no se duplica la opción.
+              if (!esMotivoPreset(texto)) {
+                setMotivosPropios((prev) =>
+                  prev.includes(texto) ? prev : [...prev, texto]
+                );
+              }
+              handleSetData({ motivo: texto });
+            }}
+          />
+        </div>
+
+        <SelectField
+          label="Cuenta origen"
+          value={data.cuentaOrigen ? String(data.cuentaOrigen) : ""}
+          onChange={(v) => {
+            setDestinoEditado(false);
+            handleSetData({ cuentaOrigen: Number(v) });
+          }}
+          options={cuentaOptions}
         />
 
         <SelectField
-          label="Motivo"
-          value={data.motivo}
-          onChange={(v) => handleSetData({ motivo: v })}
-          options={motivos.map((m) => ({ value: m, label: m }))}
-          placeholder="Seleccionar o escribir…"
-          createLabel="Usar otro motivo"
-          createLabelFor={(q) => `Usar «${motivoTransferenciaFinal(q)}»`}
-          searchPlaceholder="Buscar o escribir…"
-          onCreate={(prefill) => {
-            // Motivo FINAL: los presets se guardan tal cual y los motivos
-            // escritos a mano con el prefijo "Transf - " (lo resuelve el helper
-            // compartido `lib/motivos-transferencia.ts`, que el backend vuelve a
-            // aplicar al persistir).
-            const texto = motivoTransferenciaFinal(prefill);
-            if (!texto) return;
-            // Un texto igual a un preset se comporta como preset (usa su par de
-            // conceptos específico) y no se duplica la opción.
-            if (!esMotivoPreset(texto)) {
-              setMotivosPropios((prev) =>
-                prev.includes(texto) ? prev : [...prev, texto]
-              );
-            }
-            handleSetData({ motivo: texto });
+          label="Cuenta destino"
+          value={data.cuentaDestino ? String(data.cuentaDestino) : ""}
+          onChange={(v) => {
+            setDestinoEditado(false);
+            handleSetData({ cuentaDestino: Number(v) });
+          }}
+          options={cuentaOptions}
+        />
+
+        <NumberField
+          label={`Monto destino (${monedaDestinoISO})`}
+          value={data.montoDestino}
+          onChange={(v) => {
+            setDestinoEditado(true);
+            handleSetData({ montoDestino: v });
           }}
         />
       </div>
 
-      <SelectField
-        label="Cuenta origen"
-        value={data.cuentaOrigen ? String(data.cuentaOrigen) : ""}
-        onChange={(v) => {
-          setDestinoEditado(false);
-          handleSetData({ cuentaOrigen: Number(v) });
-        }}
-        options={cuentaOptions}
-      />
-
-      <NumberField
-        label={`Monto origen (${monedaOrigenISO})`}
-        value={data.montoOrigen}
-        onChange={(v) => handleSetData({ montoOrigen: v })}
-      />
-
-      <SelectField
-        label="Cuenta destino"
-        value={data.cuentaDestino ? String(data.cuentaDestino) : ""}
-        onChange={(v) => {
-          setDestinoEditado(false);
-          handleSetData({ cuentaDestino: Number(v) });
-        }}
-        options={cuentaOptions}
-      />
-
-      <NumberField
-        label={`Monto destino (${monedaDestinoISO})`}
-        value={data.montoDestino}
-        onChange={(v) => {
-          setDestinoEditado(true);
-          handleSetData({ montoDestino: v });
-        }}
-      />
-
       {!mismaMoneda && cuentaOrigen && cuentaDestino && (
-        <p className="text-[12px] text-subtitle">
+        <p className="mt-3 text-[12px] text-subtitle">
           Las cuentas tienen monedas distintas ({monedaOrigenISO} →{" "}
           {monedaDestinoISO}). El monto destino se autocomputa con la
           cotización del día y podés editarlo.
@@ -256,10 +268,10 @@ export function Transferencia() {
       {data.cuentaOrigen > 0 &&
         data.cuentaDestino > 0 &&
         data.cuentaOrigen === data.cuentaDestino && (
-          <p className="text-[12px] text-danger">
+          <p className="mt-3 text-[12px] text-danger">
             La cuenta origen y destino deben ser distintas.
           </p>
         )}
-    </StepShell>
+    </StepShellFintech>
   );
 }

@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft } from "lucide-react";
 import { useMovimientoStepper } from "./stepper-context";
 import {
+  StepShellFintech,
+  HeroeFintech,
+  BotonPrincipal,
   DateField,
   SelectField,
   NumberField,
@@ -24,7 +25,7 @@ import {
   type PantallaDictable,
   type ValoresPantalla,
 } from "@/components/voz/dictado-pantalla";
-import { numberToCurrency, todayLocalISODate } from "@/lib/utils";
+import { simboloMoneda, todayLocalISODate } from "@/lib/utils";
 import type { CampoDictable } from "@/lib/voz/tipos";
 
 /**
@@ -48,23 +49,9 @@ function tieneValorEn(
   return true;
 }
 
-/** Símbolo de la moneda (ej. `US$`, `$`) a partir del código ISO 4217. */
-function simboloMoneda(iso: string): string {
-  return numberToCurrency(0, iso).replace(/[0-9.,\s\u00a0]/g, "");
-}
-
 export function GastoDirecto() {
-  const {
-    data,
-    handleSetData,
-    navigateTo,
-    options,
-    addCategoriaGasto,
-    direct,
-    volverA,
-    resetData,
-  } = useMovimientoStepper();
-  const router = useRouter();
+  const { data, handleSetData, navigateTo, options, addCategoriaGasto } =
+    useMovimientoStepper();
   // Alta rápida (opción A): texto buscado con el que abre el modal de categoría
   // nueva (null = cerrado).
   const [nuevaCategoria, setNuevaCategoria] = useState<string | null>(null);
@@ -304,53 +291,32 @@ export function GastoDirecto() {
   const isoCuenta =
     options.cuentas.find((c) => c.id === data.cuentaOrigen)?.moneda?.codigoISO ??
     "";
-  const simbolo = isoCuenta ? simboloMoneda(isoCuenta) : "";
-  // El `‹` del encabezado **siempre cancela y sale** del wizard (decisión del
-  // usuario 2026-10-01): va al origen (`volverA`) o al dashboard. En modo
-  // stepper se resetean los datos para que el wizard arranque limpio.
-  const volver = () => {
-    if (!direct) resetData();
-    router.push(volverA ?? "/dashboard");
-  };
 
   return (
-    <div className="mx-auto max-w-xl py-4">
-      {/* Encabezado: solo "Gasto" (no "Gasto directo"). */}
-      <div className="mb-5 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={volver}
-          aria-label="Cancelar"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-border bg-muted text-subtitle transition-colors hover:text-header"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <h1 className="text-[17px] font-semibold text-header">Gasto</h1>
-        {!direct && (
-          <span className="ml-auto text-[12px] text-subtitle">2/3</span>
-        )}
-      </div>
-
-      {/* Monto: protagonista de la pantalla. */}
-      <div className="mb-5">
-        <div className="flex items-baseline justify-center gap-2">
-          {simbolo && (
-            <span className="text-[20px] font-medium text-subtitle">
-              {simbolo}
-            </span>
-          )}
+    <StepShellFintech
+      titulo="Gasto"
+      step={2}
+      total={3}
+      heroe={
+        <HeroeFintech etiqueta={`Monto${isoCuenta ? ` · ${isoCuenta}` : ""}`}>
           <NumberField
             hero
+            heroPrefix={isoCuenta ? simboloMoneda(isoCuenta) : ""}
             label="Monto"
             value={data.montoOrigen}
             onChange={(v) => handleSetData({ montoOrigen: v })}
           />
-        </div>
-        <p className="mt-2 text-center text-[12px] text-subtitle">
-          Monto{isoCuenta ? ` · ${isoCuenta}` : ""}
-        </p>
-      </div>
-
+        </HeroeFintech>
+      }
+      footer={
+        <BotonPrincipal
+          onClick={() => navigateTo(STEP_CONFIRMACION)}
+          disabled={!isValid}
+        >
+          Siguiente
+        </BotonPrincipal>
+      }
+    >
       {/* Campos secundarios, agrupados en una sola tarjeta. */}
       <div className="space-y-4 rounded-xl border border-border bg-card p-4">
         <AutoCompleteField
@@ -391,19 +357,6 @@ export function GastoDirecto() {
         />
       </div>
 
-      {/* Acción principal en la zona del pulgar. `data-pie-accion` hace que el
-          FAB de voz se corra a un lado cuando este pie entra en su franja. */}
-      <div className="mt-4" data-pie-accion="">
-        <button
-          type="button"
-          onClick={() => navigateTo(STEP_CONFIRMACION)}
-          disabled={!isValid}
-          className="w-full rounded-xl bg-primary px-4 py-3.5 text-[15px] font-semibold text-primary-foreground transition-opacity hover:enabled:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          Siguiente
-        </button>
-      </div>
-
       {/* Alta rápida de la categoría sin salir del wizard. Los movimientos
           guardan la categoría por ID, así que se agrega a las opciones del
           stepper (contexto) y luego se selecciona por id. */}
@@ -436,6 +389,6 @@ export function GastoDirecto() {
         show={buscandoUltimo}
         message="Buscando el último gasto..."
       />
-    </div>
+    </StepShellFintech>
   );
 }

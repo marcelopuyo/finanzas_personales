@@ -2,9 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useMovimientoStepper } from "./stepper-context";
-import { StepShell, NavButtons, DateField, SelectField, NumberField } from "./ui";
+import {
+  StepShellFintech,
+  HeroeFintech,
+  BotonPrincipal,
+  DateField,
+  SelectField,
+  NumberField,
+} from "./ui";
 import { STEP_CONFIRMACION, type MovimientoData } from "./types";
-import { numberToCurrency } from "@/lib/utils";
+import { numberToCurrency, simboloMoneda } from "@/lib/utils";
 import { crearDictadoAjuste } from "./dictado-ajuste";
 import { aplicarDictadoSimple, escribirEnPantalla } from "./dictado-comun";
 import { useAliasDeCampo } from "@/components/voz/voz-provider";
@@ -81,46 +88,63 @@ export function AjusteCuenta() {
   useRegistrarPantallaDictable(pantalla);
 
   return (
-    <StepShell
-      title="Por favor ingrese la información del ajuste:"
+    <StepShellFintech
+      titulo="Ajuste de cuenta"
       step={2}
       total={3}
+      heroe={
+        <HeroeFintech
+          etiqueta={
+            <>
+              Monto{cuenta ? ` · ${iso}` : ""}
+              <span className="mt-0.5 block text-[11px]">
+                Positivo: ingreso · Negativo: egreso
+              </span>
+            </>
+          }
+        >
+          <NumberField
+            hero
+            heroPrefix={cuenta ? simboloMoneda(iso) : ""}
+            allowNegative
+            label="Monto"
+            value={data.montoOrigen}
+            onChange={(v) => handleSetData({ montoOrigen: v })}
+          />
+        </HeroeFintech>
+      }
       footer={
-        <NavButtons
-          onBack={() => navigateTo(0)}
-          onNext={() => navigateTo(STEP_CONFIRMACION)}
-          nextDisabled={!isValid}
-        />
+        <BotonPrincipal
+          onClick={() => navigateTo(STEP_CONFIRMACION)}
+          disabled={!isValid}
+        >
+          Siguiente
+        </BotonPrincipal>
       }
     >
-      <DateField
-        label="Fecha"
-        value={data.fecha}
-        onChange={(v) => handleSetData({ fecha: v })}
-      />
+      <div className="space-y-4 rounded-xl border border-border bg-card p-4">
+        <DateField
+          label="Fecha"
+          value={data.fecha}
+          onChange={(v) => handleSetData({ fecha: v })}
+        />
 
-      <SelectField
-        label="Cuenta"
-        value={data.cuentaOrigen ? String(data.cuentaOrigen) : ""}
-        onChange={(v) => handleSetData({ cuentaOrigen: Number(v) })}
-        options={options.cuentas.map((c) => ({
-          value: String(c.id),
-          label: c.moneda ? `${c.nombre} (${c.moneda.codigoISO})` : c.nombre,
-        }))}
-      />
-
-      <NumberField
-        label="Monto (positivo: ingreso / negativo: egreso)"
-        value={data.montoOrigen}
-        onChange={(v) => handleSetData({ montoOrigen: v })}
-        allowNegative
-      />
+        <SelectField
+          label="Cuenta"
+          value={data.cuentaOrigen ? String(data.cuentaOrigen) : ""}
+          onChange={(v) => handleSetData({ cuentaOrigen: Number(v) })}
+          options={options.cuentas.map((c) => ({
+            value: String(c.id),
+            label: c.moneda ? `${c.nombre} (${c.moneda.codigoISO})` : c.nombre,
+          }))}
+        />
+      </div>
 
       {/* Feedback del ajuste: muestra el saldo actual de la cuenta y el saldo
           RESULTANTE tras aplicar el monto ingresado, para verificar que el
           importe es correcto. Se muestra al elegir la cuenta (en su moneda). */}
       {cuenta && (
-        <div className="rounded-lg border border-border bg-muted px-3 py-2.5">
+        <div className="mt-4 rounded-xl border border-border bg-card px-4 py-3">
           <div className="flex items-center justify-between text-[13px]">
             <span className="text-subtitle">Saldo actual</span>
             <span className="font-medium text-card-foreground">
@@ -135,6 +159,6 @@ export function AjusteCuenta() {
           </div>
         </div>
       )}
-    </StepShell>
+    </StepShellFintech>
   );
 }
