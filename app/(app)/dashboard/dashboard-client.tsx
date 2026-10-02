@@ -29,6 +29,7 @@ import { aFuenteIngresos } from "@/backend/src/lib/ingresos-trabajo";
 import type { GastoOut } from "@/backend/src/queries/gastos";
 import type { LiquidacionOut } from "@/backend/src/queries/trabajos";
 import { cn, numberToCurrency, todayLocalISODate } from "@/lib/utils";
+import { estimarCobros } from "@/lib/cobros-estimados";
 import { useMontado } from "@/lib/use-cliente";
 import { usePendingNav, usePrefetchNav } from "@/components/ui/nav-progress";
 import { useTap } from "@/lib/tap";
@@ -166,6 +167,27 @@ export function DashboardClient({ data }: Props) {
     data.ingresosMesActual,
     data.resultadosMesActual,
     data.monedaPredeterminadaISO,
+  ]);
+
+  // Reparto de los pendientes en "Por cobrar / En curso / Sin período estimado".
+  // ⚠️ Igual que los badges: el servidor (Vercel, **UTC**) lo calcula con SU
+  // fecha, que en la tarde-noche ya es la del día siguiente respecto al usuario
+  // (ej. 21:00 en GMT-4 ⇒ el server está en el día siguiente) ⇒ una ventana que
+  // cierra mañana aparecía HOY en "Por cobrar". Con `montado` se recalcula con
+  // la fecha **LOCAL** del navegador (en SSR/hidratación se usa el valor del
+  // servidor ⇒ sin desajuste). `ingresosDetalle` ya son las liquidaciones con
+  // cobro real (= las "cerradas" que usa la inferencia de cadencia).
+  const estimaciones = useMemo(() => {
+    if (!montado) return data.cobrosEstimados;
+    const hoyLocal = todayLocalISODate();
+    if (hoyLocal === data.hoyServidor) return data.cobrosEstimados;
+    return estimarCobros(data.itemsPendientes, data.ingresosDetalle, hoyLocal);
+  }, [
+    montado,
+    data.cobrosEstimados,
+    data.hoyServidor,
+    data.itemsPendientes,
+    data.ingresosDetalle,
   ]);
 
   // filteredGastos pero SIN el filtro de categoría (para el panel Resumen)
@@ -559,7 +581,7 @@ export function DashboardClient({ data }: Props) {
             <h2 className="text-[16px] font-semibold text-header">Trabajo</h2>
           </div>
           <PeriodosTrabajoLista
-            estimaciones={data.cobrosEstimados}
+            estimaciones={estimaciones}
             currency={data.monedaPredeterminadaISO}
           />
         </div>

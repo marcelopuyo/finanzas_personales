@@ -14,8 +14,15 @@
 //  3. **`ancla`** = `fechaDesde` de la última liquidación cerrada.
 //  4. **Ventanas**: `inicio(k) = ancla + k · paso`, `fin = inicio + duracion − 1`,
 //     generadas hacia adelante y hacia atrás hasta cubrir los ítems pendientes.
-//  5. **"Por cobrar"** = los ítems cuya ventana **YA CERRÓ** (`fin ≤ hoy`)
-//     (decisión del usuario). Lo demás (en curso, futura) va a **"En curso"**.
+//  5. **"Por cobrar"** = los ítems cuya ventana **YA CERRÓ**, es decir **a partir
+//     del día SIGUIENTE a su último día** (`fin < hoy`): la ventana incluye su
+//     último día, y ese día todavía puede entrar una jornada (decisión del
+//     usuario 2026-09-27; afinada el 2026-10-01 al detectar que Duffys pasaba a
+//     "Por cobrar" el día anterior al cierre).
+//  5-bis. ⚠️ La fecha **"hoy"** que llega debe ser la **local del usuario**: la
+//     calcula el servidor (UTC) y el cliente la **recalcula con la suya** tras
+//     montar (mismo patrón que los badges "Mes actual"), porque en la
+//     tarde-noche el UTC ya está en el día siguiente.
 //  6. Ítems que no caen en ninguna ventana ⇒ **"Sin período estimado"**.
 //  7. **Sin cadencia confiable** (menos de 3 liquidaciones, duración 1 día —
 //     típico de `por_tarea` y de los trabajos legacy— o paso inconsistente) ⇒
@@ -320,8 +327,11 @@ export function estimarCobros(
         sueltos.push(i);
         continue;
       }
-      // "Por cobrar" = la ventana YA CERRÓ (decisión del usuario 2026-09-27).
-      if (v.hasta <= hoyISO) {
+      // "Por cobrar" = la ventana YA CERRÓ. La ventana **incluye su último día**,
+      // así que recién está cerrada **desde el día siguiente** (`hasta < hoy`):
+      // si no, el día del cierre un ítem que entre ese día caería en "Por cobrar"
+      // con el período todavía abierto (bug detectado con Duffys, 2026-10-01).
+      if (v.hasta < hoyISO) {
         cerradas.push(i);
         if (v.hasta > cierreCerradas) cierreCerradas = v.hasta;
       } else {
