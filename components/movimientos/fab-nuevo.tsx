@@ -1,10 +1,35 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Receipt, Send, Settings2 } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { usePrefetchNav } from "@/components/ui/nav-progress";
+import { cn } from "@/lib/utils";
+
+/**
+ * **Base visual compartida por los dos FAB de Inicio** (2026-10-02): el de
+ * *nuevo movimiento* y el de *gestionar cuentas*. Una sola fuente para el
+ * tamaño, la posición y la animación (regla de la app: FAB **blanco**,
+ * `bg-header text-background`).
+ *
+ * 🔑 **`visible = false` lo difumina y lo deja inerte** en vez de desmontarlo:
+ * el carrusel de Inicio cambia de tarjeta al deslizar, así que los dos FAB se
+ * cruzan con un fade (transparente + `pointer-events-none` + `aria-hidden` +
+ * fuera del orden de tabulación).
+ */
+function claseFab(visible: boolean) {
+  return cn(
+    "fixed right-4 z-30 flex h-13 w-13 items-center justify-center rounded-full bg-header text-background shadow-lg transition-[transform,opacity] duration-200 active:scale-95",
+    visible ? "opacity-100" : "pointer-events-none opacity-0"
+  );
+}
+
+/** `bottom` del FAB: por encima de la barra inferior (4rem) + su safe-area. */
+const ESTILO_FAB = {
+  bottom: "calc(4.75rem + env(safe-area-inset-bottom))",
+} as const;
 
 /**
  * **FAB "+"** (2026-10-01, rama `rediseno-ui`) — la entrada al registro.
@@ -22,8 +47,20 @@ import { usePrefetchNav } from "@/components/ui/nav-progress";
  *
  * ⚠️ No es el único camino: el **long press** sobre la tarjeta de la cuenta sigue
  * abriendo el popup de acciones (`AccountActionsSheet`) con la misma cuenta.
+ *
+ * 🔑 **La prop `visible` lo oculta** (2026-10-02): en Inicio, cuando la tarjeta en
+ * foco es la de **Balance** no hay ninguna acción de registro que hacer (no hay
+ * cuenta con la que precargar el wizard), así que ese caso lo cubre el otro FAB
+ * de Inicio, **`FabCuentas`** (gestionar cuentas).
  */
-export function FabNuevo({ cuentaId }: { cuentaId?: number }) {
+export function FabNuevo({
+  cuentaId,
+  visible = true,
+}: {
+  cuentaId?: number;
+  /** ¿Se muestra? Con `false` queda transparente, inerte y fuera del foco. */
+  visible?: boolean;
+}) {
   const router = useRouter();
   const prefetch = usePrefetchNav();
   const [open, setOpen] = useState(false);
@@ -52,9 +89,11 @@ export function FabNuevo({ cuentaId }: { cuentaId?: number }) {
         data-fab-nuevo=""
         aria-label="Nuevo movimiento"
         title="Nuevo movimiento"
-        className="fixed right-4 z-30 flex h-13 w-13 items-center justify-center rounded-full bg-header text-background shadow-lg transition-transform active:scale-95"
-        // Por encima de la barra inferior (4rem) + su safe-area.
-        style={{ bottom: "calc(4.75rem + env(safe-area-inset-bottom))" }}
+        // Oculto = transparente + inerte (no clickeable ni alcanzable por teclado).
+        aria-hidden={!visible}
+        tabIndex={visible ? 0 : -1}
+        className={claseFab(visible)}
+        style={ESTILO_FAB}
       >
         <span className="text-[26px] font-light leading-none">+</span>
       </button>
@@ -95,5 +134,36 @@ export function FabNuevo({ cuentaId }: { cuentaId?: number }) {
         </div>
       </Modal>
     </>
+  );
+}
+
+/**
+ * **FAB "Gestionar cuentas"** (2026-10-02, §212.h.2) — el FAB de la tarjeta
+ * **Balance Actual** del carrusel de Inicio.
+ *
+ * Decisión del usuario: esa tarjeta no tiene una acción de *registro* que ofrecer
+ * (no hay cuenta con la que precargar el wizard), pero **sí** tiene la acción
+ * natural del balance: **gestionar las cuentas** que lo componen ⇒ navega al CRUD
+ * de cuentas, la misma ruta y el mismo icono que el ítem del menú ⋯ del panel
+ * "Cuentas" (`?origen=dashboard`, para que el "volver" del CRUD regrese acá).
+ *
+ * Va con **`<Link>`** (no `onClick` + `router.push`): es una navegación en mobile
+ * y la regla de la app es `<Link>` —además prefetchea el CRUD—. Los dos FAB de
+ * Inicio comparten `claseFab`/`ESTILO_FAB` y se cruzan con un fade.
+ */
+export function FabCuentas({ visible = true }: { visible?: boolean }) {
+  return (
+    <Link
+      href="/cruds/cuentas?origen=dashboard"
+      data-fab-cuentas=""
+      aria-label="Gestionar cuentas"
+      title="Gestionar cuentas"
+      aria-hidden={!visible}
+      tabIndex={visible ? 0 : -1}
+      className={claseFab(visible)}
+      style={ESTILO_FAB}
+    >
+      <Settings2 className="h-6 w-6" />
+    </Link>
   );
 }

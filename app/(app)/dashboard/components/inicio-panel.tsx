@@ -6,7 +6,7 @@ import { AccountCard } from "./account-card";
 import { BalanceCard } from "./balance-card";
 import { BalanceBarrasChart } from "./balance-barras-chart";
 import { EvolutionChart } from "./line-chart";
-import { FabNuevo } from "@/components/movimientos/fab-nuevo";
+import { FabCuentas, FabNuevo } from "@/components/movimientos/fab-nuevo";
 import { MovimientosCuentaClient } from "@/app/(app)/cuentas/[id]/movimientos-client";
 import type { HistorialPagina } from "@/backend/src/queries/movimientos";
 import type { DashboardData } from "../dashboard-data";
@@ -205,9 +205,13 @@ export function InicioPanel({ data, historialInicial }: InicioPanelProps) {
         </div>
       )}
 
-      {/* "+" flotante: entra al registro con la cuenta en foco precargada.
-          Es la ÚNICA pantalla que lo muestra (decisión del usuario). */}
-      <FabNuevo cuentaId={cuenta?.id} />
+      {/* FAB de la tarjeta en foco: con una **cuenta** registra un movimiento
+          precargado con ella; con el **Balance** lleva a **gestionar cuentas**
+          (2026-10-02: esa tarjeta no tiene acción de registro pero sí la de
+          administrar las cuentas que lo componen). Los dos están siempre
+          montados y se cruzan con un fade: el oculto queda inerte. */}
+      <FabNuevo cuentaId={cuenta?.id} visible={indice > 0} />
+      <FabCuentas visible={indice === 0} />
     </div>
   );
 }
