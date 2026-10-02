@@ -41,6 +41,17 @@ export interface DashboardData {
     monedaISO?: string;
     /** Nombre del tipo de cuenta (para el icono de la tarjeta). */
     tipo?: string;
+    /**
+     * Saldo de la cuenta **en la moneda predeterminada del usuario** (2026-10-02,
+     * `rediseno-ui`): es la serie del **gráfico de barras "Aporte al balance"**
+     * que se pinta debajo de la tarjeta *Balance Actual* de Inicio.
+     */
+    saldoPredeterminado: number;
+    /**
+     * ¿La cuenta suma al **Balance Actual**? (switch "Incluir en el balance
+     * actual" del CRUD). El gráfico de barras solo muestra las que suman.
+     */
+    aportaAlBalance: boolean;
   }[];
   gastosResumen: {
     name: string;
@@ -134,6 +145,10 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     monedaISO?: string;
     /** Nombre del tipo de cuenta (para el icono de la tarjeta). */
     tipo?: string;
+    /** Saldo convertido a `monedaPredeterminadaISO` (barras del balance). */
+    saldoPredeterminado: number;
+    /** ¿Suma al balance actual? (switch del CRUD de cuentas). */
+    aportaAlBalance: boolean;
   }[] = cuentasEvol.map((c) => ({
     id: c.id,
     title: c.nombreCuenta,
@@ -142,6 +157,8 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     values: c.valoresEjeX || [],
     monedaISO: c.monedaCodigoISO ?? "ARS",
     tipo: c.tipoNombre ?? undefined,
+    saldoPredeterminado: c.saldoEnPredeterminada,
+    aportaAlBalance: c.incluirEnBalance,
   }));
 
   // Las tarjetas sintéticas "Por cobrar"/"Actuales" se calculan en el cliente

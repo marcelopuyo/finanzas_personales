@@ -106,7 +106,7 @@ export function AccionesFab({
         aria-expanded={abierto}
         aria-label="Cargar o cobrar trabajo"
         title="Cargar o cobrar trabajo"
-        className="pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg transition-transform active:scale-95"
+        className="pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full bg-header text-background shadow-lg transition-transform active:scale-95"
       >
         <Plus
           className={cn(

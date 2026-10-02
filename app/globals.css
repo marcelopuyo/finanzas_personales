@@ -268,9 +268,15 @@ html.fp-sin-red [data-app-lock] {
   right: 1rem;
   bottom: calc(1rem + env(safe-area-inset-bottom));
 }
-html:has([data-fab-acciones]) .fp-voz-fab {
-  right: calc(1rem + 4.25rem);
+/* Con la **barra de navegación** del rediseño (2026-10-01) el rincón inferior ya
+   está ocupado: el FAB de acciones **sube por encima** (mismo criterio que
+   `[data-barra-inferior]`). */
+html:has([data-barra-nav]) .fp-fab-acciones {
+  bottom: calc(4.75rem + env(safe-area-inset-bottom));
 }
+/* ⚠️ Se eliminó la regla que corría el FAB de VOZ a la izquierda cuando este FAB
+   estaba presente: desde el rediseño el dictado se dispara desde la **top bar** y
+   el contenedor `.fp-voz-fab` solo aloja la burbuja, que cuelga del techo. */
 
 /* Aparición del dial (el `+` gira a ✕ en el componente). */
 @keyframes dial-in {

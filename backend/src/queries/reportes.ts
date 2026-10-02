@@ -37,6 +37,19 @@ export interface CuentaConEvolucion {
   monedaCodigoISO: string | null;
   /** Nombre del tipo de cuenta (para el icono de la tarjeta del dashboard). */
   tipoNombre: string | null;
+  /**
+   * Saldo de la cuenta **convertido a la moneda predeterminada del usuario**
+   * (2026-10-02, `rediseno-ui`): lo usa el gráfico de barras "Aporte al balance"
+   * de la tarjeta Balance de Inicio, donde todas las barras deben estar en la
+   * MISMA moneda para poder compararse entre sí.
+   */
+  saldoEnPredeterminada: number;
+  /**
+   * ¿La cuenta suma al **Balance Actual**? Es el switch "Incluir en el balance
+   * actual" del CRUD de cuentas: `getBalanceActual()` suma solo estas
+   * (menos los gastos pendientes y, si el flag está activo, el neto de préstamos).
+   */
+  incluirEnBalance: boolean;
 }
 
 // ============================================================
@@ -299,6 +312,13 @@ export async function getCuentasConEvolucion(): Promise<CuentaConEvolucion[]> {
   const unMes = new Date();
   unMes.setMonth(unMes.getMonth() - 1);
 
+  // Moneda predeterminada del usuario: el gráfico de barras de la tarjeta
+  // "Balance Actual" (Inicio) necesita TODOS los saldos en la misma moneda para
+  // poder comparar cuentas que están en monedas distintas.
+  const sesion = await getSessionUser();
+  const predeterminada = sesion?.monedaPredeterminada;
+  const hoy = new Date();
+
   const result: CuentaConEvolucion[] = [];
 
   for (const cuenta of cuentas) {
@@ -349,6 +369,13 @@ export async function getCuentasConEvolucion(): Promise<CuentaConEvolucion[]> {
       valoresEjeX: vValues,
       monedaCodigoISO: cuenta.moneda?.codigoISO ?? null,
       tipoNombre: cuenta.tipo?.nombre ?? null,
+      saldoEnPredeterminada: await convertir(
+        cuenta.saldo,
+        cuenta.moneda,
+        predeterminada,
+        hoy
+      ),
+      incluirEnBalance: cuenta.incluirEnBalance,
     });
   }
 

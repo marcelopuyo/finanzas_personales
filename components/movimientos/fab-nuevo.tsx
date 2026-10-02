@@ -52,7 +52,7 @@ export function FabNuevo({ cuentaId }: { cuentaId?: number }) {
         data-fab-nuevo=""
         aria-label="Nuevo movimiento"
         title="Nuevo movimiento"
-        className="fixed right-4 z-30 flex h-13 w-13 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95"
+        className="fixed right-4 z-30 flex h-13 w-13 items-center justify-center rounded-full bg-header text-background shadow-lg transition-transform active:scale-95"
         // Por encima de la barra inferior (4rem) + su safe-area.
         style={{ bottom: "calc(4.75rem + env(safe-area-inset-bottom))" }}
       >
