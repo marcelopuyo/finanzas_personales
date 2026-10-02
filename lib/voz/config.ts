@@ -133,3 +133,18 @@ export const RELLENO_INICIAL = new Set([
  * como "sin ubicar" en vez de ensuciar el campo.
  */
 export const MAX_TOKENS_TEXTO = 5;
+
+/**
+ * Evento de ventana con el que la **top bar** dispara el dictado (2026-10-01,
+ * rama `rediseno-ui`): el 🎤 dejó de ser un FAB y pasó a la cabecera, pero TODA la
+ * lógica del dictado sigue viviendo en `components/voz/voz-fab.tsx` (que ahora solo
+ * dibuja la burbuja). Así se evita partir el componente en dos y se mantiene
+ * intacto el motor de voz (que tiene su propia QA pendiente).
+ */
+export const EVENTO_VOZ_DICTAR = "fp:voz-dictar";
+
+/**
+ * Evento con el que `VozFab` avisa si está escuchando, para que el 🎤 de la top
+ * bar muestre el mismo feedback que antes daba el FAB (rojo + pulso).
+ */
+export const EVENTO_VOZ_ESTADO = "fp:voz-estado";

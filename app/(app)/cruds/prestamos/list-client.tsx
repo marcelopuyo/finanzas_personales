@@ -133,8 +133,14 @@ interface Props {
   /** Origen de navegación (?origen=...). Si es "dashboard" se muestra el botón
       volver al dashboard y el "+"/editar conservan el origen (patrón mobile app). */
   origen?: string;
+  /**
+   * **Modo embebido** (2026-10-01, rama `rediseno-ui`): la grilla se muestra
+   * DENTRO de la pantalla de Préstamos, debajo del gráfico, así que no lleva el
+   * botón "volver" (ya estamos en su pantalla).
+   */
+  embebido?: boolean;
 }
-export function PrestamosListClient({ initialData, origen }: Props) {
+export function PrestamosListClient({ initialData, origen, embebido = false }: Props) {
   const desdeDashboard = origen === "dashboard";
   const origenQ = desdeDashboard ? "?origen=dashboard" : "";
   // Navegación con feedback (barra de progreso global).
@@ -196,7 +202,7 @@ export function PrestamosListClient({ initialData, origen }: Props) {
       getId={(i) => i.id}
       searchPredicate={(i, q) => (i.detalle ?? "").toLowerCase().includes(q)}
       rowClassName={filaSaldoCls}
-      backHref={desdeDashboard ? "/dashboard" : undefined}
+      backHref={embebido ? undefined : desdeDashboard ? "/dashboard" : undefined}
       mobileBottomNav
       // Mobile: cada préstamo es una TARJETA y se listan solo los que tienen
       // saldo; el pie permite ver también los saldados.

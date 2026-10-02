@@ -10,7 +10,11 @@ import { norm, tokenizar } from "@/lib/voz/normalizar";
 import { irAlPanel } from "@/lib/panel-scroll";
 import { usePendingNav } from "@/components/ui/nav-progress";
 import { Modal } from "@/components/ui/modal";
-import { VOZ_LANG } from "@/lib/voz/config";
+import {
+  EVENTO_VOZ_DICTAR,
+  EVENTO_VOZ_ESTADO,
+  VOZ_LANG,
+} from "@/lib/voz/config";
 import { dejarTexto, tomarTexto } from "@/lib/voz/handoff";
 import { INTENCIONES } from "@/lib/voz/intenciones";
 import { parsearIntencion } from "@/lib/voz/parse-intencion";
@@ -105,6 +109,15 @@ type PreguntaCuenta = {
 
 /** Margen (px) alrededor de la franja del FAB para decidir si se corre. */
 const MARGEN_FRANJA = 8;
+
+/**
+ * ¿Sigue activo el "correrse" cuando un pie de acción está debajo?
+ * `false` desde la rama `rediseno-ui` (2026-10-01): el dictado se dispara desde el
+ * 🎤 de la **top bar** y la burbuja cuelga de arriba, así que ya no hay nada que
+ * esquivar. El código y su medición se conservan tal cual: alcanza con volver este
+ * flag a `true` para recuperar el comportamiento anterior.
+ */
+const CEDER_ACTIVO = false;
 
 /**
  * Cuántos ejemplos ofrece la burbuja como máximo.
@@ -545,6 +558,29 @@ export function VozFab() {
   const tap = useTap(alTocar);
 
   /**
+   * **Disparo desde la top bar** (rama `rediseno-ui`): el 🎤 dejó de ser este FAB,
+   * pero TODA la lógica del dictado sigue acá — la cabecera solo emite
+   * `EVENTO_VOZ_DICTAR`. El ref "siempre al día" evita re-suscribir el listener en
+   * cada render y, a la vez, que el handler vea estado viejo.
+   */
+  const alTocarRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    alTocarRef.current = alTocar;
+  });
+  useEffect(() => {
+    const h = () => alTocarRef.current();
+    window.addEventListener(EVENTO_VOZ_DICTAR, h);
+    return () => window.removeEventListener(EVENTO_VOZ_DICTAR, h);
+  }, []);
+
+  /** El estado de escucha vuelve a la top bar para que su 🎤 lo muestre. */
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent(EVENTO_VOZ_ESTADO, { detail: { escuchando } })
+    );
+  }, [escuchando]);
+
+  /**
    * Dictado que **ya viene resuelto de otra pantalla**: el sobrante que dejó el
    * FAB al navegar (`llevaTexto`, D10) o el `?dicho=` del Atajo de Apple.
    *
@@ -731,6 +767,9 @@ export function VozFab() {
    * una pregunta del dictado).
    */
   useEffect(() => {
+    // El disparador del dictado vive en la top bar desde la rama `rediseno-ui`.
+    if (!CEDER_ACTIVO) return;
+
     let io: IntersectionObserver | null = null;
     const conectar = () => {
       io?.disconnect();
@@ -815,7 +854,7 @@ export function VozFab() {
   return (
     <div
       className={cn(
-        "fp-voz-fab fixed right-4 z-40 flex flex-col items-end gap-2",
+        "fp-voz-fab fixed right-4 z-40 flex flex-col-reverse items-end gap-2",
         "transition-opacity duration-200",
         // Se corre mientras hay una acción primaria debajo (ver el observer).
         ceder && "pointer-events-none opacity-0"
@@ -1053,6 +1092,9 @@ export function VozFab() {
       <button
         type="button"
         ref={botonRef}
+        // Oculto (pero presente y medible): el disparador visible es el 🎤 de la
+        // top bar. El ref se sigue usando para medir la franja del `ceder`.
+        style={{ display: "none" }}
         aria-label={escuchando ? "Detener el dictado" : "Dictar por voz"}
         title={escuchando ? "Escuchando…" : "Dictar"}
         className={cn(

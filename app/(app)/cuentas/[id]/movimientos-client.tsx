@@ -38,6 +38,12 @@ interface MovimientosCuentaClientProps {
   primeraPagina: HistorialPagina;
   /** ISO de la moneda predeterminada del usuario (equivalente secundario). */
   monedaPredeterminadaISO: string;
+  /**
+   * **Modo embebido** (2026-10-01, rama `rediseno-ui`): sin cabecera de pantalla
+   * (volver + nombre) ni recuadro "Saldo actual", porque en el carrusel de Inicio
+   * el nombre y el saldo ya están en la tarjeta de arriba.
+   */
+  embebido?: boolean;
 }
 
 /** Filas por tanda del scroll infinito (el backend acota el valor a 1..100). */
@@ -66,6 +72,7 @@ export function MovimientosCuentaClient({
   cuenta,
   primeraPagina,
   monedaPredeterminadaISO,
+  embebido = false,
 }: MovimientosCuentaClientProps) {
   const router = useRouter();
   const { go } = usePendingNav();
@@ -128,6 +135,23 @@ export function MovimientosCuentaClient({
     obs.observe(el);
     return () => obs.disconnect();
   }, [cargarMas, hayMas]);
+
+  /**
+   * **Semilla vacía ⇒ pide la página 0 al montar.**
+   *
+   * Lo usa el carrusel de Inicio (2026-10-01, rama `rediseno-ui`): la pantalla abre
+   * con el historial de la PRIMERA cuenta ya resuelto en el server y, al deslizar a
+   * otra, su historial se pide recién ahí (la lista se remonta con `key={cuenta.id}`).
+   * ⚠️ El `setTimeout` mantiene el `setState` fuera del cuerpo del efecto (regla
+   * `react-hooks/set-state-in-effect`, §114 de la bitácora).
+   */
+  useEffect(() => {
+    if (rows.length > 0 || !hayMas) return;
+    const t = setTimeout(() => {
+      void cargarMas();
+    }, 0);
+    return () => clearTimeout(t);
+  }, [rows.length, hayMas, cargarMas]);
 
   /**
    * Vuelve a pedir TODO lo cargado. Se usa después de eliminar: al sacar un
@@ -266,32 +290,41 @@ export function MovimientosCuentaClient({
   ];
 
   return (
-    <div className="mx-auto max-w-5xl pb-8 pt-4 lg:pt-0">
-      {/* Encabezado: volver + nombre de la cuenta (único punto de entrada: la
-          tarjeta del dashboard). */}
-      <div className="mb-4 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => go("/dashboard", "back")}
-          className="rounded-lg p-1.5 text-subtitle transition-colors hover:bg-muted hover:text-header"
-          aria-label="Volver"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <h1 className="min-w-0 truncate text-[18px] font-semibold text-header">
-          {cuenta.nombre}
-        </h1>
-      </div>
+    <div className={embebido ? undefined : "mx-auto max-w-5xl pb-8 pt-4 lg:pt-0"}>
+      {!embebido && (
+        <>
+          {/* Encabezado: volver + nombre de la cuenta (único punto de entrada: la
+              tarjeta del dashboard). */}
+          <div className="mb-4 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => go("/dashboard", "back")}
+              className="rounded-lg p-1.5 text-subtitle transition-colors hover:bg-muted hover:text-header"
+              aria-label="Volver"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <h1 className="min-w-0 truncate text-[18px] font-semibold text-header">
+              {cuenta.nombre}
+            </h1>
+          </div>
 
-      {/* Resumen: el mismo dato que mostraba el recuadro del popup. */}
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted px-3 py-2">
-        <p className="text-[13px] font-medium text-header">Saldo actual</p>
-        <p className="text-[18px] font-semibold tracking-tight text-value">
-          {numberToCurrency(cuenta.saldo, cuenta.monedaISO)}
-        </p>
-      </div>
+          {/* Resumen: el mismo dato que mostraba el recuadro del popup. */}
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted px-3 py-2">
+            <p className="text-[13px] font-medium text-header">Saldo actual</p>
+            <p className="text-[18px] font-semibold tracking-tight text-value">
+              {numberToCurrency(cuenta.saldo, cuenta.monedaISO)}
+            </p>
+          </div>
+        </>
+      )}
 
-      <h2 className="mb-2 mt-5 text-[16px] font-semibold text-header">
+      <h2
+        className={cn(
+          "mb-2 text-[16px] font-semibold text-header",
+          embebido ? "mt-0" : "mt-5"
+        )}
+      >
         Movimientos
       </h2>
 

@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import { StatBadge } from "@/components/ui/stat-badge";
 import { Tabs } from "@/components/ui/tabs";
@@ -34,8 +34,31 @@ import { useMontado } from "@/lib/use-cliente";
 import { usePendingNav, usePrefetchNav } from "@/components/ui/nav-progress";
 import { useTap } from "@/lib/tap";
 
+/**
+ * Vista (pantalla) que se está pintando. Sin `solo` se pintan **todas**, que es el
+ * comportamiento histórico (una sola página larga) y ya no lo usa ninguna ruta.
+ */
+export type Vista = "inicio" | "gastos" | "ingresos" | "resultados" | "prestamos";
+
 interface Props {
   data: DashboardData;
+  /** Pinta SOLO esta vista (2026-10-01, rama `rediseno-ui`). */
+  solo?: Vista;
+}
+
+/**
+ * Envoltorio de bloque: lo pinta solo si corresponde a la vista activa.
+ * ⚠️ Los hijos **no se montan** cuando `visible` es false — no se crean gráficos
+ * ni tablas de las otras pantallas (el JSX igual se evalúa, pero es gratis).
+ */
+function Solo({
+  visible,
+  children,
+}: {
+  visible: boolean;
+  children: ReactNode;
+}) {
+  return visible ? <>{children}</> : null;
 }
 
 const SIN_CATEGORIA = "Sin categoría";
@@ -51,7 +74,10 @@ function toDateKey(v: string | Date | null | undefined): string {
   return String(v).slice(0, 10);
 }
 
-export function DashboardClient({ data }: Props) {
+export function DashboardClient({ data, solo }: Props) {
+  /** ¿Se pinta esta vista? (sin `solo` se pintan todas) */
+  const ver = (...vistas: Vista[]) => solo === undefined || vistas.includes(solo);
+
   // ── Navegación del panel "Trabajo" (todo el panel, salvo el ⋯) ──────────
   // ⚠️ Se dispara con **`useTap`** (touch events + click), NO con `onClick`: en
   // iOS un toque sobre una zona grande puede no generar `click` (el navegador lo
@@ -425,9 +451,10 @@ export function DashboardClient({ data }: Props) {
 
   const gastosTabs = (
     <Tabs
+      // Sin la pestaña "Detalle" (2026-10-01, `rediseno-ui`): ese listado pasó a
+      // vivir SIEMPRE **debajo del panel**, como sección de la pantalla.
       tabs={[
         { id: "resumen", label: "Resumen" },
-        { id: "detalle", label: "Detalle" },
         { id: "historico", label: "Histórico" },
       ]}
       activeTab={tabGastos}
@@ -506,6 +533,7 @@ export function DashboardClient({ data }: Props) {
           alto fijo de AccountCard (título + importe + área del gráfico h-10).
           El `pt-4 lg:pt-0` separa la tarjeta de la barra superior de menú en
           mobile (en desktop el main ya aporta margen superior, lg:pt-6). */}
+      <Solo visible={ver("inicio")}>
       <div
         data-panel="balance"
         className="relative flex min-h-31.75 items-center justify-center rounded-lg border border-border bg-card p-4 shadow-sm"
@@ -517,10 +545,12 @@ export function DashboardClient({ data }: Props) {
           {numberToCurrency(data.balance, data.monedaPredeterminadaISO)}
         </p>
       </div>
+      </Solo>
 
       {/* Panel Cuentas — solo cuentas reales (el toque abre la pantalla de sus
           movimientos, `/cuentas/[id]`). El panel usa bg-card como el resto; las
           tarjetas internas van en bg-muted. */}
+      <Solo visible={ver("inicio")}>
       <div data-panel="cuentas" className="rounded-lg border border-border bg-card p-4 sm:p-5">
         {/* Encabezado: título a la izquierda y menú (⋮) anclado al ángulo
             superior derecho del panel (accede al CRUD de cuentas). */}
@@ -548,6 +578,7 @@ export function DashboardClient({ data }: Props) {
           ))}
         </div>
       </div>
+      </Solo>
 
       {/* Panel Trabajo — ítems PENDIENTES de cobro (jornadas/tareas sin
           liquidar) repartidos en las **tandas estimadas** de cada trabajo:
@@ -561,6 +592,7 @@ export function DashboardClient({ data }: Props) {
           EXCLUIDO porque se monta FUERA del área clickeable (es un hermano que
           flota sobre la esquina). El toque usa `useTap` porque en iOS el primer
           toque de una zona grande puede no generar `click` (§118). */}
+      <Solo visible={ver("ingresos")}>
       <div data-panel="trabajo" className="relative">
         <div
           role="link"
@@ -592,9 +624,11 @@ export function DashboardClient({ data }: Props) {
           <TrabajosActionsMenu />
         </div>
       </div>
+      </Solo>
 
       {/* Gastos Section — filtro compartido. El ancla de voz (`?panel=gastos`) va
           en un wrapper: las 3 vistas (Resumen/Detalle/Histórico) se excluyen. */}
+      <Solo visible={ver("gastos")}>
       <div data-panel="gastos">
       {tabGastos === "resumen" ? (
         <DonutChart
@@ -611,24 +645,6 @@ export function DashboardClient({ data }: Props) {
             prevByName: Object.fromEntries(gastosMesAnterior),
           } : null}
         />
-      ) : tabGastos === "detalle" ? (
-        <div className="rounded-lg border border-border bg-card p-5">
-          {/* Cabecera de "Gastos → Detalle": MISMA estructura de dos filas que
-              Resumen/Histórico (fila 1 = título + badge "Mes actual" + ⋯ en el ángulo
-              superior derecho; fila 2 = pestañas) para que ni el badge ni el ⋯ se
-              muevan al cambiar de pestaña. Esta pestaña NO lleva Filtros ni
-              buscador: el Detalle muestra los últimos 3 días en tarjetas
-              (2026-09-30) y la búsqueda vive en la pantalla "Ver más gastos". */}
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-            {gastosFilaTitulo}
-            {gastosHeaderActions(false)}
-          </div>
-          <GastosTarjetas
-            data={todosLosGastos}
-            hoyServidor={data.hoyServidor}
-            currency={data.monedaPredeterminadaISO}
-          />
-        </div>
       ) : (
         <EvolutionChart
           title="Gastos"
@@ -642,7 +658,28 @@ export function DashboardClient({ data }: Props) {
       )}
       </div>
 
+      {/* **Listado de gastos**, SIEMPRE debajo del panel (2026-10-01).
+          Antes era la pestaña "Detalle": con las funcionalidades separadas por
+          pantalla se lee mucho mejor como sección — misma filosofía que la grilla
+          de Préstamos en su pantalla. La cabecera conserva la MISMA estructura de
+          dos filas que el panel (título + badge + ⋯ / pestañas) así el ⋯ no salta.
+          ⚠️ No lleva Filtros ni buscador: el listado muestra los últimos 3 días en
+          tarjetas y la búsqueda vive en "Ver más gastos" (`/gastos`). */}
+      <div className="mt-6 rounded-lg border border-border bg-card p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          {gastosFilaTitulo}
+          {gastosHeaderActions(false)}
+        </div>
+        <GastosTarjetas
+          data={todosLosGastos}
+          hoyServidor={data.hoyServidor}
+          currency={data.monedaPredeterminadaISO}
+        />
+      </div>
+      </Solo>
+
       {/* Ingresos Section — filtro compartido (mismo criterio de ancla). */}
+      <Solo visible={ver("ingresos")}>
       <div data-panel="ingresos">
       {tabIngresos === "resumen" ? (
         <DonutChart
@@ -690,12 +727,14 @@ export function DashboardClient({ data }: Props) {
         />
       )}
       </div>
+      </Solo>
 
       {/* Panel **Resultados**: se renderiza SIEMPRE (decisión del usuario
           2026-10-01) — si no hay datos, `EvolutionChart` muestra su estado vacío
           ("Sin datos disponibles") con su título y su badge. Así el ancla de voz
           `data-panel="resultados"` **existe siempre** (antes, sin datos, el
           panel no se montaba y el scroll a ese panel no tenía destino). */}
+      <Solo visible={ver("resultados")}>
       <div data-panel="resultados">
       <EvolutionChart
         title="Resultados"
@@ -706,9 +745,11 @@ export function DashboardClient({ data }: Props) {
         currency={data.monedaPredeterminadaISO}
       />
       </div>
+      </Solo>
 
       {/* Panel de préstamos: se muestra SIEMPRE (también sin préstamos
           cargados; en ese caso PrestamosChart muestra su estado vacío). */}
+      <Solo visible={ver("prestamos")}>
       <div data-panel="prestamos">
       <PrestamosChart
         title="Préstamos Pendientes"
@@ -728,6 +769,7 @@ export function DashboardClient({ data }: Props) {
         action={<PrestamosActionsMenu />}
       />
       </div>
+      </Solo>
 
       {/* Modal de filtros */}
       <Modal open={open} onClose={() => setOpen(false)} title="Filtros"

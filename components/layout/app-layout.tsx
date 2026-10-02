@@ -1,4 +1,5 @@
 import TopBar from "./top-bar";
+import BottomNav from "./bottom-nav";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { NavProgress } from "@/components/ui/nav-progress";
 import { OfflineNotice } from "@/components/pwa/offline-notice";
@@ -47,21 +48,26 @@ export default function AppLayout({
             cuando está visible. */}
         <OfflineNotice />
         {children}
-        {/* Espaciador del FAB de voz: reserva la franja inferior para que el
-            último elemento del contenido (típicamente los botones "Siguiente"
-            /"Guardar" de los formularios, que van EN EL FLUJO) nunca quede
-            debajo del FAB. Va como elemento y no como `padding-bottom` del
-            contenedor de scroll porque el padding de un `overflow: auto` no es
-            confiable en iOS. La altura suma el safe-area porque el FAB también
-            sube con él (PWA standalone en iPhone con home indicator). */}
+        {/* Espaciador del pie: reserva la **barra inferior** (4rem) + la franja de
+            los FAB (el "+" de Inicio) para que el último elemento del contenido —
+            típicamente los botones "Siguiente"/"Guardar" de los formularios, que van
+            EN EL FLUJO— nunca quede tapado. Va como elemento y no como
+            `padding-bottom` del contenedor de scroll porque el padding de un
+            `overflow: auto` no es confiable en iOS. La altura suma el safe-area
+            porque la barra y los FAB también suben con él. */}
         <div
           aria-hidden="true"
-          style={{ height: "calc(5rem + env(safe-area-inset-bottom))" }}
+          style={{ height: "calc(8.75rem + env(safe-area-inset-bottom))" }}
         />
       </PullToRefresh>
+      {/* Barra inferior de navegación (2026-10-01, rama `rediseno-ui`): 5 destinos
+          de primer nivel. Va FUERA de PullToRefresh para no participar del gesto. */}
+      <BottomNav />
       {/* FAB 🎤 global (2026-09-23, fase G1 del replanteo de la voz). Va FUERA de
           PullToRefresh porque maneja sus propios touch events y no debe disparar
-          el gesto de "tirar para actualizar". */}
+          el gesto de "tirar para actualizar".
+          ⚠️ Desde la rama `rediseno-ui` su **disparador vive en la top bar** y este
+          componente solo se ocupa de la burbuja (ver `top-bar.tsx`). */}
       <VozFab />
     </div>
   );

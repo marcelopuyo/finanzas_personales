@@ -34,6 +34,12 @@ interface AccountCardProps {
   /** Se invoca al tocar una tarjeta de cuenta real (abre su pantalla de
       movimientos, `/cuentas/[id]`). */
   onOpen?: () => void;
+  /** Oculta el sparkline de la tarjeta: en Inicio el gráfico vive FUERA de ella
+      (2026-10-01, rama `rediseno-ui`). */
+  sinSparkline?: boolean;
+  /** El toque **no navega**: la tarjeta solo se selecciona (carrusel de Inicio).
+      El **long press** sigue abriendo el popup de acciones. */
+  soloSeleccionar?: boolean;
 }
 
 export function AccountCard({
@@ -46,11 +52,17 @@ export function AccountCard({
   tipo,
   className,
   onOpen,
+  sinSparkline = false,
+  soloSeleccionar = false,
 }: AccountCardProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const esCuentaReal = id != null && onOpen != null;
-  /** ¿La tarjeta tiene acciones propias (bottom sheet)? */
-  const tieneAcciones = esCuentaReal;
+  /**
+   * ¿La tarjeta tiene acciones propias (bottom sheet)?
+   * ⚠️ Depende de tener **id**, NO de `onOpen`: en el carrusel de Inicio la tarjeta
+   * se selecciona (no navega) pero el long press debe seguir abriendo el popup.
+   */
+  const tieneAcciones = id != null;
   // LONG PRESS en mobile (2026-09-17): manteniendo el dedo ~500 ms sobre la
   // tarjeta se abre el MISMO bottom sheet que antes abría el botón ⋮ — que ahora
   // se oculta en los equipos táctiles (`pointer-coarse`, ver `menuButton`) y se
@@ -103,13 +115,15 @@ export function AccountCard({
           Con 1 valor el sparkline dibuja una línea horizontal (0 o 1 movimiento
           en el último mes); solo las tarjetas SIN valores (sintéticas) dejan el
           espacio reservado. */}
-      <div className="mt-2">
-        {values.length >= 1 ? (
-          <SparkLineChart data={values} labels={labels} currency={monedaISO} />
-        ) : (
-          <div className="h-10" aria-hidden="true" />
-        )}
-      </div>
+      {!sinSparkline && (
+        <div className="mt-2">
+          {values.length >= 1 ? (
+            <SparkLineChart data={values} labels={labels} currency={monedaISO} />
+          ) : (
+            <div className="h-10" aria-hidden="true" />
+          )}
+        </div>
+      )}
     </>
   );
 
@@ -143,12 +157,12 @@ export function AccountCard({
   // cuenta, ver `app/(app)/cuentas/[id]`) + botón de opciones (⋮) con el bottom
   // sheet de acciones completo. Se usa un <div> con role="button" (no un <button>)
   // para no anidar botones (el menú es un <button> real).
-  if (esCuentaReal) {
+  if (tieneAcciones) {
     return (
       <>
         <div
-          role="button"
-          tabIndex={0}
+          role={soloSeleccionar ? "option" : "button"}
+          tabIndex={soloSeleccionar ? undefined : 0}
           {...longPressProps}
           onTouchStart={(e) => {
             longPressProps.onTouchStart(e);
@@ -158,16 +172,21 @@ export function AccountCard({
             longPressProps.onTouchEnd();
             tap.onTouchEnd(e);
           }}
-          onClick={tap.onClick}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              onOpen();
-            }
-          }}
+          onClick={soloSeleccionar ? undefined : tap.onClick}
+          onKeyDown={
+            soloSeleccionar
+              ? undefined
+              : (e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onOpen?.();
+                  }
+                }
+          }
           className={cn(
             base,
-            "w-full cursor-pointer text-left",
+            "w-full text-left",
+            !soloSeleccionar && "cursor-pointer",
             // Evita que el long press seleccione texto o abra el callout de iOS.
             tieneAcciones && "select-none [-webkit-touch-callout:none]",
             className

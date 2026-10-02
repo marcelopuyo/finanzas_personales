@@ -226,13 +226,25 @@ html.fp-sin-red [data-app-lock] {
    `lg:hidden`: en escritorio sigue en el DOM (oculta) y si no, subiría el FAB al
    pedo. En mobile la posición es la misma en todas las pantallas (nunca salta).
    ───────────────────────────────────────────────────────────────────────── */
-.fp-voz-fab {
-  bottom: calc(1rem + env(safe-area-inset-bottom));
-}
+/* ⚠️ Desde la rama `rediseno-ui` (2026-10-01) el disparador del dictado es el 🎤 de
+   la **top bar**: el contenedor de la burbuja se ancla ARRIBA, justo debajo de la
+   cabecera (`--app-top` ya suma el safe-area) y la burbuja cuelga hacia abajo
+   (`flex-col-reverse`). El botón del componente queda oculto (`display:none`) y el
+   🎤 de la cabecera dispara `EVENTO_VOZ_DICTAR`. */
+/* BARRA DE ACCIONES vs BARRA DE NAVEGACIÓN (2026-10-01 · `rediseno-ui`):
+   las pantallas principales llevan la barra de navegación abajo (`data-barra-nav`)
+   y algunas traen además su propia barra de acciones inferior
+   (`data-barra-inferior`, ver `ui/bottom-action-bar.tsx`). Cuando conviven —hoy en
+   la pantalla de Préstamos, con la grilla embebida— la de acciones **sube** para no
+   taparla (mismo criterio que tenía el FAB de voz). */
 @media (max-width: 1023.98px) {
-  html:has([data-barra-inferior]) .fp-voz-fab {
-    bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  html:has([data-barra-nav]) [data-barra-inferior] {
+    bottom: calc(4rem + env(safe-area-inset-bottom));
   }
+}
+
+.fp-voz-fab {
+  top: calc(var(--app-top) + 0.5rem);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
