@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Receipt, Send, Settings2 } from "lucide-react";
+import { Receipt, Send, Settings2, X } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { usePrefetchNav } from "@/components/ui/nav-progress";
 import { cn } from "@/lib/utils";
@@ -41,9 +41,16 @@ const ESTILO_FAB = {
  * 🔑 **Solo aparece donde se usa**: hoy únicamente en **Inicio**, y con la **cuenta
  * en foco** precargada en el wizard (como hacía el popup de la tarjeta).
  *
- * Ofrece los 3 flujos manuales (Gasto · Transferencia · Ajuste) + **"Ver todos los
- * tipos"**, porque en la app hay **8 conceptos** y los otros 5 (Cobrar trabajo,
- * Pago de préstamo, Pago de gasto, Jornada, Tarea) se lanzan desde contexto.
+ * Ofrece los 3 flujos manuales (**Gasto · Transferencia · Ajuste de cuenta**), que
+ * son los que se pueden precargar con la cuenta en foco; los otros 5 conceptos
+ * (Cobrar trabajo, Pago de préstamo, Pago de gasto, Jornada, Tarea) se lanzan
+ * desde su contexto.
+ *
+ * 🧹 **2026-10-02**: el popup perdió el ítem **"Ver todos los tipos"** (pedido del
+ * usuario) y sumó una **cruz de cierre** flotante arriba a la derecha, porque va
+ * **sin encabezado** (§113). ⚠️ Con eso la pantalla `/movimientos` (el listado
+ * completo de tipos) **queda sin punto de entrada** en la app; sigue existiendo y
+ * también es el `redirect` de `nuevo/[tipo]` cuando el concepto no existe.
  *
  * ⚠️ No es el único camino: el **long press** sobre la tarjeta de la cuenta sigue
  * abriendo el popup de acciones (`AccountActionsSheet`) con la misma cuenta.
@@ -99,6 +106,18 @@ export function FabNuevo({
       </button>
 
       <Modal open={open} onClose={() => setOpen(false)} centrado>
+        {/* Cruz de cierre arriba a la derecha (2026-10-02): el popup va **sin
+            encabezado** (§113), así que el cierre vive flotando en la esquina. */}
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          aria-label="Cerrar"
+          title="Cerrar"
+          className="absolute right-2 top-2 rounded-lg p-2 text-subtitle transition-colors hover:bg-muted hover:text-header"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
         <div className="-mx-1">
           {acciones.map((a) => (
             <button
@@ -116,21 +135,6 @@ export function FabNuevo({
               <span className="text-[14px] text-card-foreground">{a.label}</span>
             </button>
           ))}
-          <div className="my-1 border-t border-border" />
-          <button
-            type="button"
-            onPointerEnter={() => prefetch("/movimientos")}
-            onClick={() => {
-              setOpen(false);
-              router.push("/movimientos");
-            }}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-muted"
-          >
-            <ArrowRight className="h-5 w-5 text-subtitle" />
-            <span className="text-[14px] text-card-foreground">
-              Ver todos los tipos
-            </span>
-          </button>
         </div>
       </Modal>
     </>
