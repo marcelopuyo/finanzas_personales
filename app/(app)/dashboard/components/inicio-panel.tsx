@@ -80,7 +80,7 @@ export function InicioPanel({ data, historialInicial }: InicioPanelProps) {
   return (
     <div className="pb-8 pt-4 lg:pt-0">
       {/* Balance: UNA línea (descripción a la izquierda, monto a la derecha). */}
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3">
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card px-4 py-3">
         <p className="text-[13px] font-medium text-label">Balance Actual</p>
         <p className="text-[17px] font-semibold tracking-tight text-success">
           {numberToCurrency(data.balance, data.monedaPredeterminadaISO)}

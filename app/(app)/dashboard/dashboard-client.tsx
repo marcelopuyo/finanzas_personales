@@ -472,7 +472,7 @@ export function DashboardClient({ data, solo }: Props) {
    * se repartía en dos filas. Ahora hay una sola fila y un solo juego de controles.
    */
   const gastosEncabezado = (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-border bg-card px-4 py-3">
       <h1 className="text-[18px] font-semibold text-header">Gastos</h1>
       <StatBadge label="Mes actual" value={badges.gastos} />
       <div className="ml-auto flex items-center gap-1.5">
@@ -482,8 +482,9 @@ export function DashboardClient({ data, solo }: Props) {
     </div>
   );
 
-  /** Selector de pestañas del panel de gráficos (va DENTRO del panel). */
-  const gastosPanelTabs = <div className="mb-4">{gastosTabs}</div>;
+  /** Selector de pestañas del panel de gráficos: va DENTRO del panel y **alineado
+      a la derecha** (2026-10-01). */
+  const gastosPanelTabs = <div className="mb-4 flex justify-end">{gastosTabs}</div>;
 
   /**
    * Encabezado de la sección **"Últimos gastos"** (el listado que va debajo del
@@ -516,7 +517,7 @@ export function DashboardClient({ data, solo }: Props) {
       <Solo visible={ver("inicio")}>
       <div
         data-panel="balance"
-        className="relative flex min-h-31.75 items-center justify-center rounded-lg border border-border bg-card p-4 shadow-sm"
+        className="relative flex min-h-31.75 items-center justify-center rounded-2xl border border-border bg-card p-4 shadow-sm"
       >
         {/* Rótulo en el ángulo superior izquierdo, como el título de las
             tarjetas de cuentas (dentro del mismo padding p-4). */}
@@ -531,7 +532,7 @@ export function DashboardClient({ data, solo }: Props) {
           movimientos, `/cuentas/[id]`). El panel usa bg-card como el resto; las
           tarjetas internas van en bg-muted. */}
       <Solo visible={ver("inicio")}>
-      <div data-panel="cuentas" className="rounded-lg border border-border bg-card p-4 sm:p-5">
+      <div data-panel="cuentas" className="rounded-2xl border border-border bg-card p-4 sm:p-5">
         {/* Encabezado: título a la izquierda y menú (⋮) anclado al ángulo
             superior derecho del panel (accede al CRUD de cuentas). */}
         <div className="relative mb-3 pr-8">
@@ -585,7 +586,7 @@ export function DashboardClient({ data, solo }: Props) {
           // instantánea.
           onPointerEnter={() => prefetch(HREF_TRABAJO)}
           onTouchStartCapture={() => prefetch(HREF_TRABAJO)}
-          className="cursor-default select-none rounded-lg border border-border bg-card p-4 [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] sm:p-5"
+          className="cursor-default select-none rounded-2xl border border-border bg-card p-4 [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] sm:p-5"
         >
           {/* Encabezado: título a la izquierda (el ⋯ va FUERA de esta caja, ver
               abajo, para que su toque no dispare la navegación del panel). */}
@@ -711,8 +712,8 @@ export function DashboardClient({ data, solo }: Props) {
           `data-panel="resultados"` **existe siempre** (antes, sin datos, el
           panel no se montaba y el scroll a ese panel no tenía destino). */}
       <Solo visible={ver("resultados")}>
-      {/* Encabezado suelto arriba (filosofía del rediseño, 2026-10-01). */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      {/* Encabezado suelto arriba, DENTRO de su propio panel (2026-10-01). */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-border bg-card px-4 py-3">
         <h1 className="text-[18px] font-semibold text-header">Resultados</h1>
         <StatBadge label="Mes actual" value={badges.resultados} />
       </div>
@@ -730,8 +731,9 @@ export function DashboardClient({ data, solo }: Props) {
       {/* Panel de préstamos: se muestra SIEMPRE (también sin préstamos
           cargados; en ese caso PrestamosChart muestra su estado vacío). */}
       <Solo visible={ver("prestamos")}>
-      {/* Encabezado suelto arriba: título + saldos netos + ⋯. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      {/* Encabezado suelto arriba, DENTRO de su propio panel: título + saldos
+          netos + ⋯. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-border bg-card px-4 py-3">
         <h1 className="text-[18px] font-semibold text-header">Préstamos</h1>
         {data.prestamosTotales.map((t) => (
           <StatBadge

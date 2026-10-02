@@ -128,7 +128,7 @@ export function AccountCard({
   );
 
   const base =
-    "relative flex flex-col justify-start rounded-lg border border-border bg-muted p-4 transition-colors";
+    "relative flex flex-col justify-start rounded-2xl border border-border bg-muted p-4 transition-colors";
 
   // Botón de opciones (⋮) que abre el bottom sheet de acciones.
   // ⚠️ En mobile se OCULTA (`pointer-coarse:hidden`): ahí el sheet se abre con

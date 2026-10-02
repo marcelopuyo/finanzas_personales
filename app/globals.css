@@ -27,6 +27,11 @@
   --color-header: var(--header);
   --color-tabs: var(--tabs-bg);
   --color-tabs-hover: var(--tabs-hover);
+  /* Esquinas de los PANELES más redondeadas (2026-10-01, rama `rediseno-ui`):
+     `rounded-lg` es el radio que usan los paneles del dashboard, las tarjetas y
+     los controles; sube de 0.5rem a 0.875rem. Los paneles del rediseño que ya
+     usan `rounded-2xl` (1rem) quedan 2 px más redondos: imperceptible. */
+  --radius-lg: 0.875rem;
   /* UI — SF Pro Display (elección 2026-09-02). En Apple resuelve a SF vía
      -apple-system; si está instalada (p. ej. SF Pro de Apple Developer en
      Windows) se usa directo. Inter sigue cargada (app/layout.tsx) como

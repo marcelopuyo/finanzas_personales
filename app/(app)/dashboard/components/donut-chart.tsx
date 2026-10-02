@@ -182,7 +182,7 @@ export function DonutChart({
     <div
       onTouchEnd={touchReset.onTouchEnd}
       onTouchCancel={touchReset.onTouchCancel}
-      className={`rounded-lg border border-border bg-card p-5 ${className}`}
+      className={`rounded-2xl border border-border bg-card p-5 ${className}`}
     >
       {header}
       {!slices.length ? (

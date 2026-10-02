@@ -762,7 +762,7 @@ export function CrudTable<T, TId = number>({
             actionsFor={swipeMode ? swipeActionsFor : undefined}
             onRowTap={swipeMode ? swipeRowTap : undefined}
           >
-            <div className="rounded-lg border border-border bg-card p-3">
+            <div className="rounded-2xl border border-border bg-card p-3">
               {cardMode ? (
                 <>
                   {itemsTarjetas.length === 0 ? (
@@ -881,7 +881,7 @@ export function CrudTable<T, TId = number>({
       {toolbarEl}
 
       {/* Tabla */}
-      <div className="rounded-lg border border-border bg-card p-4">
+      <div className="rounded-2xl border border-border bg-card p-4">
         {loading ? (
           <div className="py-12 text-center text-[13px] text-subtitle">
             Cargando...
