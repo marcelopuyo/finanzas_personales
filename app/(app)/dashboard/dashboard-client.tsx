@@ -653,7 +653,9 @@ export function DashboardClient({
           encabezado={gastosPanelTabs}
           currency={data.monedaPredeterminadaISO}
           data={filteredEvolucion}
-          color="var(--primary)"
+          // 📟 Verde (no `--primary`): el histórico usa el MISMO color que el
+          // gráfico de las tarjetas de Inicio (pedido del usuario, 2026-10-03).
+          color="var(--success)"
           area
         />
       )}
@@ -696,7 +698,8 @@ export function DashboardClient({
         <EvolutionChart
           encabezado={ingresosPanelTabs}
           data={filteredIngresosEvolucion}
-          color="var(--primary)"
+          // 📟 Verde, igual que el histórico de Gastos y que las tarjetas.
+          color="var(--success)"
           area
           currency={data.monedaPredeterminadaISO}
         />
@@ -733,7 +736,9 @@ export function DashboardClient({
       <EvolutionChart
         encabezado={resultadosPanelHeader}
         data={data.evolucionResultados}
-        color="var(--primary)"
+        // 📟 Verde: es **la misma serie** que el gráfico de la tarjeta de Balance
+        // en Inicio ⇒ mismo color (pedido del usuario, 2026-10-03).
+        color="var(--success)"
         area
         currency={data.monedaPredeterminadaISO}
       />

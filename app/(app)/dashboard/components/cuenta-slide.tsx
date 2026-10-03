@@ -81,27 +81,31 @@ export function CuentaSlide({
       {/* Gráfico: más abajo del saldo (pedido del usuario) y en modo **mínimo**
           — solo la serie, sin rótulos de ejes ni líneas horizontales.
           ⚠️ El resumen muestra la **evolución de Resultados** (decisión del
-          usuario 2026-10-02); las cuentas, su propia evolución. */}
-      <div className="mt-6">
+          usuario 2026-10-02); las cuentas, su propia evolución.
+          📏 Alto **relativo a la pantalla** (`min(128px, 16vh)`): la banda tiene
+          que quedar en ~media pantalla (pedido del usuario 2026-10-03); con un
+          px fijo, en un celular de pantalla baja la banda se comía más de la mitad. */}
+      <div className="mt-4 h-[min(128px,16vh)]">
         {!conGrafico ? (
-          <Skeleton className="h-37.5 rounded-xl" />
+          <Skeleton className="h-full rounded-xl" />
         ) : (
           <EvolutionChart
             data={evolucion}
             color="var(--success)"
             area
-            height={150}
+            height="100%"
             currency={monedaISO}
             encabezado={null}
             sinRecuadro
             minimo
+            sinScrollLateral
           />
         )}
       </div>
 
       {/* Acciones (las del FAB + la del resumen), abajo del gráfico y DENTRO del
           carrusel: al deslizar viajan con la cuenta. */}
-      <div className="mt-2 flex justify-center gap-1">
+      <div className="mt-1.5 flex justify-center gap-1">
         {esBalance ? (
           <AccionSlide href={HREF_CUENTAS} icon={Settings2} label="Cuentas" />
         ) : (
@@ -142,9 +146,9 @@ function AccionSlide({
       href={href}
       onPointerEnter={onPrefetch}
       onTouchStartCapture={onPrefetch}
-      className="flex w-[92px] flex-col items-center gap-1.5 rounded-xl px-1 py-1.5"
+      className="flex w-[92px] flex-col items-center gap-1 rounded-xl px-1 py-1"
     >
-      <span className="flex h-9.5 w-9.5 items-center justify-center rounded-full border border-border bg-card/60 text-value">
+      <span className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/60 text-value">
         <Icon className="h-4.5 w-4.5" />
       </span>
       <span className="text-center text-[9.5px] leading-[1.15] text-card-foreground">

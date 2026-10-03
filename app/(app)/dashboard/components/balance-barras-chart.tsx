@@ -133,6 +133,7 @@ export function BalanceBarrasChart({
 
   return (
     <div
+      onTouchStart={touchReset.onTouchStart}
       onTouchEnd={touchReset.onTouchEnd}
       onTouchCancel={touchReset.onTouchCancel}
       className={caja}

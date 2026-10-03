@@ -21,7 +21,8 @@ interface EvolutionChartProps {
   title?: string;
   data: { name: string; value: number }[];
   color?: string;
-  height?: number;
+  /** Px del área del gráfico (o `"100%"` para llenar un contenedor con alto). */
+  height?: number | `${number}%`;
   className?: string;
   action?: ReactNode;
   badge?: ReactNode;
@@ -44,8 +45,13 @@ interface EvolutionChartProps {
    * **Modo mínimo** (banda de Inicio): deja **solo la serie** — sin rótulos de
    * los ejes X/Y ni líneas horizontales de grilla (el tooltip sigue andando).
    */
-  minimo?: boolean;
-}
+  minimo?: boolean;  /**
+   * **El dedo sobre el gráfico NO arrastra el contenedor horizontal**
+   * (`touch-action: pan-y`): lo usa la **banda de Inicio**, donde el pedido del
+   * usuario (2026-10-03) es que el gesto lateral sobre el gráfico **scrubbee el
+   * tooltip en vez de mover el carrusel**. El scroll vertical sigue normal.
+   */
+  sinScrollLateral?: boolean;}
 
 export function EvolutionChart({
   title,
@@ -59,8 +65,7 @@ export function EvolutionChart({
   currency,
   encabezado,
   sinRecuadro = false,
-  minimo = false,
-}: EvolutionChartProps) {
+  minimo = false,  sinScrollLateral = false,}: EvolutionChartProps) {
   /** Wrapper: con `sinRecuadro` queda transparente (banda de Inicio). */
   const caja = sinRecuadro
     ? className
@@ -105,8 +110,12 @@ export function EvolutionChart({
 
   return (
     <div
+      onTouchStart={touchReset.onTouchStart}
       onTouchEnd={touchReset.onTouchEnd}
       onTouchCancel={touchReset.onTouchCancel}
+      // Con `pan-y` el navegador no se queda con el gesto horizontal: el dedo
+      // sobre el gráfico scrubbea el tooltip y NO mueve el carrusel de Inicio.
+      style={sinScrollLateral ? { touchAction: "pan-y" } : undefined}
       className={caja}
     >
       {header}
@@ -211,6 +220,7 @@ export function MultiLineChart({
 
   return (
     <div
+      onTouchStart={touchReset.onTouchStart}
       onTouchEnd={touchReset.onTouchEnd}
       onTouchCancel={touchReset.onTouchCancel}
       className={`rounded-lg border border-border bg-card p-5 ${className}`}

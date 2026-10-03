@@ -197,6 +197,7 @@ export function PrestamosChart({
 
   return (
     <div
+      onTouchStart={touchReset.onTouchStart}
       onTouchEnd={touchReset.onTouchEnd}
       onTouchCancel={touchReset.onTouchCancel}
       className={`rounded-lg border border-border bg-card p-5 ${className}`}

@@ -127,8 +127,15 @@ export default function BottomNav() {
       // (misma idea que `data-barra-inferior`, ver `globals.css`).
       data-barra-nav=""
       aria-label="Secciones"
-      className="fixed bottom-0 left-0 right-0 z-40 mx-auto flex h-16 max-w-lg items-stretch border-t border-border bg-sidebar"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      // ⚠️ La altura **suma** el safe-area en vez de recortar el contenido: la
+      // barra medía `h-16` (4rem) **con** el padding del home indicator adentro,
+      // así que en un iPhone la franja útil quedaba en ~2rem y los iconos se
+      // pegaban al borde superior (reportado en prod el 2026-10-03).
+      className="fixed bottom-0 left-0 right-0 z-40 mx-auto flex max-w-lg items-stretch border-t border-border bg-sidebar"
+      style={{
+        height: "calc(4rem + env(safe-area-inset-bottom))",
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
     >
       {TABS.map((t) => {
         const activo = esActivo(t.href, ruta);

@@ -197,7 +197,7 @@ export function InicioPanel({ data, historialInicial }: InicioPanelProps) {
         </div>
 
         {/* Dots: dentro de la banda, abajo de las acciones. */}
-        <div className="mt-3 flex items-center justify-center gap-1.5 pb-3">
+        <div className="mt-2 flex items-center justify-center gap-1.5 pb-2">
           {Array.from({ length: totalTarjetas }).map((_, i) => (
             <i
               key={i}

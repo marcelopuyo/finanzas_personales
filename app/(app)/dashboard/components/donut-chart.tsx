@@ -180,6 +180,7 @@ export function DonutChart({
 
   return (
     <div
+      onTouchStart={touchReset.onTouchStart}
       onTouchEnd={touchReset.onTouchEnd}
       onTouchCancel={touchReset.onTouchCancel}
       className={`rounded-2xl border border-border bg-card p-5 ${className}`}
