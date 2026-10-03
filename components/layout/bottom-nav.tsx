@@ -127,15 +127,28 @@ export default function BottomNav() {
       // (misma idea que `data-barra-inferior`, ver `globals.css`).
       data-barra-nav=""
       aria-label="Secciones"
-      // ⚠️ Altura = **banda de contenido (3.5rem) + safe-area**, y el contenido se
-      // centra en el alto TOTAL (sin `padding-bottom`): así los iconos quedan a
-      // ~27px del borde inferior en vez de a ~50px. Antes era `h-16` (4rem) con el
-      // padding del home indicator adentro (los iconos pegados al borde superior +
-      // ~31px muertos abajo) y luego `4rem + safe-area` (barra demasiado alta y los
-      // iconos “levantados” del borde) — reportado en prod el 2026-10-03.
+      // ⚠️ Posición y alto (2026-10-03, reportado en un **iPhone Pro Max**, en el
+      // Pro se veía perfecto con el mismo build):
+      // · `height` = banda de contenido (3.5rem) + safe-area **topado** en 2.5rem:
+      //   el alto del viewport de iOS en algunos modelos/versiones no llega hasta
+      //   el borde físico de la pantalla y un inset enorme estiraba la barra.
+      // · `paddingBottom` = inset **entre 0.5 y 1.75rem**: mantiene el contenido a
+      //   una distancia fija (~28px) del borde inferior en TODOS los dispositivos
+      //   (sin tope, con un inset grande se iba al medio de la barra).
       className="fixed bottom-0 left-0 right-0 z-40 mx-auto flex max-w-lg items-stretch border-t border-border bg-sidebar"
-      style={{ height: "calc(3.5rem + env(safe-area-inset-bottom))" }}
+      style={{
+        height: "calc(3.5rem + min(env(safe-area-inset-bottom), 2.5rem))",
+        paddingBottom: "clamp(0.75rem, env(safe-area-inset-bottom), 1.75rem)",
+      }}
     >
+      {/* Faldón: pinta el fondo de la barra **por debajo** de ella. Si el viewport
+          de iOS termina antes que la pantalla (el caso del Pro Max), la franja que
+          queda debajo muestra el fondo de la barra y no el de la página ⇒ la barra
+          se ve pegada al borde. Si no hay franja, queda fuera de pantalla. */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute left-0 right-0 top-full h-40 bg-sidebar"
+      />
       {TABS.map((t) => {
         const activo = esActivo(t.href, ruta);
         const Icono = activo ? t.iconoActivo : t.icono;
@@ -147,7 +160,9 @@ export default function BottomNav() {
             onPointerEnter={() => prefetch(t.href)}
             onTouchStartCapture={() => prefetch(t.href)}
             className={cn(
-              "flex flex-1 flex-col items-center justify-center gap-1 transition-colors",
+              // `justify-end`: el contenido se apoya arriba del padding del
+              // safe-area ⇒ queda siempre a la misma distancia del borde inferior.
+              "flex flex-1 flex-col items-center justify-end gap-1 transition-colors",
               activo ? "text-header" : "text-subtitle hover:text-label"
             )}
           >
@@ -171,7 +186,7 @@ export default function BottomNav() {
         aria-haspopup="dialog"
         aria-expanded={abierto}
         className={cn(
-          "flex flex-1 flex-col items-center justify-center gap-1 transition-colors",
+          "flex flex-1 flex-col items-center justify-end gap-1 transition-colors",
           masActivo ? "text-header" : "text-subtitle hover:text-label"
         )}
       >
