@@ -260,6 +260,21 @@ html.fp-sin-red [data-app-lock] {
    voz, que se apila sobre la barra de navegación con las reglas de arriba.) */
 
 /* ─────────────────────────────────────────────────────────────────────────
+   BARRA INFERIOR semitransparente (2026-10-03 · pedido del usuario: "igual que
+   la superior")
+
+   Mismo criterio que `html.fp-inicio-scrolled .topbar-inicio`: 78% del color
+   propio + desenfoque de lo que pasa por detrás, en vez de un fondo opaco. Se
+   aplica al `<nav>`; el **faldón** (la franja que tapa el viewport cuando termina
+   antes que la pantalla) queda opaco para tapar sin transparencias.
+   ───────────────────────────────────────────────────────────────────────── */
+.barra-nav-vidrio {
+  background-color: color-mix(in srgb, var(--sidebar) 78%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
    TOP BAR de INICIO (2026-10-02 · rama `rediseno-ui`)
 
    En Inicio la banda (hero) va A SANGRE y arranca en el borde superior ⇒ la top

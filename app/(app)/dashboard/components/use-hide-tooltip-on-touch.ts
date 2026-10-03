@@ -7,6 +7,19 @@ import type { TouchEvent } from "react";
 const UMBRAL_TAP_PX = 10;
 /** Cuánto se espera antes del 2º ocultado (ver la nota de la red de seguridad). */
 const MS_RED_SEGURIDAD = 350;
+/**
+ * Selector de **controles**: si el toque arranca acá NO se cancela el `touchend`.
+ *
+ * ⚠️ **Bug reportado en prod (2026-10-03)**: el encabezado de los paneles de
+ * gráficos viaja como `encabezado` **dentro** del contenedor que maneja los toques
+ * (por eso el hook envuelve al panel) y ahí adentro viven las **pestañas
+ * Resumen/Histórico** y el **⋯**. Como `preventDefault()` en el `touchend` de un
+ * tap suprime el `click` en iOS, esos controles **dejaron de responder**. Ahora,
+ * si el gesto empieza sobre un control, se saltea el `preventDefault` (el tooltip
+ * se sigue apagando igual).
+ */
+const SELECTOR_CONTROL =
+  "a, button, [role='button'], input, select, textarea, label, summary";
 
 /**
  * Oculta el tooltip de un gráfico Recharts al levantar el dedo en mobile.
@@ -46,6 +59,8 @@ const MS_RED_SEGURIDAD = 350;
 export function useHideTooltipOnTouch<T extends HTMLElement = HTMLDivElement>() {
   /** Punto donde arrancó el toque: distingue un **tap** de un **arrastre**. */
   const desdeRef = useRef<{ x: number; y: number } | null>(null);
+  /** ¿El toque arrancó sobre un control interactivo? (entonces no se cancela). */
+  const controlRef = useRef(false);
   /** Ocultados diferidos pendientes (se cancelan al volver a tocar). */
   const timersRef = useRef<number[]>([]);
 
@@ -71,6 +86,10 @@ export function useHideTooltipOnTouch<T extends HTMLElement = HTMLDivElement>() 
       limpiarTimers();
       const t = e.touches[0];
       desdeRef.current = t ? { x: t.clientX, y: t.clientY } : null;
+      // ¿El dedo cayó sobre las pestañas / el ⋯ del encabezado? (ver arriba)
+      const destino = e.target;
+      controlRef.current =
+        destino instanceof Element && destino.closest(SELECTOR_CONTROL) !== null;
     },
     [limpiarTimers]
   );
@@ -89,13 +108,14 @@ export function useHideTooltipOnTouch<T extends HTMLElement = HTMLDivElement>() 
       // los que volvían a encender el tooltip ⇒ quedaba pegado hasta el toque
       // siguiente). En un **arrastre** no se cancela (el navegador está cerrando
       // el scroll/snap) y ese caso lo cubre la red de seguridad de abajo.
-      if (movido <= UMBRAL_TAP_PX) {
+      if (movido <= UMBRAL_TAP_PX && !controlRef.current) {
         try {
           e.preventDefault();
         } catch {
           /* listener pasivo ⇒ cae a la red de seguridad */
         }
       }
+      controlRef.current = false;
 
       limpiarTimers();
       apagar(raiz);

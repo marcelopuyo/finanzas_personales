@@ -135,7 +135,7 @@ export default function BottomNav() {
       // · `paddingBottom` = inset **entre 0.5 y 1.75rem**: mantiene el contenido a
       //   una distancia fija (~28px) del borde inferior en TODOS los dispositivos
       //   (sin tope, con un inset grande se iba al medio de la barra).
-      className="fixed bottom-0 left-0 right-0 z-40 mx-auto flex max-w-lg items-stretch border-t border-border bg-sidebar"
+      className="fixed bottom-0 left-0 right-0 z-40 mx-auto flex max-w-lg items-stretch border-t border-border barra-nav-vidrio"
       style={{
         height: "calc(3.5rem + min(env(safe-area-inset-bottom), 2.5rem))",
         paddingBottom: "clamp(0.75rem, env(safe-area-inset-bottom), 1.75rem)",
