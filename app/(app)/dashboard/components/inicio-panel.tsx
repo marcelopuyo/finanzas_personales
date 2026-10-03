@@ -196,15 +196,18 @@ export function InicioPanel({ data, historialInicial }: InicioPanelProps) {
           })}
         </div>
 
-        {/* Dots: dentro de la banda, abajo de las acciones. */}
-        <div className="mt-2 flex items-center justify-center gap-1.5 pb-2">
+        {/* Dots: dentro de la banda, abajo de las acciones. En **monocromo** desde
+            el 2026-10-03 (el activo era azul `--primary`: el usuario pidió sacar el
+            azul de la barra y de este carrusel; el activo ahora es un blanco más
+            ancho, igual que el tab activo de la barra inferior). */}
+        <div className="mt-1.5 flex items-center justify-center gap-1.5 pb-1.5">
           {Array.from({ length: totalTarjetas }).map((_, i) => (
             <i
               key={i}
               aria-hidden="true"
               className={cn(
                 "block h-1.5 rounded-full",
-                i === indice ? "w-4.5 bg-primary" : "w-1.5 bg-border"
+                i === indice ? "w-4.5 bg-header" : "w-1.5 bg-border"
               )}
             />
           ))}

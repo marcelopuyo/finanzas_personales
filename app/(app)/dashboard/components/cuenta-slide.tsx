@@ -70,11 +70,11 @@ export function CuentaSlide({
       {/* Rótulo: **solo el nombre** (sin icono), centrado y en el **mismo color que
           las demás tarjetas** (`text-value`), incluso en la del resumen (pedido del
           usuario). El color distintivo del resumen queda solo en su **monto**. */}
-      <p className="pt-1 text-center text-[12.5px] text-value">{titulo}</p>
+      <p className="text-center text-[12.5px] text-value">{titulo}</p>
       {/* El monto va **siempre en blanco**, igual que en las demás tarjetas (el
           resumen ya no se distingue por color: solo por su gráfico de barras y por
           tener una única acción). */}
-      <p className="mt-0.5 text-center text-[30px] leading-9 tracking-tight text-value">
+      <p className="mt-0.5 text-center text-[28px] leading-8 tracking-tight text-value">
         {monto}
       </p>
 
@@ -82,18 +82,21 @@ export function CuentaSlide({
           — solo la serie, sin rótulos de ejes ni líneas horizontales.
           ⚠️ El resumen muestra la **evolución de Resultados** (decisión del
           usuario 2026-10-02); las cuentas, su propia evolución.
-          📏 Alto **relativo a la pantalla** (`min(128px, 16vh)`): la banda tiene
-          que quedar en ~media pantalla (pedido del usuario 2026-10-03); con un
-          px fijo, en un celular de pantalla baja la banda se comía más de la mitad. */}
-      <div className="mt-4 h-[min(128px,16vh)]">
+          📏 Alto **fijo en px** (no `%` ni `vh`): con `min(128px,16vh)` el 2026-10-03
+          el gráfico no se pintó en el celular y la banda quedaba en más de media
+          pantalla. 96px deja la banda cómoda y la serie se lee bien. */}
+      <div className="mt-3">
         {!conGrafico ? (
-          <Skeleton className="h-full rounded-xl" />
+          // ⚠️ El fondo de la banda es `bg-muted` y el skeleton por defecto también
+          // ⇒ quedaba **invisible** y el hueco se leía como "gráfico roto". Con
+          // `bg-card/40` se ve como un bloque en carga.
+          <Skeleton className="h-24 rounded-xl bg-card/40" />
         ) : (
           <EvolutionChart
             data={evolucion}
             color="var(--success)"
             area
-            height="100%"
+            height={96}
             currency={monedaISO}
             encabezado={null}
             sinRecuadro
@@ -146,12 +149,12 @@ function AccionSlide({
       href={href}
       onPointerEnter={onPrefetch}
       onTouchStartCapture={onPrefetch}
-      className="flex w-[92px] flex-col items-center gap-1 rounded-xl px-1 py-1"
+      className="flex w-[104px] flex-col items-center gap-1 rounded-xl px-1 py-0.5"
     >
-      <span className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/60 text-value">
-        <Icon className="h-4.5 w-4.5" />
+      <span className="flex h-8.5 w-8.5 items-center justify-center rounded-full border border-border bg-card/60 text-value">
+        <Icon className="h-4 w-4" />
       </span>
-      <span className="text-center text-[9.5px] leading-[1.15] text-card-foreground">
+      <span className="text-center text-[9px] leading-[1.15] text-card-foreground">
         {label}
       </span>
       <LinkNavStatus />

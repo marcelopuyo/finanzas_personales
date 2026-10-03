@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useMemo } from "react";
 import {
   LineChart,
   Line,
@@ -72,6 +73,31 @@ export function EvolutionChart({
     : `rounded-lg border border-border bg-card p-5 ${className}`;
   // El tooltip se oculta al levantar el dedo en mobile (ver el hook).
   const touchReset = useHideTooltipOnTouch();
+
+  /**
+   * 📈 **Dominio ajustado a los datos** (2026-10-03, bug reportado en prod): con el
+   * dominio por defecto (`[0, auto]`) una serie de **saldos altos y con poca
+   * variación** queda aplastada contra el borde superior —el caso real de las
+   * cuentas: 2 puntos, 4.700 → 6.000 ⇒ la curva quedaba a 17px del techo de 128 y
+   * el gráfico **se veía vacío**—. En el **modo mínimo** (banda de Inicio) se usa el
+   * rango real con un 15% de aire, así la tendencia ocupa todo el alto.
+   * ⚠️ Con todos los valores iguales (o uno solo) el rango sería 0 ⇒ se fuerza un
+   * aire mínimo para que el eje no colapse.
+   */
+  const dominio = useMemo<[number, number] | undefined>(() => {
+    if (!minimo || data.length === 0) return undefined;
+    const valores = data.map((d) => d.value);
+    const min = Math.min(...valores);
+    const max = Math.max(...valores);
+    const aire = (max - min) * 0.15 || Math.max(Math.abs(max) * 0.05, 1);
+    return [min - aire, max + aire];
+  }, [minimo, data]);
+
+  /**
+   * Con **1 a 3 puntos** no hay curva que leer (una recta entre 2 puntos casi no se
+   * distingue del fondo): se dibujan los puntos para que la serie sea visible.
+   */
+  const mostrarPuntos = minimo && data.length <= 3;
   const header =
     encabezado !== undefined ? (
       encabezado
@@ -139,6 +165,7 @@ export function EvolutionChart({
             hide={minimo}
             // Con los ejes ocultos la serie toca los bordes: se le deja aire.
             padding={minimo ? { top: 12, bottom: 12 } : undefined}
+            domain={dominio}
             tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
             axisLine={false}
             tickLine={false}
@@ -158,7 +185,7 @@ export function EvolutionChart({
                 stroke={color}
                 strokeWidth={2}
                 fill="url(#evolutionArea)"
-                dot={false}
+                dot={mostrarPuntos ? { r: 2.5, fill: color } : false}
                 activeDot={{ r: 4, fill: color }}
               />
             </>
@@ -168,7 +195,7 @@ export function EvolutionChart({
               dataKey="value"
               stroke={color}
               strokeWidth={2}
-              dot={false}
+              dot={mostrarPuntos ? { r: 2.5, fill: color } : false}
               activeDot={{ r: 4, fill: color }}
             />
           )}

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Test · Recharts altura 100% vs px</title>
+<style>
+  body{margin:0;background:#151517;color:#e2e4f0;font:13px/1.4 -apple-system,"Segoe UI",Roboto,sans-serif;padding:14px}
+  .caja{border:1px solid #3e3f42;margin:0 0 12px;padding:8px;border-radius:10px;background:#1b1b1f}
+  .caja p{margin:0 0 6px;color:#9a9b9e;font-size:11.5px}
+  .contenedor{background:#242428;border-radius:8px}
+  #res{margin-top:14px;font-size:12px;color:#c9cad0;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<div id="raiz"></div>
+<div id="res">midiendo…</div>
+
+<script type="importmap">
+{"imports":{
+  "react":"https://esm.sh/react@19.1.1",
+  "react-dom":"https://esm.sh/react-dom@19.1.1",
+  "react-dom/client":"https://esm.sh/react-dom@19.1.1/client",
+  "recharts":"https://esm.sh/recharts@3.10.1?external=react,react-dom"
+}}
+</script>
+<script type="module">
+import React from "react";
+import { createRoot } from "react-dom/client";
+import { ComposedChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
+
+const h = React.createElement;
+
+/** Réplica EXACTA del gráfico de la banda de Inicio (`minimo` + `area`). */
+const serieHeroe = (data, conPadding = true, dominio, puntos = false) =>
+  h(ComposedChart, { data },
+    h(XAxis, {
+      dataKey: "name", hide: true, axisLine: false, tickLine: false,
+      tick: { fontSize: 12 },
+      padding: conPadding ? { top: 12, bottom: 12 } : undefined,
+    }),
+    h(YAxis, {
+      hide: true, axisLine: false, tickLine: false, tick: { fontSize: 12 },
+      padding: { top: 12, bottom: 12 }, domain: dominio,
+    }),
+    h(Tooltip, null),
+    h(Area, {
+      type: "monotone", dataKey: "value", stroke: "#51cf66", strokeWidth: 2,
+      fill: "url(#g)", dot: puntos ? { r: 2.5, fill: "#51cf66" } : false,
+      activeDot: { r: 4, fill: "#51cf66" },
+    })
+  );
+
+/** Dominio que ahora calcula `EvolutionChart` en modo mínimo (dataMin/Max ±15%). */
+const ajustado = (data) => {
+  const v = data.map((d) => d.value);
+  const min = Math.min(...v), max = Math.max(...v);
+  const aire = (max - min) * 0.15 || Math.max(Math.abs(max) * 0.05, 1);
+  return [min - aire, max + aire];
+};
+
+/** Serie REAL de "Bco Galicia USD" (cuenta 4): 2 puntos en la ventana. */
+const P2 = [{ name: "2026-09-10", value: 4700 }, { name: "2026-10-02", value: 6000 }];
+const P3 = [{ name: "2026-09-10", value: 4700 }, { name: "2026-09-18", value: 5700 }, { name: "2026-10-02", value: 6000 }];
+const P14 = Array.from({ length: 14 }, (_, i) => ({ name: "m" + i, value: 100 + i * 40 }));
+
+/** Cada caso: [etiqueta, datos, padding en el eje X, dominio, puntos] */
+const CASOS = [
+  ["G · 2 puntos, dominio por defecto (ANTES)", P2, true, undefined, false],
+  ["L · 2 puntos + dominio ajustado + puntos (AHORA)", P2, true, ajustado(P2), true],
+  ["M · 14 puntos + dominio ajustado (Balance)", P14, true, ajustado(P14), false],
+  ["N · 1 solo punto + dominio ajustado + puntos", P2.slice(0, 1), true, ajustado(P2.slice(0, 1)), true],
+];
+
+function App() {
+  return h("div", null,
+    CASOS.map(([etiqueta, datos, conPadding, dominio, puntos], i) =>
+      h("div", { className: "caja", key: i, "data-caso": i },
+        h("p", null, etiqueta),
+        h("div", { className: "contenedor", style: { height: "128px" } },
+          h(ResponsiveContainer, { width: "100%", height: "100%" },
+            serieHeroe(datos, conPadding, dominio, puntos)
+          )
+        )
+      )
+    ),
+    h("svg", { width: 0, height: 0 },
+      h("defs", null,
+        h("linearGradient", { id: "g", x1: "0", y1: "0", x2: "0", y2: "1" },
+          h("stop", { offset: "0%", stopColor: "#51cf66", stopOpacity: 0.35 }),
+          h("stop", { offset: "100%", stopColor: "#51cf66", stopOpacity: 0 })
+        )
+      )
+    )
+  );
+}
+
+createRoot(document.getElementById("raiz")).render(h(App));
+
+// Informe: ¿se dibujó la curva o quedó degenerada?
+window.__medir = () => {
+  return [...document.querySelectorAll("[data-caso]")].map((caja, i) => {
+    const paths = [...caja.querySelectorAll("path")];
+    const detalle = paths.map((p) => {
+      const d = p.getAttribute("d") || "";
+      const r = p.getBoundingClientRect();
+      return (p.getAttribute("class") || "").replace("recharts-", "") + ":d=" + d.length + ",${Math.round(r.width)}x${Math.round(r.height)}";
+    });
+    return CASOS[i][0] + "  →  paths:" + paths.length + (detalle.length ? "  " + detalle.join(" | ") : "  SIN PATH");
+  }).join("\n");
+};
+</script>
+</body>
+</html>

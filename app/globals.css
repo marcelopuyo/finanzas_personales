@@ -244,7 +244,7 @@ html.fp-sin-red [data-app-lock] {
    taparla (mismo criterio que tenía el FAB de voz). */
 @media (max-width: 1023.98px) {
   html:has([data-barra-nav]) [data-barra-inferior] {
-    bottom: calc(4rem + env(safe-area-inset-bottom));
+    bottom: calc(3.5rem + env(safe-area-inset-bottom));
   }
 }
 
@@ -272,7 +272,7 @@ html.fp-sin-red [data-app-lock] {
    está ocupado: el FAB de acciones **sube por encima** (mismo criterio que
    `[data-barra-inferior]`). */
 html:has([data-barra-nav]) .fp-fab-acciones {
-  bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  bottom: calc(4.25rem + env(safe-area-inset-bottom));
 }
 /* ⚠️ Se eliminó la regla que corría el FAB de VOZ a la izquierda cuando este FAB
    estaba presente: desde el rediseño el dictado se dispara desde la **top bar** y
