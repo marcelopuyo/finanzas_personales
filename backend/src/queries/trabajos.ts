@@ -6,6 +6,7 @@ import { Movimiento } from "../entities/movimiento.entity";
 import { Liquidacion } from "../entities/periodo-trabajo.entity";
 import { TareaTrabajo } from "../entities/tarea-trabajo.entity";
 import { Trabajo } from "../entities/trabajo.entity";
+import { SIN_TRABAJO } from "@/lib/filtros-dashboard";
 
 // ============================================================
 // Tipos de salida (coinciden con los Response DTOs del backend)
@@ -244,24 +245,41 @@ export interface LiquidacionesPagina {
  */
 export async function getLiquidacionesCobradasPaginado(
   offset: number,
-  limit: number
+  limit: number,
+  /**
+   * **Nombres de trabajo** a los que acotar el listado (filtro del panel de
+   * Ingresos, 2026-10-03: el filtro de la grilla es el mismo del gráfico, **sin**
+   * las fechas). Vacío o `undefined` = sin filtro. El rótulo `SIN_TRABAJO` no
+   * devuelve nada: una liquidación **siempre** tiene trabajo (el `innerJoin` de
+   * abajo lo garantiza) — los "sin trabajo" son **pendientes**.
+   */
+  trabajos?: string[]
 ): Promise<LiquidacionesPagina> {
   const userId = await requireUserId();
   const ds = await getDb();
   const take = Math.min(Math.max(Math.trunc(limit) || 20, 1), 100);
   const skip = Math.max(Math.trunc(offset) || 0, 0);
   const repo = ds.getRepository(Liquidacion);
+  const nombres = (trabajos ?? []).filter((n) => n && n !== SIN_TRABAJO);
 
   // Un cobro real deja `fechaDeCobro` con una fecha >= 1901-01-02 (el centinela
   // 1901-01-01 significa "pendiente"): mismo criterio que `tieneCobroReal`
   // (`lib/ingresos-trabajo.ts`), pero resuelto en SQL para poder paginar.
-  const filtro = () =>
-    repo
+  const filtro = () => {
+    const qb = repo
       .createQueryBuilder("p")
       .innerJoin("p.trabajo", "t")
       .where("t.usuarioId = :userId", { userId })
       .andWhere("p.eliminado = false")
       .andWhere('p."fechaDeCobro" >= :desde', { desde: "1901-01-02" });
+    if (nombres.length) {
+      qb.andWhere("t.nombre IN (:...nombres)", { nombres });
+    } else if ((trabajos ?? []).length) {
+      // Solo se pidió "Sin trabajo" ⇒ ninguna liquidación cumple.
+      qb.andWhere("1 = 0");
+    }
+    return qb;
+  };
 
   // ⚠️ **Paginar en DOS pasos.** Usar `skip/take` con los joins a las
   // colecciones (jornadas/tareas) hace que TypeORM arme un `SELECT DISTINCT` con

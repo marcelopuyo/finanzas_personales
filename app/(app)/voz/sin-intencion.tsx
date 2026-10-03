@@ -8,7 +8,7 @@ import Link from "next/link";
 export function SinIntencion({ texto }: { texto: string }) {
   return (
     <div className="mx-auto max-w-lg space-y-4 pb-6">
-      <h1 className="text-[15px] font-semibold text-header">
+      <h1 className="text-[15px] text-header">
         No entendí qué querías hacer
       </h1>
 

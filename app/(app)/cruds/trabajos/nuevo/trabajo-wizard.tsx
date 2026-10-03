@@ -187,7 +187,7 @@ export function TrabajoWizard({ origen }: { origen?: string }) {
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <h1 className="text-[18px] font-semibold text-header">Nuevo Trabajo</h1>
+        <h1 className="text-[18px] text-header">Nuevo Trabajo</h1>
       </div>
 
       {/* Indicador de pasos */}

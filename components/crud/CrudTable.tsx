@@ -64,6 +64,13 @@ interface CrudTableProps<T, TId = number> {
   /** Texto opcional bajo el título en mobile (p. ej. "Tocá una fila para
       seleccionarla"). Solo aplica con mobileBottomNav. */
   mobileHint?: string;
+  /**
+   * **Título DENTRO del panel** (2026-10-03, "ningún título fuera de los paneles"):
+   * en la rama mobile, el título + su contador se pintan **dentro** del recuadro de
+   * las tarjetas en vez de quedar flotando arriba. Lo usa la pantalla de Préstamos
+   * del dashboard, que embebe este CRUD como **sección** de su pantalla.
+   */
+  tituloEnPanel?: boolean;
   /** Modo "swipe" mobile (`<lg`): reemplaza las opciones de la barra inferior
       por un menú que se revela al deslizar la fila hacia la IZQUIERDA (estilo
       WhatsApp) y hace que la fila NO se seleccione al tocarla. Requiere
@@ -194,6 +201,7 @@ export function CrudTable<T, TId = number>({
   exportInfo,
   mobileBottomNav = false,
   mobileHint,
+  tituloEnPanel = false,
   mobileSwipe,
   trailingColumns = [],
   extraAction,
@@ -542,10 +550,10 @@ export function CrudTable<T, TId = number>({
             <ArrowLeft className="h-4 w-4" />
           </button>
         )}
-        <h1 className="text-[20px] font-semibold text-header">{title}</h1>
+        <h1 className="text-[20px] text-header">{title}</h1>
       </div>
       <div className="flex items-center gap-2">
-        <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-muted px-2 text-[12px] font-semibold text-subtitle">
+        <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-muted px-2 text-[12px] text-subtitle">
           {cardMode ? itemsTarjetas.length : filtered.length}
         </span>
       </div>
@@ -751,7 +759,7 @@ export function CrudTable<T, TId = number>({
       {/* ===== Variante mobile (bottomNav): barra inferior + selección por fila ===== */}
       {mobileBottomNav && (
         <div className="lg:hidden">
-          {titleMobileEl}
+          {!tituloEnPanel && titleMobileEl}
           {topContent}
           {mobileHint && (
             <p className="-mt-2 mb-3 text-[12px] text-subtitle">{mobileHint}</p>
@@ -763,6 +771,7 @@ export function CrudTable<T, TId = number>({
             onRowTap={swipeMode ? swipeRowTap : undefined}
           >
             <div className="rounded-2xl border border-border bg-card p-3">
+              {tituloEnPanel && titleMobileEl}
               {cardMode ? (
                 <>
                   {itemsTarjetas.length === 0 ? (
@@ -870,10 +879,12 @@ export function CrudTable<T, TId = number>({
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
-          <h1 className="text-[18px] font-semibold text-header">{title}</h1>
+          <h1 className="text-[18px] text-header">{title}</h1>
         </div>
       ) : (
-        <h1 className="mb-4 text-[18px] font-semibold text-header">{title}</h1>
+        !tituloEnPanel && (
+          <h1 className="mb-4 text-[18px] text-header">{title}</h1>
+        )
       )}
 
       {topContent}
@@ -882,6 +893,9 @@ export function CrudTable<T, TId = number>({
 
       {/* Tabla */}
       <div className="rounded-2xl border border-border bg-card p-4">
+        {tituloEnPanel && (
+          <h1 className="mb-4 text-[18px] text-header">{title}</h1>
+        )}
         {loading ? (
           <div className="py-12 text-center text-[13px] text-subtitle">
             Cargando...

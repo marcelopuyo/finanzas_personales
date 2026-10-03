@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Mic } from "lucide-react";
 import Logo from "./logo";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,19 @@ export default function TopBar({
   /** Etiqueta del usuario (tooltip/aria del avatar). */
   userLabel?: string;
 }) {
+  const pathname = usePathname();
+  /**
+   * **Inicio**: la banda arranca a sangre ⇒ la barra va **transparente** en el top
+   * para que la banda se vea continua (sin borde ni cambio de tono). Apenas el
+   * contenido sale del tope, la propia página marca `html.fp-inicio-scrolled` y
+   * `.topbar-inicio` pasa a **translúcida con blur** + línea inferior (ver
+   * `globals.css`). Se resuelve con una clase en el `<html>` —mismo patrón que
+   * `fp-sin-red`— y no con estado compartido: la barra vive en el **layout** y la
+   * página en el **route**, así no dependemos de que un módulo de estado sea la
+   * misma instancia en los dos bundles.
+   */
+  const enInicio = pathname === "/dashboard";
+
   // El dictado lo maneja `VozFab` (montado en `AppLayout`); acá solo se refleja
   // **si está escuchando** para conservar el feedback que daba el FAB (rojo + pulso).
   const [escuchando, setEscuchando] = useState(false);
@@ -37,7 +51,12 @@ export default function TopBar({
 
   return (
     <header
-      className="fixed top-0 right-0 left-0 z-50 border-b border-border bg-sidebar"
+      className={cn(
+        "fixed top-0 right-0 left-0 z-50 border-b transition-[background-color,border-color] duration-200",
+        // Resto de la app: la barra sólida de siempre. En Inicio manda
+        // `.topbar-inicio` (transparente en el top / translúcida con scroll).
+        enInicio ? "topbar-inicio" : "border-border bg-sidebar"
+      )}
       // PWA standalone: con `viewport-fit: cover` el contenido pasa por debajo de
       // la barra de estado / notch, así que el header crece con el safe-area y
       // conserva sus 3.5rem (h-14) de contenido. El scroll compensa con el mismo
@@ -88,7 +107,7 @@ export default function TopBar({
             className="ml-1 rounded-full transition-opacity hover:opacity-90"
           >
           <span
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#414346] text-[15px] font-semibold text-[#f0f1f2]"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#414346] text-[15px] text-[#f0f1f2]"
             style={{ width: 32, height: 32 }}
           >
             {initial}

@@ -60,7 +60,7 @@ export default function CotizacionesClient({
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-[18px] font-semibold tracking-tight text-header">
+        <h1 className="text-[18px] tracking-tight text-header">
           Cotizaciones
         </h1>
         <p className="mt-0.5 text-[13px] text-subtitle">
@@ -109,7 +109,7 @@ export default function CotizacionesClient({
             type="button"
             onClick={handleRefrescar}
             disabled={refrescando || !origenId || !destinoId || origenId === destinoId}
-            className="flex shrink-0 items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="flex shrink-0 items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2 text-[13px] text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             <RefreshCw className={cn("h-4 w-4", refrescando && "animate-spin")} />
             {refrescando ? "Consultando..." : "Refrescar"}

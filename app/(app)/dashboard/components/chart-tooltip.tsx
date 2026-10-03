@@ -23,7 +23,7 @@ export function ChartTooltip({
   return (
     <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-lg">
       <p className="text-[12px] font-medium text-subtitle">{label}</p>
-      <p className="mt-0.5 text-[16px] font-semibold text-card-foreground">
+      <p className="mt-0.5 text-[16px] text-card-foreground">
         {numberToCurrency(total, currency)}
       </p>
     </div>

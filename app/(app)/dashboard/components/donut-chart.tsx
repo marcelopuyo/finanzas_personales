@@ -134,7 +134,7 @@ function DonutTooltip({
   return (
     <div className="rounded-lg bg-background/80 px-3 py-2 shadow-lg backdrop-blur-sm">
       <p className="text-[12px] font-medium text-subtitle">{d.name}</p>
-      <p className="mt-0.5 text-[16px] font-semibold text-card-foreground">
+      <p className="mt-0.5 text-[16px] text-card-foreground">
         {numberToCurrency(d.value, currency)}
       </p>
     </div>
@@ -163,7 +163,7 @@ export function DonutChart({
           a la derecha dentro del `badge` (hoy: el botón ⋯ del panel Gastos) queda
           pegado al borde superior derecho. En desktop vuelve a shrink-to-fit. */}
       <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-        <h3 className="text-[16px] font-semibold text-header">{title}</h3>
+        <h3 className="text-[16px] text-header">{title}</h3>
         {badge}
       </div>
       {action && (
@@ -220,7 +220,7 @@ export function DonutChart({
                 Total
               </span>
               <span className="flex max-w-full items-center gap-1 px-2">
-                <span className="truncate text-[17px] font-semibold text-header">
+                <span className="truncate text-[17px] text-header">
                   {numberToCurrency(total, currency)}
                 </span>
                 {compare && (

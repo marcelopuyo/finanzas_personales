@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { NavSpinner } from "@/components/ui/nav-progress";
@@ -9,6 +9,7 @@ import type {
   LiquidacionOut,
 } from "@/backend/src/queries/trabajos";
 import { cn, decimalToTime, isoADdMmAa, numberToCurrency } from "@/lib/utils";
+import { SIN_TRABAJO } from "@/lib/filtros-dashboard";
 import { etiquetaConteoItems } from "@/lib/trabajo-texto";
 import { getLiquidacionesCobradasPaginaAction } from "../actions";
 
@@ -158,6 +159,9 @@ export function PeriodosGrid({
   fechasCobro,
   onEditar,
   onEliminar,
+  encabezado,
+  filtroTrabajos,
+  onTotalCobrados,
 }: {
   pendientes: ItemPendienteOut[];
   /** Primera tanda de cobradas, ya resuelta en el server (la pantalla abre con datos). */
@@ -172,6 +176,21 @@ export function PeriodosGrid({
   onEditar?: (item: ItemPendienteOut) => void;
   /** Pide confirmación para eliminar un ítem pendiente. */
   onEliminar?: (item: ItemPendienteOut) => void;
+  /**
+   * **Encabezado de la sección**, pintado **dentro** de este panel (2026-10-03):
+   * lleva el título + el ⋯ y el resumen de tandas. Antes iban **fuera** del
+   * recuadro, con el título flotando sobre el fondo.
+   */
+  encabezado?: ReactNode;
+  /**
+   * **Filtro por trabajo** (2026-10-03): el listado respeta el mismo filtro que el
+   * gráfico del panel de Ingresos (**sin** las fechas). Los **pendientes** ya
+   * llegan filtrados; las **cobradas** se piden con el filtro al server, así que al
+   * cambiar se **reinicia** la lista (la primera tanda del server viene sin filtrar).
+   */
+  filtroTrabajos?: string[];
+  /** Avisa el total de cobradas **con el filtro vigente** (lo muestra el resumen). */
+  onTotalCobrados?: (total: number) => void;
 }) {
   // Fila abierta (por `key`): el desglose se muestra de a una.
   const [abierta, setAbierta] = useState<string | null>(null);
@@ -184,25 +203,69 @@ export function PeriodosGrid({
   const [cargando, setCargando] = useState(false);
   /** Centinela del scroll infinito. */
   const centinelaRef = useRef<HTMLDivElement | null>(null);
+  /** Clave del filtro con el que se cargó `cobrados` ("" = sin filtro). */
+  const [filtroCargado, setFiltroCargado] = useState("");
+  const filtroKey = JSON.stringify(filtroTrabajos ?? []);
+  /** ¿La lista cargada quedó de un filtro anterior? (mientras sí, no se pagina). */
+  const listaVieja = filtroCargado !== filtroKey;
+  /** Filtro vigente para los pedidos (y callback del total, sin re-crear `cargar`). */
+  const filtroRef = useRef<string[]>(filtroTrabajos ?? []);
+  const totalRef = useRef(onTotalCobrados);
+  useEffect(() => {
+    totalRef.current = onTotalCobrados;
+  }, [onTotalCobrados]);
 
-  /** Pide la siguiente tanda de cobradas y la agrega al final de la lista. */
-  const cargarMas = useCallback(async () => {
-    if (cargando || !hayMas) return;
-    const offset = cobrados.length;
+  /**
+   * Pide una tanda de cobradas con el **filtro vigente**. `offset = 0` reemplaza la
+   * lista (se usa al cambiar el filtro: la tanda inicial del server viene sin filtrar).
+   */
+  const cargar = useCallback(async (offset: number) => {
+    const filtro = filtroRef.current;
     setCargando(true);
     try {
-      const pagina = await getLiquidacionesCobradasPaginaAction(offset, PAGE);
-      // Se agrega SOLO si la lista no cambió mientras viajaba el pedido.
+      const pagina = await getLiquidacionesCobradasPaginaAction(
+        offset,
+        PAGE,
+        filtro
+      );
       setCobrados((prev) =>
-        prev.length === offset ? [...prev, ...pagina.filas] : prev
+        offset === 0
+          ? pagina.filas
+          : prev.length === offset
+            ? [...prev, ...pagina.filas]
+            : prev
       );
       setHayMas(pagina.hayMas);
+      setFiltroCargado(JSON.stringify(filtro));
+      totalRef.current?.(pagina.total);
     } catch {
       toast.error("No se pudieron cargar más períodos");
     } finally {
       setCargando(false);
     }
-  }, [cargando, hayMas, cobrados.length]);
+  }, []);
+
+  /** Pide la siguiente tanda y la agrega al final de la lista. */
+  const cargarMas = useCallback(async () => {
+    // Con una lista de otro filtro el `offset` no sirve: se espera la recarga.
+    if (cargando || !hayMas || listaVieja) return;
+    await cargar(cobrados.length);
+  }, [cargando, hayMas, listaVieja, cobrados.length, cargar]);
+
+  /**
+   * **Cambio de filtro** (2026-10-03): se recarga desde cero con el filtro nuevo.
+   * ⚠️ El pedido va dentro de un `setTimeout` —no en el cuerpo del efecto— porque
+   * `cargar` hace `setState` (regla de lint de la app: nada de `setState` sincrónico
+   * en un efecto); además así se cancela si el filtro vuelve a cambiar enseguida.
+   */
+  useEffect(() => {
+    if (filtroCargado === filtroKey) return;
+    const t = setTimeout(() => {
+      filtroRef.current = filtroTrabajos ?? [];
+      void cargar(0);
+    }, 0);
+    return () => clearTimeout(t);
+  }, [filtroKey, filtroTrabajos, filtroCargado, cargar]);
 
   // El observer se rearma al terminar cada tanda (cambia `cargarMas`), así que si
   // el centinela sigue a la vista encadena la próxima tanda.
@@ -247,9 +310,21 @@ export function PeriodosGrid({
   filasPendientes.sort((a, b) =>
     a.refFecha < b.refFecha ? 1 : a.refFecha > b.refFecha ? -1 : 0
   );
+  /**
+   * Cobradas a mostrar: si la lista quedó de un **filtro anterior** (mientras llega
+   * la primera tanda filtrada) se acota en memoria, así no se ven filas que el
+   * filtro nuevo excluye. El server reconcilia enseguida con la página 0.
+   */
+  const cobradosVisibles = listaVieja
+    ? cobrados.filter(
+        (p) =>
+          !filtroTrabajos?.length ||
+          filtroTrabajos.includes(p.trabajo?.nombre ?? SIN_TRABAJO)
+      )
+    : cobrados;
   const filas: Fila[] = [
     ...filasPendientes,
-    ...cobrados.map((p): Fila => {
+    ...cobradosVisibles.map((p): Fila => {
       // El importe de la fila es lo COBRADO. El `montoCalculado` —lo que
       // correspondía— ya NO se muestra (2026-09-27, pedido del usuario: se quitó
       // la línea "calc. …" que salía en los cobros parciales); queda sólo como
@@ -271,6 +346,7 @@ export function PeriodosGrid({
   return (
     <>
       <div className="rounded-2xl border border-border bg-card px-3">
+        {encabezado}
         {filas.map((f) => {
           const isAbierta = abierta === f.key;
           return (
@@ -286,7 +362,7 @@ export function PeriodosGrid({
                       la ventana (ámbar) o cuándo venció (verde). Reemplaza al
                       chip de ventana (2026-10-02). */}
                   <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                    <span className="text-[13.5px] font-semibold break-words text-header">
+                    <span className="text-[13.5px] break-words text-header">
                       {f.titulo}
                     </span>
                     {f.tipo === "pendiente" && f.fecha && (
@@ -314,7 +390,7 @@ export function PeriodosGrid({
                       diferencia estética entre las dos clases de fila. */}
                   <span
                     className={cn(
-                      "block text-[14.5px] font-semibold tabular-nums",
+                      "block text-[14.5px] tabular-nums",
                       f.tipo === "pendiente" ? "text-success" : "text-value"
                     )}
                   >
@@ -346,7 +422,7 @@ export function PeriodosGrid({
                             </span>
                           )}
                         </p>
-                        <span className="shrink-0 text-[12.5px] font-semibold tabular-nums text-success">
+                        <span className="shrink-0 text-[12.5px] tabular-nums text-success">
                           {numberToCurrency(i.monto || 0, currency)}
                         </span>
                         <div className="flex shrink-0 items-center gap-0.5">
@@ -414,7 +490,7 @@ export function PeriodosGrid({
                                 </span>
                               )}
                             </p>
-                            <span className="shrink-0 text-[12.5px] font-semibold tabular-nums text-value">
+                            <span className="shrink-0 text-[12.5px] tabular-nums text-value">
                               {numberToCurrency(i.monto, currency)}
                             </span>
                           </div>
@@ -434,26 +510,28 @@ export function PeriodosGrid({
       </div>
 
       {/* Centinela del scroll infinito: al entrar en pantalla (con `PRELOAD_PX`
-          de margen) se pide la tanda siguiente de cobradas. */}
+          de margen) se pide la tanda siguiente de cobradas. Con una lista de otro
+          filtro (`listaVieja`) no se pagina: se espera la recarga con el nuevo. */}
       <div ref={centinelaRef} aria-hidden="true" className="h-px" />
-      {hayMas && (
+      {hayMas && cargando && !listaVieja && (
         <div className="flex justify-center py-3">
-          {cargando ? (
-            <p className="flex items-center gap-2 text-[12px] text-subtitle">
-              <NavSpinner className="text-primary" />
-              Cargando más períodos…
-            </p>
-          ) : (
-            // Respaldo para teclado / pantallas donde el centinela ya está
-            // visible sin scrollear.
-            <button
-              type="button"
-              onClick={() => void cargarMas()}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-4 py-1.5 text-[13px] font-medium text-card-foreground transition-colors hover:bg-muted"
-            >
-              Cargar más períodos
-            </button>
-          )}
+          <p className="flex items-center gap-2 text-[12px] text-subtitle">
+            <NavSpinner className="text-primary" />
+            Cargando más períodos…
+          </p>
+        </div>
+      )}
+      {hayMas && !cargando && !listaVieja && (
+        <div className="flex justify-center py-3">
+          {/* Respaldo para teclado / pantallas donde el centinela ya está
+              visible sin scrollear. */}
+          <button
+            type="button"
+            onClick={() => void cargarMas()}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-4 py-1.5 text-[13px] font-medium text-card-foreground transition-colors hover:bg-muted"
+          >
+            Cargar más períodos
+          </button>
         </div>
       )}
     </>

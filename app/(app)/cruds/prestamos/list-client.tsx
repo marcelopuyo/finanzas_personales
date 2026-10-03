@@ -94,7 +94,7 @@ function PrestamoCard({ p }: { p: PrestamoOut }) {
   const moneda = p.monedaISO ?? "ARS";
   return (
     <>
-      <span className="block text-[14px] leading-snug font-semibold break-words text-header">
+      <span className="block text-[14px] leading-snug break-words text-header">
         {p.detalle ?? "—"}
       </span>
       <p className="mt-0.5 truncate text-[11.5px] text-subtitle">
@@ -116,7 +116,7 @@ function PrestamoCard({ p }: { p: PrestamoOut }) {
           </span>
           <span
             className={cn(
-              "text-[16px] leading-tight font-semibold",
+              "text-[16px] leading-tight",
               saldo > 0 ? "text-danger" : "text-value"
             )}
           >
@@ -192,6 +192,9 @@ export function PrestamosListClient({ initialData, origen, embebido = false }: P
   return (
     <CrudTable<PrestamoOut, string>
       title={embebido ? "Listado" : "Préstamos"}
+      // En el dashboard (embebido) el título va DENTRO del panel de tarjetas: en
+      // la pantalla de Préstamos no queda ningún título fuera de los paneles.
+      tituloEnPanel={embebido}
       columns={columns}
       trailingColumns={pagarColumn}
       initialData={initialData}

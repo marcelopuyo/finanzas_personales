@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
-import { useVentanasCobro } from "./components/use-ventanas-cobro";
 import type {
   EstimacionTrabajo,
   LiquidacionCerradaFuente,
@@ -19,6 +18,8 @@ import type {
   LiquidacionOut,
 } from "@/backend/src/queries/trabajos";
 import { dateTimeToString, numberToCurrency } from "@/lib/utils";
+import { SIN_TRABAJO } from "@/lib/filtros-dashboard";
+import { useVentanasCobro } from "./components/use-ventanas-cobro";
 import { obtenerItemEditable } from "./actions";
 import { AccionesFab } from "./components/acciones-fab";
 import { ItemEditModal } from "./components/item-edit-modal";
@@ -56,6 +57,7 @@ export function TrabajoClient({
   estimacionesSSR,
   hoyServidor,
   ingresosDetalle,
+  filtroTrabajos,
 }: {
   pendientes: ItemPendienteOut[];
   /** Primera tanda de cobradas (el resto llega con el scroll infinito). */
@@ -64,6 +66,11 @@ export function TrabajoClient({
   hayMasCobrados: boolean;
   /** Total de liquidaciones cobradas (resumen del encabezado). */
   totalCobrados: number;
+  /**
+   * **Filtro por trabajo** del panel de Ingresos (2026-10-03): los pendientes se
+   * acotan en memoria y las cobradas se piden filtradas al server. Vacío = todo.
+   */
+  filtroTrabajos?: string[];
   /** Cuentas del usuario (para el depósito de la propina al editar). */
   cuentas: { id: number; nombre: string }[];
   /** ISO 4217 de la moneda predeterminada del usuario. */
@@ -88,15 +95,45 @@ export function TrabajoClient({
 }) {
   const { go } = usePendingNav();
 
+  /**
+   * **Pendientes filtrados por trabajo** (2026-10-03): el filtro del panel de
+   * Ingresos acota los pendientes **en memoria** (vienen todos) y, con eso, también
+   * el resumen y las ventanas de cobro. Sin filtro se usa la lista original.
+   */
+  const pendientesFiltrados = useMemo(
+    () =>
+      filtroTrabajos?.length
+        ? pendientes.filter((i) =>
+            filtroTrabajos.includes(i.trabajoNombre || SIN_TRABAJO)
+          )
+        : pendientes,
+    [pendientes, filtroTrabajos]
+  );
+
   /** Fecha estimada de cobro por trabajo + total cobrable: se recalculan con la
       fecha **local** del navegador (§211). */
   const { fechas: fechasCobro, totalPorCobrar } = useVentanasCobro({
     estimacionesSSR,
     hoyServidor,
-    items: pendientes,
+    // Con el **filtro por trabajo** los pendientes se acotan antes de calcular las
+    // ventanas (y se **fuerza** el recálculo: las del server son de todos).
+    items: pendientesFiltrados,
     liquidaciones: ingresosDetalle ?? [],
+    // ⚠️ Un array **nuevo** en cada render dispararía el memo ⇒ se pasa un booleano.
+    forzar: Boolean(filtroTrabajos?.length),
   });
-  const totalPendiente = pendientes.reduce((acc, i) => acc + (i.monto || 0), 0);
+  const totalPendiente = pendientesFiltrados.reduce(
+    (acc, i) => acc + (i.monto || 0),
+    0
+  );
+  /**
+   * Total de cobradas que se muestra en el resumen: el del server, o el que avisa
+   * la grilla cuando hay **filtro por trabajo** (ese listado se pagina filtrado).
+   */
+  const [totalCobradosFiltrado, setTotalCobradosFiltrado] = useState(totalCobrados);
+  const totalCobradosMostrado = filtroTrabajos?.length
+    ? totalCobradosFiltrado
+    : totalCobrados;
   // Ítem que se está editando: se pide COMPLETO recién al abrir el modal (la
   // lista de la pantalla no trae la hora de la tarea ni la cuenta de la propina).
   const [itemEditando, setItemEditando] = useState<ItemEditable | null>(null);
@@ -136,6 +173,53 @@ export function TrabajoClient({
     }
   };
 
+  /**
+   * **Resumen de las tandas** (una línea + la de "Por cobrar"): el total que falta
+   * cobrar es el único dato que la grilla no muestra en conjunto. ⚠️ Dice
+   * "Pendiente" y NO "Por cobrar" para no chocar con las fichas de ventana de cada
+   * fila (donde "Por cobrar" = ventana ya cerrada ⇒ cobrable ahora).
+   *
+   * 🔑 Desde el 2026-10-03 viaja **dentro del panel** de la grilla en el modo
+   * embebido (antes flotaba sobre el fondo, junto al título "Trabajo").
+   */
+  const resumenTandas = (
+    <div className="flex flex-col gap-1 text-[12.5px] text-subtitle">
+      <div className="flex flex-wrap items-baseline gap-x-2">
+        <span>
+          Pendiente{" "}
+          <span className="tabular-nums text-success">
+            {numberToCurrency(totalPendiente, monedaISO)}
+          </span>
+          {pendientesFiltrados.length > 0 && <> · {pendientesFiltrados.length} ítems</>}
+        </span>
+        <span className="ml-auto">{totalCobradosMostrado} cobrados</span>
+      </div>
+      {/* Segunda línea: lo que ya se puede cobrar **ahora** (Σ de los ítems cuya
+          ventana estimada cerró). Verde = plata pendiente, mismo criterio que el
+          monto "Pendiente" y que el de las filas. Solo si hay algo. */}
+      {totalPorCobrar > 0 && (
+        <div>
+          Por cobrar{" "}
+          <span className="tabular-nums text-success">
+            {numberToCurrency(totalPorCobrar, monedaISO)}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+
+  /**
+   * **Encabezado de la sección de trabajo** para el modo **embebido** (Ingresos):
+   * solo el **resumen de tandas**, **dentro del panel** de la grilla (2026-10-03).
+   *
+   * ⚠️ **Sin título y sin ⋯** (pedido del usuario, mismo día): el título "Trabajo" se
+   * eliminó y el **⋯ pasó al mini-panel superior** de la pantalla (junto a los
+   * Filtros y al monto del mes).
+   */
+  const encabezadoSeccion = (
+    <div className="border-b border-border pb-2.5 pt-2.5">{resumenTandas}</div>
+  );
+
   return (
     <div className={embebido ? undefined : "mx-auto max-w-5xl pb-24 pt-4 lg:pt-0"}>
       {!embebido && (
@@ -152,57 +236,38 @@ export function TrabajoClient({
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
-            <h1 className="min-w-0 truncate text-[18px] font-semibold text-header">
+            <h1 className="min-w-0 truncate text-[18px] text-header">
               Períodos de trabajo
             </h1>
           </div>
         </>
       )}
 
-      {/* Resumen de una línea (no es un panel): el total que falta cobrar es el
-          único dato que la grilla no muestra en conjunto. ⚠️ Dice "Pendiente" y
-          NO "Por cobrar" para no chocar con las fichas de ventana de cada fila
-          (donde "Por cobrar" = ventana ya cerrada ⇒ cobrable ahora). */}
-      <div className="mb-2 flex flex-col gap-1 text-[12.5px] text-subtitle">
-        <div className="flex flex-wrap items-baseline gap-x-2">
-          <span>
-            Pendiente{" "}
-            <span className="font-semibold tabular-nums text-success">
-              {numberToCurrency(totalPendiente, monedaISO)}
-            </span>
-            {pendientes.length > 0 && <> · {pendientes.length} ítems</>}
-          </span>
-          <span className="ml-auto">{totalCobrados} cobrados</span>
-        </div>
-        {/* Segunda línea: lo que ya se puede cobrar **ahora** (Σ de los ítems
-            cuya ventana estimada cerró). Verde = plata pendiente, mismo criterio
-            que el monto "Pendiente" y que el de las filas. Solo si hay algo. */}
-        {totalPorCobrar > 0 && (
-          <div>
-            Por cobrar{" "}
-            <span className="font-semibold tabular-nums text-success">
-              {numberToCurrency(totalPorCobrar, monedaISO)}
-            </span>
-          </div>
-        )}
-      </div>
+      {!embebido && resumenTandas}
 
       {/* UNA sola grilla: primero los pendientes (monto verde) y después las
           cobradas (monto blanco), con el mismo diseño de fila y scroll
-          infinito para lo cobrado. */}
-      {pendientes.length === 0 && totalCobrados === 0 ? (
+          infinito para lo cobrado. En el modo **embebido** el encabezado de la
+          sección (título + ⋯ + resumen) viaja DENTRO de este panel. */}
+      {pendientesFiltrados.length === 0 &&
+      (filtroTrabajos?.length
+        ? totalCobradosFiltrado === 0
+        : totalCobrados === 0) ? (
         <div className="flex h-32 items-center justify-center rounded-lg border border-border bg-card text-[13px] text-subtitle">
           Sin datos disponibles
         </div>
       ) : (
         <PeriodosGrid
-          pendientes={pendientes}
+          pendientes={pendientesFiltrados}
           cobradosIniciales={cobradosIniciales}
           hayMasCobrados={hayMasCobrados}
           currency={monedaISO}
           fechasCobro={fechasCobro}
           onEditar={(i) => void abrirEdicion(i)}
           onEliminar={setAEliminar}
+          encabezado={embebido ? encabezadoSeccion : undefined}
+          filtroTrabajos={filtroTrabajos}
+          onTotalCobrados={setTotalCobradosFiltrado}
         />
       )}
 

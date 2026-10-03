@@ -144,7 +144,7 @@ export default function LoginClient({
     <main className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
-          <h1 className="text-[20px] font-semibold text-header">Finanzas</h1>
+          <h1 className="text-[20px] text-header">Finanzas</h1>
           <p className="mt-1 text-[13px] text-subtitle">
             Ingresá para ver tus finanzas personales
           </p>
@@ -207,7 +207,7 @@ export default function LoginClient({
           <button
             type="submit"
             disabled={loading}
-            className="mt-6 w-full rounded-md bg-primary py-2.5 text-[13px] font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="mt-6 w-full rounded-md bg-primary py-2.5 text-[13px] text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {loading ? "Ingresando..." : "Iniciar sesión"}
           </button>

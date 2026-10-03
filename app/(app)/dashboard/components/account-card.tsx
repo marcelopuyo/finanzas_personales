@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 
 // Icono por tipo de cuenta para la esquina superior izquierda de la tarjeta.
 // Se pinta en el mismo gris que el nombre de la cuenta (text-label).
-const ICONOS_POR_TIPO: Record<string, LucideIcon> = {
+export const ICONOS_POR_TIPO: Record<string, LucideIcon> = {
   "Cuenta Bancaria": Landmark,
   "Caja Fisica": Wallet,
 };
@@ -101,7 +101,7 @@ export function AccountCard({
               mobile el grid es de 1 columna, así que cada tarjeta está en su
               propia fila y el `stretch` del grid no las iguala. */}
           {value ? (
-            <p className="mt-0.5 truncate text-[18px] font-semibold leading-7 tracking-tight text-value">
+            <p className="mt-0.5 truncate text-[18px] leading-7 tracking-tight text-value">
               {value}
             </p>
           ) : (

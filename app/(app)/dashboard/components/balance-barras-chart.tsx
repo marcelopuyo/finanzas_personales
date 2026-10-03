@@ -42,6 +42,15 @@ interface BalanceBarrasChartProps {
   currency: string;
   height?: number;
   className?: string;
+  /** Sin el recuadro del panel (lo usa la banda de Inicio). */
+  sinRecuadro?: boolean;
+  /**
+   * **Modo mínimo** (banda de Inicio): solo las barras — sin rótulos de los ejes
+   * X/Y ni líneas horizontales de grilla (el tooltip sigue andando).
+   */
+  minimo?: boolean;
+  /** Color de las barras (default: el primario de la app). */
+  color?: string;
 }
 
 /**
@@ -101,13 +110,20 @@ export function BalanceBarrasChart({
   currency,
   height = 170,
   className = "",
+  sinRecuadro = false,
+  minimo = false,
+  color = "var(--primary)",
 }: BalanceBarrasChartProps) {
+  /** Wrapper: con `sinRecuadro` queda transparente (banda de Inicio). */
+  const caja = sinRecuadro
+    ? className
+    : `rounded-2xl border border-border bg-card p-5 ${className}`;
   // El tooltip se oculta al levantar el dedo en mobile (ver el hook).
   const touchReset = useHideTooltipOnTouch();
 
   if (!data.length) {
     return (
-      <div className={`rounded-2xl border border-border bg-card p-5 ${className}`}>
+      <div className={caja}>
         <p className="text-[13px] text-subtitle">
           No hay cuentas que aporten al balance actual.
         </p>
@@ -119,18 +135,28 @@ export function BalanceBarrasChart({
     <div
       onTouchEnd={touchReset.onTouchEnd}
       onTouchCancel={touchReset.onTouchCancel}
-      className={`rounded-2xl border border-border bg-card p-5 ${className}`}
+      className={caja}
     >
       <ResponsiveContainer width="100%" height={height}>
-        <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -12 }}>
-          <CartesianGrid
-            strokeDasharray="3 3"
-            vertical={false}
-            stroke="var(--border)"
-          />
+        <BarChart
+          data={data}
+          margin={
+            minimo
+              ? { top: 8, right: 4, bottom: 4, left: 4 }
+              : { top: 4, right: 4, bottom: 0, left: -12 }
+          }
+        >
+          {!minimo && (
+            <CartesianGrid
+              strokeDasharray="3 3"
+              vertical={false}
+              stroke="var(--border)"
+            />
+          )}
           {/* `height` = alto reservado para las hasta 3 líneas del rótulo. */}
           <XAxis
             dataKey="name"
+            hide={minimo}
             height={40}
             interval={0}
             tick={<RotuloCuenta />}
@@ -138,6 +164,7 @@ export function BalanceBarrasChart({
             tickLine={false}
           />
           <YAxis
+            hide={minimo}
             tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
             axisLine={false}
             tickLine={false}
@@ -152,7 +179,7 @@ export function BalanceBarrasChart({
               reproduciría el "crecer desde cero" cada vez. */}
           <Bar
             dataKey="value"
-            fill="var(--primary)"
+            fill={color}
             radius={[6, 6, 0, 0]}
             maxBarSize={44}
             isAnimationActive={false}

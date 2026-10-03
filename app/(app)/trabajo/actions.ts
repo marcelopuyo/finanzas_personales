@@ -88,7 +88,9 @@ export async function obtenerItemEditable(
  */
 export async function getLiquidacionesCobradasPaginaAction(
   offset: number,
-  limit: number
+  limit: number,
+  /** Nombres de trabajo (filtro del panel de Ingresos): acota el listado. */
+  trabajos?: string[]
 ) {
-  return getLiquidacionesCobradasPaginado(offset, limit);
+  return getLiquidacionesCobradasPaginado(offset, limit, trabajos);
 }

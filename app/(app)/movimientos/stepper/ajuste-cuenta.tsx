@@ -153,7 +153,7 @@ export function AjusteCuenta() {
           </div>
           <div className="mt-1.5 flex items-center justify-between border-t border-border pt-1.5 text-[13px]">
             <span className="text-subtitle">Saldo ajustado</span>
-            <span className="font-semibold tracking-tight text-value">
+            <span className="tracking-tight text-value">
               {numberToCurrency(saldoAjustado, iso)}
             </span>
           </div>

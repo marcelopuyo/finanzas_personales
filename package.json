@@ -19,6 +19,7 @@
     "@hookform/resolvers": "^5.6.0",
     "@simplewebauthn/browser": "^14.0.0",
     "@simplewebauthn/server": "^14.0.2",
+    "@solar-icons/react": "^2.3.2",
     "@tanstack/react-table": "^8.21.3",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",

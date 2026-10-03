@@ -98,7 +98,7 @@ function GastoCard({ gasto, currency }: { gasto: GastoOut; currency: string }) {
     <li className="rounded-[10px] border border-border bg-muted px-3 py-2.5">
       <div className="flex items-start gap-2.5">
         <div className="min-w-0 flex-1 space-y-1">
-          <p className="truncate text-[13.5px] font-semibold leading-4.5 text-card-foreground">
+          <p className="truncate text-[13.5px] leading-4.5 text-card-foreground">
             {gasto.descripcion || "Sin descripción"}
           </p>
           <p className="flex items-center gap-1.5 text-[11px] leading-4 text-subtitle">
@@ -111,7 +111,7 @@ function GastoCard({ gasto, currency }: { gasto: GastoOut; currency: string }) {
             </span>
           </p>
         </div>
-        <p className="shrink-0 text-[14.5px] font-semibold leading-4.5 tabular-nums text-card-foreground">
+        <p className="shrink-0 text-[14.5px] leading-4.5 tabular-nums text-card-foreground">
           {numberToCurrency(Number(gasto.monto) || 0, currency)}
         </p>
       </div>

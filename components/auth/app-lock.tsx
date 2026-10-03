@@ -330,7 +330,7 @@ export function AppLock({ habilitado }: { habilitado: boolean }) {
 
       <div className="flex flex-col items-center gap-2">
         <Lock className="h-5 w-5 text-subtitle" />
-        <h2 className="text-[15px] font-semibold text-header">
+        <h2 className="text-[15px] text-header">
           Aplicación bloqueada
         </h2>
         <p className="max-w-70 text-[13px] text-subtitle">
@@ -345,7 +345,7 @@ export function AppLock({ habilitado }: { habilitado: boolean }) {
           type="button"
           onClick={() => void desbloquear()}
           disabled={cargando}
-          className="flex items-center justify-center gap-2 rounded-md bg-primary py-2.5 text-[13px] font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="flex items-center justify-center gap-2 rounded-md bg-primary py-2.5 text-[13px] text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
         >
           {cargando ? (
             <Loader2 className="h-4 w-4 animate-spin" />

@@ -47,7 +47,7 @@ export default function RegisterClient() {
     <main className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
-          <h1 className="text-[20px] font-semibold text-header">Crear cuenta</h1>
+          <h1 className="text-[20px] text-header">Crear cuenta</h1>
           <p className="mt-1 text-[13px] text-subtitle">
             Registrate para empezar a gestionar tus finanzas
           </p>
@@ -66,7 +66,7 @@ export default function RegisterClient() {
                 </p>
                 <a
                   href={devVerifyUrl}
-                  className="mt-4 block w-full rounded-md bg-primary py-2.5 text-center text-[13px] font-semibold text-primary-foreground hover:opacity-90"
+                  className="mt-4 block w-full rounded-md bg-primary py-2.5 text-center text-[13px] text-primary-foreground hover:opacity-90"
                 >
                   Verificar email (dev)
                 </a>
@@ -81,7 +81,7 @@ export default function RegisterClient() {
                   href={previewUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-4 block w-full rounded-md bg-primary py-2.5 text-center text-[13px] font-semibold text-primary-foreground hover:opacity-90"
+                  className="mt-4 block w-full rounded-md bg-primary py-2.5 text-center text-[13px] text-primary-foreground hover:opacity-90"
                 >
                   Ver email (Ethereal)
                 </a>
@@ -150,7 +150,7 @@ export default function RegisterClient() {
             <button
               type="submit"
               disabled={loading}
-              className="mt-6 w-full rounded-md bg-primary py-2.5 text-[13px] font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="mt-6 w-full rounded-md bg-primary py-2.5 text-[13px] text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {loading ? "Creando cuenta..." : "Crear cuenta"}
             </button>

@@ -33,6 +33,7 @@ export function useVentanasCobro({
   hoyServidor,
   items,
   liquidaciones,
+  forzar = false,
 }: {
   /** Reparto calculado en el server (`dashboard-data.ts`). */
   estimacionesSSR?: EstimacionTrabajo[];
@@ -42,15 +43,21 @@ export function useVentanasCobro({
   items: ItemPendienteFuente[];
   /** Liquidaciones con COBRO REAL (las "cerradas" que usa la inferencia). */
   liquidaciones: LiquidacionCerradaFuente[];
+  /**
+   * **Fuerza el recálculo en el cliente** (2026-10-03): con el **filtro por
+   * trabajo** del panel de Ingresos, las estimaciones del server —que son de
+   * **todos** los pendientes— no sirven y hay que repartir solo los filtrados.
+   */
+  forzar?: boolean;
 }): { fechas: Record<string, FechaCobroEstimada>; totalPorCobrar: number } {
   const montado = useMontado();
 
   const estimaciones = useMemo(() => {
     if (!montado || !hoyServidor || !estimacionesSSR) return estimacionesSSR ?? [];
     const hoyLocal = todayLocalISODate();
-    if (hoyLocal === hoyServidor) return estimacionesSSR;
-    return estimarCobros(items, liquidaciones, hoyLocal);
-  }, [montado, hoyServidor, estimacionesSSR, items, liquidaciones]);
+    if (!forzar && hoyLocal === hoyServidor) return estimacionesSSR;
+    return estimarCobros(items, liquidaciones, hoyLocal || hoyServidor);
+  }, [montado, hoyServidor, estimacionesSSR, items, liquidaciones, forzar]);
 
   return useMemo(() => {
     const fechas: Record<string, FechaCobroEstimada> = {};

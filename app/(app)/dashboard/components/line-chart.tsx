@@ -35,6 +35,16 @@ interface EvolutionChartProps {
    * (`dashboard-client.tsx`). Con `null` el panel no pinta ningún encabezado.
    */
   encabezado?: ReactNode;
+  /**
+   * **Sin el recuadro del panel** (fondo, borde y padding): lo usa la **banda de
+   * Inicio** (2026-10-02), donde el gráfico va a sangre sobre el hero.
+   */
+  sinRecuadro?: boolean;
+  /**
+   * **Modo mínimo** (banda de Inicio): deja **solo la serie** — sin rótulos de
+   * los ejes X/Y ni líneas horizontales de grilla (el tooltip sigue andando).
+   */
+  minimo?: boolean;
 }
 
 export function EvolutionChart({
@@ -48,7 +58,13 @@ export function EvolutionChart({
   area = false,
   currency,
   encabezado,
+  sinRecuadro = false,
+  minimo = false,
 }: EvolutionChartProps) {
+  /** Wrapper: con `sinRecuadro` queda transparente (banda de Inicio). */
+  const caja = sinRecuadro
+    ? className
+    : `rounded-lg border border-border bg-card p-5 ${className}`;
   // El tooltip se oculta al levantar el dedo en mobile (ver el hook).
   const touchReset = useHideTooltipOnTouch();
   const header =
@@ -60,7 +76,7 @@ export function EvolutionChart({
           a la derecha dentro del `badge` (hoy: el botón ⋯ del panel Gastos) queda
           pegado al borde superior derecho. En desktop vuelve a shrink-to-fit. */}
       <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-        <h3 className="text-[16px] font-semibold text-header">{title}</h3>
+        <h3 className="text-[16px] text-header">{title}</h3>
         {badge}
       </div>
       {action && (
@@ -74,9 +90,13 @@ export function EvolutionChart({
 
   if (!data.length) {
     return (
-      <div className={`rounded-lg border border-border bg-card p-5 ${className}`}>
+      <div className={caja}>
         {header}
-        <div className="flex h-64 items-center justify-center text-[13px] text-subtitle">
+        <div
+          className={`flex ${
+            sinRecuadro ? "h-28" : "h-64"
+          } items-center justify-center text-[13px] text-subtitle`}
+        >
           Sin datos disponibles
         </div>
       </div>
@@ -87,23 +107,29 @@ export function EvolutionChart({
     <div
       onTouchEnd={touchReset.onTouchEnd}
       onTouchCancel={touchReset.onTouchCancel}
-      className={`rounded-lg border border-border bg-card p-5 ${className}`}
+      className={caja}
     >
       {header}
       <ResponsiveContainer width="100%" height={height}>
         <ComposedChart data={data}>
-          <CartesianGrid
-            strokeDasharray="3 3"
-            vertical={false}
-            stroke="var(--border)"
-          />
+          {!minimo && (
+            <CartesianGrid
+              strokeDasharray="3 3"
+              vertical={false}
+              stroke="var(--border)"
+            />
+          )}
           <XAxis
             dataKey="name"
+            hide={minimo}
             tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
             axisLine={false}
             tickLine={false}
           />
           <YAxis
+            hide={minimo}
+            // Con los ejes ocultos la serie toca los bordes: se le deja aire.
+            padding={minimo ? { top: 12, bottom: 12 } : undefined}
             tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
             axisLine={false}
             tickLine={false}
@@ -165,7 +191,7 @@ export function MultiLineChart({
   const header = (
     <div className="mb-4 flex items-center justify-between">
       <div className="flex items-center gap-2">
-        <h3 className="text-[16px] font-semibold text-header">{title}</h3>
+        <h3 className="text-[16px] text-header">{title}</h3>
         {badge}
       </div>
       {action}

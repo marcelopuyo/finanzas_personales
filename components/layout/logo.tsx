@@ -23,7 +23,7 @@ export default function Logo({ size = 15 }: LogoProps) {
         style={{
           fontFamily: "var(--font-unbounded), sans-serif",
           fontSize: size,
-          fontWeight: 600,
+          fontWeight: 400,
           letterSpacing: "-0.01em",
         }}
       >
@@ -33,7 +33,7 @@ export default function Logo({ size = 15 }: LogoProps) {
         className="flex items-center justify-center rounded bg-[#0f172a] text-white dark:bg-white dark:text-[#0f172a]"
         style={{
           fontSize: Math.round(size * 0.66),
-          fontWeight: 600,
+          fontWeight: 400,
           lineHeight: 1,
           padding: `${badgePadY}px ${badgePadX}px`,
         }}

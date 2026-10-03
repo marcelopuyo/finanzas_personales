@@ -198,7 +198,7 @@ export function CrudForm({
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <h1 className="text-[18px] font-semibold text-header">{title}</h1>
+        <h1 className="text-[18px] text-header">{title}</h1>
       </div>
 
       {/* Form */}

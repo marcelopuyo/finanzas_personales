@@ -1,59 +1,53 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
-import { numberToCurrency } from "@/lib/utils";
-import { AccountCard } from "./account-card";
-import { BalanceCard } from "./balance-card";
-import { BalanceBarrasChart } from "./balance-barras-chart";
-import { EvolutionChart } from "./line-chart";
-import { FabCuentas, FabNuevo } from "@/components/movimientos/fab-nuevo";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CuentaSlide } from "./cuenta-slide";
+import { ResultadosMensuales } from "./resultados-mensuales";
 import { MovimientosCuentaClient } from "@/app/(app)/cuentas/[id]/movimientos-client";
 import type { HistorialPagina } from "@/backend/src/queries/movimientos";
 import type { DashboardData } from "../dashboard-data";
+import { cn, numberToCurrency } from "@/lib/utils";
+import { setTopbarScrolled } from "@/lib/topbar-scroll";
 
 /**
- * **Pantalla Inicio** (2026-10-01, rama `rediseno-ui`) — reemplaza los paneles
- * "Balance Actual" + "Cuentas" del dashboard de una sola página.
+ * **Pantalla Inicio** (`/dashboard`) — banda (hero) + carrusel de cuentas
+ * (2026-10-02, rama `rediseno-ui`).
  *
- * Decisión del usuario (preview aprobado):
- * 1. **Balance** en **una sola línea** y más bajo (descripción ← → monto).
- * 2. **Carrusel de cuentas**: una tarjeta visible + *peek* de la siguiente, con
- *    `scroll-snap` nativo (nunca arrastre por JS: lección §88 del CRUD de períodos).
- * 3. El **sparkline sale de la tarjeta** y se grafica **abajo, full-width**.
- * 4. El **historial de la cuenta en foco** se muestra **en la misma pantalla**, con
- *    scroll infinito (se reusa `MovimientosCuentaClient` de `/cuentas/[id]`), así
- *    no hay que tocar la tarjeta para ver los movimientos.
+ * Rediseño pedido por el usuario a partir de una referencia de app bancaria:
  *
- * 🔑 La cuenta en foco se define **solo por el swipe**: el toque en la tarjeta no
- * navega (`soloSeleccionar`) y el long press sigue abriendo el popup de acciones.
- * Al cambiar de cuenta, el gráfico y el historial **cambian con ella** (se lee como
- * un solo bloque "cuenta en foco").
+ * 1. **Banda a sangre** (`bg-muted`) que arranca en el borde superior y
+ *    **contiene la top bar** ⇒ en el top no hay separación entre la barra y el
+ *    resto (la barra se pinta **transparente** desde `components/layout/top-bar.tsx`
+ *    y pasa a **translúcida con blur** al scrollear).
+ * 2. **Carrusel full-width, 1 cuenta por vista, SIN *peek*** (decisión del
+ *    usuario): cada slide trae el bloque completo —nombre + saldo + gráfico +
+ *    acciones— y al deslizar cambia todo junto.
+ * 3. **Dots** dentro de la banda, abajo de las acciones.
+ * 4. Debajo de la banda, el **detalle de la tarjeta en foco**: el historial de la
+ *    cuenta (`MovimientosCuentaClient` de `/cuentas/[id]`, con scroll infinito) o,
+ *    si el foco es el resumen, los **resultados mensuales** (mismo dato del panel
+ *    Resultados, del mes más actual al más antiguo).
  *
- * ⚠️ La cuenta inicial es **la primera del orden configurado** en el CRUD (no se
- * recuerda la última vista).
+ * 🔑 La tarjeta en foco la define **solo el swipe** (se guarda en `sessionStorage`
+ *    para volver a la misma cuenta tras remontar). La **primera** tarjeta es el
+ *    **resumen (Balance Actual)**, con el gráfico de **evolución de Resultados**
+ *    (decisión del usuario 2026-10-02: antes eran barras de aporte por cuenta).
  *
- * 📌 **2026-10-02 — el Balance pasó a ser la PRIMERA tarjeta del carrusel** (antes
- * era una franja suelta de una línea arriba): es siempre la tarjeta de entrada, con
- * el mismo lenguaje visual que las de cuenta pero con tratamiento propio
- * (`BalanceCard`). Debajo del carrusel, **cuando el foco es la tarjeta de balance**,
- * se pinta un **gráfico de barras** con una barra por cuenta que suma al balance
- * (`BalanceBarrasChart`) en lugar de la evolución de una cuenta. Índices del
- * carrusel: **0 = Balance**, 1..N = cuentas.
+ * ⚠️ **Lazy**: el gráfico se monta solo en el **foco ± 1** (`conGrafico` del slide);
+ * el resto reserva el alto con un `Skeleton` hasta acercarse.
+ *
+ * ⚠️ Se eliminaron los **FAB** de Inicio: las acciones viven **dentro de cada
+ * slide** (mismas 3 del FAB "+" en las cuentas y `Gestionar cuentas` en el resumen).
  */
 const PAGINA_VACIA: HistorialPagina = { rows: [], total: 0, hayMas: true };
 
-/** Paso del carrusel en px: ancho de la tarjeta (286) + separación (12, `gap-3`). */
-const PASO = 286 + 12;
+/** Px de scroll a partir de los cuales la top bar se "despega" (translúcida). */
+const UMBRAL_TOPBAR_PX = 8;
 
 /**
- * Clave de `sessionStorage` con la **tarjeta en foco** del carrusel de Inicio
- * (`"0"` = Balance, 1..N = cuenta). Es **por pestaña** y sobrevive al remontaje de
- * la pantalla ⇒ al volver del wizard de un gasto/transferencia/ajuste el carrusel
- * arranca en la MISMA cuenta con la que se entró.
- *
- * 🐞 2026-10-02 (reporte del usuario): el FAB abre el wizard y éste sale con
- * `router.push("/dashboard")` ⇒ `InicioPanel` se **remonta** con `foco = 0` y
- * siempre aparecía la tarjeta de **Balance**, perdiendo la cuenta elegida.
+ * Clave de `sessionStorage` con la **tarjeta en foco** (`"0"` = Balance,
+ * 1..N = cuenta): es por pestaña y sobrevive al remontaje de la pantalla ⇒ al
+ * volver del wizard el carrusel queda en la MISMA cuenta con la que se entró.
  */
 const CLAVE_FOCO = "fp_inicio_foco";
 
@@ -63,7 +57,6 @@ function leerFocoGuardado(): number {
     const n = Number(sessionStorage.getItem(CLAVE_FOCO));
     return Number.isFinite(n) && n > 0 ? n : 0;
   } catch {
-    // Modo privado / storage deshabilitado: se arranca en Balance.
     return 0;
   }
 }
@@ -105,16 +98,10 @@ export function InicioPanel({ data, historialInicial }: InicioPanelProps) {
 
   /**
    * Ref del track del carrusel: guarda el nodo **y restaura la tarjeta en foco**
-   * guardada en `sessionStorage`.
-   *
-   * 🔑 Va en un **ref callback** (fase de commit) y no en un efecto por dos razones:
-   * 1. `sessionStorage` no existe en el server ⇒ leerlo en el render sería un
-   *    desajuste de hidratación.
-   * 2. El `scrollLeft` queda aplicado **antes del primer pintado** (no se llega a
-   *    ver la tarjeta de Balance un instante).
-   *
-   * El índice se recorta a las tarjetas existentes: si la lista de cuentas cambió,
-   * el navegador limita el scroll solo y `onScroll` corrige el foco.
+   * guardada en `sessionStorage`. Va en un **ref callback** (fase de commit) y no
+   * en un efecto: `sessionStorage` no existe en el server (leerlo en el render
+   * sería un desajuste de hidratación) y así el `scrollLeft` queda aplicado **antes
+   * del primer pintado**.
    */
   const montarTrack = useCallback(
     (node: HTMLDivElement | null) => {
@@ -123,23 +110,23 @@ export function InicioPanel({ data, historialInicial }: InicioPanelProps) {
       restauradoRef.current = true;
       const i = Math.min(leerFocoGuardado(), totalTarjetas - 1);
       if (i <= 0) return;
-      node.scrollLeft = i * PASO;
+      node.scrollLeft = i * node.clientWidth;
       setFoco(i);
     },
     [totalTarjetas]
   );
 
   /**
-   * Índice enfocado a partir del scroll del carrusel. Se calcula en el propio
-   * handler (no en un efecto) y solo se llama a `setFoco` cuando **cambia**; al
-   * cambiar queda **guardado en la sesión** para poder volver a esa tarjeta.
+   * Índice enfocado a partir del scroll del carrusel. Cada slide ocupa el **100 %
+   * del ancho** (sin *peek* y sin gap) ⇒ el paso es `clientWidth`.
    */
   const onScroll = () => {
     const el = trackRef.current;
     if (!el) return;
+    const paso = el.clientWidth || 1;
     const i = Math.max(
       0,
-      Math.min(totalTarjetas - 1, Math.round(el.scrollLeft / PASO))
+      Math.min(totalTarjetas - 1, Math.round(el.scrollLeft / paso))
     );
     if (i === foco) return;
     setFoco(i);
@@ -147,110 +134,97 @@ export function InicioPanel({ data, historialInicial }: InicioPanelProps) {
   };
 
   /**
-   * Barras del balance: una por **cuenta que suma al Balance Actual**
-   * (`aportaAlBalance` = switch "Incluir en el balance actual" del CRUD), en el
-   * **orden del carrusel** y con el saldo **convertido a la moneda predeterminada**
-   * (lo resuelve el backend en `getCuentasConEvolucion`), para que las cuentas en
-   * monedas distintas sean comparables entre sí.
+   * **Top bar**: marca en el `<html>` si el contenido salió del tope (para que la
+   * barra pase de transparente a translúcida — ver `globals.css`). Se escucha el
+   * `scroll` del **`<main>` interno** (es quien scrollea; la ventana no) y se llama
+   * al setter en cada evento (el toggle de `classList` es idempotente y barato).
    */
-  const barrasBalance = useMemo(
-    () =>
-      cuentas
-        .filter((c) => c.aportaAlBalance)
-        .map((c) => ({ name: c.title, value: c.saldoPredeterminado })),
-    [cuentas]
-  );
-
-  /** Evolución de la cuenta en foco, en el formato que espera `EvolutionChart`. */
-  const evolucion = useMemo(
-    () =>
-      (cuenta?.values ?? []).map((v, i) => ({
-        name: cuenta?.labels?.[i] ?? "",
-        value: v,
-      })),
-    [cuenta]
-  );
+  useEffect(() => {
+    const root = document.querySelector<HTMLElement>("main");
+    if (!root) return;
+    const onScroll = () => setTopbarScrolled(root.scrollTop > UMBRAL_TOPBAR_PX);
+    onScroll();
+    root.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      root.removeEventListener("scroll", onScroll);
+      // Al salir de Inicio la barra vuelve a su estado transparente.
+      setTopbarScrolled(false);
+    };
+  }, []);
 
   return (
-    <div className="pb-8 pt-4 lg:pt-0">
-      {/* Carrusel: `scroll-snap` nativo + peek lateral de la siguiente.
-          La PRIMERA tarjeta es el **Balance Actual** (la de entrada) y después
-          vienen las cuentas en su orden configurado. */}
+    // A sangre: cancela el padding del `<main>` (px-4/lg:px-6 + pt-[--app-top])
+    // para que la banda llegue hasta los bordes y hasta arriba de todo.
+    <div className="-mx-4 -mt-[var(--app-top)] lg:-mx-6">
+      {/* ───────── BANDA (hero) ───────── */}
       <div
-        ref={montarTrack}
-        onScroll={onScroll}
-        className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 scroll-pl-4 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        data-inicio-hero=""
+        className="relative border-b border-border bg-muted"
+        style={{ paddingTop: "var(--app-top)" }}
       >
-        <div className="w-[286px] shrink-0 snap-start">
-          <BalanceCard
-            balance={numberToCurrency(
-              data.balance,
-              data.monedaPredeterminadaISO
-            )}
-            className={indice === 0 ? undefined : "opacity-60"}
+        {/* Carrusel: full-width, una tarjeta por vista, snap sin peek ni gap. */}
+        <div
+          ref={montarTrack}
+          onScroll={onScroll}
+          className="flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          <CuentaSlide
+            titulo="Balance Actual"
+            monto={numberToCurrency(data.balance, data.monedaPredeterminadaISO)}
+            esBalance
+            evolucion={data.evolucionResultados}
+            monedaISO={data.monedaPredeterminadaISO}
+            conGrafico={indice <= 1}
           />
+          {cuentas.map((c, i) => {
+            const idx = i + 1;
+            return (
+              <CuentaSlide
+                key={c.id}
+                titulo={c.title}
+                monto={c.value}
+                esBalance={false}
+                evolucion={(c.values ?? []).map((v, k) => ({
+                  name: c.labels?.[k] ?? "",
+                  value: v,
+                }))}
+                monedaISO={c.monedaISO ?? data.monedaPredeterminadaISO}
+                cuentaId={c.id ?? undefined}
+                conGrafico={Math.abs(idx - indice) <= 1}
+              />
+            );
+          })}
         </div>
-        {cuentas.map((c, i) => (
-          <div key={c.id} className="w-[286px] shrink-0 snap-start">
-            <AccountCard
-              {...c}
-              sinSparkline
-              soloSeleccionar
-              className={i + 1 === indice ? undefined : "opacity-60"}
+
+        {/* Dots: dentro de la banda, abajo de las acciones. */}
+        <div className="mt-3 flex items-center justify-center gap-1.5 pb-3">
+          {Array.from({ length: totalTarjetas }).map((_, i) => (
+            <i
+              key={i}
+              aria-hidden="true"
+              className={cn(
+                "block h-1.5 rounded-full",
+                i === indice ? "w-4.5 bg-primary" : "w-1.5 bg-border"
+              )}
             />
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
-      {/* Puntos del carrusel: **centrados** y **sin contador "m de n"**
-          (2026-10-02, pedido del usuario: la posición se lee por el punto
-          ancho, el recuento era ruido). */}
-      <div className="mt-3 flex items-center justify-center gap-1.5">
-        {Array.from({ length: totalTarjetas }).map((_, i) => (
-          <i
-            key={i}
-            aria-hidden="true"
-            className={
-              i === indice
-                ? "block h-1.5 w-4.5 rounded-full bg-primary"
-                : "block h-1.5 w-1.5 rounded-full bg-border"
-            }
-          />
-        ))}
-      </div>
-
-      {cuentas.length === 0 && (
-        <p className="mt-4 rounded-2xl border border-border bg-card px-4 py-3 text-[13px] text-subtitle">
-          No hay cuentas cargadas.
-        </p>
-      )}
-
-      {/* Gráfico de la tarjeta en foco: con la del **Balance** (índice 0) es un
-          gráfico de BARRAS con una barra por cuenta que suma al balance; con una
-          cuenta es su evolución. En los dos casos va **sin el nombre dentro del
-          panel** (`encabezado={null}`). */}
-      <div className="mt-4">
-        {indice === 0 ? (
-          <BalanceBarrasChart
-            data={barrasBalance}
-            currency={data.monedaPredeterminadaISO}
-          />
-        ) : (
-          <EvolutionChart
-            data={evolucion}
-            area
-            height={150}
-            currency={cuenta?.monedaISO}
-            encabezado={null}
-          />
+      {/* ── Debajo de la banda: detalle de la tarjeta en foco ── */}
+      <div className="px-4 pt-4 lg:px-6">
+        {cuentas.length === 0 && (
+          <p className="mb-3 rounded-2xl border border-border bg-card px-4 py-3 text-[13px] text-subtitle">
+            No hay cuentas cargadas.
+          </p>
         )}
-      </div>
-
-      {/* Historial de la cuenta en foco, con scroll infinito en la misma pantalla.
-          `key` = cuenta ⇒ al deslizar se pide su página 0. Con la tarjeta de
-          Balance en foco no se pinta: el balance no es una cuenta. */}
-      {cuenta && (
-        <div className="mt-4">
+        {indice === 0 ? (
+          /* Foco = resumen: los resultados mes a mes, en la grilla de movimientos. */
+          <ResultadosMensuales
+            data={data.evolucionResultados}
+            monedaISO={data.monedaPredeterminadaISO}
+          />
+        ) : cuenta ? (
           <MovimientosCuentaClient
             key={cuenta.id}
             embebido
@@ -265,16 +239,8 @@ export function InicioPanel({ data, historialInicial }: InicioPanelProps) {
             }
             monedaPredeterminadaISO={data.monedaPredeterminadaISO}
           />
-        </div>
-      )}
-
-      {/* FAB de la tarjeta en foco: con una **cuenta** registra un movimiento
-          precargado con ella; con el **Balance** lleva a **gestionar cuentas**
-          (2026-10-02: esa tarjeta no tiene acción de registro pero sí la de
-          administrar las cuentas que lo componen). Los dos están siempre
-          montados y se cruzan con un fade: el oculto queda inerte. */}
-      <FabNuevo cuentaId={cuenta?.id} visible={indice > 0} />
-      <FabCuentas visible={indice === 0} />
+        ) : null}
+      </div>
     </div>
   );
 }

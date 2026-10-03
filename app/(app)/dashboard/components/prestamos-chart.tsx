@@ -128,7 +128,7 @@ export function PrestamosChart({
       {/* El título + badges pueden ocupar varias líneas en mobile; el menú (⋮)
           se ancla SIEMPRE al ángulo superior derecho del panel. */}
       <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-[16px] font-semibold text-header">{title}</h3>
+        <h3 className="text-[16px] text-header">{title}</h3>
         {badge}
       </div>
       {/* Leyenda de las dos zonas del gráfico divergente (arriba/abajo). */}
@@ -241,7 +241,7 @@ export function PrestamosChart({
                 style: {
                   fontSize: 11,
                   fill: "var(--muted-foreground)",
-                  fontWeight: 600,
+                  fontWeight: 400,
                 },
               }}
             />

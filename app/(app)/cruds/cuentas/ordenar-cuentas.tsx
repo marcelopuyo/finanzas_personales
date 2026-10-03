@@ -78,7 +78,7 @@ export function OrdenarCuentas({
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
-          <h1 className="text-[18px] font-semibold text-header">
+          <h1 className="text-[18px] text-header">
             Ordenar cuentas
           </h1>
         </div>
@@ -155,7 +155,7 @@ function SortableRow({
       >
         <GripVertical className="h-4 w-4" />
       </button>
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-[12px] font-semibold text-subtitle">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-[12px] text-subtitle">
         {index + 1}
       </span>
       <div className="min-w-0 flex-1">

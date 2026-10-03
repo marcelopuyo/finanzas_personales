@@ -82,7 +82,7 @@ export default function OfflinePage() {
       </span>
 
       <div className="max-w-sm">
-        <h1 className="text-[18px] font-semibold text-header">Sin conexión</h1>
+        <h1 className="text-[18px] text-header">Sin conexión</h1>
         <p className="mt-1.5 text-[13px] text-subtitle">
           No pudimos conectarnos con el servidor. Revisá tu conexión: la app se
           recupera sola cuando vuelva.
@@ -92,7 +92,7 @@ export default function OfflinePage() {
       <button
         type="button"
         onClick={retry}
-        className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+        className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-[13px] text-primary-foreground transition-opacity hover:opacity-90"
       >
         <RefreshCw className="h-4 w-4" />
         Reintentar

@@ -15,7 +15,7 @@ import {
 import { getGastosPaginaAction } from "@/backend/src/actions/gastos-pagina";
 import { eliminarGasto } from "@/backend/src/actions/gastos";
 import type { GastoOut, GastosPagina } from "@/backend/src/queries/gastos";
-import { dateTimeToString, numberToCurrency } from "@/lib/utils";
+import { cn, dateTimeToString, numberToCurrency } from "@/lib/utils";
 import { useTap } from "@/lib/tap";
 import { GastoRow } from "./gasto-row";
 
@@ -31,12 +31,28 @@ interface GastosClientProps {
   primeraPagina: GastosPagina;
   /** ISO de la moneda predeterminada del usuario (en la que está `gasto.monto`). */
   monedaISO: string;
+  /**
+   * **Modo embebido** (2026-10-03, rama `rediseno-ui`): la pantalla de **Gastos**
+   * del dashboard muestra esta misma lista **como su segundo panel** —todos los
+   * gastos, con búsqueda y scroll infinito— en vez de las tarjetas de los últimos
+   * 3 días. Se omite la cabecera (volver + título) y el padding de pantalla;
+   * **no lleva título** (pedido del usuario).
+   */
+  embebido?: boolean;
+  /**
+   * **Filtros del panel** (2026-10-03): el listado respeta los **mismos** filtros
+   * que los gráficos del dashboard —categoría y cuenta—, **menos las fechas**: el
+   * listado muestra todo el historial. Llegan tal como los muestra la UI (con los
+   * rótulos "Sin categoría" / "Sin cuenta").
+   */
+  filtros?: { categorias?: string[]; cuentas?: string[] };
 }
 
 /**
  * Pantalla **`/gastos`** — TODOS los gastos, con búsqueda y scroll infinito
- * (2026-09-30). Se entra desde el "Ver más gastos" de la pestaña *Detalle* del
- * panel Gastos del dashboard.
+ * (2026-09-30). Desde el 2026-10-03 **la misma lista se embebe como segundo panel
+ * de la pantalla Gastos** del dashboard (`embebido`, sin título): así esa pantalla
+ * tiene la **misma resolución** que Ingresos (que lista todos los períodos).
  *
  * - **Mobile (<640px)**: filas multilínea (`GastoRow`) con **swipe para eliminar**
  *   (con confirmación) y **scroll infinito** (IntersectionObserver + centinela).
@@ -51,7 +67,12 @@ interface GastosClientProps {
  * del gasto y sus movimientos ⇒ el efecto es el mismo que eliminar el movimiento
  * desde la pantalla de una cuenta.
  */
-export function GastosClient({ primeraPagina, monedaISO }: GastosClientProps) {
+export function GastosClient({
+  primeraPagina,
+  monedaISO,
+  embebido = false,
+  filtros,
+}: GastosClientProps) {
   const router = useRouter();
   const { go } = usePendingNav();
 
@@ -82,13 +103,22 @@ export function GastosClient({ primeraPagina, monedaISO }: GastosClientProps) {
   const pedidoRef = useRef(0);
   /** Término vigente para los callbacks (sin re-crearlos en cada tecla). */
   const aplicadaRef = useRef("");
+  /** **Filtros vigentes** (categorías/cuentas del panel) para `cargar`. */
+  const filtrosRef = useRef(filtros ?? {});
+  /** Clave de los filtros ya aplicados (para no recargar al montar). */
+  const filtrosAplicadosRef = useRef(JSON.stringify(filtros ?? {}));
 
   /** Pide una tanda (`offset` 0 = recargar desde el principio) y la aplica. */
   const cargar = useCallback(async (offset: number, termino: string) => {
     const token = ++pedidoRef.current;
     setCargando(true);
     try {
-      const pagina = await getGastosPaginaAction(offset, PAGE, termino);
+      const pagina = await getGastosPaginaAction(
+        offset,
+        PAGE,
+        termino,
+        filtrosRef.current
+      );
       // Llegó tarde (el usuario ya buscó otra cosa): se descarta.
       if (token !== pedidoRef.current) return;
       setRows((prev) => (offset === 0 ? pagina.rows : [...prev, ...pagina.rows]));
@@ -118,6 +148,20 @@ export function GastosClient({ primeraPagina, monedaISO }: GastosClientProps) {
     }, DEBOUNCE_MS);
     return () => clearTimeout(t);
   }, [busqueda, cargar]);
+
+  /**
+   * **Filtros del panel** (2026-10-03, pantalla Gastos del dashboard): cuando el
+   * usuario cambia las categorías o las cuentas, el listado se recarga desde el
+   * principio — el `offset` anterior ya no sirve con otro filtro.
+   * ⚠️ Las **fechas** no entran: son solo de los gráficos.
+   */
+  const filtrosKey = JSON.stringify(filtros ?? {});
+  useEffect(() => {
+    if (filtrosKey === filtrosAplicadosRef.current) return;
+    filtrosAplicadosRef.current = filtrosKey;
+    filtrosRef.current = filtros ?? {};
+    void cargar(0, aplicadaRef.current);
+  }, [filtrosKey, filtros, cargar]);
 
   /** Aplica la búsqueda YA (Enter, o el "Limpiar" del campo). */
   const aplicarYa = (texto: string) => {
@@ -245,55 +289,80 @@ export function GastosClient({ primeraPagina, monedaISO }: GastosClientProps) {
     } as ColumnDef<GastoOut>,
   ];
 
-  return (
-    <div className="mx-auto max-w-5xl pb-8 pt-4 lg:pt-0">
-      {/* Encabezado: volver (único punto de entrada: el Detalle de Gastos). */}
-      <div className="mb-4 flex items-center gap-3">
+  /**
+   * **Campo de búsqueda** (se aplica solo ~350 ms después de dejar de escribir).
+   * Se define acá porque se pinta en **dos lugares** según el modo: arriba de todo
+   * en la pantalla `/gastos`, o **dentro del panel** del listado cuando va
+   * embebido en la pantalla Gastos del dashboard (2026-10-03).
+   */
+  const campoBusqueda = (
+    <div className="relative">
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtitle" />
+      <input
+        type="text"
+        value={busqueda}
+        onChange={(e) => setBusqueda(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") aplicarYa(busqueda);
+          if (e.key === "Escape" && busqueda) limpiarBusqueda();
+        }}
+        placeholder="Buscar por descripción, categoría o cuenta..."
+        aria-label="Buscar gasto"
+        enterKeyHint="search"
+        // En el panel el campo va con `bg-muted` (el panel ya es `bg-card`: si no,
+        // el recuadro se confundiría con el fondo del panel).
+        className={cn(
+          "w-full rounded-full border border-border py-2 pl-9 pr-10 text-[13px] text-card-foreground placeholder:text-subtitle focus:outline-none focus:ring-2 focus:ring-primary/40",
+          embebido ? "bg-muted" : "bg-card"
+        )}
+      />
+      {busqueda.length > 0 && (
         <button
           type="button"
-          onClick={() => go("/dashboard", "back")}
-          className="rounded-lg p-1.5 text-subtitle transition-colors hover:bg-muted hover:text-header"
-          aria-label="Volver"
+          {...tapLimpiar}
+          aria-label="Limpiar búsqueda"
+          title="Limpiar"
+          className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-subtitle transition-colors hover:bg-muted hover:text-header"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <X className="h-3.5 w-3.5" />
         </button>
-        <h1 className="min-w-0 truncate text-[18px] font-semibold text-header">
-          Gastos
-        </h1>
-      </div>
+      )}
+    </div>
+  );
 
-      {/* Búsqueda (arriba de todo): la resuelve el server. */}
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtitle" />
-        <input
-          type="text"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") aplicarYa(busqueda);
-            if (e.key === "Escape" && busqueda) limpiarBusqueda();
-          }}
-          placeholder="Buscar por descripción, categoría o cuenta..."
-          aria-label="Buscar gasto"
-          enterKeyHint="search"
-          className="w-full rounded-full border border-border bg-card py-2 pl-9 pr-10 text-[13px] text-card-foreground placeholder:text-subtitle focus:outline-none focus:ring-2 focus:ring-primary/40"
-        />
-        {busqueda.length > 0 && (
+  /** Contador de filas del listado (cuántas de cuántas). */
+  const contadorGastos = (
+    <p className="mb-2 mt-3 text-[12px] text-subtitle">
+      {rows.length} de {total} gastos
+    </p>
+  );
+
+  return (
+    <div className={embebido ? undefined : "mx-auto max-w-5xl pb-8 pt-4 lg:pt-0"}>
+      {/* Encabezado: volver (único punto de entrada: el Detalle de Gastos).
+          En modo **embebido** (panel de la pantalla Gastos) no se pinta: el panel
+          va **sin título** (2026-10-03). */}
+      {!embebido && (
+        <div className="mb-4 flex items-center gap-3">
           <button
             type="button"
-            {...tapLimpiar}
-            aria-label="Limpiar búsqueda"
-            title="Limpiar"
-            className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-subtitle transition-colors hover:bg-muted hover:text-header"
+            onClick={() => go("/dashboard", "back")}
+            className="rounded-lg p-1.5 text-subtitle transition-colors hover:bg-muted hover:text-header"
+            aria-label="Volver"
           >
-            <X className="h-3.5 w-3.5" />
+            <ArrowLeft className="h-4 w-4" />
           </button>
-        )}
-      </div>
+          <h1 className="min-w-0 truncate text-[18px] text-header">
+            Gastos
+          </h1>
+        </div>
+      )}
 
-      <p className="mb-2 mt-3 text-[12px] text-subtitle">
-        {rows.length} de {total} gastos
-      </p>
+      {/* Búsqueda: la resuelve el server. En la pantalla `/gastos` va arriba de
+          todo; en el modo **embebido** viaja **dentro del panel** del listado
+          (2026-10-03, pedido del usuario). */}
+      {!embebido && campoBusqueda}
+      {!embebido && contadorGastos}
 
       {rows.length === 0 ? (
         <div className="flex h-32 items-center justify-center text-center text-[13px] text-subtitle">
@@ -309,6 +378,12 @@ export function GastosClient({ primeraPagina, monedaISO }: GastosClientProps) {
               {/* `overflow-hidden` recorta la fila cuando se corre para revelar
                   las acciones. */}
               <div className="overflow-hidden rounded-lg border border-border bg-card">
+                {embebido && (
+                  <div className="px-3 pt-3">
+                    {campoBusqueda}
+                    {contadorGastos}
+                  </div>
+                )}
                 <ul>
                   {rows.map((g) => (
                     <GastoRow key={g.id} gasto={g} monedaISO={monedaISO} />
@@ -330,6 +405,8 @@ export function GastosClient({ primeraPagina, monedaISO }: GastosClientProps) {
           {/* ── Desde sm (640px): la tabla ── */}
           <div className="hidden sm:block">
             <div className="rounded-lg border border-border bg-card p-4">
+              {embebido && campoBusqueda}
+              {embebido && contadorGastos}
               <DataTable columns={columns} data={rows} pageSize={PAGE} />
             </div>
             {hayMas && (
@@ -400,7 +477,7 @@ export function GastosClient({ primeraPagina, monedaISO }: GastosClientProps) {
               </div>
               <div className="flex justify-between gap-3">
                 <span className="text-subtitle">Monto</span>
-                <span className="font-semibold text-card-foreground">
+                <span className="text-card-foreground">
                   {numberToCurrency(Number(pendiente.monto), monedaISO)}
                 </span>
               </div>

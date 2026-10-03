@@ -117,7 +117,7 @@ export default function PerfilClient({
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <div>
-          <h1 className="text-[18px] font-semibold text-header">Perfil</h1>
+          <h1 className="text-[18px] text-header">Perfil</h1>
           <p className="text-[13px] text-subtitle">
             Opciones de tu cuenta
           </p>
@@ -128,7 +128,7 @@ export default function PerfilClient({
         {/* Cuenta */}
         <section className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center gap-3">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-[14px] font-semibold text-primary-foreground">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-[14px] text-primary-foreground">
               {initials}
             </span>
             <div className="min-w-0">
@@ -202,7 +202,7 @@ export default function PerfilClient({
               type="button"
               onClick={handleGuardarMoneda}
               disabled={savingMoneda || monedaId === monedaPredeterminadaId}
-              className="shrink-0 rounded-md bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="shrink-0 rounded-md bg-primary px-4 py-2 text-[13px] text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {savingMoneda ? "Guardando..." : "Guardar"}
             </button>
@@ -309,7 +309,7 @@ export default function PerfilClient({
           <button
             type="submit"
             disabled={saving}
-            className="w-full rounded-md bg-primary py-2.5 text-[13px] font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="w-full rounded-md bg-primary py-2.5 text-[13px] text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {saving ? "Guardando..." : "Actualizar contraseña"}
           </button>

@@ -48,11 +48,11 @@ function TrabajoCard({ t }: { t: TrabajoOut }) {
   return (
     <>
       <div className="flex items-baseline justify-between gap-2">
-        <span className="truncate text-[14px] font-semibold text-header">
+        <span className="truncate text-[14px] text-header">
           {t.nombre}
         </span>
         {mostraPrecio && (
-          <span className="shrink-0 text-[14px] font-semibold text-value">
+          <span className="shrink-0 text-[14px] text-value">
             {numberToCurrency(t.precioHora ?? 0)}
           </span>
         )}

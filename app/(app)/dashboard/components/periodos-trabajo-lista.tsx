@@ -99,7 +99,7 @@ export function PeriodosTrabajoLista({
             <div className="flex items-center gap-1.5 pb-1.5">
               <span
                 className={cn(
-                  "inline-flex shrink-0 items-center gap-0.5 rounded-full border px-1.5 py-px text-[9px] font-semibold tracking-wide uppercase",
+                  "inline-flex shrink-0 items-center gap-0.5 rounded-full border px-1.5 py-px text-[9px] tracking-wide uppercase",
                   sec.chip
                 )}
               >
@@ -111,7 +111,7 @@ export function PeriodosTrabajoLista({
               <span className="text-[12.5px] text-subtitle">· {nItems}</span>
               <span
                 className={cn(
-                  "ml-auto text-[13.5px] font-semibold tabular-nums",
+                  "ml-auto text-[13.5px] tabular-nums",
                   sec.monto
                 )}
               >
@@ -135,12 +135,12 @@ export function PeriodosTrabajoLista({
                   >
                     {/* Línea 1: trabajo + monto (del color de la sección). */}
                     <div className="flex items-baseline gap-2.5">
-                      <p className="min-w-0 flex-1 text-[13.5px] font-semibold break-words text-header">
+                      <p className="min-w-0 flex-1 text-[13.5px] break-words text-header">
                         {b.trabajo}
                       </p>
                       <span
                         className={cn(
-                          "shrink-0 text-[14.5px] font-semibold tabular-nums",
+                          "shrink-0 text-[14.5px] tabular-nums",
                           sec.monto
                         )}
                       >

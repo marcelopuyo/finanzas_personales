@@ -20,7 +20,7 @@ const columns: ColumnDef<CategoriaGastoOut>[] = [
  */
 function CategoriaCard({ c }: { c: CategoriaGastoOut }) {
   return (
-    <span className="block text-[14px] leading-snug font-semibold break-words text-header">
+    <span className="block text-[14px] leading-snug break-words text-header">
       {c.nombre}
     </span>
   );

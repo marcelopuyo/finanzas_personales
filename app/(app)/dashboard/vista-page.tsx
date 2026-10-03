@@ -1,5 +1,9 @@
 import { fetchDashboardData } from "./dashboard-data";
+import { getGastosPaginado, type GastosPagina } from "@/backend/src/queries/gastos";
 import { DashboardClient, type Vista } from "./dashboard-client";
+
+/** Filas de la primera tanda del listado embebido de gastos. */
+const PAGINA_GASTOS = 20;
 
 /**
  * Render de una **vista del dashboard** (2026-10-01, rama `rediseno-ui`).
@@ -15,8 +19,23 @@ import { DashboardClient, type Vista } from "./dashboard-client";
  */
 export async function VistaPage({ vista }: { vista: Vista }) {
   let data: Awaited<ReturnType<typeof fetchDashboardData>>;
+  /**
+   * Primera tanda del listado **completo** de gastos (solo en la pantalla Gastos):
+   * su segundo panel embebe `GastosClient` (búsqueda + scroll infinito) en vez de
+   * las tarjetas de los últimos 3 días ⇒ misma resolución que Ingresos.
+   */
+  let gastosPrimeraPagina: GastosPagina | undefined;
   try {
-    data = await fetchDashboardData();
+    const [d, g] = await Promise.all([
+      fetchDashboardData(),
+      vista === "gastos"
+        ? getGastosPaginado({ offset: 0, limit: PAGINA_GASTOS }).catch(
+            () => undefined
+          )
+        : Promise.resolve(undefined),
+    ]);
+    data = d;
+    gastosPrimeraPagina = g;
   } catch (error) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -31,5 +50,11 @@ export async function VistaPage({ vista }: { vista: Vista }) {
       </div>
     );
   }
-  return <DashboardClient data={data} solo={vista} />;
+  return (
+    <DashboardClient
+      data={data}
+      solo={vista}
+      gastosPrimeraPagina={gastosPrimeraPagina}
+    />
+  );
 }

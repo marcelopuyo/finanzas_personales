@@ -31,6 +31,37 @@ const ESTILO_FAB = {
   bottom: "calc(4.75rem + env(safe-area-inset-bottom))",
 } as const;
 
+/** Ruta del CRUD de cuentas (la única acción de la tarjeta de resumen). */
+export const HREF_CUENTAS = "/cruds/cuentas?origen=dashboard";
+
+/**
+ * Las **3 acciones del registro manual** (Gasto · Transferencia · Ajuste de
+ * cuenta) con la **cuenta en foco** precargada en el wizard.
+ *
+ * 🔑 **Fuente ÚNICA** (2026-10-02): la usan el FAB "+" de Inicio y las
+ * **acciones dentro del carrusel** —así el set queda idéntico en los dos lugares—.
+ */
+export function accionesNuevoMovimiento(cuentaId?: number) {
+  /** URL del wizard en modo directo, con el concepto y el rol de la cuenta. */
+  const hrefWizard = (tipo: string, param: "cuenta" | "origen") =>
+    cuentaId != null
+      ? `/movimientos/nuevo/${tipo}?${new URLSearchParams({ [param]: String(cuentaId) })}`
+      : `/movimientos/nuevo/${tipo}`;
+  return [
+    { icon: Receipt, label: "Gasto", href: hrefWizard("gasto", "cuenta") },
+    {
+      icon: Send,
+      label: "Transferencia",
+      href: hrefWizard("transferencia", "origen"),
+    },
+    {
+      icon: Settings2,
+      label: "Ajuste de cuenta",
+      href: hrefWizard("ajuste", "cuenta"),
+    },
+  ];
+}
+
 /**
  * **FAB "+"** (2026-10-01, rama `rediseno-ui`) — la entrada al registro.
  *
@@ -72,21 +103,7 @@ export function FabNuevo({
   const prefetch = usePrefetchNav();
   const [open, setOpen] = useState(false);
 
-  /** URL del wizard en modo directo, con el concepto y el rol de la cuenta. */
-  const hrefWizard = (tipo: string, param: "cuenta" | "origen") =>
-    cuentaId != null
-      ? `/movimientos/nuevo/${tipo}?${new URLSearchParams({ [param]: String(cuentaId) })}`
-      : `/movimientos/nuevo/${tipo}`;
-
-  const acciones = [
-    { icon: Receipt, label: "Gasto", href: hrefWizard("gasto", "cuenta") },
-    {
-      icon: Send,
-      label: "Transferencia",
-      href: hrefWizard("transferencia", "origen"),
-    },
-    { icon: Settings2, label: "Ajuste de cuenta", href: hrefWizard("ajuste", "cuenta") },
-  ];
+  const acciones = accionesNuevoMovimiento(cuentaId);
 
   return (
     <>
@@ -158,7 +175,7 @@ export function FabNuevo({
 export function FabCuentas({ visible = true }: { visible?: boolean }) {
   return (
     <Link
-      href="/cruds/cuentas?origen=dashboard"
+      href={HREF_CUENTAS}
       data-fab-cuentas=""
       aria-label="Gestionar cuentas"
       title="Gestionar cuentas"

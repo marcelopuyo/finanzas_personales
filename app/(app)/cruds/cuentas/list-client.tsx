@@ -74,11 +74,11 @@ function CuentaCard({
   return (
     <>
       <div className="flex items-baseline justify-between gap-2">
-        <span className="truncate text-[14px] font-semibold text-header">
+        <span className="truncate text-[14px] text-header">
           {c.nombre}
         </span>
         <span className="flex shrink-0 items-center gap-1.5">
-          <span className="text-[14px] font-semibold text-value">
+          <span className="text-[14px] text-value">
             {numberToCurrency(c.saldo, c.moneda?.codigoISO ?? "ARS")}
           </span>
           {orden != null && (

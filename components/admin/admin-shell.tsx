@@ -90,7 +90,7 @@ export default function AdminShell({
           {/* Marca */}
           <Link href="/admin" className="flex shrink-0 items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-primary" />
-            <span className="hidden text-[14px] font-semibold text-sidebar-foreground sm:inline">
+            <span className="hidden text-[14px] text-sidebar-foreground sm:inline">
               Finanzas
             </span>
             <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[11px] font-medium text-primary">
@@ -127,7 +127,7 @@ export default function AdminShell({
               className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-sidebar-hover"
               aria-label="Opciones de usuario"
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-[12px] font-semibold text-primary-foreground">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-[12px] text-primary-foreground">
                 {initials}
               </span>
               <span className="hidden text-left md:block">

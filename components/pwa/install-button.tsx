@@ -60,7 +60,7 @@ export function InstallButton() {
         {hint === "ios" ? (
           <ol className="space-y-3 text-[13px] text-card-foreground">
             <li className="flex items-start gap-2">
-              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary">
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] text-primary">
                 1
               </span>
               <span>
@@ -69,7 +69,7 @@ export function InstallButton() {
               </span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary">
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] text-primary">
                 2
               </span>
               <span>
@@ -77,7 +77,7 @@ export function InstallButton() {
               </span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary">
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] text-primary">
                 3
               </span>
               <span>

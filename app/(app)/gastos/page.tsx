@@ -8,9 +8,9 @@ const PRIMERA_PAGINA = 20;
 /**
  * Pantalla **`/gastos`** — todos los gastos del usuario (2026-09-30).
  *
- * Se entra desde el **"Ver más gastos"** de la pestaña *Detalle* del panel
- * Gastos del dashboard (que ahora muestra tarjetas de los últimos 3 días):
- * acá está la lista completa, con **búsqueda** y **scroll infinito**.
+ * ⚠️ Desde el 2026-10-03 **ya no tiene punto de entrada en la UI**: la pantalla
+ * Gastos del dashboard embebe esta misma lista, así que desapareció el botón
+ * "Ver más gastos". La ruta sigue viva (marcadores, historial y la voz).
  *
  * El server resuelve la **primera tanda** (así la pantalla abre con datos, sin
  * spinner); las siguientes las pide el cliente con `getGastosPaginaAction`.

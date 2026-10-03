@@ -68,7 +68,7 @@ export function SparkLineChart({
           {labelTooltip(tooltip.label)}
         </p>
       )}
-      <p className="text-[11px] font-semibold leading-tight text-card-foreground">
+      <p className="text-[11px] leading-tight text-card-foreground">
         {numberToCurrency(tooltip.value, currency)}
       </p>
     </div>

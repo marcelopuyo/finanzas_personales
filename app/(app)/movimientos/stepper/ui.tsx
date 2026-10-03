@@ -56,7 +56,7 @@ export function StepShell({
   return (
     <StepShellBase
       encabezado={
-        <h1 className="mb-1 text-[18px] font-semibold text-header">
+        <h1 className="mb-1 text-[18px] text-header">
           {tituloPagina}
         </h1>
       }
@@ -148,7 +148,7 @@ export function StepShellFintech({
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <h1 className="text-[17px] font-semibold text-header">{titulo}</h1>
+        <h1 className="text-[17px] text-header">{titulo}</h1>
         {!direct && (
           <span className="ml-auto text-[12px] text-subtitle">
             {step}/{total}
@@ -196,7 +196,7 @@ export function BotonPrincipal({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-3.5 text-[15px] font-semibold text-primary-foreground transition-opacity hover:enabled:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+      className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-3.5 text-[15px] text-primary-foreground transition-opacity hover:enabled:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
     >
       {children}
     </button>

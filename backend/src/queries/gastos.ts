@@ -4,6 +4,7 @@ import { requireUserId } from "../lib/auth";
 import { CategoriaGasto } from "../entities/categoria-gasto.entity";
 import { Gasto } from "../entities/gasto.entity";
 import { Movimiento } from "../entities/movimiento.entity";
+import { SIN_CATEGORIA, SIN_CUENTA } from "@/lib/filtros-dashboard";
 
 // ============================================================
 // Tipos de salida (coinciden con los Response DTOs del backend)
@@ -232,6 +233,14 @@ export interface GastosPaginaOpciones {
   limit?: number;
   /** Texto a buscar (descripción, categoría o cuenta de pago). */
   search?: string;
+  /**
+   * **Filtros del panel** (2026-10-03): el listado respeta los MISMOS filtros que
+   * los gráficos —**menos las fechas**, que solo aplican a los gráficos—. Viajan
+   * como los **nombres** que muestra la UI, incluido el rótulo "sin"
+   * (`SIN_CATEGORIA` / `SIN_CUENTA`, ver `lib/filtros-dashboard.ts`).
+   */
+  categorias?: string[];
+  cuentas?: string[];
 }
 
 /** Tope de filas por pedido: el tamaño de página lo propone el cliente. */
@@ -255,6 +264,8 @@ export async function getGastosPaginado({
   offset = 0,
   limit = 20,
   search = "",
+  categorias = [],
+  cuentas: cuentasFiltro = [],
 }: GastosPaginaOpciones = {}): Promise<GastosPagina> {
   const userId = await requireUserId();
   const ds = await getDb();
@@ -287,6 +298,45 @@ export async function getGastosPaginado({
       { q: `%${q}%` }
     );
   }
+
+  // ── Filtros del panel (2026-10-03) ──
+  // **Categoría**: por nombre; el rótulo "Sin categoría" matchea los gastos SIN
+  // categoría (el `leftJoin` deja `categoria.nombre` en NULL).
+  const cats = categorias.filter((c) => c !== SIN_CATEGORIA);
+  if (cats.length && categorias.includes(SIN_CATEGORIA)) {
+    qb.andWhere("(categoria.nombre IN (:...cats) OR categoria.nombre IS NULL)", {
+      cats,
+    });
+  } else if (cats.length) {
+    qb.andWhere("categoria.nombre IN (:...cats)", { cats });
+  } else if (categorias.includes(SIN_CATEGORIA)) {
+    qb.andWhere("categoria.nombre IS NULL");
+  }
+
+  // **Cuenta**: la del **pago** (el gasto guarda la cuenta en sus movimientos, no
+  // en una columna). "Sin cuenta" = sin ningún movimiento de pago vivo.
+  const ctas = cuentasFiltro.filter((c) => c !== SIN_CUENTA);
+  const partes: string[] = [];
+  const paramsCuenta: { ctas?: string[] } = {};
+  if (ctas.length) {
+    partes.push(
+      `EXISTS (
+         SELECT 1 FROM movimiento m
+         JOIN cuenta cu ON cu.id = m."cuentaId"
+        WHERE m."gastoId" = g.id AND m.eliminado = false AND cu.nombre IN (:...ctas)
+       )`
+    );
+    paramsCuenta.ctas = ctas;
+  }
+  if (cuentasFiltro.includes(SIN_CUENTA)) {
+    partes.push(
+      `NOT EXISTS (
+         SELECT 1 FROM movimiento m
+        WHERE m."gastoId" = g.id AND m.eliminado = false
+       )`
+    );
+  }
+  if (partes.length) qb.andWhere(`(${partes.join(" OR ")})`, paramsCuenta);
 
   const [rows, total] = await qb.skip(desde).take(cuantos).getManyAndCount();
   const mapped = rows.map(mapGasto);

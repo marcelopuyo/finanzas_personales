@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Preview · Barra inferior con Solar</title>
+<style>
+  :root{
+    --bg:#151517; --card:#353638; --muted:#1e1e20; --border:#3e3f42;
+    --header:#ffffff; --subtitle:#808185; --label:#9a9b9e; --primary:#4c6ef5;
+  }
+  *{box-sizing:border-box}
+  b,strong{font-weight:400}
+  body{margin:0;background:#0e0e10;color:#e2e4f0;
+       font:14px/1.5 -apple-system,"SF Pro Display",Inter,"Segoe UI",Roboto,sans-serif;
+       padding:26px 22px 90px}
+  h1{font-size:19px;margin:0 0 6px;color:#fff;font-weight:400}
+  h2{font-size:15px;margin:0 0 14px;color:#fff;font-weight:400;display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+  h2 .tag{margin-left:auto;font-size:10px;color:var(--label);letter-spacing:.06em;text-transform:uppercase}
+  .lead{color:var(--subtitle);margin:0 0 8px;max-width:1080px}
+  .lead b{color:#e2e4f0}
+  .meta{color:#6a6b6f;font-size:11.5px;margin:0 0 26px;max-width:1080px}
+  .sec{margin:0 0 40px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(376px,1fr));gap:20px}
+  .cell{display:flex;flex-direction:column;gap:7px}
+  .cell .cap{font-size:11.5px;color:var(--subtitle);margin:0}
+  .cell .cap .num{color:var(--label);font-variant-numeric:tabular-nums}
+  /* ── barra inferior (mock fiel del componente real) ── */
+  .nav{display:flex;align-items:stretch;height:64px;background:#18181b;border:1px solid var(--border);
+       border-radius:14px;overflow:hidden}
+  .nav.antes{border-color:#4a4a4f}
+  .nav .it{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+           color:var(--subtitle)}
+  .nav .it .lbl{font-size:10px;line-height:1}
+  .nav .it.on{color:#ffffff}
+  .duo{display:flex;align-items:flex-end;gap:8px;color:#e8e9ec}
+  code{background:#202024;padding:1px 5px;border-radius:5px;font-size:11px;color:#c9cad0}
+</style>
+</head>
+<body>
+
+<h1>Barra inferior con el set <b>Solar</b> — inactivo <code>linear</code> · activo <code>bold-duotone</code></h1>
+<p class="lead">Así queda la barra con lo que elegiste: los 4 destinos en <b>Solar</b>, el tab activo en <b>blanco</b> y en la
+  variante <b>bold-duotone</b> (capa principal blanca al 100%, capa secundaria al 50%) ⇒ el estado activo se distingue por
+  <b>forma y relleno</b>, no sólo por color.</p>
+<p class="meta">Todos los iconos son los reales (mismo dibujo que traen los paquetes). ⚠️ El icono de <b>Ingresos</b> que está
+  puesto ahora (<code>money-bag</code> de Solar) a 21px se lee como un <b>portafolio</b>: en la sección de abajo están las
+  opciones de <b>monedas apiladas</b>, que Solar <b>no tiene</b>.</p>
+
+<div class="sec">
+  <h2>La barra como quedó <span class="tag">tamaño real 21px</span></h2>
+  <div class="grid" id="final"></div>
+</div>
+
+<div class="sec">
+  <h2>Icono de «Ingresos» — alternativas dentro de Solar <span class="tag">set sin monedas apiladas</span></h2>
+  <p class="lead">Solar <b>no tiene</b> icono de monedas apiladas ni de billetes múltiples: la familia “dinero” son estos.
+    En cada celda está la barra con <b>Ingresos activo</b> y al lado el icono suelto en los dos estados (inactivo / activo).</p>
+  <div class="grid" id="ingresos"></div>
+</div>
+
+<div class="sec">
+  <h2>«Ingresos» con MONEDAS APILADAS <span class="tag">hay que salir de Solar — sólo ese slot</span></h2>
+  <p class="lead">Solar no tiene monedas, así que este slot tiene que venir de otro set (el resto de la barra sigue en Solar).
+    Los primeros 3 son los que traen <b>par trazo + relleno</b>, así el activo también queda resuelto; los últimos 3 son de
+    sets que <b>sólo tienen trazo</b> (el activo sería el mismo dibujo en blanco).</p>
+  <p class="meta">Ojo: en la barra conviven dos sets ⇒ el trazo de ese icono puede verse un poco más grueso o más fino que Solar.</p>
+  <div class="grid" id="monedas"></div>
+  <h3 style="font-size:12px;margin:26px 0 10px;color:#9a9b9e;font-weight:400;letter-spacing:.05em;text-transform:uppercase">
+    Lo mismo pero mirando otro lado dentro de Solar (sin monedas)</h3>
+  <div class="grid" id="otrasSolar"></div>
+</div>
+
+<div class="sec">
+  <h2>Opciones para Inicio y Gastos <span class="tag">por si preferís la otra variante</span></h2>
+  <div class="grid" id="otros"></div>
+</div>
+
+<script>
+  /** Estilos del set Solar: inactivo / activo. */
+  const INACTIVO = "linear";
+  const ACTIVO = "bold-duotone";
+
+  const ico = (full, px) =>
+    '<iconify-icon icon="' + full + '" style="font-size:' + px + 'px;line-height:1"></iconify-icon>';
+
+  /** Icono de Solar con sus dos variantes (las de la app). */
+  const solar = (n) => ({ off: "solar:" + n + "-" + INACTIVO, on: "solar:" + n + "-" + ACTIVO });
+  /** Icono de otro set, con variante rellena opcional. */
+  const par = (off, on) => ({ off, on: on || off });
+
+  /** Barra con un tab activo (el resto en su variante inactiva). */
+  const barra = (slots, activoIdx, extraClass) => {
+    const lbls = ["Inicio", "Gastos", "Ingresos", "Más"];
+    return (
+      '<div class="nav ' + (extraClass || "") + '">' +
+      slots
+        .map((s, i) => {
+          const on = i === activoIdx;
+          return (
+            '<div class="it' + (on ? " on" : "") + '"><span>' +
+            ico(on ? s.on : s.off, 21) +
+            '</span><span class="lbl">' + lbls[i] + "</span></div>"
+          );
+        })
+        .join("") +
+      "</div>"
+    );
+  };
+
+  /** Par de variantes suelto (inactivo gris · activo blanco a 21 y 34px). */
+  const sueltos = (s) =>
+    '<div class="duo"><span>' + ico(s.off, 21) + "</span><span>" + ico(s.on, 21) +
+    "</span><span>" + ico(s.on, 34) + "</span></div>";
+
+  const celda = (cap, html) => '<div class="cell">' + html + '<p class="cap">' + cap + "</p></div>";
+
+  const BASE = [solar("home"), solar("bill-list"), solar("money-bag"), solar("hamburger-menu")];
+
+  // ── 1) la barra final, con cada tab activo ──
+  document.getElementById("final").innerHTML = [
+    ["Inicio activo", 0],
+    ["Gastos activo", 1],
+    ["Ingresos activo", 2],
+    ["Más activo", 3],
+  ]
+    .map(([cap, i]) => celda(cap, barra(BASE, i)))
+    .join("");
+
+  // ── 2) alternativas de Ingresos dentro de Solar ──
+  const INGRESOS = [
+    "money-bag", "money-roll", "banknote", "banknote-2", "wallet-money",
+    "dollar-minimalistic", "hand-money", "safe-square", "card-receive",
+  ];
+  document.getElementById("ingresos").innerHTML = INGRESOS.map((name, i) => {
+    const cand = solar(name);
+    const num = String(i + 1).padStart(2, "0");
+    const cap =
+      '<span class="num">' + num + "</span>" + (name === "money-bag" ? " · el que está puesto ahora (parece portafolio)" : "");
+    return celda(cap, barra([BASE[0], BASE[1], cand, BASE[3]], 2) + sueltos(cand));
+  }).join("");
+
+  // ── 2.b) monedas apiladas (fuera de Solar) ──
+  const MONEDAS = [
+    ["phosphor", "coins", par("ph:coins", "ph:coins-fill")],
+    ["remix", "coins", par("ri:coins-line", "ri:coins-fill")],
+    ["hugeicons (el 08 que pediste)", "coins-01", par("hugeicons:coins-01")],
+    ["lucide (ya instalado)", "coins", par("lucide:coins")],
+    ["tabler", "coins", par("tabler:coins")],
+    ["iconoir", "coins", par("iconoir:coins")],
+  ];
+  document.getElementById("monedas").innerHTML = MONEDAS.map(([set, nombre, cand]) =>
+    celda("<span class=\"num\">" + set + "</span> · " + nombre, barra([BASE[0], BASE[1], cand, BASE[3]], 2) + sueltos(cand))
+  ).join("");
+
+  // ── 2.c) otras de Solar que no parecen portafolio ──
+  document.getElementById("otrasSolar").innerHTML = ["money-roll", "banknote", "wallet-money", "dollar-minimalistic", "hand-money"]
+    .map((name) => {
+      const cand = solar(name);
+      return celda("<span class=\"num\">" + name + "</span>", barra([BASE[0], BASE[1], cand, BASE[3]], 2) + sueltos(cand));
+    })
+    .join("");
+
+  // ── 3) alternativas de Inicio y Gastos ──
+  document.getElementById("otros").innerHTML = [
+    celda("Inicio con <code>home-2</code>", barra([solar("home-2"), BASE[1], BASE[2], BASE[3]], 0)),
+    celda("Gastos con <code>bill</code>", barra([BASE[0], solar("bill"), BASE[2], BASE[3]], 1)),
+    celda("Gastos con <code>bill-check</code>", barra([BASE[0], solar("bill-check"), BASE[2], BASE[3]], 1)),
+    celda("Más con <code>menu-dots</code>", barra([BASE[0], BASE[1], BASE[2], solar("menu-dots")], 3)),
+  ].join("");
+
+  // ── 4) SVG reales (un fetch por colección; resuelve ALIASES) ──
+  (async () => {
+    const nodos = [...document.querySelectorAll("iconify-icon")];
+    const porPrefijo = new Map();
+    for (const n of nodos) {
+      const [pre, nombre] = (n.getAttribute("icon") || "").split(":");
+      if (!pre || !nombre) continue;
+      if (!porPrefijo.has(pre)) porPrefijo.set(pre, new Set());
+      porPrefijo.get(pre).add(nombre);
+    }
+    for (const [pre, set] of porPrefijo) {
+      let data;
+      try {
+        const r = await fetch("https://api.iconify.design/" + pre + ".json?icons=" + [...set].join(","));
+        data = await r.json();
+      } catch {
+        continue;
+      }
+      const W = data.width ?? 24;
+      const H = data.height ?? 24;
+      for (const n of nodos) {
+        const [p, nombre] = (n.getAttribute("icon") || "").split(":");
+        if (p !== pre) continue;
+        // ojo: muchos nombres son ALIAS ⇒ hay que resolver el padre.
+        let ic = data.icons?.[nombre];
+        let al = data.aliases?.[nombre];
+        while (!ic && al) {
+          ic = data.icons?.[al.parent];
+          al = data.aliases?.[al.parent];
+        }
+        if (!ic?.body) {
+          console.warn("icono no encontrado:", pre + ":" + nombre);
+          continue;
+        }
+        const svg =
+          '<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 ' +
+          (ic.width ?? W) +
+          " " +
+          (ic.height ?? H) +
+          '">' +
+          ic.body +
+          "</svg>";
+        const span = document.createElement("span");
+        span.style.display = "inline-flex";
+        span.style.lineHeight = "1";
+        span.style.fontSize = getComputedStyle(n).fontSize;
+        span.style.color = getComputedStyle(n).color;
+        span.innerHTML = svg;
+        n.replaceWith(span);
+      }
+    }
+  })();
+</script>
+</body>
+</html>

@@ -34,7 +34,7 @@ function PersonaCard({ p }: { p: PersonaOut }) {
   const contacto = [p.telefono, p.mail].filter(Boolean).join(" · ");
   return (
     <>
-      <span className="block text-[14px] leading-snug font-semibold break-words text-header">
+      <span className="block text-[14px] leading-snug break-words text-header">
         {p.nombre}
       </span>
       <p className="mt-0.5 truncate text-[11.5px] text-subtitle">

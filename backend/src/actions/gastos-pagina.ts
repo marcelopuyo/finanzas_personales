@@ -13,7 +13,18 @@ import { getGastosPaginado } from "../queries/gastos";
 export async function getGastosPaginaAction(
   offset: number,
   limit: number,
-  search: string
+  search: string,
+  /**
+   * Filtros del panel (categoría y cuenta, **sin** la fecha): el listado de la
+   * pantalla Gastos respeta los mismos filtros que sus gráficos (2026-10-03).
+   */
+  filtros?: { categorias?: string[]; cuentas?: string[] }
 ) {
-  return getGastosPaginado({ offset, limit, search });
+  return getGastosPaginado({
+    offset,
+    limit,
+    search,
+    categorias: filtros?.categorias,
+    cuentas: filtros?.cuentas,
+  });
 }

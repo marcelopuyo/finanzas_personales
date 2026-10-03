@@ -304,7 +304,7 @@ export function MovimientosCuentaClient({
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
-            <h1 className="min-w-0 truncate text-[18px] font-semibold text-header">
+            <h1 className="min-w-0 truncate text-[18px] text-header">
               {cuenta.nombre}
             </h1>
           </div>
@@ -312,21 +312,20 @@ export function MovimientosCuentaClient({
           {/* Resumen: el mismo dato que mostraba el recuadro del popup. */}
           <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted px-3 py-2">
             <p className="text-[13px] font-medium text-header">Saldo actual</p>
-            <p className="text-[18px] font-semibold tracking-tight text-value">
+            <p className="text-[18px] tracking-tight text-value">
               {numberToCurrency(cuenta.saldo, cuenta.monedaISO)}
             </p>
           </div>
         </>
       )}
 
-      <h2
-        className={cn(
-          "mb-2 text-[16px] font-semibold text-header",
-          embebido ? "mt-0" : "mt-5"
-        )}
-      >
-        Movimientos
-      </h2>
+      {/* Título de la sección. En el modo **embebido** (panel de Inicio) va
+          **dentro** del recuadro de las filas (2026-10-03): «ningún título fuera
+          del panel». En la pantalla de la cuenta (`/cuentas/[id]`) el título vive
+          arriba, como encabezado de la lista. */}
+      {!embebido && (
+        <h2 className="mb-2 mt-5 text-[16px] text-header">Movimientos</h2>
+      )}
 
       {rows.length === 0 ? (
         <div className="flex h-32 items-center justify-center text-[13px] text-subtitle">
@@ -340,6 +339,11 @@ export function MovimientosCuentaClient({
               {/* `overflow-hidden` recorta la fila cuando se corre para
                   revelar las acciones. */}
               <div className="overflow-hidden rounded-lg border border-border bg-card">
+                {embebido && (
+                  <div className="border-b border-border px-3 py-2.5">
+                    <h2 className="text-[15.5px] text-header">Movimientos</h2>
+                  </div>
+                )}
                 <ul>
                   {rows.map((m) => (
                     <MovimientoRow
@@ -367,6 +371,9 @@ export function MovimientosCuentaClient({
           {/* ── Desde sm (640px): la tabla de siempre ── */}
           <div className="hidden sm:block">
             <div className="rounded-lg border border-border bg-card p-4">
+              {embebido && (
+                <h2 className="mb-3 text-[15.5px] text-header">Movimientos</h2>
+              )}
               <DataTable columns={columns} data={rows} pageSize={PAGE} />
             </div>
             {hayMas && (
@@ -436,7 +443,7 @@ export function MovimientosCuentaClient({
                 <span className="text-subtitle">Monto</span>
                 <span
                   className={cn(
-                    "font-semibold",
+                    "text-[13px]",
                     (pendingAnular.categoria ?? "").toLowerCase() === "egreso"
                       ? "text-danger"
                       : "text-success"

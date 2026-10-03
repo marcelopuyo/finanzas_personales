@@ -85,7 +85,7 @@ export async function enviarEmailVerificacion(
       `<p style="font-size:14px;color:#9a9b9e;line-height:1.5">` +
       `Para terminar de crear tu cuenta en <strong style="color:#f0f1f2">Finanzas Personales</strong>, hacé clic en el botón:</p>` +
       `<p style="text-align:center;margin:20px 0">` +
-      `<a href="${link}" style="display:inline-block;background:#4c6ef5;color:#ffffff;padding:10px 18px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600">Verificar email</a>` +
+      `<a href="${link}" style="display:inline-block;background:#4c6ef5;color:#ffffff;padding:10px 18px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:400">Verificar email</a>` +
       `</p>` +
       `<p style="font-size:12px;color:#808185">Si el botón no funciona, copiá este enlace en tu navegador:<br>` +
       `<a href="${link}" style="color:#4c6ef5;word-break:break-all">${link}</a></p>` +

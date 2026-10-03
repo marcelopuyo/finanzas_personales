@@ -50,7 +50,7 @@ export function GastoRow({ gasto, monedaISO }: GastoRowProps) {
         </div>
         {/* Columna de dinero: ancho propio, alineada a la derecha. */}
         <div className="shrink-0 space-y-0.5 text-right">
-          <p className="text-[15px] font-semibold leading-4.75 tabular-nums text-card-foreground">
+          <p className="text-[15px] leading-4.75 tabular-nums text-card-foreground">
             {numberToCurrency(Number(gasto.monto), monedaISO)}
           </p>
           <p className="whitespace-nowrap text-[11px] leading-3.5 tabular-nums text-subtitle">

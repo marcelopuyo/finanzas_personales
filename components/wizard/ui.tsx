@@ -82,7 +82,7 @@ export function StepShell({
         ))}
       <div className="rounded-lg border border-border bg-card p-5">
         {titulo && (
-          <h2 className="mb-4 text-[15px] font-semibold text-header">{titulo}</h2>
+          <h2 className="mb-4 text-[15px] text-header">{titulo}</h2>
         )}
         <div className="space-y-4">{children}</div>
       </div>
@@ -390,7 +390,7 @@ export function NumberField({
           value={text}
           onChange={(e) => handleChange(e.target.value)}
           placeholder={placeholder ?? "0"}
-          className="w-45 max-w-full bg-transparent text-center text-[34px] font-semibold leading-none tracking-tight text-header placeholder:text-subtitle/50 focus:outline-none"
+          className="w-45 max-w-full bg-transparent text-center text-[34px] leading-none tracking-tight text-header placeholder:text-subtitle/50 focus:outline-none"
         />
         {allowNegative && (
           <button
@@ -400,7 +400,7 @@ export function NumberField({
               text.startsWith("-") ? "Cambiar a positivo" : "Cambiar a negativo"
             }
             title="+/−"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-border bg-muted text-[16px] font-semibold text-card-foreground transition-colors hover:bg-muted/70"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-border bg-muted text-[16px] text-card-foreground transition-colors hover:bg-muted/70"
           >
             {text.startsWith("-") ? "+" : "−"}
           </button>
@@ -429,7 +429,7 @@ export function NumberField({
               text.startsWith("-") ? "Cambiar a positivo" : "Cambiar a negativo"
             }
             title="+/−"
-            className="absolute inset-y-1 right-1 flex w-10 items-center justify-center rounded-md border border-border bg-muted text-[16px] font-semibold text-card-foreground transition-colors hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="absolute inset-y-1 right-1 flex w-10 items-center justify-center rounded-md border border-border bg-muted text-[16px] text-card-foreground transition-colors hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-primary/40"
           >
             {text.startsWith("-") ? "+" : "−"}
           </button>

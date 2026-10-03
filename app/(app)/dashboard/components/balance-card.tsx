@@ -46,7 +46,7 @@ export function BalanceCard({ balance, className }: BalanceCardProps) {
         <Scale className="h-4.5 w-4.5 flex-none text-primary" />
         <div className="min-w-0">
           <p className="text-[12px] leading-4 text-label">Balance Actual</p>
-          <p className="mt-0.5 truncate text-[18px] font-semibold leading-7 tracking-tight text-success">
+          <p className="mt-0.5 truncate text-[18px] leading-7 tracking-tight text-success">
             {balance}
           </p>
         </div>

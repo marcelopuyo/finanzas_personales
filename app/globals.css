@@ -278,6 +278,27 @@ html:has([data-barra-nav]) .fp-fab-acciones {
    estaba presente: desde el rediseño el dictado se dispara desde la **top bar** y
    el contenedor `.fp-voz-fab` solo aloja la burbuja, que cuelga del techo. */
 
+/* ─────────────────────────────────────────────────────────────────────────
+   TOP BAR de INICIO (2026-10-02 · rama `rediseno-ui`)
+
+   En Inicio la banda (hero) va A SANGRE y arranca en el borde superior ⇒ la top
+   bar empieza **transparente** (sin fondo ni borde) para que la banda se vea
+   continua. Apenas el contenido sale del tope, la **página** marca
+   `html.fp-inicio-scrolled` y la barra pasa a **semitransparente con blur** + su
+   línea inferior, con el contenido pasando por detrás.
+   El tono es el de la banda (`--muted`) ⇒ la transición no "salta" de color.
+   ───────────────────────────────────────────────────────────────────────── */
+.topbar-inicio {
+  background-color: transparent;
+  border-bottom-color: transparent;
+}
+html.fp-inicio-scrolled .topbar-inicio {
+  background-color: color-mix(in srgb, var(--muted) 78%, transparent);
+  border-bottom-color: var(--border);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
 /* Aparición del dial (el `+` gira a ✕ en el componente). */
 @keyframes dial-in {
   from {

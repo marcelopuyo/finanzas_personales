@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Preview · Paneles: título adentro y sin negritas</title>
+<style>
+  :root{
+    /* Tokens REALES del tema oscuro (app/globals.css .dark) */
+    --bg:#151517; --card:#353638; --muted:#1e1e20; --border:#3e3f42;
+    --header:#ffffff; --subtitle:#808185; --label:#9a9b9e; --value:#ffffff;
+    --card-fg:#e2e4f0; --primary:#4c6ef5; --success:#51cf66; --warning:#ffd43b;
+    --danger:#ff6b6b; --tabs:#2b2c2e;
+  }
+  *{box-sizing:border-box}
+  /* Ni el documento de preview lleva negritas: <b> solo se usa para resaltar color. */
+  b,strong{font-weight:400}
+  body{margin:0;background:#0e0e10;color:#e2e4f0;
+       font:14px/1.5 -apple-system,"SF Pro Display",Inter,"Segoe UI",Roboto,sans-serif;
+       padding:26px 22px 70px}
+  h1{font-size:19px;margin:0 0 6px;color:#fff;font-weight:400}
+  h1+p{margin-top:0}
+  .lead{color:var(--subtitle);margin:0 0 14px;max-width:1120px}
+  .meta{color:#6a6b6f;font-size:11.5px;margin:0 0 26px;max-width:1120px}
+  .row{display:flex;flex-wrap:wrap;gap:26px;align-items:flex-start;margin:0 0 34px}
+  .col{display:flex;flex-direction:column;gap:9px}
+  .col h2{font-size:13px;margin:0;color:#fff;font-weight:400;display:flex;gap:8px;align-items:center}
+  .cap{font-size:11.5px;color:var(--subtitle);max-width:364px;margin:0}
+  .cap b{color:#e2e4f0;font-weight:400}
+  .tag{display:inline-block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;
+       padding:2px 7px;border-radius:999px;border:1px solid var(--border);color:var(--subtitle);white-space:nowrap}
+  .tag.a{border-color:rgba(76,110,245,.6);color:#93a8ff;background:rgba(76,110,245,.12)}
+  .tag.b{border-color:rgba(81,207,102,.5);color:#8fe39b;background:rgba(81,207,102,.1)}
+  .tag.x{border-color:rgba(255,107,107,.5);color:#ff9a9a;background:rgba(255,107,107,.1)}
+  .tag.n{border-color:rgba(255,212,59,.45);color:#ffd97a;background:rgba(255,212,59,.1)}
+  .divider{border-top:1px solid #26262a;margin:8px 0 32px}
+
+  /* ═══════════════ MARCO TELÉFONO (390 px) — ACÁ NO HAY NINGUNA NEGRITA ═══════════════ */
+  .phone{width:364px;background:var(--bg);border:1px solid var(--border);border-radius:24px;
+         overflow:hidden;box-shadow:0 22px 55px rgba(0,0,0,.55)}
+  .scr{padding:10px 11px 12px;display:flex;flex-direction:column;gap:12px}
+  .stat{height:22px;display:flex;align-items:center;justify-content:space-between;
+        font-size:10px;color:#c9cad0;padding:0 3px}
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 13px}
+  .panel.tight{padding:11px 11px 6px}
+  /* títulos / textos — TODO en 400 */
+  .tt{font-size:15.5px;line-height:1.15;color:var(--header)}
+  .tt-sm{font-size:13px;line-height:1.2;color:var(--subtitle)}
+  .tt-lab{font-size:10.5px;line-height:1.2;color:var(--label);letter-spacing:.11em;text-transform:uppercase}
+  .tt-num{font-size:22px;line-height:1.1;color:var(--header);font-variant-numeric:tabular-nums;letter-spacing:-.015em}
+  .mut{color:var(--subtitle)}
+  .lbl{font-size:10px;color:var(--label);letter-spacing:.06em;text-transform:uppercase}
+  .num{font-variant-numeric:tabular-nums}
+  .num-s{font-size:12.5px;color:var(--card-fg);font-variant-numeric:tabular-nums}
+  /* filas internas del panel */
+  .ph1{display:flex;align-items:center;gap:8px}
+  .ph2{display:flex;align-items:center;gap:8px;margin-top:9px}
+  .sp{flex:1}
+  .acc{width:30px;height:30px;flex:0 0 30px;border-radius:9px;border:1px solid var(--border);
+       background:transparent;color:var(--subtitle);display:flex;align-items:center;
+       justify-content:center;font-size:14px;letter-spacing:.06em}
+  .acc.ghost{border-color:transparent}
+  /* badge (hoy) */
+  .badge{border:1px solid var(--border);background:var(--muted);border-radius:8px;padding:4px 7px}
+  .badge .l{font-size:10px;line-height:1;color:var(--muted-foreground,#9a9b9e)}
+  .badge .v{margin-top:3px;font-size:12px;line-height:1;color:var(--header)}
+  /* tabs (Tabs real) */
+  .tabs{display:inline-flex;gap:2px;background:var(--tabs);border-radius:999px;padding:2px}
+  .tabs span{font-size:12px;line-height:20px;padding:0 5px;border-radius:999px;color:var(--subtitle)}
+  .tabs span.on{background:var(--card);color:var(--card-fg);box-shadow:0 1px 2px rgba(0,0,0,.25)}
+  /* filtros */
+  .fbtn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);background:var(--muted);
+        border-radius:9px;padding:6px 9px;font-size:12px;color:var(--card-fg)}
+  .fbtn i{width:6px;height:6px;border-radius:99px;background:var(--primary);display:block}
+  /* gráfico */
+  .chart{display:flex;align-items:center;gap:14px;margin-top:12px}
+  .donut{position:relative;width:132px;height:132px;flex:0 0 132px}
+  .center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+  .center .l{font-size:9.5px;color:var(--subtitle);letter-spacing:.07em;text-transform:uppercase}
+  .center .v{font-size:15px;color:var(--header);font-variant-numeric:tabular-nums}
+  .center .s{font-size:9px;color:var(--subtitle)}
+  .leg{flex:1;display:flex;flex-direction:column;gap:7px;min-width:0}
+  .leg .li{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--card-fg)}
+  .leg .dot{width:8px;height:8px;border-radius:3px;flex:0 0 8px}
+  .leg .li .m{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--subtitle)}
+  .empty{height:150px;display:flex;align-items:center;justify-content:center;font-size:12.5px;color:var(--subtitle)}
+  /* filas de listado dentro del panel */
+  .li2{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--border);font-size:12.5px}
+  .li2:first-of-type{border-top:0}
+  .li2 .n{margin-left:auto;font-variant-numeric:tabular-nums}
+  .gr{color:var(--success)} .rd{color:var(--danger)} .bl{color:#93a8ff}
+  .flag{font-size:10px;color:#ff9a9a}
+  .ok{font-size:10px;color:#8fe39b}
+  .note{font-size:11px;color:var(--subtitle);margin:4px 0 0;max-width:364px}
+  /* escritorio */
+  .desk{width:840px;background:var(--bg);border:1px solid var(--border);border-radius:18px;
+        overflow:hidden;box-shadow:0 22px 55px rgba(0,0,0,.55)}
+  .desk .scr{padding:12px 14px 14px}
+  .desk .panel{padding:14px 16px}
+  .desk .ph1,.desk .ph2{margin-top:0}
+  .desk .head{display:flex;align-items:center;gap:10px}
+  .dec{border:1px solid var(--border);border-radius:16px;padding:16px 18px;max-width:1120px;background:#17171a;margin-bottom:18px}
+  .dec h3{margin:0 0 10px;font-size:14px;color:#fff;font-weight:400}
+  .dec ul{margin:0;padding-left:18px;font-size:12.5px;color:var(--subtitle)}
+  .dec ul li{margin:7px 0}
+  .dec b{color:#e2e4f0;font-weight:400}
+  code{background:#202024;padding:1px 5px;border-radius:5px;font-size:11.5px;color:#c9cad0}
+  table{border-collapse:collapse;font-size:12.5px;color:var(--subtitle);width:100%;max-width:820px}
+  th,td{text-align:left;padding:6px 10px 6px 0;border-bottom:1px solid #26262a}
+  th{color:#c9cad0;font-weight:400;font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+  td b{color:#e2e4f0;font-weight:400}
+</style>
+</head>
+<body>
+
+<h1>Paneles · el título adentro y sin negritas</h1>
+<p class="lead">
+  Dos cambios pedidos: <b>ningún título fuera de los paneles</b> (hoy el encabezado de cada pantalla vive en su
+  <b>propia tarjeta</b> arriba del panel del gráfico, y “Trabajo” en Ingresos flota sin tarjeta) y <b>cero bold / semibold</b>
+  dentro de los paneles. Como sin peso la jerarquía se pierde, hay que reemplazarla por <b>tamaño, color y espacio</b>:
+  estas son 4 alternativas de encabezado, todas con el título <b>adentro</b> del panel.
+</p>
+<p class="meta">
+  Preview descartable · 2026-10-02 · rama <code>rediseno-ui</code> · mock estático (no es la app) · datos inventados.
+  Los rótulos de este documento (A/B/C/D, notas) son <b>anotación</b>; dentro de los marcos <b>no hay ninguna negrita</b>
+  (todo 400, incluso los montos).
+</p>
+
+<!-- ══════════════════════════ HOY ══════════════════════════ -->
+<h2 style="font-size:14px;color:#fff;font-weight:400;margin:0 0 14px">Cómo está hoy (el problema)</h2>
+<div class="row">
+  <div class="col">
+    <h2><span class="tag x">hoy</span> 2 tarjetas + 1 título suelto</h2>
+    <div class="phone"><div class="scr">
+      <div class="stat"><span>9:41</span><span>▮▮▮</span></div>
+      <div class="panel">
+        <div class="ph1">
+          <span class="tt">Gastos</span>
+          <span class="badge"><span class="l">Mes actual</span><span class="v">US$ 12.480,00</span></span>
+          <span class="sp"></span>
+          <span class="fbtn"><i></i>2</span>
+          <span class="acc">⋯</span>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph1"><span class="sp"></span><span class="tabs"><span class="on">Resumen</span><span>Histórico</span></span></div>
+        <div class="chart">
+          <div class="donut">
+            <svg viewBox="0 0 120 120" width="132" height="132">
+              <circle cx="60" cy="60" r="42" fill="none" stroke="#2b2c2e" stroke-width="17"/>
+              <g transform="rotate(-90 60 60)" fill="none" stroke-width="17">
+                <circle cx="60" cy="60" r="42" stroke="#4c6ef5" stroke-dasharray="110.8 263.9"/>
+                <circle cx="60" cy="60" r="42" stroke="#51cf66" stroke-dasharray="68.6 263.9" stroke-dashoffset="-110.8"/>
+                <circle cx="60" cy="60" r="42" stroke="#ffd43b" stroke-dasharray="47.5 263.9" stroke-dashoffset="-179.4"/>
+                <circle cx="60" cy="60" r="42" stroke="#9775fa" stroke-dasharray="36.9 263.9" stroke-dashoffset="-226.9"/>
+              </g>
+            </svg>
+            <div class="center"><span class="l">Total</span><span class="v">US$ 12.480,00</span></div>
+          </div>
+          <div class="leg">
+            <div class="li"><i class="dot" style="background:#4c6ef5"></i>Alimentación<span class="m">5.230</span></div>
+            <div class="li"><i class="dot" style="background:#51cf66"></i>Vivienda<span class="m">3.240</span></div>
+            <div class="li"><i class="dot" style="background:#ffd43b"></i>Transporte<span class="m">2.240</span></div>
+            <div class="li"><i class="dot" style="background:#9775fa"></i>Otros<span class="m">1.770</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph1"><span class="tt">Últimos gastos</span></div>
+        <div style="margin-top:8px">
+          <div class="li2"><span>Super Mercado</span><span class="n">US$ 84,20</span></div>
+          <div class="li2"><span>Nafta</span><span class="n">US$ 46,00</span></div>
+        </div>
+      </div>
+    </div></div>
+    <p class="cap">
+      El título de la pantalla (<b>Gastos</b>) y sus controles van en una tarjeta <b>aparte</b> del panel del gráfico ⇒ se leen
+      <b>dos paneles</b> y el alto se desperdicia. En Ingresos, <b>Trabajo</b> directamente <b>flota</b> sobre el fondo, sin tarjeta.
+    </p>
+  </div>
+
+  <!-- ══════════════════════════ A ══════════════════════════ -->
+  <div class="col">
+    <h2><span class="tag a">A</span> Todo el encabezado adentro (2 filas)</h2>
+    <div class="phone"><div class="scr">
+      <div class="stat"><span>9:41</span><span>▮▮▮</span></div>
+      <div class="panel">
+        <div class="ph1"><span class="tt">Gastos</span><span class="sp"></span><span class="acc">⋯</span></div>
+        <div class="ph2">
+          <span class="badge"><span class="l">Mes actual</span><span class="v">US$ 12.480,00</span></span>
+          <span class="sp"></span>
+          <span class="tabs"><span class="on">Resumen</span><span>Histórico</span></span>
+        </div>
+        <div class="chart">
+          <div class="donut">
+            <svg viewBox="0 0 120 120" width="132" height="132">
+              <circle cx="60" cy="60" r="42" fill="none" stroke="#2b2c2e" stroke-width="17"/>
+              <g transform="rotate(-90 60 60)" fill="none" stroke-width="17">
+                <circle cx="60" cy="60" r="42" stroke="#4c6ef5" stroke-dasharray="110.8 263.9"/>
+                <circle cx="60" cy="60" r="42" stroke="#51cf66" stroke-dasharray="68.6 263.9" stroke-dashoffset="-110.8"/>
+                <circle cx="60" cy="60" r="42" stroke="#ffd43b" stroke-dasharray="47.5 263.9" stroke-dashoffset="-179.4"/>
+                <circle cx="60" cy="60" r="42" stroke="#9775fa" stroke-dasharray="36.9 263.9" stroke-dashoffset="-226.9"/>
+              </g>
+            </svg>
+            <div class="center"><span class="l">Total</span><span class="v">US$ 12.480,00</span></div>
+          </div>
+          <div class="leg">
+            <div class="li"><i class="dot" style="background:#4c6ef5"></i>Alimentación<span class="m">5.230</span></div>
+            <div class="li"><i class="dot" style="background:#51cf66"></i>Vivienda<span class="m">3.240</span></div>
+            <div class="li"><i class="dot" style="background:#ffd43b"></i>Transporte<span class="m">2.240</span></div>
+            <div class="li"><i class="dot" style="background:#9775fa"></i>Otros<span class="m">1.770</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph1"><span class="tt">Últimos gastos</span></div>
+        <div style="margin-top:8px">
+          <div class="li2"><span>Super Mercado</span><span class="n">US$ 84,20</span></div>
+          <div class="li2"><span>Nafta</span><span class="n">US$ 46,00</span></div>
+        </div>
+      </div>
+    </div></div>
+    <p class="cap">
+      Lo de hoy, <b>una tarjeta menos</b>: el mismo encabezado (título · badge · pestañas · ⋯) pasa adentro del panel.
+      Es el <b>cambio mínimo</b> y el que menos acuerdos necesita. Costo: el panel arranca con 2 filas de encabezado
+      (~86 px) antes del gráfico.
+    </p>
+  </div>
+
+  <!-- ══════════════════════════ B ══════════════════════════ -->
+  <div class="col">
+    <h2><span class="tag b">B</span> Título solo + contexto en gris</h2>
+    <div class="phone"><div class="scr">
+      <div class="stat"><span>9:41</span><span>▮▮▮</span></div>
+      <div class="panel">
+        <div class="ph1"><span class="tt">Gastos</span><span class="sp"></span><span class="acc">⋯</span></div>
+        <div class="ph2">
+          <span class="tt-sm">Mes actual · US$ 12.480,00</span>
+          <span class="sp"></span>
+          <span class="tabs"><span class="on">Resumen</span><span>Histórico</span></span>
+        </div>
+        <div class="chart">
+          <div class="donut">
+            <svg viewBox="0 0 120 120" width="132" height="132">
+              <circle cx="60" cy="60" r="42" fill="none" stroke="#2b2c2e" stroke-width="17"/>
+              <g transform="rotate(-90 60 60)" fill="none" stroke-width="17">
+                <circle cx="60" cy="60" r="42" stroke="#4c6ef5" stroke-dasharray="110.8 263.9"/>
+                <circle cx="60" cy="60" r="42" stroke="#51cf66" stroke-dasharray="68.6 263.9" stroke-dashoffset="-110.8"/>
+                <circle cx="60" cy="60" r="42" stroke="#ffd43b" stroke-dasharray="47.5 263.9" stroke-dashoffset="-179.4"/>
+                <circle cx="60" cy="60" r="42" stroke="#9775fa" stroke-dasharray="36.9 263.9" stroke-dashoffset="-226.9"/>
+              </g>
+            </svg>
+            <div class="center"><span class="l">Total</span><span class="v">US$ 12.480,00</span></div>
+          </div>
+          <div class="leg">
+            <div class="li"><i class="dot" style="background:#4c6ef5"></i>Alimentación<span class="m">5.230</span></div>
+            <div class="li"><i class="dot" style="background:#51cf66"></i>Vivienda<span class="m">3.240</span></div>
+            <div class="li"><i class="dot" style="background:#ffd43b"></i>Transporte<span class="m">2.240</span></div>
+            <div class="li"><i class="dot" style="background:#9775fa"></i>Otros<span class="m">1.770</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph1"><span class="tt">Últimos gastos</span><span class="sp"></span><span class="tt-sm">3 días</span></div>
+        <div style="margin-top:8px">
+          <div class="li2"><span>Super Mercado</span><span class="n">US$ 84,20</span></div>
+          <div class="li2"><span>Nafta</span><span class="n">US$ 46,00</span></div>
+        </div>
+      </div>
+    </div></div>
+    <p class="cap">
+      El <b>badge deja de ser píldora</b> y pasa a ser una línea de contexto en gris (12.5 px) al lado de las pestañas: el
+      encabezado pesa mucho menos y el dato sigue ahí. La fila 2 se lee como <b>controles del gráfico</b>, no como título.
+    </p>
+  </div>
+
+  <!-- ══════════════════════════ C ══════════════════════════ -->
+  <div class="col">
+    <h2><span class="tag n">C</span> El número es el protagonista</h2>
+    <div class="phone"><div class="scr">
+      <div class="stat"><span>9:41</span><span>▮▮▮</span></div>
+      <div class="panel">
+        <div class="ph1"><span class="tt-sm">Gastos · mes actual</span><span class="sp"></span><span class="acc">⋯</span></div>
+        <div class="ph2">
+          <span class="tt-num">US$ 12.480,00</span>
+          <span class="sp"></span>
+          <span class="tabs"><span class="on">Resumen</span><span>Histórico</span></span>
+        </div>
+        <div class="chart">
+          <div class="donut">
+            <svg viewBox="0 0 120 120" width="132" height="132">
+              <circle cx="60" cy="60" r="42" fill="none" stroke="#2b2c2e" stroke-width="17"/>
+              <g transform="rotate(-90 60 60)" fill="none" stroke-width="17">
+                <circle cx="60" cy="60" r="42" stroke="#4c6ef5" stroke-dasharray="110.8 263.9"/>
+                <circle cx="60" cy="60" r="42" stroke="#51cf66" stroke-dasharray="68.6 263.9" stroke-dashoffset="-110.8"/>
+                <circle cx="60" cy="60" r="42" stroke="#ffd43b" stroke-dasharray="47.5 263.9" stroke-dashoffset="-179.4"/>
+                <circle cx="60" cy="60" r="42" stroke="#9775fa" stroke-dasharray="36.9 263.9" stroke-dashoffset="-226.9"/>
+              </g>
+            </svg>
+            <div class="center"><span class="l">Total</span><span class="v">US$ 12.480,00</span></div>
+          </div>
+          <div class="leg">
+            <div class="li"><i class="dot" style="background:#4c6ef5"></i>Alimentación<span class="m">5.230</span></div>
+            <div class="li"><i class="dot" style="background:#51cf66"></i>Vivienda<span class="m">3.240</span></div>
+            <div class="li"><i class="dot" style="background:#ffd43b"></i>Transporte<span class="m">2.240</span></div>
+            <div class="li"><i class="dot" style="background:#9775fa"></i>Otros<span class="m">1.770</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph1"><span class="tt-sm">Últimos gastos</span><span class="sp"></span><span class="tt-sm">3 días</span></div>
+        <div style="margin-top:8px">
+          <div class="li2"><span>Super Mercado</span><span class="n">US$ 84,20</span></div>
+          <div class="li2"><span>Nafta</span><span class="n">US$ 46,00</span></div>
+        </div>
+      </div>
+    </div></div>
+    <p class="cap">
+      El nombre de la pantalla se achica a <b>contexto</b> (13 px gris) y el <b>monto del mes</b> toma el lugar del título
+      (22 px, 400). Sin negrita, la jerarquía la da el <b>tamaño</b>. ⚠️ El tab activo de la barra inferior ya dice en qué
+      pantalla estás ⇒ el nombre puede vivir en segundo plano.
+    </p>
+  </div>
+
+  <!-- ══════════════════════════ D ══════════════════════════ -->
+  <div class="col">
+    <h2><span class="tag b">D</span> Una sola fila (rótulo)</h2>
+    <div class="phone"><div class="scr">
+      <div class="stat"><span>9:41</span><span>▮▮▮</span></div>
+      <div class="panel">
+        <div class="ph1">
+          <span class="tt-lab">Gastos</span>
+          <span class="sp"></span>
+          <span class="tabs"><span class="on">Resumen</span><span>Histórico</span></span>
+          <span class="acc">⋯</span>
+        </div>
+        <div class="chart">
+          <div class="donut">
+            <svg viewBox="0 0 120 120" width="132" height="132">
+              <circle cx="60" cy="60" r="42" fill="none" stroke="#2b2c2e" stroke-width="17"/>
+              <g transform="rotate(-90 60 60)" fill="none" stroke-width="17">
+                <circle cx="60" cy="60" r="42" stroke="#4c6ef5" stroke-dasharray="110.8 263.9"/>
+                <circle cx="60" cy="60" r="42" stroke="#51cf66" stroke-dasharray="68.6 263.9" stroke-dashoffset="-110.8"/>
+                <circle cx="60" cy="60" r="42" stroke="#ffd43b" stroke-dasharray="47.5 263.9" stroke-dashoffset="-179.4"/>
+                <circle cx="60" cy="60" r="42" stroke="#9775fa" stroke-dasharray="36.9 263.9" stroke-dashoffset="-226.9"/>
+              </g>
+            </svg>
+            <div class="center"><span class="l">Mes actual</span><span class="v">US$ 12.480,00</span></div>
+          </div>
+          <div class="leg">
+            <div class="li"><i class="dot" style="background:#4c6ef5"></i>Alimentación<span class="m">5.230</span></div>
+            <div class="li"><i class="dot" style="background:#51cf66"></i>Vivienda<span class="m">3.240</span></div>
+            <div class="li"><i class="dot" style="background:#ffd43b"></i>Transporte<span class="m">2.240</span></div>
+            <div class="li"><i class="dot" style="background:#9775fa"></i>Otros<span class="m">1.770</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph1"><span class="tt-lab">Últimos gastos</span><span class="sp"></span><span class="tt-sm">3 días</span></div>
+        <div style="margin-top:8px">
+          <div class="li2"><span>Super Mercado</span><span class="n">US$ 84,20</span></div>
+          <div class="li2"><span>Nafta</span><span class="n">US$ 46,00</span></div>
+        </div>
+      </div>
+    </div></div>
+    <p class="cap">
+      El encabezado más bajo posible (~34 px): el título se convierte en <b>rótulo en mayúsculas</b> (10.5 px, gris) y el
+      <b>badge desaparece</b> porque el dato ya está escrito en el centro del gráfico. ✅ Entra incluso a 320 px.
+      Usa el <b>mismo rótulo chico</b> que ya tienen las tarjetas de cuenta (<code>MONTO</code>, <code>SALDO</code>).
+    </p>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════ SECCIONES / LISTADOS ══════════════════════════ -->
+<h1 style="font-size:17px">Los títulos de sección (listados) también van adentro</h1>
+<p class="lead" style="max-width:1120px">
+  Hoy <b>Trabajo</b> (Ingresos) es lo único que <b>flota</b> sobre el fondo, y en Préstamos el listado arranca con
+  <b>“Listado”</b> como si fuera otra pantalla. Con el mismo criterio, cada sección pasa a ser <b>un panel</b> y su título
+  va adentro, junto a su ⋯ / su contador.
+</p>
+<div class="row">
+  <div class="col">
+    <h2><span class="tag a">sección</span> Trabajo (Ingresos) — hoy flota</h2>
+    <div class="phone"><div class="scr">
+      <div class="panel">
+        <div class="ph1"><span class="tt">Trabajo</span><span class="sp"></span><span class="acc">⋯</span></div>
+        <div class="ph2">
+          <span class="tt-sm">Pendiente US$ 3.248,99 · 31 ítems</span>
+          <span class="sp"></span>
+          <span class="tt-sm gr">Por cobrar US$ 1.985,54</span>
+        </div>
+        <div style="margin-top:10px">
+          <div class="li2"><span>Labado Autos</span><span class="n gr">US$ 400,00</span></div>
+          <div class="li2"><span>QA Test – Horas variables</span><span class="n gr">US$ 40,00</span></div>
+          <div class="li2"><span>QA Test – Por Tarea</span><span class="n gr">US$ 423,45</span></div>
+          <div class="li2 mut"><span>75 cobrados</span><span class="n">ver todos</span></div>
+        </div>
+      </div>
+    </div></div>
+    <p class="cap">
+      Título + resumen de tandas dentro del panel, y las <b>filas dentro del mismo panel</b> (hoy viven en una tarjeta
+      aparte, separadas del título que las describe). El ⋯ queda en el ángulo derecho del panel.
+    </p>
+  </div>
+
+  <div class="col">
+    <h2><span class="tag a">sección</span> Últimos gastos / Préstamos</h2>
+    <div class="phone"><div class="scr">
+      <div class="panel">
+        <div class="ph1"><span class="tt">Préstamos</span><span class="sp"></span><span class="acc">⋯</span></div>
+        <div class="ph2">
+          <span class="tt-sm">Saldo neto ARS · $ 475.000,00</span>
+          <span class="sp"></span>
+          <span class="tt-sm">USD · US$ 2.500,00</span>
+        </div>
+        <div style="margin-top:10px">
+          <div class="li2"><span>Préstamo USD temporal</span><span class="n rd">US$ 2.500,00</span></div>
+          <div class="li2"><span>Prestamo viaje</span><span class="n rd">$ 50.000,00</span></div>
+          <div class="li2 mut"><span>4 préstamos · 2 saldados</span><span class="n">ver todos</span></div>
+        </div>
+      </div>
+    </div></div>
+    <p class="cap">
+      Sin el rótulo suelto <b>“Listado”</b>: el panel del gráfico arriba (Préstamos + saldos) y el listado abajo con su
+      propio encabezado adentro. Los <b>saldos netos</b> dejan de ser píldoras y pasan a texto gris.
+    </p>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════ ESCRITORIO ══════════════════════════ -->
+<h1 style="font-size:17px">En escritorio alcanza una sola fila</h1>
+<p class="lead" style="max-width:900px">Desde <code>sm</code> (640 px) el mismo encabezado de <b>A</b> entra cómodo en <b>una fila</b>: título · badge · (Filtros) · pestañas · ⋯.</p>
+<div class="row">
+  <div class="col">
+    <div class="desk"><div class="scr">
+      <div class="panel">
+        <div class="head">
+          <span class="tt">Gastos</span>
+          <span class="badge"><span class="l">Mes actual</span><span class="v">US$ 12.480,00</span></span>
+          <span class="fbtn"><i></i>2</span>
+          <span class="sp"></span>
+          <span class="tabs"><span class="on">Resumen</span><span>Histórico</span></span>
+          <span class="acc">⋯</span>
+        </div>
+        <div class="chart" style="margin-top:16px">
+          <div class="donut" style="width:170px;height:170px;flex:0 0 170px">
+            <svg viewBox="0 0 120 120" width="170" height="170">
+              <circle cx="60" cy="60" r="42" fill="none" stroke="#2b2c2e" stroke-width="15"/>
+              <g transform="rotate(-90 60 60)" fill="none" stroke-width="15">
+                <circle cx="60" cy="60" r="42" stroke="#4c6ef5" stroke-dasharray="110.8 263.9"/>
+                <circle cx="60" cy="60" r="42" stroke="#51cf66" stroke-dasharray="68.6 263.9" stroke-dashoffset="-110.8"/>
+                <circle cx="60" cy="60" r="42" stroke="#ffd43b" stroke-dasharray="47.5 263.9" stroke-dashoffset="-179.4"/>
+                <circle cx="60" cy="60" r="42" stroke="#9775fa" stroke-dasharray="36.9 263.9" stroke-dashoffset="-226.9"/>
+              </g>
+            </svg>
+            <div class="center"><span class="l">Total</span><span class="v" style="font-size:17px">US$ 12.480,00</span></div>
+          </div>
+          <div class="leg" style="max-width:320px">
+            <div class="li"><i class="dot" style="background:#4c6ef5"></i>Alimentación<span class="m">5.230</span></div>
+            <div class="li"><i class="dot" style="background:#51cf66"></i>Vivienda<span class="m">3.240</span></div>
+            <div class="li"><i class="dot" style="background:#ffd43b"></i>Transporte<span class="m">2.240</span></div>
+            <div class="li"><i class="dot" style="background:#9775fa"></i>Otros<span class="m">1.770</span></div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<div class="dec">
+  <h3>La escala sin negritas (jerarquía por tamaño / color / aire)</h3>
+  <table>
+    <tr><th>Rol</th><th>Hoy</th><th>Propuesto</th><th>Ejemplo</th></tr>
+    <tr><td>Título de panel</td><td>16 px · 600 · blanco</td><td><b>15.5 px · 400 · blanco</b></td><td><span class="tt">Gastos</span></td></tr>
+    <tr><td>Subtítulo / contexto</td><td>11–13 px · 400–600</td><td><b>12.5 px · 400 · gris</b></td><td><span class="tt-sm">Mes actual · US$ 12.480,00</span></td></tr>
+    <tr><td>Rótulo de dato</td><td>10 px · 400 · gris</td><td>10 px · 400 · gris (igual)</td><td><span class="lbl">Monto</span></td></tr>
+    <tr><td>Número importante</td><td>16–18 px · 600</td><td><b>17–22 px · 400 · tabular</b></td><td><span class="tt-num">US$ 12.480,00</span></td></tr>
+    <tr><td>Fila / monto de fila</td><td>14.5 px · 600</td><td><b>12.5–14 px · 400</b></td><td><span class="num-s">US$ 84,20</span></td></tr>
+    <tr><td>Énfasis</td><td>peso</td><td><b>color</b> (verde / rojo / ámbar / primario)</td><td><span class="gr">US$ 1.985,54</span></td></tr>
+  </table>
+  <p class="note">Regla: si algo tenía que “gritar” con negrita, ahora grita con <b>color</b> o con <b>tamaño</b> — nunca con peso.</p>
+</div>
+
+<div class="dec">
+  <h3>Qué habría que tocar (alcance) — y 2 preguntas</h3>
+  <ul>
+    <li><b>Encabezados sueltos → adentro del panel</b>: en <code>dashboard-client.tsx</code> desaparecen las 3 filas-tarjeta (<code>gastosEncabezado</code>, <code>ingresosEncabezado</code>, Resultados y Préstamos) y su contenido pasa al <code>encabezado</code> del panel; <code>ingresosSeccion</code> (Trabajo) pasa a ser un panel con las filas adentro.</li>
+    <li><b>Sin negritas</b>: <code>line-chart</code>, <code>donut-chart</code>, <code>prestamos-chart</code> y <code>stat-badge</code> (título + valor), más los <code>font-semibold</code> de lo que vive dentro de los paneles: <code>gastos-tarjetas</code>, <code>periodos-trabajo-lista</code>, <code>periodos-grid</code>, <code>resultados-mensuales</code>, <code>sparkline-chart</code>, <code>chart-tooltip</code>, <code>account-card</code>/<code>balance-card</code>/<code>cuenta-slide</code>, <code>trabajo-client</code>.</li>
+    <li><b>Pregunta 1 · alcance</b>: ¿es <b>solo los paneles del dashboard</b> (Gastos · Ingresos · Préstamos · Inicio) o <b>toda la app</b>? (En toda la app hay ~112 <code>font-semibold/bold</code> repartidos en 51 archivos: CRUDs, wizards, tablas, PDF, login.)</li>
+    <li><b>Pregunta 2 · badge “Mes actual”</b>: si el panel ya muestra el total del gráfico, ¿el badge se conserva como píldora (A), pasa a texto gris (B) o se elimina (C/D)?</li>
+    <li>⚠️ Nada de esto está implementado: es solo el mock. Decidida la alternativa, se aplica en la rama <code>rediseno-ui</code>.</li>
+  </ul>
+</div>
+
+</body>
+</html>

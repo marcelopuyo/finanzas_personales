@@ -167,13 +167,13 @@ function PeriodoCard({
   return (
     <li className="rounded-[10px] border border-border bg-muted px-3 py-2.5">
       <div className="flex items-start gap-2.5">
-        <p className="min-w-0 flex-1 truncate text-[13.5px] leading-4.5 font-semibold text-card-foreground">
+        <p className="min-w-0 flex-1 truncate text-[13.5px] leading-4.5 text-card-foreground">
           {trabajo}
         </p>
         <div className="flex shrink-0 flex-col items-end gap-0.5">
           <span
             className={cn(
-              "inline-flex items-center rounded-full px-2 py-0.5 text-[12px] font-semibold tabular-nums",
+              "inline-flex items-center rounded-full px-2 py-0.5 text-[12px] tabular-nums",
               fechaCobro
                 ? "bg-success/10 text-success"
                 : "bg-danger/10 text-danger"

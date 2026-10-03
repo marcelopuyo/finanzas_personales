@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { SlidersHorizontal } from "lucide-react";
-import { StatBadge } from "@/components/ui/stat-badge";
+import { PanelHeader } from "./components/panel-header";
 import { Tabs } from "@/components/ui/tabs";
 import { Modal } from "@/components/ui/modal";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,7 +15,8 @@ import { EvolutionChart } from "./components/line-chart";
 import { PrestamosChart } from "./components/prestamos-chart";
 import { PrestamosActionsMenu } from "./components/prestamos-actions-menu";
 import { GastosActionsMenu } from "./components/gastos-actions-menu";
-import { GastosTarjetas } from "./components/gastos-tarjetas";
+import { GastosClient } from "@/app/(app)/gastos/gastos-client";
+import { TrabajoClient } from "@/app/(app)/trabajo/trabajo-client";
 import type { DashboardData } from "./dashboard-data";
 import { gastosEvolucionPor } from "./gastos-agrupacion";
 import {
@@ -24,9 +25,17 @@ import {
   ingresosEnRango,
 } from "./ingresos-helpers";
 import { aFuenteIngresos } from "@/backend/src/lib/ingresos-trabajo";
-import type { GastoOut } from "@/backend/src/queries/gastos";
-import type { LiquidacionOut } from "@/backend/src/queries/trabajos";
+import type { GastoOut, GastosPagina } from "@/backend/src/queries/gastos";
+import type {
+  ItemPendienteOut,
+  LiquidacionOut,
+} from "@/backend/src/queries/trabajos";
 import { cn, numberToCurrency, todayLocalISODate } from "@/lib/utils";
+import {
+  SIN_CATEGORIA as FILTRO_SIN_CATEGORIA,
+  SIN_CUENTA as FILTRO_SIN_CUENTA,
+  SIN_TRABAJO as FILTRO_SIN_TRABAJO,
+} from "@/lib/filtros-dashboard";
 import { useMontado } from "@/lib/use-cliente";
 import { usePendingNav } from "@/components/ui/nav-progress";
 
@@ -40,6 +49,27 @@ interface Props {
   data: DashboardData;
   /** Pinta SOLO esta vista (2026-10-01, rama `rediseno-ui`). */
   solo?: Vista;
+  /**
+   * Primera tanda del listado **completo** de gastos (la resuelve el server en
+   * `vista-page.tsx`, solo para la pantalla Gastos): su segundo panel embebe
+   * `GastosClient` (búsqueda + scroll infinito) en vez de las tarjetas de los
+   * últimos 3 días (2026-10-03).
+   */
+  gastosPrimeraPagina?: GastosPagina;
+  /**
+   * Datos de la **grilla unificada de trabajo** de la pantalla Ingresos
+   * (2026-10-03): la monta este componente —y no la página— para que el **filtro de
+   * trabajo** del mini-panel llegue **directo** a la grilla (es estado de acá).
+   */
+  trabajo?: {
+    pendientes: ItemPendienteOut[];
+    cobradosIniciales: LiquidacionOut[];
+    hayMasCobrados: boolean;
+    totalCobrados: number;
+    cuentas: { id: number; nombre: string }[];
+    /** ISO de la moneda del usuario (la usa la grilla). */
+    monedaISO: string;
+  };
 }
 
 /**
@@ -57,9 +87,9 @@ function Solo({
   return visible ? <>{children}</> : null;
 }
 
-const SIN_CATEGORIA = "Sin categoría";
-const SIN_CUENTA = "Sin cuenta";
-const SIN_TRABAJO = "Sin trabajo";
+const SIN_CATEGORIA = FILTRO_SIN_CATEGORIA;
+const SIN_CUENTA = FILTRO_SIN_CUENTA;
+const SIN_TRABAJO = FILTRO_SIN_TRABAJO;
 
 function toDateKey(v: string | Date | null | undefined): string {
   if (!v) return "";
@@ -67,7 +97,12 @@ function toDateKey(v: string | Date | null | undefined): string {
   return String(v).slice(0, 10);
 }
 
-export function DashboardClient({ data, solo }: Props) {
+export function DashboardClient({
+  data,
+  solo,
+  gastosPrimeraPagina,
+  trabajo,
+}: Props) {
   /** ¿Se pinta esta vista? (sin `solo` se pintan todas) */
   const ver = (...vistas: Vista[]) => solo === undefined || vistas.includes(solo);
 
@@ -305,7 +340,7 @@ export function DashboardClient({ data, solo }: Props) {
     >
       <SlidersHorizontal className="h-3.5 w-3.5" />
       {activeFilters > 0 && (
-        <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+        <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] text-primary-foreground">
           {activeFilters}
         </span>
       )}
@@ -412,7 +447,7 @@ export function DashboardClient({ data, solo }: Props) {
     >
       <SlidersHorizontal className="h-3.5 w-3.5" />
       {activeIngFilters > 0 && (
-        <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+        <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] text-primary-foreground">
           {activeIngFilters}
         </span>
       )}
@@ -433,36 +468,33 @@ export function DashboardClient({ data, solo }: Props) {
   );
 
   /**
-   * **Encabezado de la pantalla Gastos** (filosofía del rediseño, 2026-10-01): el
-   * título, el badge del mes, los Filtros y el ⋯ van en **una fila suelta ARRIBA,
-   * fuera del panel**. Después viene el panel de gráficos (con su selector de
-   * pestañas adentro) y, más abajo, el listado (ver `gastosFilaTitulo`).
+   * **Mini-panel superior de Gastos** (2026-10-03): el mes, el monto, los Filtros y
+   * el ⋯ salen del panel del gráfico a su **propio panel**, arriba de todo. El panel
+   * del gráfico se queda con su **selector de pestañas** y el gráfico.
    *
-   * ⚠️ Antes todo esto vivía DENTRO del panel (`gastosHeaderActions`) y en mobile
-   * se repartía en dos filas. Ahora hay una sola fila y un solo juego de controles.
+   * 🔑 La **grilla** de abajo respeta estos mismos filtros (categoría y cuenta),
+   * **menos las fechas**: el listado muestra todo el historial.
    */
-  const gastosEncabezado = (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-border bg-card px-4 py-3">
-      <h1 className="text-[18px] font-semibold text-header">Gastos</h1>
-      <StatBadge label="Mes actual" value={badges.gastos} />
-      <div className="ml-auto flex items-center gap-1.5">
-        {filterBtn()}
-        <GastosActionsMenu />
-      </div>
+  const gastosMiniPanel = (
+    <div className="rounded-2xl border border-border bg-card px-4 py-3">
+      <PanelHeader
+        titulo="Gastos"
+        contexto="mes actual"
+        numero={badges.gastos}
+        acciones={
+          <>
+            {filterBtn()}
+            <GastosActionsMenu />
+          </>
+        }
+      />
     </div>
   );
 
-  /** Selector de pestañas del panel de gráficos: va DENTRO del panel y **alineado
-      a la derecha** (2026-10-01). */
-  const gastosPanelTabs = <div className="mb-4 flex justify-end">{gastosTabs}</div>;
-
-  /**
-   * Encabezado de la sección **"Últimos gastos"** (el listado que va debajo del
-   * panel). ⚠️ NO reusa el título/badge/pestañas del panel: si los repite, la
-   * pantalla se ve como un panel duplicado (defecto del primer armado).
-   */
-  const gastosFilaTitulo = (
-    <h2 className="text-[16px] font-semibold text-header">Últimos gastos</h2>
+  /** Pestañas del panel de gráficos: van **dentro del panel**, alineadas a la
+      derecha (el encabezado vive en el mini-panel de arriba). */
+  const gastosPanelTabs = (
+    <div className="mb-4 flex justify-end">{gastosTabs}</div>
   );
 
   const ingresosTabs = (
@@ -479,38 +511,69 @@ export function DashboardClient({ data, solo }: Props) {
     />
   );
 
-  /** Selector de pestañas del panel de gráficos de Ingresos (adentro, a la derecha). */
+  /** **Mini-panel superior de Ingresos** (2026-10-03): mes + monto + Filtros + el ⋯
+      de Trabajo (que antes vivía en el panel de la grilla). */
+  const ingresosMiniPanel = (
+    <div className="rounded-2xl border border-border bg-card px-4 py-3">
+      <PanelHeader
+        titulo="Ingresos"
+        contexto="mes actual"
+        numero={badges.ingresos}
+        acciones={
+          <>
+            {ingFilterBtn()}
+            <TrabajosActionsMenu />
+          </>
+        }
+      />
+    </div>
+  );
+
+  /** Pestañas del panel de gráficos de Ingresos (**dentro** del panel, a la derecha). */
   const ingresosPanelTabs = (
     <div className="mb-4 flex justify-end">{ingresosTabs}</div>
   );
 
   /**
-   * **Encabezado de la pantalla Ingresos** (fila suelta, dentro de su panel):
-   * título + badge del mes + Filtros + ⋯ — mismo criterio que Gastos.
+   * Saldo neto **protagonista** del panel Préstamos: el de la moneda predeterminada
+   * (o el primero, si no está) y los demás como texto secundario. Antes eran
+   * píldoras `StatBadge` (una por moneda); el badge se eliminó en el diseño C.
    */
-  const ingresosEncabezado = (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-border bg-card px-4 py-3">
-      <h1 className="text-[18px] font-semibold text-header">Ingresos</h1>
-      <StatBadge label="Mes actual" value={badges.ingresos} />
-      <div className="ml-auto flex items-center gap-1.5">
-        {ingFilterBtn()}
-      </div>
-    </div>
+  const netoPred =
+    data.prestamosTotales.find(
+      (t) => t.currency === data.monedaPredeterminadaISO
+    ) ?? data.prestamosTotales[0];
+  const netosSecundarios = data.prestamosTotales.filter((t) => t !== netoPred);
+  const prestamosNumero = netoPred ? (
+    <>
+      {netoPred.value}
+      {netosSecundarios.map((t) => (
+        <span key={t.currency} className="ml-2.5 text-[13px] text-subtitle">
+          {t.currency} · {t.value}
+        </span>
+      ))}
+    </>
+  ) : null;
+
+  /** **Encabezado del panel Préstamos** (diseño C): contexto + saldo neto + ⋯. */
+  const prestamosPanelHeader = (
+    <PanelHeader
+      className="mb-4"
+      titulo="Préstamos"
+      contexto={netoPred ? "saldo neto" : "sin préstamos cargados"}
+      numero={prestamosNumero}
+      acciones={<PrestamosActionsMenu />}
+    />
   );
 
-  /**
-   * **Encabezado de la sección del listado unificado de Ingresos**: solo el título
-   * y el **⋯** de acciones del circuito. Las **ventanas de cobro** dejaron de ser un
-   * panel aparte: ahora viajan como **fichas dentro de cada fila de la grilla**
-   * (2026-10-01, fusión pedida por el usuario) ⇒ ver `periodos-grid.tsx`.
-   */
-  const ingresosSeccion = (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-      <h2 className="text-[16px] font-semibold text-header">Trabajo</h2>
-      <div className="ml-auto flex items-center gap-1.5">
-        <TrabajosActionsMenu />
-      </div>
-    </div>
+  /** **Encabezado del panel Resultados** (diseño C): contexto + resultado del mes. */
+  const resultadosPanelHeader = (
+    <PanelHeader
+      className="mb-4"
+      titulo="Resultados"
+      contexto="mes actual"
+      numero={badges.resultados}
+    />
   );
 
   return (
@@ -527,8 +590,8 @@ export function DashboardClient({ data, solo }: Props) {
       >
         {/* Rótulo en el ángulo superior izquierdo, como el título de las
             tarjetas de cuentas (dentro del mismo padding p-4). */}
-        <p className="absolute left-4 top-4 text-[16px] font-semibold text-header">Balance Actual</p>
-        <p className="text-3xl font-semibold tracking-tight text-success">
+        <p className="absolute left-4 top-4 text-[16px] text-header">Balance Actual</p>
+        <p className="text-3xl tracking-tight text-success">
           {numberToCurrency(data.balance, data.monedaPredeterminadaISO)}
         </p>
       </div>
@@ -542,7 +605,7 @@ export function DashboardClient({ data, solo }: Props) {
         {/* Encabezado: título a la izquierda y menú (⋮) anclado al ángulo
             superior derecho del panel (accede al CRUD de cuentas). */}
         <div className="relative mb-3 pr-8">
-          <h2 className="text-[16px] font-semibold text-header">Cuentas</h2>
+          <h2 className="text-[16px] text-header">Cuentas</h2>
           <div className="absolute right-0 top-0 flex items-center">
             <CuentasActionsMenu />
           </div>
@@ -570,7 +633,7 @@ export function DashboardClient({ data, solo }: Props) {
       {/* Gastos Section — filtro compartido. El ancla de voz (`?panel=gastos`) va
           en un wrapper: las 3 vistas (Resumen/Detalle/Histórico) se excluyen. */}
       <Solo visible={ver("gastos")}>
-      {gastosEncabezado}
+      {gastosMiniPanel}
       <div data-panel="gastos">
       {tabGastos === "resumen" ? (
         <DonutChart
@@ -596,27 +659,27 @@ export function DashboardClient({ data, solo }: Props) {
       )}
       </div>
 
-      {/* **Listado de gastos**, SIEMPRE debajo del panel (2026-10-01).
-          Antes era la pestaña "Detalle": con las funcionalidades separadas por
-          pantalla se lee mucho mejor como sección — misma filosofía que la grilla
-          de Préstamos en su pantalla. La cabecera conserva la MISMA estructura de
-          dos filas que el panel (título + badge + ⋯ / pestañas) así el ⋯ no salta.
-          ⚠️ No lleva Filtros ni buscador: el listado muestra los últimos 3 días en
-          tarjetas y la búsqueda vive en "Ver más gastos" (`/gastos`). */}
-      <div className="mt-6 rounded-lg border border-border bg-card p-5">
-        <div className="mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-          {gastosFilaTitulo}
-        </div>
-        <GastosTarjetas
-          data={todosLosGastos}
-          hoyServidor={data.hoyServidor}
-          currency={data.monedaPredeterminadaISO}
+      {/* **Listado de gastos**, debajo del panel: desde el **2026-10-03** es el
+          listado **COMPLETO** (búsqueda + scroll infinito), el mismo que se ve en
+          `/gastos` — reemplaza a las tarjetas de los últimos 3 días y al botón
+          "Ver más gastos". Así la pantalla Gastos tiene la **misma resolución que
+          Ingresos** (que lista todos los períodos de trabajo).
+          ⚠️ **Sin título** (pedido del usuario): el panel arranca con el buscador.
+          La primera tanda viene del server (`gastosPrimeraPagina`); las siguientes
+          las pide `GastosClient` con `getGastosPaginaAction`. */}
+      {gastosPrimeraPagina && (
+        <GastosClient
+          embebido
+          primeraPagina={gastosPrimeraPagina}
+          monedaISO={data.monedaPredeterminadaISO}
+          // Mismos filtros que el mini-panel y el gráfico, **sin** las fechas.
+          filtros={{ categorias: selCat, cuentas: selCta }}
         />
-      </div>
+      )}
       </Solo>
 
       <Solo visible={ver("ingresos")}>
-      {ingresosEncabezado}
+      {ingresosMiniPanel}
       <div data-panel="ingresos">
       {tabIngresos === "resumen" ? (
         <DonutChart
@@ -639,7 +702,25 @@ export function DashboardClient({ data, solo }: Props) {
         />
       )}
       </div>
-      {ingresosSeccion}
+
+      {/* Grilla unificada de trabajo (pendientes + cobradas con scroll infinito):
+          el **filtro de trabajo** del mini-panel la acota (los pendientes en memoria
+          y las cobradas contra el server). Las fechas NO la afectan. */}
+      {trabajo && (
+        <TrabajoClient
+          embebido
+          estimacionesSSR={data.cobrosEstimados}
+          hoyServidor={data.hoyServidor}
+          ingresosDetalle={data.ingresosDetalle}
+          pendientes={trabajo.pendientes}
+          cobradosIniciales={trabajo.cobradosIniciales}
+          hayMasCobrados={trabajo.hayMasCobrados}
+          totalCobrados={trabajo.totalCobrados}
+          cuentas={trabajo.cuentas}
+          monedaISO={trabajo.monedaISO}
+          filtroTrabajos={selTra}
+        />
+      )}
       </Solo>
 
       {/* Panel **Resultados**: se renderiza SIEMPRE (decisión del usuario
@@ -648,14 +729,9 @@ export function DashboardClient({ data, solo }: Props) {
           `data-panel="resultados"` **existe siempre** (antes, sin datos, el
           panel no se montaba y el scroll a ese panel no tenía destino). */}
       <Solo visible={ver("resultados")}>
-      {/* Encabezado suelto arriba, DENTRO de su propio panel (2026-10-01). */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-border bg-card px-4 py-3">
-        <h1 className="text-[18px] font-semibold text-header">Resultados</h1>
-        <StatBadge label="Mes actual" value={badges.resultados} />
-      </div>
       <div data-panel="resultados">
       <EvolutionChart
-        encabezado={null}
+        encabezado={resultadosPanelHeader}
         data={data.evolucionResultados}
         color="var(--primary)"
         area
@@ -667,24 +743,9 @@ export function DashboardClient({ data, solo }: Props) {
       {/* Panel de préstamos: se muestra SIEMPRE (también sin préstamos
           cargados; en ese caso PrestamosChart muestra su estado vacío). */}
       <Solo visible={ver("prestamos")}>
-      {/* Encabezado suelto arriba, DENTRO de su propio panel: título + saldos
-          netos + ⋯. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-border bg-card px-4 py-3">
-        <h1 className="text-[18px] font-semibold text-header">Préstamos</h1>
-        {data.prestamosTotales.map((t) => (
-          <StatBadge
-            key={t.currency}
-            label={`Saldo neto (${t.currency})`}
-            value={t.value}
-          />
-        ))}
-        <div className="ml-auto flex items-center gap-1.5">
-          <PrestamosActionsMenu />
-        </div>
-      </div>
       <div data-panel="prestamos">
       <PrestamosChart
-        encabezado={null}
+        encabezado={prestamosPanelHeader}
         data={data.prestamosChart.data}
         series={data.prestamosChart.series}
       />

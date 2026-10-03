@@ -72,7 +72,7 @@ export function MovimientoRow({
         <div className="shrink-0 space-y-0.5 text-right">
           <p
             className={cn(
-              "text-[15px] font-semibold leading-4.75 tabular-nums",
+              "text-[15px] leading-4.75 tabular-nums",
               esEgreso ? "text-danger" : "text-success"
             )}
           >

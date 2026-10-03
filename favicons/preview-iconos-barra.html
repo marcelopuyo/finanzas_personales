@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Preview · Iconos de la barra inferior</title>
+<!-- Los SVG reales de cada set se inyectan al abrir la página (ver el script del final).
+     ⚠️ Es solo para el preview: la app los necesita BUNDLEADOS (es PWA con offline). -->
+<style>
+  :root{
+    --bg:#151517; --card:#353638; --muted:#1e1e20; --border:#3e3f42;
+    --header:#ffffff; --subtitle:#808185; --label:#9a9b9e; --primary:#4c6ef5;
+  }
+  *{box-sizing:border-box}
+  b,strong{font-weight:400}
+  body{margin:0;background:#0e0e10;color:#e2e4f0;
+       font:14px/1.5 -apple-system,"SF Pro Display",Inter,"Segoe UI",Roboto,sans-serif;
+       padding:26px 22px 80px}
+  h1{font-size:19px;margin:0 0 6px;color:#fff;font-weight:400}
+  h2{font-size:15px;margin:0 0 14px;color:#fff;font-weight:400;display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+  h2 .tag{margin-left:auto;font-size:10px;color:var(--label);letter-spacing:.06em;text-transform:uppercase}
+  .lead{color:var(--subtitle);margin:0 0 12px;max-width:1120px}
+  .lead b{color:#e2e4f0}
+  .meta{color:#6a6b6f;font-size:11.5px;margin:0 0 26px;max-width:1120px}
+  .sec{margin:0 0 34px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(376px,1fr));gap:22px}
+  .cell{display:flex;flex-direction:column;gap:8px}
+  .cell .cap{font-size:11.5px;color:var(--subtitle);margin:0}
+  .cell .cap b{color:#e2e4f0}
+  .cell .cap code{background:#202024;padding:1px 5px;border-radius:5px;font-size:11px;color:#c9cad0}
+  /* ── barra inferior (mock fiel del componente real) ── */
+  .nav{display:flex;align-items:stretch;height:64px;background:#18181b;border:1px solid var(--border);
+       border-radius:14px;overflow:hidden}
+  .nav .it{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+           color:var(--subtitle)}
+  .nav .it .lbl{font-size:10px;line-height:1}
+  .nav .it.on{color:#ffffff}
+  .nav .it.on.pill{position:relative}
+  .nav .it.on.pill .ico{background:rgba(255,255,255,.09);border-radius:999px;padding:4px 12px}
+  .nav .it.on.fill{color:#fff}
+  .nav .it .dot{width:3px;height:3px;border-radius:99px;background:transparent;margin-top:-1px}
+  .nav .it.on.dotty .dot{background:#fff}
+  .nav .it .ico{display:flex;align-items:center;justify-content:center;height:29px}
+  .nav.hoy .it.on{color:var(--primary)}
+  .nav.hoy{background:#151517}
+  .nav .it .lbl,.nav .it .ico{transition:none}
+  /* ── estados (fila de variantes) ── */
+  .estados{display:flex;flex-wrap:wrap;gap:20px}
+  .estado{display:flex;flex-direction:column;gap:7px}
+  .estado .cap{font-size:11.5px;color:var(--subtitle);max-width:220px}
+  .estado .cap b{color:#e2e4f0}
+  .frame{background:#18181b;border:1px solid var(--border);border-radius:14px;padding:6px 10px;display:flex;gap:16px}
+  .frame .it{display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtitle);font-size:10px}
+  .frame .it.on{color:#fff}
+  .frame .it.on .ico{padding:4px 12px;border-radius:999px}
+  .frame .it.on.pill .ico{background:rgba(255,255,255,.09)}
+  .frame .it.on .ico.nopad{padding:0}
+  .frame .it .dot{width:3px;height:3px;border-radius:99px}
+  .frame .it.on.dotty .dot{background:#fff}
+  .dec{border:1px solid var(--border);border-radius:16px;padding:16px 18px;max-width:1120px;background:#17171a}
+  .dec h3{margin:0 0 10px;font-size:14px;color:#fff;font-weight:400}
+  .dec ul{margin:0;padding-left:18px;font-size:12.5px;color:var(--subtitle)}
+  .dec ul li{margin:7px 0}
+  .dec b{color:#e2e4f0}
+  code{background:#202024;padding:1px 5px;border-radius:5px;font-size:11.5px;color:#c9cad0}
+  table{border-collapse:collapse;font-size:12.5px;color:var(--subtitle);width:100%}
+  th,td{text-align:left;padding:6px 12px 6px 0;border-bottom:1px solid #26262a;vertical-align:top}
+  th{color:#c9cad0;font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+  .ok{color:#8fe39b}
+  .warn{color:#ffd97a}
+</style>
+</head>
+<body>
+
+<h1>Iconos de la barra inferior · alternativas</h1>
+<p class="lead">
+  La app usa <b>Lucide</b> (<code>lucide-react</code>, ya instalado) con trazo 2 y 21 px. Comparación de <b>sets gratuitos</b>
+  con los <b>4 destinos reales</b> (Inicio · Gastos · Ingresos · Más) y el <b>activo en blanco</b> (paleta monocroma) en vez del azul.
+</p>
+<p class="meta">
+  Preview descartable · 2026-10-03 · rama <code>rediseno-ui</code> · los iconos se cargan por <b>Iconify</b> solo para el preview
+  (la app los necesita <b>bundleados</b>: es PWA y funciona sin conexión). Dentro de los marcos <b>no hay ninguna negrita</b>.
+</p>
+
+<!-- ══════════════════ HOY ══════════════════ -->
+<div class="sec">
+  <h2>Hoy (para comparar) <span class="tag">lucide + activo azul</span></h2>
+  <div class="grid">
+    <div class="cell">
+      <div class="nav hoy">
+        <div class="it on"><span class="ico"><iconify-icon icon="lucide:house" style="font-size:21px"></iconify-icon></span><span class="lbl">Inicio</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="lucide:receipt" style="font-size:21px"></iconify-icon></span><span class="lbl">Gastos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="lucide:briefcase" style="font-size:21px"></iconify-icon></span><span class="lbl">Ingresos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="lucide:menu" style="font-size:21px"></iconify-icon></span><span class="lbl">Más</span></div>
+      </div>
+      <p class="cap">Lo que hay ahora: <b>Lucide</b> (trazo uniforme, esquinas cuadradas) + activo en <b>azul primario</b>.</p>
+    </div>
+    <div class="cell">
+      <div class="nav">
+        <div class="it on"><span class="ico"><iconify-icon icon="lucide:house" style="font-size:21px"></iconify-icon></span><span class="lbl">Inicio</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="lucide:receipt" style="font-size:21px"></iconify-icon></span><span class="lbl">Gastos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="lucide:briefcase" style="font-size:21px"></iconify-icon></span><span class="lbl">Ingresos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="lucide:menu" style="font-size:21px"></iconify-icon></span><span class="lbl">Más</span></div>
+      </div>
+      <p class="cap">Lo mismo pero con el <b>activo en blanco</b> (el cambio de color que pediste). Ya se nota mucho más
+        monocromo, pero el icono sigue igual de “plano”. ✅ <b>Ya implementado</b> en <code>bottom-nav.tsx</code>: el
+        activo quedó en blanco (<code>text-header</code>) y el azul salió de la barra; el hover de los inactivos pasó a
+        <code>--label</code> para que no se confunda con el activo.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ SETS ══════════════════ -->
+<div class="sec">
+  <h2>Sets alternativos <span class="tag">activo en blanco</span></h2>
+  <div class="grid">
+
+    <!-- Tabler -->
+    <div class="cell">
+      <div class="nav">
+        <div class="it on"><span class="ico"><iconify-icon icon="tabler:home" style="font-size:22px"></iconify-icon></span><span class="lbl">Inicio</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="tabler:receipt-2" style="font-size:22px"></iconify-icon></span><span class="lbl">Gastos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="tabler:briefcase-2" style="font-size:22px"></iconify-icon></span><span class="lbl">Ingresos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="tabler:menu-2" style="font-size:22px"></iconify-icon></span><span class="lbl">Más</span></div>
+      </div>
+      <p class="cap"><b>Tabler Icons</b> · MIT · <code>@tabler/icons-react</code> — pariente de Lucide pero con las **puntas redondeadas**
+        y el dibujo un poco más “amable”. Es el que menos descoloca respecto de hoy.</p>
+    </div>
+
+    <!-- Phosphor regular -->
+    <div class="cell">
+      <div class="nav">
+        <div class="it on"><span class="ico"><iconify-icon icon="ph:house" style="font-size:22px"></iconify-icon></span><span class="lbl">Inicio</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="ph:receipt" style="font-size:22px"></iconify-icon></span><span class="lbl">Gastos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="ph:briefcase" style="font-size:22px"></iconify-icon></span><span class="lbl">Ingresos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="ph:list" style="font-size:22px"></iconify-icon></span><span class="lbl">Más</span></div>
+      </div>
+      <p class="cap"><b>Phosphor (Regular)</b> · MIT · <code>@phosphor-icons/react</code> — trazo más <b>fino y elegante</b>;
+        el set tiene <b>6 pesos</b> del mismo icono (thin · light · regular · bold · fill · duotone) ⇒ permite “encender”
+        el activo pasando a <b>fill</b> sin cambiar de familia.</p>
+    </div>
+
+    <!-- Phosphor fill -->
+    <div class="cell">
+      <div class="nav">
+        <div class="it on"><span class="ico"><iconify-icon icon="ph:house-fill" style="font-size:22px"></iconify-icon></span><span class="lbl">Inicio</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="ph:receipt" style="font-size:22px"></iconify-icon></span><span class="lbl">Gastos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="ph:briefcase" style="font-size:22px"></iconify-icon></span><span class="lbl">Ingresos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="ph:list" style="font-size:22px"></iconify-icon></span><span class="lbl">Más</span></div>
+      </div>
+      <p class="cap"><b>Phosphor</b> con el <b>activo relleno</b> (fill) en blanco e inactivos en trazo gris. Es el patrón de
+        iOS/Material: el estado activo se lee <b>al instante</b> y sigue siendo 100% monocromo.</p>
+    </div>
+
+    <!-- Solar linear -->
+    <div class="cell">
+      <div class="nav">
+        <div class="it on"><span class="ico"><iconify-icon icon="solar:home-linear" style="font-size:22px"></iconify-icon></span><span class="lbl">Inicio</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="solar:bill-list-linear" style="font-size:22px"></iconify-icon></span><span class="lbl">Gastos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="solar:case-linear" style="font-size:22px"></iconify-icon></span><span class="lbl">Ingresos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="solar:hamburger-menu-linear" style="font-size:22px"></iconify-icon></span><span class="lbl">Más</span></div>
+      </div>
+      <p class="cap"><b>Solar (Linear)</b> · MIT · <code>solar-icon-set</code> — muy <b>moderno y distintivo</b> (esquinas amplias,
+        trazo de 1.5). Se aleja más de lo actual: es el más “de app nueva”.</p>
+    </div>
+
+    <!-- Solar bold duotone -->
+    <div class="cell">
+      <div class="nav">
+        <div class="it on"><span class="ico"><iconify-icon icon="solar:home-bold-duotone" style="font-size:22px"></iconify-icon></span><span class="lbl">Inicio</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="solar:bill-list-linear" style="font-size:22px"></iconify-icon></span><span class="lbl">Gastos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="solar:case-linear" style="font-size:22px"></iconify-icon></span><span class="lbl">Ingresos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="solar:hamburger-menu-linear" style="font-size:22px"></iconify-icon></span><span class="lbl">Más</span></div>
+      </div>
+      <p class="cap"><b>Solar</b> activo en <b>bold-duotone</b> (las dos capas con opacidad distinta). Es lo más “estilizado” de
+        la lista; hay que ver cómo se lee blanco sobre blanco al 2º tono (acá el duotone se ve sutil).</p>
+    </div>
+
+    <!-- Iconoir -->
+    <div class="cell">
+      <div class="nav">
+        <div class="it on"><span class="ico"><iconify-icon icon="iconoir:home" style="font-size:22px"></iconify-icon></span><span class="lbl">Inicio</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="iconoir:wallet" style="font-size:22px"></iconify-icon></span><span class="lbl">Gastos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="iconoir:suitcase" style="font-size:22px"></iconify-icon></span><span class="lbl">Ingresos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="iconoir:menu" style="font-size:22px"></iconify-icon></span><span class="lbl">Más</span></div>
+      </div>
+      <p class="cap"><b>Iconoir</b> · MIT · <code>iconoir-react</code> — trazo fino con <b>terminaciones en punta</b>: muy
+        “boutique”. Contras: el set es más chico (<b>no tiene</b> “recibo”: acá Gastos usa <b>billetera</b>) ⇒ puede faltar
+        algún icono puntual.</p>
+    </div>
+
+    <!-- Material Symbols Rounded -->
+    <div class="cell">
+      <div class="nav">
+        <div class="it on"><span class="ico"><iconify-icon icon="material-symbols:home-rounded" style="font-size:22px"></iconify-icon></span><span class="lbl">Inicio</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="material-symbols:receipt-long-rounded" style="font-size:22px"></iconify-icon></span><span class="lbl">Gastos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="material-symbols:work-rounded" style="font-size:22px"></iconify-icon></span><span class="lbl">Ingresos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="material-symbols:menu-rounded" style="font-size:22px"></iconify-icon></span><span class="lbl">Más</span></div>
+      </div>
+      <p class="cap"><b>Material Symbols Rounded</b> · Apache 2.0 · <code>@material-symbols/fonts</code> (fuente variable) —
+        el más <b>reconocible</b> y el que mejor soporta “outline ⇄ filled” en el mismo glifo. Es una <b>fuente</b>, no SVG
+        (pesa ~100-300 KB según recorte).</p>
+    </div>
+
+    <!-- Heroicons Solid -->
+    <div class="cell">
+      <div class="nav">
+        <div class="it on"><span class="ico"><iconify-icon icon="heroicons-solid:home" style="font-size:22px"></iconify-icon></span><span class="lbl">Inicio</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="heroicons:receipt-percent" style="font-size:22px"></iconify-icon></span><span class="lbl">Gastos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="heroicons:briefcase" style="font-size:22px"></iconify-icon></span><span class="lbl">Ingresos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="heroicons:bars-3" style="font-size:22px"></iconify-icon></span><span class="lbl">Más</span></div>
+      </div>
+      <p class="cap"><b>Heroicons</b> · MIT · <code>@heroicons/react</code> — el <b>outline</b> (24 px) es delicado y el
+        <b>solid</b> (arriba, Inicio) es macizo ⇒ el activo relleno se ve muy limpio. 2 pesos: outline + solid.</p>
+    </div>
+
+    <!-- Remix fill -->
+    <div class="cell">
+      <div class="nav">
+        <div class="it on"><span class="ico"><iconify-icon icon="ri:home-5-fill" style="font-size:22px"></iconify-icon></span><span class="lbl">Inicio</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="ri:bill-line" style="font-size:22px"></iconify-icon></span><span class="lbl">Gastos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="ri:briefcase-line" style="font-size:22px"></iconify-icon></span><span class="lbl">Ingresos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="ri:menu-line" style="font-size:22px"></iconify-icon></span><span class="lbl">Más</span></div>
+      </div>
+      <p class="cap"><b>Remix Icon</b> · Apache 2.0 · <code>remixicon</code> — cada icono existe en <b>line y fill</b> (mismo
+        nombre) y el dibujo es un poco más <b>detallado</b>. Muy buen catálogo (2.800+).</p>
+    </div>
+
+    <!-- Hugeicons -->
+    <div class="cell">
+      <div class="nav">
+        <div class="it on"><span class="ico"><iconify-icon icon="hugeicons:home-01" style="font-size:22px"></iconify-icon></span><span class="lbl">Inicio</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="hugeicons:invoice-01" style="font-size:22px"></iconify-icon></span><span class="lbl">Gastos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="hugeicons:briefcase-01" style="font-size:22px"></iconify-icon></span><span class="lbl">Ingresos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="hugeicons:menu-01" style="font-size:22px"></iconify-icon></span><span class="lbl">Más</span></div>
+      </div>
+      <p class="cap"><b>Hugeicons</b> (gratis, MIT) · <code>hugeicons-react</code> — trazo <b>suave y redondeado</b>, pensado para
+        UI de producto. El proyecto tiene buena pinta pero el set es más joven.</p>
+    </div>
+
+    <!-- Radix -->
+    <div class="cell">
+      <div class="nav">
+        <div class="it on"><span class="ico"><iconify-icon icon="radix-icons:home" style="font-size:22px"></iconify-icon></span><span class="lbl">Inicio</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="radix-icons:file-text" style="font-size:22px"></iconify-icon></span><span class="lbl">Gastos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="radix-icons:backpack" style="font-size:22px"></iconify-icon></span><span class="lbl">Ingresos</span></div>
+        <div class="it"><span class="ico"><iconify-icon icon="radix-icons:hamburger-menu" style="font-size:22px"></iconify-icon></span><span class="lbl">Más</span></div>
+      </div>
+      <p class="cap"><b>Radix Icons</b> · MIT · <code>@radix-ui/react-icons</code> — dibujados en una grilla de <b>15 px</b> ⇒
+        <b>no escalan bien</b> a 21-22 px (se ven gruesos y apretados). Lo muestro para descartarlo con datos.</p>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════ ESTADOS DEL ACTIVO ══════════════════ -->
+<div class="sec">
+  <h2>Estados del “activo”, todo en monocromo <span class="tag">tabler + phosphor</span></h2>
+  <div class="estados">
+
+    <div class="estado">
+      <div class="frame">
+        <div class="it on"><span class="ico nopad"><iconify-icon icon="tabler:home" style="font-size:22px"></iconify-icon></span><span>Inicio</span></div>
+        <div class="it"><span class="ico nopad"><iconify-icon icon="tabler:receipt-2" style="font-size:22px"></iconify-icon></span><span>Gastos</span></div>
+        <div class="it"><span class="ico nopad"><iconify-icon icon="tabler:briefcase-2" style="font-size:22px"></iconify-icon></span><span>Ingresos</span></div>
+        <div class="it"><span class="ico nopad"><iconify-icon icon="tabler:menu-2" style="font-size:22px"></iconify-icon></span><span>Más</span></div>
+      </div>
+      <p class="cap"><b>A · solo color</b> (el más sobrio): activo en blanco puro, inactivo en gris <code>#808185</code>. Cambio mínimo.</p>
+    </div>
+
+    <div class="estado">
+      <div class="frame">
+        <div class="it on pill"><span class="ico"><iconify-icon icon="tabler:home" style="font-size:22px"></iconify-icon></span><span>Inicio</span></div>
+        <div class="it"><span class="ico nopad"><iconify-icon icon="tabler:receipt-2" style="font-size:22px"></iconify-icon></span><span>Gastos</span></div>
+        <div class="it"><span class="ico nopad"><iconify-icon icon="tabler:briefcase-2" style="font-size:22px"></iconify-icon></span><span>Ingresos</span></div>
+        <div class="it"><span class="ico nopad"><iconify-icon icon="tabler:menu-2" style="font-size:22px"></iconify-icon></span><span>Más</span></div>
+      </div>
+      <p class="cap"><b>B · pastilla</b> detrás del icono activo (<code>blanco al 9%</code>): se lee mejor en el sol y con guantes,
+        y sigue siendo monocromo.</p>
+    </div>
+
+    <div class="estado">
+      <div class="frame">
+        <div class="it on"><span class="ico nopad"><iconify-icon icon="ph:house-fill" style="font-size:22px"></iconify-icon></span><span>Inicio</span></div>
+        <div class="it"><span class="ico nopad"><iconify-icon icon="ph:receipt" style="font-size:22px"></iconify-icon></span><span>Gastos</span></div>
+        <div class="it"><span class="ico nopad"><iconify-icon icon="ph:briefcase" style="font-size:22px"></iconify-icon></span><span>Ingresos</span></div>
+        <div class="it"><span class="ico nopad"><iconify-icon icon="ph:list" style="font-size:22px"></iconify-icon></span><span>Más</span></div>
+      </div>
+      <p class="cap"><b>C · activo relleno</b> (Phosphor fill, blanco) + inactivos en trazo: el estado se lee <b>sin depender del color</b>
+        — lo mejor para accesibilidad y para “no hay azul en la app”.</p>
+    </div>
+
+    <div class="estado">
+      <div class="frame">
+        <div class="it on dotty"><span class="ico nopad"><iconify-icon icon="tabler:home" style="font-size:22px"></iconify-icon></span><span>Inicio</span><span class="dot"></span></div>
+        <div class="it"><span class="ico nopad"><iconify-icon icon="tabler:receipt-2" style="font-size:22px"></iconify-icon></span><span>Gastos</span><span class="dot"></span></div>
+        <div class="it"><span class="ico nopad"><iconify-icon icon="tabler:briefcase-2" style="font-size:22px"></iconify-icon></span><span>Ingresos</span><span class="dot"></span></div>
+        <div class="it"><span class="ico nopad"><iconify-icon icon="tabler:menu-2" style="font-size:22px"></iconify-icon></span><span>Más</span><span class="dot"></span></div>
+      </div>
+      <p class="cap"><b>D · puntito</b> debajo (estilo iOS): una tercera señal, muy discreta. Se puede combinar con A o B.</p>
+    </div>
+
+  </div>
+</div>
+
+<div class="dec">
+  <h3>Notas para decidir</h3>
+  <ul>
+    <li><b>Todos son gratuitos y permisivos</b>: Lucide (ISC) · Tabler (MIT) · Phosphor (MIT) · Solar (MIT) · Iconoir (MIT) ·
+      Heroicons (MIT) · Hugeicons (MIT) · Remix (Apache 2.0) · Material Symbols (Apache 2.0). <b>Ninguno requiere atribución en la UI.</b></li>
+    <li><b>⚙️ Instalación</b>: no instalé nada (regla del proyecto: consultar antes). Si elegís uno, se agrega <b>un solo</b> paquete
+      y se cambian 4 imports en <code>bottom-nav.tsx</code>; el resto de la app (lucide) puede quedar como está o migrarse después.</li>
+    <li><b>⚠️ Bundle / PWA</b>: los paquetes de iconos son <b>tree-shakeables</b> (solo entra lo que se importa, ~1-2 KB por icono).
+      Nada de CDN en runtime: la app es <b>PWA con offline</b> ⇒ los iconos tienen que venir bundleados. (El preview los trae de la API
+      de Iconify solo para mostrar los SVG reales.)</li>
+    <li><b>Alternativa “un paquete para todos”</b>: <code>react-icons</code> trae Feather, Bootstrap, Heroicons, Remix, Tabler,
+      Phosphor, Material… en un solo paquete (importás con prefijo, ej. <code>PiHouse</code>). Cómodo, pero <b>pesa más</b> si algún día
+      se instala entero; y mezclar familias se nota.</li>
+    <li><b>Material Symbols</b> es una <b>fuente</b>, no SVG: perfecta para “outline ⇄ filled” del mismo glifo, pero suma
+      ~100-300 KB de fuente (recortada) y no tiene tree-shaking real.</li>
+    <li><b>Mi recomendación</b>: <b>Phosphor</b> (regular en inactivos + <b>fill</b> en el activo, estado <b>C</b> encima de <b>A</b>).
+      Es la que mejor combina “más estilizado” + activo legible sin color + catálogo completo. Segunda: <b>Tabler</b> con el
+      estado A o B (el cambio menos traumático respecto de lo que ya tenés).</li>
+  </ul>
+</div>
+
+<script>
+  /**
+   * Trae los SVG **reales** de cada set desde la API de Iconify y los inyecta
+   * inline (un solo pedido por colección: pedirlos de a uno hacía que la API
+   * cortara la ráfaga y quedaran iconos vacíos).
+   */
+  (async () => {
+    const nodos = [...document.querySelectorAll("iconify-icon")];
+    const porPrefijo = new Map();
+    for (const n of nodos) {
+      const [pre, nombre] = (n.getAttribute("icon") || "").split(":");
+      if (!pre || !nombre) continue;
+      if (!porPrefijo.has(pre)) porPrefijo.set(pre, new Set());
+      porPrefijo.get(pre).add(nombre);
+    }
+    for (const [pre, set] of porPrefijo) {
+      let data;
+      try {
+        const r = await fetch(
+          "https://api.iconify.design/" + pre + ".json?icons=" + [...set].join(",")
+        );
+        data = await r.json();
+      } catch {
+        continue;
+      }
+      const W = data.width ?? 24;
+      const H = data.height ?? 24;
+      for (const n of nodos) {
+        const [p, nombre] = (n.getAttribute("icon") || "").split(":");
+        if (p !== pre) continue;
+        // ojo: muchos nombres son ALIAS (p. ej. material-symbols:work-rounded
+        // → icono "work"): hay que resolver el padre o el icono no aparece.
+        let ic = data.icons?.[nombre];
+        let al = data.aliases?.[nombre];
+        while (!ic && al) {
+          ic = data.icons?.[al.parent];
+          al = data.aliases?.[al.parent];
+        }
+        if (!ic?.body) {
+          console.warn("icono no encontrado:", pre + ":" + nombre);
+          continue;
+        }
+        const svg =
+          '<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 ' +
+          (ic.width ?? W) +
+          " " +
+          (ic.height ?? H) +
+          '">' +
+          ic.body +
+          "</svg>";
+        const span = document.createElement("span");
+        span.style.display = "inline-flex";
+        span.style.lineHeight = "1";
+        span.style.fontSize = getComputedStyle(n).fontSize;
+        span.innerHTML = svg;
+        n.replaceWith(span);
+      }
+    }
+  })();
+</script>
+</body>
+</html>

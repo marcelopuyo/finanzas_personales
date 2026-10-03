@@ -270,9 +270,9 @@ export function CalendarPanel({
               className={cn(
                 "flex h-9 items-center justify-center rounded-md text-[13px] transition-colors",
                 c.iso === value
-                  ? "bg-primary font-semibold text-primary-foreground"
+                  ? "bg-primary text-primary-foreground"
                   : c.iso === hoy
-                    ? "font-semibold text-primary hover:bg-muted"
+                    ? "text-primary hover:bg-muted"
                     : "text-card-foreground hover:bg-muted"
               )}
             >

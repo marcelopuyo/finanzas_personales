@@ -200,7 +200,7 @@ export function PasskeysSection({
                 type="button"
                 onClick={handleActivar}
                 disabled={activando}
-                className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+                className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-[13px] text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 <Fingerprint className="h-4 w-4" />
                 {activando ? "Activando..." : "Activar en este dispositivo"}
@@ -256,7 +256,7 @@ export function PasskeysSection({
             type="button"
             onClick={handleRevocar}
             disabled={guardando}
-            className="rounded-md bg-danger px-3 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="rounded-md bg-danger px-3 py-2 text-[13px] text-white transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {guardando ? "Revocando..." : "Revocar"}
           </button>
@@ -292,7 +292,7 @@ export function PasskeysSection({
             type="button"
             onClick={handleRenombrar}
             disabled={guardando || !nombreNuevo.trim()}
-            className="rounded-md bg-primary px-3 py-2 text-[13px] font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="rounded-md bg-primary px-3 py-2 text-[13px] text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {guardando ? "Guardando..." : "Guardar"}
           </button>

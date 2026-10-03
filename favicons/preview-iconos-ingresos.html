@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Preview · Icono de Ingresos (sin portafolio)</title>
+<style>
+  :root{
+    --bg:#151517; --card:#353638; --muted:#1e1e20; --border:#3e3f42;
+    --header:#ffffff; --subtitle:#808185; --label:#9a9b9e; --primary:#4c6ef5;
+  }
+  *{box-sizing:border-box}
+  b,strong{font-weight:400}
+  body{margin:0;background:#0e0e10;color:#e2e4f0;
+       font:14px/1.5 -apple-system,"SF Pro Display",Inter,"Segoe UI",Roboto,sans-serif;
+       padding:26px 22px 90px}
+  h1{font-size:19px;margin:0 0 6px;color:#fff;font-weight:400}
+  h2{font-size:15px;margin:0 0 14px;color:#fff;font-weight:400;display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+  h2 .tag{margin-left:auto;font-size:10px;color:var(--label);letter-spacing:.06em;text-transform:uppercase}
+  h3{font-size:12px;margin:22px 0 10px;color:var(--label);font-weight:400;letter-spacing:.05em;text-transform:uppercase}
+  .lead{color:var(--subtitle);margin:0 0 8px;max-width:1080px}
+  .lead b{color:#e2e4f0}
+  .meta{color:#6a6b6f;font-size:11.5px;margin:0 0 26px;max-width:1080px}
+  .sec{margin:0 0 40px}
+  /* ── candidatos ── */
+  .fams{display:flex;flex-direction:column}
+  .cands{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:12px}
+  .cand{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #2a2a2e;border-radius:12px;
+        background:#16161a}
+  .cand .num{font-size:10px;color:#6a6b6f;min-width:18px;font-variant-numeric:tabular-nums}
+  .cand .big{display:inline-flex;color:#e8e9ec}
+  .cand .sizes{display:flex;align-items:flex-end;gap:9px;margin-left:auto}
+  .cand .mini{display:inline-flex;color:var(--subtitle)}
+  /* ── barra inferior (mock fiel del componente real) ── */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(376px,1fr));gap:20px}
+  .cell{display:flex;flex-direction:column;gap:7px}
+  .cell .cap{font-size:11.5px;color:var(--subtitle);margin:0}
+  .cell .cap .num{color:var(--label);font-variant-numeric:tabular-nums}
+  .nav{display:flex;align-items:stretch;height:64px;background:#18181b;border:1px solid var(--border);
+       border-radius:14px;overflow:hidden}
+  .nav .it{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+           color:var(--subtitle)}
+  .nav .it .lbl{font-size:10px;line-height:1}
+  .nav .it.on{color:#ffffff}
+  .nav.hoy{border-color:#4a4a4f}
+  details{margin-top:8px;border-top:1px solid #26262a;padding-top:14px}
+  summary{cursor:pointer;color:var(--label);font-size:12px}
+  table{border-collapse:collapse;margin-top:12px;font-size:11.5px;color:var(--subtitle)}
+  td,th{border:1px solid #26262a;padding:4px 8px;text-align:left;font-weight:400}
+  th{color:var(--label)}
+  code{background:#202024;padding:1px 5px;border-radius:5px;font-size:11px;color:#c9cad0}
+</style>
+</head>
+<body>
+
+<h1>Icono de «Ingresos» — alternativas que NO sean portafolio</h1>
+<p class="lead">Todos los iconos son <b>reales</b> (se bajan de la API de Iconify al abrir la página) y todos existen en sets
+  <b>gratuitos y tree-shakeables</b>. Arriba están en <b>grande (44px)</b> para juzgar la forma y al lado en el
+  <b>tamaño real de la barra (21px)</b>. Abajo, cada finalista montado en la barra con <b>«Ingresos» activo en blanco</b>
+  (los otros 3 quedan como están hoy, para que la comparación sea sólo del icono nuevo).</p>
+<p class="meta">Los números son sólo para que digas “el 07”. Las familias son descriptivas, no nombres de iconos.</p>
+
+<div class="sec">
+  <h2>Por familia de idea <span class="tag">44px · y a 21px</span></h2>
+  <div class="fams" id="fams"></div>
+</div>
+
+<div class="sec">
+  <h2>En la barra, tamaño real <span class="tag">«Ingresos» activo</span></h2>
+  <div class="grid" id="barras"></div>
+</div>
+
+<details>
+  <summary>Referencia técnica (nº → set · nombre)</summary>
+  <table id="ref"><thead><tr><th>#</th><th>set</th><th>nombre</th><th>familia</th></tr></thead><tbody></tbody></table>
+</details>
+
+<script>
+  /** Familias de idea. El orden define la numeración (01..N). */
+  const FAMILIAS = [
+    { t: "Monedas / dinero", items: [
+      "lucide:coins", "tabler:coins", "tabler:coin", "ph:coins", "ph:coins-fill",
+      "iconoir:coins", "ri:coins-line", "hugeicons:coins-01", "hugeicons:coins-02",
+      "material-symbols:money-outline-rounded", "iconoir:money-square", "ph:money",
+      "lucide:circle-dollar-sign", "solar:money-bag-linear", "hugeicons:money-01",
+    ]},
+    { t: "Billete", items: [
+      "lucide:banknote", "tabler:cash-banknote", "solar:banknote-linear",
+      "solar:banknote-2-linear", "hugeicons:banknote", "heroicons:banknotes",
+      "material-symbols:payments-rounded",
+    ]},
+    { t: "Mano que recibe", items: [
+      "lucide:hand-coins", "ph:hand-coins", "ph:hand-coins-fill", "hugeicons:hand-coins",
+      "ph:hand-deposit",
+    ]},
+    { t: "Sube (gráfico)", items: [
+      "lucide:trending-up", "tabler:trending-up", "heroicons:arrow-trending-up",
+      "material-symbols:trending-up-rounded", "material-symbols:finance-rounded",
+      "hugeicons:analytics-up", "ph:chart-line-up", "ri:line-chart-line",
+    ]},
+    { t: "Entra (flecha)", items: [
+      "lucide:arrow-down-to-line", "heroicons:arrow-up-tray", "lucide:arrow-up-right",
+      "tabler:arrow-up-right",
+    ]},
+    { t: "Ahorro / bolsa", items: [
+      "lucide:piggy-bank", "ph:piggy-bank", "iconoir:piggy-bank",
+      "material-symbols:savings-rounded", "tabler:pig-money", "hugeicons:money-bag-01",
+    ]},
+  ];
+
+  /** Finalistas que se montan en la barra (por nombre de icono). */
+  const SELECCION = [
+    "lucide:coins", "hugeicons:coins-01", "tabler:coin", "material-symbols:money-outline-rounded",
+    "solar:money-bag-linear", "hugeicons:money-01", "lucide:banknote", "solar:banknote-linear",
+    "hugeicons:banknote", "ph:hand-coins", "ph:hand-deposit", "heroicons:arrow-trending-up",
+    "material-symbols:finance-rounded", "lucide:arrow-down-to-line", "ph:piggy-bank",
+  ];
+
+  const ico = (n, px) => '<iconify-icon icon="' + n + '" style="font-size:' + px + 'px;line-height:1"></iconify-icon>';
+
+  // ── numeración global (01..N) ──
+  const NUM = new Map();
+  let k = 0;
+  for (const f of FAMILIAS) for (const n of f.items) NUM.set(n, { n: String(++k).padStart(2, "0"), fam: f.t });
+  const nn = (name) => (NUM.get(name)?.n ?? "—");
+
+  // ── 1) candidatos ──
+  let html = "";
+  for (const f of FAMILIAS) {
+    html += '<h3>' + f.t + '</h3><div class="cands">';
+    for (const n of f.items) {
+      html +=
+        '<div class="cand"><span class="num">' + nn(n) + '</span>' +
+        '<span class="big">' + ico(n, 44) + '</span>' +
+        '<span class="sizes"><span class="mini">' + ico(n, 21) + '</span></span></div>';
+    }
+    html += "</div>";
+  }
+  document.getElementById("fams").innerHTML = html;
+
+  // ── 2) montados en la barra (Ingresos ACTIVO) ──
+  const barra = (icono, cap) =>
+    '<div class="cell"><div class="nav">' +
+      '<div class="it"><span>' + ico("lucide:house", 21) + '</span><span class="lbl">Inicio</span></div>' +
+      '<div class="it"><span>' + ico("lucide:receipt", 21) + '</span><span class="lbl">Gastos</span></div>' +
+      '<div class="it on"><span>' + ico(icono, 21) + '</span><span class="lbl">Ingresos</span></div>' +
+      '<div class="it"><span>' + ico("lucide:menu", 21) + '</span><span class="lbl">Más</span></div>' +
+    '</div><p class="cap">' + cap + '</p></div>';
+
+  let barras = barra("lucide:briefcase", '<span class="num">hoy</span> · el portafolio actual (para comparar)');
+  for (const n of SELECCION) barras += barra(n, '<span class="num">' + nn(n) + "</span> · " + NUM.get(n).fam.toLowerCase());
+  document.getElementById("barras").innerHTML = barras;
+
+  // ── 3) tabla de referencia ──
+  const tbody = document.querySelector("#ref tbody");
+  tbody.innerHTML = [...NUM.entries()]
+    .map(([name, v]) => {
+      const [pre, nom] = name.split(":");
+      return "<tr><td>" + v.n + "</td><td>" + pre + "</td><td><code>" + nom + "</code></td><td>" + v.fam + "</td></tr>";
+    })
+    .join("");
+
+  // ── 4) SVG reales (un fetch por colección; resuelve ALIASES) ──
+  (async () => {
+    const nodos = [...document.querySelectorAll("iconify-icon")];
+    const porPrefijo = new Map();
+    for (const n of nodos) {
+      const [pre, nombre] = (n.getAttribute("icon") || "").split(":");
+      if (!pre || !nombre) continue;
+      if (!porPrefijo.has(pre)) porPrefijo.set(pre, new Set());
+      porPrefijo.get(pre).add(nombre);
+    }
+    for (const [pre, set] of porPrefijo) {
+      let data;
+      try {
+        const r = await fetch("https://api.iconify.design/" + pre + ".json?icons=" + [...set].join(","));
+        data = await r.json();
+      } catch {
+        continue;
+      }
+      const W = data.width ?? 24;
+      const H = data.height ?? 24;
+      for (const n of nodos) {
+        const [p, nombre] = (n.getAttribute("icon") || "").split(":");
+        if (p !== pre) continue;
+        // ojo: muchos nombres son ALIAS (p. ej. material-symbols:work-rounded
+        // -> icono "work"): hay que resolver el padre o el icono no aparece.
+        let ic = data.icons?.[nombre];
+        let al = data.aliases?.[nombre];
+        while (!ic && al) {
+          ic = data.icons?.[al.parent];
+          al = data.aliases?.[al.parent];
+        }
+        if (!ic?.body) {
+          console.warn("icono no encontrado:", pre + ":" + nombre);
+          continue;
+        }
+        const svg =
+          '<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 ' +
+          (ic.width ?? W) +
+          " " +
+          (ic.height ?? H) +
+          '">' +
+          ic.body +
+          "</svg>";
+        const span = document.createElement("span");
+        span.style.display = "inline-flex";
+        span.style.lineHeight = "1";
+        span.style.fontSize = getComputedStyle(n).fontSize;
+        span.style.color = getComputedStyle(n).color;
+        span.innerHTML = svg;
+        n.replaceWith(span);
+      }
+    }
+  })();
+</script>
+</body>
+</html>

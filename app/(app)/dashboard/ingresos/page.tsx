@@ -6,7 +6,6 @@ import {
 } from "@/backend/src/queries/trabajos";
 import { fetchDashboardData } from "../dashboard-data";
 import { DashboardClient } from "../dashboard-client";
-import { TrabajoClient } from "@/app/(app)/trabajo/trabajo-client";
 
 /** Filas por tanda del scroll infinito de las liquidaciones cobradas. */
 const PAGE = 20;
@@ -45,24 +44,19 @@ export default async function IngresosTabPage() {
     ]);
 
   return (
-    <>
-      <DashboardClient data={data} solo="ingresos" />
-      <div className="pb-8">
-        <TrabajoClient
-          embebido
-          // El reparto en ventanas viaja CRUDO: la grilla lo recalcula con la
-          // fecha **local** del navegador (fix de §211, `useVentanasCobro`).
-          estimacionesSSR={data.cobrosEstimados}
-          hoyServidor={data.hoyServidor}
-          ingresosDetalle={data.ingresosDetalle}
-          pendientes={pendientes}
-          cobradosIniciales={primeraPagina.filas}
-          hayMasCobrados={primeraPagina.hayMas}
-          totalCobrados={primeraPagina.total}
-          cuentas={cuentas.map((c) => ({ id: c.id, nombre: c.nombre }))}
-          monedaISO={sessionUser?.monedaPredeterminada?.codigoISO ?? "USD"}
-        />
-      </div>
-    </>
+    <DashboardClient
+      data={data}
+      solo="ingresos"
+      // La grilla unificada de trabajo la monta el dashboard: así el **filtro de
+      // trabajo** del mini-panel (que es estado de ahí) llega directo a la grilla.
+      trabajo={{
+        pendientes,
+        cobradosIniciales: primeraPagina.filas,
+        hayMasCobrados: primeraPagina.hayMas,
+        totalCobrados: primeraPagina.total,
+        cuentas: cuentas.map((c) => ({ id: c.id, nombre: c.nombre })),
+        monedaISO: sessionUser?.monedaPredeterminada?.codigoISO ?? "USD",
+      }}
+    />
   );
 }

@@ -388,7 +388,7 @@ export function Confirmacion() {
         cancelDisabled={submitting}
         heroe={
           <HeroeFintech etiqueta={`${etiquetaHeroe} · ${isoHeroe}`}>
-            <p className="text-center text-[34px] font-semibold leading-none tracking-tight text-header">
+            <p className="text-center text-[34px] leading-none tracking-tight text-header">
               {valorHeroe}
             </p>
           </HeroeFintech>
