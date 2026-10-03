@@ -35,6 +35,20 @@ export function isoADdMmAa(iso?: string | null): string {
   if (!y || !m || !d) return iso;
   return `${d}-${m}-${y.slice(-2)}`;
 }
+
+/**
+ * Rótulo de fecha de un **tooltip de gráfico**: si el texto es una fecha ISO
+ * ("2026-09-10", con o sin hora) se muestra como **`dd-mm-aa`** —el formato
+ * ÚNICO de la app (§192)— y si ya viene formateado (`sep-2026`, el nombre de una
+ * cuenta, …) se devuelve tal cual.
+ *
+ * Lo usan los tooltips que **no** dibuja Recharts (`SparkLineChart`) y el
+ * compartido `ChartTooltip` (bug reportado el 2026-10-03: los gráficos de las
+ * cuentas mostraban la fecha del eje X en crudo, `2026-09-10`).
+ */
+export function etiquetaFechaTooltip(label: string): string {
+  return /^\d{4}-\d{2}-\d{2}/.test(label) ? isoADdMmAa(label) : label;
+}
 /**
  * Convierte hora decimal (formato backend HH.MM, ej. 17.3 = 17:30) a string "HH:MM".
  */

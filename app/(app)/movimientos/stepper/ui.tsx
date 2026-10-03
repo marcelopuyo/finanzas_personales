@@ -8,12 +8,13 @@
 //
 // ⚠️ 2026-10-03: el wizard **completo** pasó al layout "fintech" (diseño D, §210)
 // ⇒ de acá se retiraron el `StepShell` y el `NavButtons` viejos (ya no los usa
-// ningún paso). Las piezas del diseño viven al final de este módulo:
-// `StepShellFintech`, `HeroeFintech`, `HeroeValor`, `BotonPrincipal` y
-// `BotonSecundario`.
+// ningún paso) y las piezas del diseño (`StepShellFintech`, `HeroeFintech`,
+// `HeroeValor`, `BotonPrincipal`, `BotonSecundario`) se movieron a las primitivas
+// compartidas `components/wizard/ui.tsx`, porque ahora también las usa el wizard
+// de alta de trabajos. Acá queda **solo** el wrapper de `StepShellFintech` que
+// resuelve el `‹` con el contexto del stepper.
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { useMovimientoStepper } from "./stepper-context";
 
 // Primitivas compartidas re-exportadas tal cual (no dependen del contexto).
@@ -28,14 +29,23 @@ export {
   NumberField,
   SelectField,
   Fila,
+  HeroeFintech,
+  HeroeValor,
+  BotonPrincipal,
+  BotonSecundario,
 } from "@/components/wizard/ui";
+import { StepShellFintech as StepShellFintechBase } from "@/components/wizard/ui";
 
 /**
- * Shell del paso con el layout **"fintech"** (diseño D, 2026-10-01): cabecera con
- * el `‹` (**cancela y sale**: `volverA`/dashboard; en modo stepper resetea los
- * datos) + título + `N/total`, bloque del **héroe** (opcional: `null` en los
- * pasos que no tienen un número protagonista), contenido agrupado y acción
- * principal full-width en la zona del pulgar.
+ * Paso del wizard de movimientos con el layout **"fintech"** (diseño D): el
+ * `StepShellFintech` compartido + el comportamiento del stepper, que es lo único
+ * que agrega esta capa:
+ *
+ * - el `‹` de la cabecera **cancela y sale** del wizard: va al origen
+ *   (`volverA`) o al dashboard y, en **modo stepper** (`/movimientos`), además
+ *   **resetea** los datos;
+ * - el indicador `N/total` se oculta en **modo directo**
+ *   (`/movimientos/nuevo/<tipo>`), donde el usuario entró a hacer una sola cosa.
  *
  * Desde el 2026-10-03 lo usan **todos** los pasos del wizard de movimientos.
  */
@@ -64,101 +74,16 @@ export function StepShellFintech({
     router.push(volverA ?? "/dashboard");
   };
   return (
-    <div className="mx-auto max-w-xl py-4">
-      <div className="mb-5 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={volver}
-          disabled={cancelDisabled}
-          aria-label="Cancelar"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-border bg-muted text-subtitle transition-colors hover:text-header disabled:opacity-50"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <h1 className="text-[17px] text-header">{titulo}</h1>
-        {!direct && (
-          <span className="ml-auto text-[12px] text-subtitle">
-            {step}/{total}
-          </span>
-        )}
-      </div>
-      {heroe}
-      {children}
-      {/* `data-pie-accion`: el FAB de voz se corre cuando este pie entra en su franja. */}
-      <div className="mt-4 space-y-2" data-pie-accion="">
-        {footer}
-      </div>
-    </div>
-  );
-}
-
-/** Bloque del **héroe** (el monto) con su rótulo, centrado. */
-export function HeroeFintech({
-  children,
-  etiqueta,
-}: {
-  children: ReactNode;
-  etiqueta: ReactNode;
-}) {
-  return (
-    <div className="mb-5">
-      {children}
-      <p className="mt-2 text-center text-[12px] text-subtitle">{etiqueta}</p>
-    </div>
-  );
-}
-
-/** Valor **de sólo lectura** del héroe (mismo tamaño que el input del héroe):
- *  lo usan la confirmación y los pasos cuyo monto lo calcula el servidor
- *  (jornada: horas × precio) o se deduce de los ítems tildados (cobro). */
-export function HeroeValor({ children }: { children: ReactNode }) {
-  return (
-    <p className="text-center text-[34px] leading-none tracking-tight text-header">
-      {children}
-    </p>
-  );
-}
-
-/** Acción principal del pie: full-width, en la zona del pulgar. */
-export function BotonPrincipal({
-  onClick,
-  disabled = false,
-  children,
-}: {
-  onClick: () => void;
-  disabled?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-3.5 text-[15px] text-primary-foreground transition-opacity hover:enabled:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+    <StepShellFintechBase
+      titulo={titulo}
+      paso={direct ? undefined : step}
+      total={direct ? undefined : total}
+      onCancel={volver}
+      cancelDisabled={cancelDisabled}
+      heroe={heroe}
+      footer={footer}
     >
       {children}
-    </button>
-  );
-}
-
-/** Acción secundaria del pie (full-width, contorno). */
-export function BotonSecundario({
-  onClick,
-  disabled = false,
-  children,
-}: {
-  onClick: () => void;
-  disabled?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-border px-4 py-3 text-[14px] font-medium text-subtitle transition-colors hover:bg-muted hover:text-header disabled:opacity-50"
-    >
-      {children}
-    </button>
+    </StepShellFintechBase>
   );
 }

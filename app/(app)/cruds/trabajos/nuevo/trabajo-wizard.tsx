@@ -7,16 +7,28 @@
 //   - Por hora             → datos → tipo de pago → modalidad horas → precio → confirmación (5 pasos)
 // Reutiliza las primitivas compartidas de `components/wizard/ui.tsx`
 // (extraídas del wizard de movimientos, 2026-09-06).
+//
+// ⚠️ 2026-10-03: pasa al layout **"fintech"** (diseño D) — el `StepShellFintech`
+// compartido: cabecera con el `‹` que cancela y sale, `N/total`, el héroe (el
+// precio por hora cuando la rama es "por hora") y las acciones full-width. El
+// nombre del paso, que antes iba en el indicador "Paso X de Y · …", es ahora el
+// **título de la cabecera**.
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Check } from "lucide-react";
-import { cn, dateTimeToString } from "@/lib/utils";
+import { Check } from "lucide-react";
+import { cn, dateTimeToString, numberToCurrency, simboloMoneda } from "@/lib/utils";
 import { crearTrabajo } from "@/backend/src/actions/trabajos";
 import {
+  BotonPrincipal,
+  BotonSecundario,
   Campo,
   DateField,
-  NavButtons,
+  Fila,
+  HeroeFintech,
+  HeroeValor,
+  NumberField,
+  StepShellFintech,
   TextField,
   inputCls,
 } from "@/components/wizard/ui";
@@ -49,7 +61,7 @@ function Tarjeta({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex w-full items-start gap-3 rounded-lg border p-4 text-left transition-colors",
+        "flex w-full items-start gap-3 rounded-xl border p-4 text-left transition-colors",
         activo
           ? "border-primary bg-primary/10"
           : "border-border bg-card hover:bg-muted"
@@ -71,7 +83,15 @@ function Tarjeta({
   );
 }
 
-export function TrabajoWizard({ origen }: { origen?: string }) {
+export function TrabajoWizard({
+  origen,
+  monedaISO,
+}: {
+  origen?: string;
+  /** ISO 4217 de la **moneda predeterminada** del usuario: es la del precio por
+   *  hora (símbolo del héroe y de la confirmación). */
+  monedaISO: string;
+}) {
   const router = useRouter();
   // Abierto desde el panel Trabajo del dashboard (?origen=dashboard): al
   // volver (paso 0) o tras guardar se regresa al listado conservando el origen
@@ -163,54 +183,69 @@ export function TrabajoWizard({ origen }: { origen?: string }) {
     }
   };
 
-  const tituloPaso =
+  // ── Layout "fintech" (diseño D, 2026-10-03) ───────────────────────────────
+  // El **título de la cabecera** es el nombre del paso (antes iba en el
+  // indicador "Paso X de Y · …", que el shell reemplaza por `N/total`).
+  const esConfirmacion = ramaCorta ? paso === 2 : paso === 4;
+  const rotuloPaso =
     paso === 0
-      ? "Datos generales"
+      ? "Nuevo trabajo"
       : paso === 1
       ? "Tipo de pago"
+      : esConfirmacion
+      ? "Confirmar"
       : paso === 2
-      ? ramaCorta
-        ? "Confirmación"
-        : "Modalidad de horas"
-      : paso === 3
-      ? "Precio por hora"
-      : "Confirmación";
+      ? "Modalidad de horas"
+      : "Precio por hora";
+
+  // El **precio por hora** (rama "por hora") es el único número del wizard: va
+  // como héroe editable en su paso y **de sólo lectura** en la confirmación.
+  const precioNum = Number(estado.precioHora) || 0;
+  const heroe =
+    paso === 3 ? (
+      <HeroeFintech etiqueta={`Precio por hora · ${monedaISO}`}>
+        <NumberField
+          hero
+          heroPrefix={simboloMoneda(monedaISO)}
+          label="Precio por hora"
+          value={precioNum}
+          onChange={(v) => set({ precioHora: v === 0 ? "" : String(v) })}
+        />
+      </HeroeFintech>
+    ) : esConfirmacion && !ramaCorta ? (
+      <HeroeFintech etiqueta={`Precio por hora · ${monedaISO}`}>
+        <HeroeValor>{numberToCurrency(precioNum, monedaISO)}</HeroeValor>
+      </HeroeFintech>
+    ) : null;
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-8">
-      <div className="mb-6 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={volver}
-          className="rounded-lg p-1.5 text-subtitle transition-colors hover:bg-muted hover:text-header"
-          aria-label="Volver"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <h1 className="text-[18px] text-header">Nuevo Trabajo</h1>
-      </div>
-
-      {/* Indicador de pasos */}
-      <div className="mb-4 flex items-center gap-2">
-        <span className="text-[12px] text-subtitle">
-          Paso {paso + 1} de {totalPasos()} · {tituloPaso}
-        </span>
-        <div className="ml-auto flex items-center gap-1">
-          {Array.from({ length: totalPasos() }).map((_, i) => (
-            <span
-              key={i}
-              className={cn(
-                "h-1.5 w-6 rounded-full",
-                i <= paso ? "bg-primary" : "bg-muted"
-              )}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="rounded-lg border border-border bg-card p-5">
+    <StepShellFintech
+      titulo={rotuloPaso}
+      paso={paso + 1}
+      total={totalPasos()}
+      onCancel={() => router.push(destino)}
+      cancelDisabled={guardando}
+      heroe={heroe}
+      footer={
+        <>
+          <BotonPrincipal onClick={siguiente} disabled={guardando}>
+            {guardando
+              ? "Guardando..."
+              : esConfirmacion
+              ? "Crear trabajo"
+              : "Siguiente"}
+          </BotonPrincipal>
+          {/* El `‹` de la cabecera cancela y sale; "Atrás" vuelve un paso. */}
+          {paso > 0 && (
+            <BotonSecundario onClick={volver} disabled={guardando}>
+              Atrás
+            </BotonSecundario>
+          )}
+        </>
+      }
+    >
         {paso === 0 && (
-          <div className="space-y-4">
+          <div className="space-y-4 rounded-xl border border-border bg-card p-4">
             <TextField
               label="Nombre"
               value={estado.nombre}
@@ -235,7 +270,7 @@ export function TrabajoWizard({ origen }: { origen?: string }) {
         )}
 
         {paso === 1 && (
-          <div className="space-y-3">
+          <div className="space-y-3 rounded-xl border border-border bg-card p-4">
             <Tarjeta
               activo={estado.tipoPago === "fijo"}
               onClick={() => {
@@ -267,7 +302,7 @@ export function TrabajoWizard({ origen }: { origen?: string }) {
         )}
 
         {paso === 2 && !ramaCorta && (
-          <div className="space-y-3">
+          <div className="space-y-3 rounded-xl border border-border bg-card p-4">
             <Tarjeta
               activo={estado.modalidadHoras === "horas_fijas"}
               onClick={() => set({ modalidadHoras: "horas_fijas" })}
@@ -283,81 +318,44 @@ export function TrabajoWizard({ origen }: { origen?: string }) {
           </div>
         )}
 
+        {/* El input del precio vive en el **héroe** de la cabecera (arriba):
+            acá queda solo la aclaración de para qué se usa. */}
         {paso === 3 && !ramaCorta && (
-          <Campo label="Precio por hora">
-            <input
-              className={inputCls}
-              inputMode="decimal"
-              value={estado.precioHora}
-              onChange={(e) =>
-                set({ precioHora: e.target.value.replace(/[^0-9.,]/g, "") })
-              }
-              placeholder="0.00"
-            />
-            <p className="mt-1 text-[12px] text-subtitle">
-              Si elegís horas variables, este precio se usa al cargar cada jornada.
-            </p>
-          </Campo>
+          <p className="rounded-xl border border-border bg-card p-4 text-[12px] leading-5 text-subtitle">
+            Si elegís horas variables, este precio se usa al cargar cada jornada.
+          </p>
         )}
 
-        {(paso === 4 || (paso === 2 && ramaCorta)) && (
-          <div className="space-y-2 text-[13px]">
-            <div className="flex justify-between border-b border-border pb-2">
-              <span className="text-subtitle">Nombre</span>
-              <span className="font-medium text-header">{estado.nombre}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-subtitle">Fecha de inicio</span>
-              <span className="text-header">{dateTimeToString(estado.fechaInicio)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-subtitle">Tipo de pago</span>
-              <span className="text-header">
-                {estado.tipoPago === "fijo"
+        {esConfirmacion && (
+          <div className="rounded-xl border border-border bg-card px-4 py-1">
+            <Fila label="Nombre" value={estado.nombre} />
+            <Fila
+              label="Fecha de inicio"
+              value={dateTimeToString(estado.fechaInicio)}
+            />
+            <Fila
+              label="Tipo de pago"
+              value={
+                estado.tipoPago === "fijo"
                   ? "Fijo por período"
                   : estado.tipoPago === "por_tarea"
                   ? "Por tarea"
-                  : "Por hora"}
-              </span>
-            </div>
+                  : "Por hora"
+              }
+            />
+            {/* El **precio por hora** es el héroe de la cabecera: no se repite acá. */}
             {!ramaCorta && (
-              <>
-                <div className="flex justify-between">
-                  <span className="text-subtitle">Modalidad</span>
-                  <span className="text-header">
-                    {estado.modalidadHoras === "horas_fijas"
-                      ? "Horas fijas por período"
-                      : "Horas variables (jornadas)"}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-subtitle">Precio por hora</span>
-                  <span className="text-header">{estado.precioHora}</span>
-                </div>
-              </>
+              <Fila
+                label="Modalidad"
+                value={
+                  estado.modalidadHoras === "horas_fijas"
+                    ? "Horas fijas por período"
+                    : "Horas variables (jornadas)"
+                }
+              />
             )}
           </div>
         )}
-
-        {/* Footer acciones (primitiva compartida) */}
-        <div className="mt-6">
-          <NavButtons
-            onCancel={
-              paso === 0 ? () => router.push("/cruds/trabajos") : undefined
-            }
-            onBack={paso === 0 ? undefined : volver}
-            onNext={siguiente}
-            nextDisabled={guardando}
-            nextLabel={
-              guardando
-                ? "Guardando..."
-                : paso === 4 || (paso === 2 && ramaCorta)
-                ? "Crear trabajo"
-                : "Siguiente"
-            }
-          />
-        </div>
-      </div>
-    </div>
+    </StepShellFintech>
   );
 }

@@ -5,6 +5,7 @@
 // `stepper-context` de movimientos). Las consumen el wizard de movimientos
 // (vía su `./ui`) y el wizard de alta de trabajos (`trabajo-wizard.tsx`).
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ArrowLeft } from "lucide-react";
 import { Combobox } from "@/components/ui/combobox";
 import { DateFieldInput } from "@/components/ui/date-picker";
 import { cn, isoADdMmAa } from "@/lib/utils";
@@ -563,5 +564,140 @@ export function Fila({ label, value }: { label: string; value: string }) {
       <span className="text-subtitle">{label}</span>
       <span className="text-right font-medium text-header">{value}</span>
     </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   LAYOUT "FINTECH" (diseño D, 2026-10-01 · unificado el 2026-10-03)
+
+   El paso del wizard se lee como una pantalla "de banco": cabecera con el `‹`
+   (**cancela y sale** del wizard) + título corto + `N/total`, el **héroe** (el
+   número protagonista) grande y centrado, el contenido agrupado en tarjetas y
+   la acción principal **full-width** en la zona del pulgar.
+
+   Es **context-free** (igual que el resto de este módulo): quien lo usa resuelve
+   el `‹` con `onCancel`. Las piezas las consumen el wizard de movimientos (que
+   las reexporta desde su `./ui`) y el wizard de alta de trabajos.
+   ───────────────────────────────────────────────────────────────────── */
+export function StepShellFintech({
+  titulo,
+  paso,
+  total,
+  onCancel,
+  cancelDisabled = false,
+  heroe,
+  children,
+  footer,
+}: {
+  titulo: string;
+  /** Paso actual y total: muestran "N/total" en la cabecera. Sin ellos no se pinta. */
+  paso?: number;
+  total?: number;
+  /** Acción del `‹` de la cabecera: **cancelar y salir** del wizard. */
+  onCancel: () => void;
+  /** Deshabilita el `‹` (p. ej. mientras se guarda). */
+  cancelDisabled?: boolean;
+  /** Bloque del héroe (el monto). Opcional: hay pasos sin número protagonista. */
+  heroe?: ReactNode;
+  children: ReactNode;
+  footer: ReactNode;
+}) {
+  return (
+    <div className="mx-auto max-w-xl py-4">
+      <div className="mb-5 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={cancelDisabled}
+          aria-label="Cancelar"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-border bg-muted text-subtitle transition-colors hover:text-header disabled:opacity-50"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <h1 className="text-[17px] text-header">{titulo}</h1>
+        {paso != null && total != null && (
+          <span className="ml-auto text-[12px] text-subtitle">
+            {paso}/{total}
+          </span>
+        )}
+      </div>
+      {heroe}
+      {children}
+      {/* `data-pie-accion`: el FAB de voz se corre cuando este pie entra en su franja. */}
+      <div className="mt-4 space-y-2" data-pie-accion="">
+        {footer}
+      </div>
+    </div>
+  );
+}
+
+/** Bloque del **héroe** (el monto) con su rótulo, centrado. */
+export function HeroeFintech({
+  children,
+  etiqueta,
+}: {
+  children: ReactNode;
+  etiqueta: ReactNode;
+}) {
+  return (
+    <div className="mb-5">
+      {children}
+      <p className="mt-2 text-center text-[12px] text-subtitle">{etiqueta}</p>
+    </div>
+  );
+}
+
+/** Valor **de sólo lectura** del héroe (mismo tamaño que el input del héroe):
+ *  lo usan la confirmación y los pasos cuyo monto lo calcula el servidor
+ *  (jornada: horas × precio) o se deduce de los ítems tildados (cobro). */
+export function HeroeValor({ children }: { children: ReactNode }) {
+  return (
+    <p className="text-center text-[34px] leading-none tracking-tight text-header">
+      {children}
+    </p>
+  );
+}
+
+/** Acción principal del pie: full-width, en la zona del pulgar. */
+export function BotonPrincipal({
+  onClick,
+  disabled = false,
+  children,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-3.5 text-[15px] text-primary-foreground transition-opacity hover:enabled:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Acción secundaria del pie (full-width, contorno). */
+export function BotonSecundario({
+  onClick,
+  disabled = false,
+  children,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-border px-4 py-3 text-[14px] font-medium text-subtitle transition-colors hover:bg-muted hover:text-header disabled:opacity-50"
+    >
+      {children}
+    </button>
   );
 }

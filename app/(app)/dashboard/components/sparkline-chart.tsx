@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import type { MouseEvent, TouchEvent } from "react";
-import { numberToCurrency } from "@/lib/utils";
+import { etiquetaFechaTooltip, numberToCurrency } from "@/lib/utils";
 
 interface SparkLineChartProps {
   data: number[];
@@ -17,17 +17,6 @@ interface TooltipState {
   top: number;
   label?: string;
   value: number;
-}
-
-/**
- * Formatea el label del tooltip cuando es una fecha ISO ("2026-09-10", con o
- * sin hora) al formato de la app: "10-09-26". Los labels que ya vienen
- * formateados (los llamadores usan `dateTimeToString`) se muestran tal cual: si
- * no matchea el patrón ISO, se devuelve el original.
- */
-function labelTooltip(label: string): string {
-  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(label);
-  return iso ? `${iso[3]}-${iso[2]}-${iso[1].slice(-2)}` : label;
 }
 
 export function SparkLineChart({
@@ -65,7 +54,7 @@ export function SparkLineChart({
     >
       {tooltip.label && (
         <p className="text-[10px] leading-tight text-subtitle">
-          {labelTooltip(tooltip.label)}
+          {etiquetaFechaTooltip(tooltip.label)}
         </p>
       )}
       <p className="text-[11px] leading-tight text-card-foreground">
