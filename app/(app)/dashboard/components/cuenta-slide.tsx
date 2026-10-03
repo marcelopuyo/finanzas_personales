@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
-import { Settings2, type LucideIcon } from "lucide-react";
+import { Settings2 } from "lucide-react";
+import { AccionCirculo } from "./accion-circulo";
 import { EvolutionChart } from "./line-chart";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LinkNavStatus, usePrefetchNav } from "@/components/ui/nav-progress";
+import { usePrefetchNav } from "@/components/ui/nav-progress";
 import {
   HREF_CUENTAS,
   accionesNuevoMovimiento,
@@ -107,13 +107,15 @@ export function CuentaSlide({
       </div>
 
       {/* Acciones (las del FAB + la del resumen), abajo del gráfico y DENTRO del
-          carrusel: al deslizar viajan con la cuenta. */}
+          carrusel: al deslizar viajan con la cuenta. El botón es el
+          **compartido** `AccionCirculo` (mismo estilo que las acciones del panel
+          de Ingresos). */}
       <div className="mt-1.5 flex justify-center gap-1">
         {esBalance ? (
-          <AccionSlide href={HREF_CUENTAS} icon={Settings2} label="Cuentas" />
+          <AccionCirculo href={HREF_CUENTAS} icon={Settings2} label="Cuentas" />
         ) : (
           acciones.map((a) => (
-            <AccionSlide
+            <AccionCirculo
               key={a.label}
               href={a.href}
               icon={a.icon}
@@ -124,40 +126,5 @@ export function CuentaSlide({
         )}
       </div>
     </section>
-  );
-}
-
-/**
- * Botón de acción del slide: **círculo semitransparente** (más chico que el FAB)
- * con el ícono y, debajo, el rótulo. Es un `<Link>` —es navegación y en mobile
- * conviene el `<a href>` nativo (lección §117/§118)— con la barra de progreso
- * global de feedback.
- */
-function AccionSlide({
-  href,
-  icon: Icon,
-  label,
-  onPrefetch,
-}: {
-  href: string;
-  icon: LucideIcon;
-  label: string;
-  onPrefetch?: () => void;
-}) {
-  return (
-    <Link
-      href={href}
-      onPointerEnter={onPrefetch}
-      onTouchStartCapture={onPrefetch}
-      className="flex w-[104px] flex-col items-center gap-1 rounded-xl px-1 py-0.5"
-    >
-      <span className="flex h-8.5 w-8.5 items-center justify-center rounded-full border border-border bg-card/60 text-value">
-        <Icon className="h-4 w-4" />
-      </span>
-      <span className="text-center text-[9px] leading-[1.15] text-card-foreground">
-        {label}
-      </span>
-      <LinkNavStatus />
-    </Link>
   );
 }

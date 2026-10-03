@@ -253,30 +253,11 @@ html.fp-sin-red [data-app-lock] {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   FAB DE ACCIONES con speed-dial (2026-09-26 · `/trabajo`)
-
-   La pantalla "Períodos de trabajo" tiene su acción primaria en el rincón de
-   abajo a la derecha: un **➕ que despliega las 3 acciones del circuito**
-   (Cobrar trabajo · Cargar jornada · Cargar tarea). El marcador
-   `data-fab-acciones` del contenedor es lo que usa esta hoja para **correr el FAB
-   de VOZ a la izquierda** mientras está presente: acá el rincón es del botón de
-   la pantalla (mismo criterio que el apilado sobre `[data-barra-inferior]`, pero
-   al costado, porque el dial se despliega hacia arriba y se pisarían). Se
-   resuelve con `:has()` ⇒ sin estado compartido ni JS.
-   ───────────────────────────────────────────────────────────────────────── */
-.fp-fab-acciones {
-  right: 1rem;
-  bottom: calc(1rem + env(safe-area-inset-bottom));
-}
-/* Con la **barra de navegación** del rediseño (2026-10-01) el rincón inferior ya
-   está ocupado: el FAB de acciones **sube por encima** (mismo criterio que
-   `[data-barra-inferior]`). */
-html:has([data-barra-nav]) .fp-fab-acciones {
-  bottom: calc(4.25rem + min(env(safe-area-inset-bottom), 2.5rem));
-}
-/* ⚠️ Se eliminó la regla que corría el FAB de VOZ a la izquierda cuando este FAB
-   estaba presente: desde el rediseño el dictado se dispara desde la **top bar** y
-   el contenedor `.fp-voz-fab` solo aloja la burbuja, que cuelga del techo. */
+   (El FAB de acciones con speed-dial y sus reglas `.fp-fab-acciones` /
+   `.fp-dial-in` se ELIMINARON el 2026-10-03: las 3 acciones del circuito de
+   trabajo son ahora botones al pie del mini-panel de Ingresos —`AccionCirculo`—
+   y ya no hay ningún FAB de pantalla. El único flotante del pie es el FAB de
+   voz, que se apila sobre la barra de navegación con las reglas de arriba.) */
 
 /* ─────────────────────────────────────────────────────────────────────────
    TOP BAR de INICIO (2026-10-02 · rama `rediseno-ui`)
@@ -297,26 +278,6 @@ html.fp-inicio-scrolled .topbar-inicio {
   border-bottom-color: var(--border);
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
-}
-
-/* Aparición del dial (el `+` gira a ✕ en el componente). */
-@keyframes dial-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.fp-dial-in {
-  animation: dial-in 0.14s ease-out;
-}
-@media (prefers-reduced-motion: reduce) {
-  .fp-dial-in {
-    animation: none;
-  }
 }
 
 /* Indicador de "escuchando" (R6: solo visual, sin texto). */

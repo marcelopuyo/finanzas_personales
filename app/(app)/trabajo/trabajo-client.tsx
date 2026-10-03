@@ -21,7 +21,6 @@ import { dateTimeToString, numberToCurrency } from "@/lib/utils";
 import { SIN_TRABAJO } from "@/lib/filtros-dashboard";
 import { useVentanasCobro } from "./components/use-ventanas-cobro";
 import { obtenerItemEditable } from "./actions";
-import { AccionesFab } from "./components/acciones-fab";
 import { ItemEditModal } from "./components/item-edit-modal";
 import { PeriodosGrid } from "./components/periodos-grid";
 import type { ItemEditable } from "./tipos";
@@ -226,7 +225,7 @@ export function TrabajoClient({
         <>
           {/* Encabezado: volver + título. **Sin ⋯**: "Gestionar trabajos" se maneja
               desde el ⋯ de la sección de trabajo en Ingresos y las acciones del
-              circuito viven en el FAB ➕ (abajo a la derecha). */}
+              circuito viven al pie del mini-panel de Ingresos. */}
           <div className="mb-4 flex items-center gap-3">
             <button
               type="button"
@@ -271,9 +270,11 @@ export function TrabajoClient({
         />
       )}
 
-      {/* Acciones del circuito (cobrar / cargar jornada / cargar tarea): FAB ➕
-          con speed-dial, abajo a la derecha de la pantalla. */}
-      <AccionesFab volverA="/trabajo" />
+      {/* ⚠️ Las acciones del circuito (cobrar / cargar jornada / cargar tarea) YA
+          NO viven acá: desde el 2026-10-03 son botones al pie del **mini-panel de
+          Ingresos** (`AccionCirculo` en `dashboard-client.tsx`), con el mismo
+          estilo que los de las tarjetas de Inicio — antes era un FAB ➕ flotante
+          en la esquina inferior derecha. */}
 
       {/* Formulario de edición de un ítem pendiente (modal centrado). */}
       {itemEditando && (

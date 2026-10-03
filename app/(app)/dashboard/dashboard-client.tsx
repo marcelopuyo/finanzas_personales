@@ -1,8 +1,9 @@
 ﻿"use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { SlidersHorizontal } from "lucide-react";
+import { Banknote, CalendarPlus, ListPlus, SlidersHorizontal } from "lucide-react";
 import { PanelHeader } from "./components/panel-header";
+import { AccionCirculo } from "./components/accion-circulo";
 import { Tabs } from "@/components/ui/tabs";
 import { Modal } from "@/components/ui/modal";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -37,7 +38,7 @@ import {
   SIN_TRABAJO as FILTRO_SIN_TRABAJO,
 } from "@/lib/filtros-dashboard";
 import { useMontado } from "@/lib/use-cliente";
-import { usePendingNav } from "@/components/ui/nav-progress";
+import { usePendingNav, usePrefetchNav } from "@/components/ui/nav-progress";
 
 /**
  * Vista (pantalla) que se está pintando. Sin `solo` se pintan **todas**, que es el
@@ -91,6 +92,18 @@ const SIN_CATEGORIA = FILTRO_SIN_CATEGORIA;
 const SIN_CUENTA = FILTRO_SIN_CUENTA;
 const SIN_TRABAJO = FILTRO_SIN_TRABAJO;
 
+/**
+ * **Acciones del circuito de trabajo** (`/movimientos/nuevo/{tipo}`), al pie del
+ * mini-panel de Ingresos desde el 2026-10-03: antes eran el **FAB ➕ con
+ * speed-dial** de la esquina inferior derecha (`acciones-fab.tsx`, eliminado).
+ * El orden es el mismo que tenían en el dial y el rótulo es el mismo texto.
+ */
+const ACCIONES_TRABAJO = [
+  { tipo: "jornada", label: "Cargar jornada", icon: CalendarPlus },
+  { tipo: "tarea", label: "Cargar tarea", icon: ListPlus },
+  { tipo: "cobro", label: "Cobrar trabajo", icon: Banknote },
+] as const;
+
 function toDateKey(v: string | Date | null | undefined): string {
   if (!v) return "";
   if (v instanceof Date) return v.toISOString().slice(0, 10);
@@ -108,6 +121,8 @@ export function DashboardClient({
 
   /** Navegación con feedback (barra de progreso global). */
   const { go: navGo } = usePendingNav();
+  /** Prefetch al primer contacto (mismo patrón que el resto de la app). */
+  const prefetch = usePrefetchNav();
   const [tabGastos, setTabGastos] = useState("resumen");
   const [tabIngresos, setTabIngresos] = useState("resumen");
 
@@ -511,8 +526,14 @@ export function DashboardClient({
     />
   );
 
-  /** **Mini-panel superior de Ingresos** (2026-10-03): mes + monto + Filtros + el ⋯
-      de Trabajo (que antes vivía en el panel de la grilla). */
+  /**
+   * **Mini-panel superior de Ingresos** (2026-10-03): mes + monto + Filtros + el ⋯
+   * de Trabajo (que antes vivía en el panel de la grilla) y, **al pie**, las 3
+   * acciones del circuito de trabajo (Cargar jornada · Cargar tarea · Cobrar
+   * trabajo): antes eran el **FAB ➕ flotante** de la esquina de la pantalla
+   * (pedido del usuario 2026-10-03) y ahora usan el **mismo estilo** que los
+   * botones de las tarjetas de Inicio (`AccionCirculo`).
+   */
   const ingresosMiniPanel = (
     <div className="rounded-2xl border border-border bg-card px-4 py-3">
       <PanelHeader
@@ -526,6 +547,22 @@ export function DashboardClient({
           </>
         }
       />
+      <div className="mt-3 flex items-center justify-center gap-1 border-t border-border pt-3">
+        {ACCIONES_TRABAJO.map((a) => {
+          const href = `/movimientos/nuevo/${a.tipo}?volverA=${encodeURIComponent(
+            "/dashboard/ingresos"
+          )}`;
+          return (
+            <AccionCirculo
+              key={a.tipo}
+              href={href}
+              icon={a.icon}
+              label={a.label}
+              onPrefetch={() => prefetch(href)}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 
