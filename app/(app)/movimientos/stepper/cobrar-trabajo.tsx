@@ -19,8 +19,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMovimientoStepper } from "./stepper-context";
 import {
-  StepShell,
-  NavButtons,
+  StepShellFintech,
+  HeroeFintech,
+  HeroeValor,
+  BotonPrincipal,
+  BotonSecundario,
   DateField,
   SelectField,
   NumberField,
@@ -28,7 +31,7 @@ import {
   formatFecha,
 } from "./ui";
 import { Checkbox } from "@/components/ui/checkbox";
-import { decimalToTime, numberToCurrency } from "@/lib/utils";
+import { decimalToTime, numberToCurrency, simboloMoneda } from "@/lib/utils";
 import { STEP_CONFIRMACION, type MovimientoData } from "./types";
 import {
   ETIQUETA_MODALIDAD,
@@ -48,7 +51,8 @@ import { aplicarDictadoSimple, escribirEnPantalla } from "./dictado-comun";
 import { crearDictadoCobro } from "./dictado-trabajo";
 
 export function CobrarTrabajo() {
-  const { data, handleSetData, navigateTo, options } = useMovimientoStepper();
+  const { data, handleSetData, navigateTo, options, direct } =
+    useMovimientoStepper();
   /**
    * Sub-paso interno del cobro. **El paso 1 es SIEMPRE sólo el TRABAJO**
    * (2026-09-26) y de su modalidad dependen las pantallas siguientes:
@@ -297,32 +301,61 @@ export function CobrarTrabajo() {
       i.tipo === "jornada"
         ? `${decimalToTime(i.horaDesde ?? 0)} a ${decimalToTime(i.horaHasta ?? 0)}`
         : i.descripcion?.trim() || (i.horas ? `${i.horas} h` : "Tarea");
+    // ⚠️ Los montos de las jornadas/tareas están en la **moneda predeterminada**
+    // del usuario: sin el ISO salían con el símbolo de ARS por defecto (`$`) al
+    // lado de un héroe en US$ (2026-10-03).
     const propina =
       i.tipo === "jornada" && i.montoPropina > 0
-        ? ` · propina ${numberToCurrency(i.montoPropina)}`
+        ? ` · propina ${numberToCurrency(i.montoPropina, options.monedaISO)}`
         : "";
-    return `${formatFecha(i.fecha)} — ${detalle}${propina} · ${numberToCurrency(i.monto)}`;
+    return `${formatFecha(i.fecha)} — ${detalle}${propina} · ${numberToCurrency(i.monto, options.monedaISO)}`;
   };
 
+  // ── Layout "fintech" (diseño D, 2026-10-03) ─────────────────────────────
+  // El héroe cambia con la pantalla: la LISTA de trabajos no tiene número
+  // protagonista, la selección muestra el **total de lo tildado** (en vivo) y la
+  // última pantalla deja el **monto editable** en la zona del pulgar.
+  const isoCuenta =
+    options.cuentas.find((c) => c.id === data.cuentaOrigen)?.moneda
+      ?.codigoISO ?? "";
+
   return (
-    <StepShell
-      title={
-        enTrabajo
-          ? "Elegí el trabajo que vas a cobrar:"
-          : enSeleccion
-            ? "Elegí qué jornadas/tareas vas a cobrar:"
-            : "Por favor ingrese la información del cobro del trabajo:"
-      }
+    <StepShellFintech
+      titulo="Cobrar"
       step={2 + subpaso}
       total={1 + totalSubpasos}
+      heroe={
+        enTrabajo ? null : enSeleccion ? (
+          <HeroeFintech etiqueta="Total de lo tildado">
+            <HeroeValor>
+              {numberToCurrency(calculado, options.monedaISO)}
+            </HeroeValor>
+          </HeroeFintech>
+        ) : (
+          <HeroeFintech
+            etiqueta={`Monto${isoCuenta ? ` · ${isoCuenta}` : ""}`}
+          >
+            <NumberField
+              hero
+              heroPrefix={isoCuenta ? simboloMoneda(isoCuenta) : ""}
+              label="Monto"
+              value={data.montoOrigen}
+              onChange={(v) => handleSetData({ montoOrigen: v })}
+            />
+          </HeroeFintech>
+        )
+      }
       footer={
-        <NavButtons
-          onBack={atras}
-          onNext={siguiente}
-          nextDisabled={!puedeAvanzar}
-          // En directo el paso pide "Atrás" porque tiene sub-pasos internos.
-          atrasEnDirecto={subpaso > 0}
-        />
+        <>
+          <BotonPrincipal onClick={siguiente} disabled={!puedeAvanzar}>
+            Siguiente
+          </BotonPrincipal>
+          {/* "Atrás" entre pantallas del cobro: en directo el paso tiene
+              sub-pasos internos y sin esto no se podría volver. */}
+          {(subpaso > 0 || !direct) && (
+            <BotonSecundario onClick={atras}>Atrás</BotonSecundario>
+          )}
+        </>
       }
     >
       {enTrabajo ? (
@@ -330,18 +363,18 @@ export function CobrarTrabajo() {
               va como LISTA de opciones (no un `select`): se ve el nombre, la
               modalidad y cuál está elegido de un vistazo. ── */
         options.trabajos.length === 0 ? (
-          <p className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2.5 text-[12px] text-warning">
+          <p className="rounded-xl border border-warning/40 bg-warning/10 px-3 py-2.5 text-[12px] text-warning">
             No tenés trabajos cargados. Creá uno desde el menú ⋯ de la pantalla
             (Gestionar trabajos) y volvé a intentar.
           </p>
         ) : (
-          <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-muted">
+          <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
             {options.trabajos.map((t) => (
               <button
                 key={t.id}
                 type="button"
                 onClick={() => elegirTrabajo(t.id)}
-                className="flex w-full items-center px-3 py-3 text-left transition-colors hover:bg-card [-webkit-tap-highlight-color:transparent]"
+                className="flex w-full items-center px-3 py-3 text-left transition-colors hover:bg-muted [-webkit-tap-highlight-color:transparent]"
               >
                 {/* Sólo el nombre (2026-09-26): la modalidad se ve en la pantalla
                     siguiente, ya con el trabajo elegido. */}
@@ -353,181 +386,179 @@ export function CobrarTrabajo() {
           </div>
         )
       ) : enSeleccion ? (
-        /* ── Paso 2 (horas variables / por tarea): QUÉ se cobra ── */
-        <div className="space-y-2">
-          <Fila label="Trabajo" value={etiquetaTrabajo} />
-          <div className="flex items-center justify-between">
-            <p className="text-[13px] font-medium text-card-foreground">
-              {modalidad === "por_tarea"
-                ? "Tareas a cobrar"
-                : "Jornadas a cobrar"}
-            </p>
-            {items.length > 0 && (
-              <button
-                type="button"
-                onClick={
-                  tildados.length === items.length ? destildarTodos : tildarTodos
-                }
-                className="text-[12px] text-primary hover:underline"
-              >
-                {tildados.length === items.length
-                  ? "Destildar todo"
-                  : "Tildar todo"}
-              </button>
-            )}
+        /* ── Selección (horas variables / por tarea): QUÉ se cobra. El **total de
+              lo tildado** es el héroe de esta pantalla. ── */
+        <div className="space-y-3">
+          <div className="rounded-xl border border-border bg-card px-4 py-1">
+            <Fila label="Trabajo" value={etiquetaTrabajo} />
           </div>
 
-          {items.length === 0 ? (
-            <p className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2.5 text-[12px] text-warning">
-              No hay {modalidad === "por_tarea" ? "tareas" : "jornadas"}{" "}
-              pendientes de cobro para este trabajo: <b>no se puede cobrar</b>.
-              Cargá {modalidad === "por_tarea" ? "una tarea" : "una jornada"} desde
-              el ⋯ de la pantalla y volvé a intentar.
-            </p>
-          ) : (
-            <div className="divide-y divide-border rounded-lg border border-border bg-card">
-              {items.map((i) => (
-                <div key={i.id} className="px-3 py-2">
-                  <Checkbox
-                    checked={tildados.includes(i.id)}
-                    onChange={() => alternarItem(i)}
-                    label={etiquetaItem(i)}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {(jornadasTildadas.length > 0 || tareasTildadas.length > 0) && (
-            <p className="text-[12px] text-subtitle">
-              {jornadasTildadas.length > 0 &&
-                `${jornadasTildadas.length} jornada${jornadasTildadas.length === 1 ? "" : "s"}`}
-              {jornadasTildadas.length > 0 && tareasTildadas.length > 0 && " + "}
-              {tareasTildadas.length > 0 &&
-                `${tareasTildadas.length} tarea${tareasTildadas.length === 1 ? "" : "s"}`}
-              {data.fechaDesde && data.fechaHasta
-                ? ` · del ${formatFecha(data.fechaDesde)} al ${formatFecha(data.fechaHasta)}`
-                : ""}
-              {/* Suma de los montos TILDADOS (2026-09-27, pedido del usuario). Es el
-                  mismo número que el monto **calculado** (`seleccionDeItems.monto`),
-                  el que se precarga en la pantalla siguiente y el que muestra la
-                  confirmación: sale de un solo lugar. */}
-              {` · Total `}
-              <span className="font-medium text-card-foreground">
-                {numberToCurrency(calculado)}
-              </span>
-            </p>
-          )}
-
-          {/* Sin ítems tildados no se puede avanzar ("Siguiente" queda
-              deshabilitado): se dice por qué, al lado de la lista. */}
-          {items.length > 0 && tildados.length === 0 && (
-            <p className="text-[12px] text-warning">
-              Tildá al menos una{" "}
-              {modalidad === "por_tarea" ? "tarea" : "jornada"} para poder
-              cobrar.
-            </p>
-          )}
-        </div>
-      ) : (
-        /* ── Última pantalla: opciones generales (sólo declaradas) + fecha del
-              cobro + cuenta + monto ── */
-        <>
-          <Fila label="Trabajo" value={etiquetaTrabajo} />
-          {declarada && (
-            <>
-              <DateField
-                label="Período desde"
-                value={data.fechaDesde}
-                onChange={(v) => handleSetData({ fechaDesde: v })}
-              />
-              <DateField
-                label="Período hasta"
-                value={data.fechaHasta}
-                onChange={(v) => handleSetData({ fechaHasta: v })}
-              />
-              {esHorasFijas && (
-                <NumberField
-                  label="Horas del período"
-                  value={data.horasPeriodo}
-                  onChange={(v) => {
-                    // `calculado = horas × precio` (snapshot del precio al cobrar); el
-                    // monto se precarga con ese calculado pero queda editable.
-                    const nuevo = Number(
-                      (v * (trabajo?.precioHora ?? 0)).toFixed(2)
-                    );
-                    handleSetData({
-                      horasPeriodo: v,
-                      montoOrigen: nuevo > 0 ? nuevo : data.montoOrigen,
-                    });
-                  }}
-                />
+          <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-[13px] text-card-foreground">
+                {modalidad === "por_tarea"
+                  ? "Tareas a cobrar"
+                  : "Jornadas a cobrar"}
+              </p>
+              {items.length > 0 && (
+                <button
+                  type="button"
+                  onClick={
+                    tildados.length === items.length ? destildarTodos : tildarTodos
+                  }
+                  className="text-[12px] text-primary hover:underline"
+                >
+                  {tildados.length === items.length
+                    ? "Destildar todo"
+                    : "Tildar todo"}
+                </button>
               )}
-            </>
-          )}
+            </div>
 
-          {tieneItems && (
-            <div className="rounded-lg border border-border bg-muted px-3 py-2 text-[12px] leading-5 text-subtitle">
-              <p>
+            {items.length === 0 ? (
+              <p className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2.5 text-[12px] text-warning">
+                No hay {modalidad === "por_tarea" ? "tareas" : "jornadas"}{" "}
+                pendientes de cobro para este trabajo: no se puede cobrar.
+                Cargá {modalidad === "por_tarea" ? "una tarea" : "una jornada"} desde
+                el ⋯ de la pantalla y volvé a intentar.
+              </p>
+            ) : (
+              <div className="divide-y divide-border rounded-lg border border-border bg-muted">
+                {items.map((i) => (
+                  <div key={i.id} className="px-3 py-2">
+                    <Checkbox
+                      checked={tildados.includes(i.id)}
+                      onChange={() => alternarItem(i)}
+                      label={etiquetaItem(i)}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {(jornadasTildadas.length > 0 || tareasTildadas.length > 0) && (
+              <p className="text-[12px] text-subtitle">
                 {jornadasTildadas.length > 0 &&
                   `${jornadasTildadas.length} jornada${jornadasTildadas.length === 1 ? "" : "s"}`}
                 {jornadasTildadas.length > 0 && tareasTildadas.length > 0 && " + "}
                 {tareasTildadas.length > 0 &&
-                  `${tareasTildadas.length} tarea${tareasTildadas.length === 1 ? "" : "s"}`}{" "}
-                a liquidar
+                  `${tareasTildadas.length} tarea${tareasTildadas.length === 1 ? "" : "s"}`}
                 {data.fechaDesde && data.fechaHasta
                   ? ` · del ${formatFecha(data.fechaDesde)} al ${formatFecha(data.fechaHasta)}`
                   : ""}
               </p>
-              <p>
-                Calculado:{" "}
-                <span className="font-medium text-card-foreground">
-                  {numberToCurrency(calculado)}
-                </span>
+            )}
+
+            {/* Sin ítems tildados no se puede avanzar ("Siguiente" queda
+                deshabilitado): se dice por qué, al lado de la lista. */}
+            {items.length > 0 && tildados.length === 0 && (
+              <p className="text-[12px] text-warning">
+                Tildá al menos una{" "}
+                {modalidad === "por_tarea" ? "tarea" : "jornada"} para poder
+                cobrar.
               </p>
-            </div>
-          )}
+            )}
+          </div>
+        </div>
+      ) : (
+        /* ── Última pantalla: opciones generales (sólo declaradas) + fecha del
+              cobro + cuenta. El **monto** es el héroe de arriba. ── */
+        <div className="space-y-3">
+          <div className="rounded-xl border border-border bg-card px-4 py-1">
+            <Fila label="Trabajo" value={etiquetaTrabajo} />
+          </div>
 
-          <DateField
-            label="Fecha del cobro"
-            value={data.fecha}
-            onChange={(v) => handleSetData({ fecha: v })}
-          />
+          <div className="space-y-4 rounded-xl border border-border bg-card p-4">
+            {declarada && (
+              <>
+                <DateField
+                  label="Período desde"
+                  value={data.fechaDesde}
+                  onChange={(v) => handleSetData({ fechaDesde: v })}
+                />
+                <DateField
+                  label="Período hasta"
+                  value={data.fechaHasta}
+                  onChange={(v) => handleSetData({ fechaHasta: v })}
+                />
+                {esHorasFijas && (
+                  <NumberField
+                    label="Horas del período"
+                    value={data.horasPeriodo}
+                    onChange={(v) => {
+                      // `calculado = horas × precio` (snapshot del precio al cobrar); el
+                      // monto se precarga con ese calculado pero queda editable.
+                      const nuevo = Number(
+                        (v * (trabajo?.precioHora ?? 0)).toFixed(2)
+                      );
+                      handleSetData({
+                        horasPeriodo: v,
+                        montoOrigen: nuevo > 0 ? nuevo : data.montoOrigen,
+                      });
+                    }}
+                  />
+                )}
+              </>
+            )}
 
-          <SelectField
-            label="Cuenta"
-            value={data.cuentaOrigen ? String(data.cuentaOrigen) : ""}
-            onChange={(v) => handleSetData({ cuentaOrigen: Number(v) })}
-            options={options.cuentas.map((c) => ({
-              value: String(c.id),
-              label: c.moneda ? `${c.nombre} (${c.moneda.codigoISO})` : c.nombre,
-            }))}
-          />
+            {tieneItems && (
+              <div className="rounded-lg border border-border bg-muted px-3 py-2 text-[12px] leading-5 text-subtitle">
+                <p>
+                  {jornadasTildadas.length > 0 &&
+                    `${jornadasTildadas.length} jornada${jornadasTildadas.length === 1 ? "" : "s"}`}
+                  {jornadasTildadas.length > 0 && tareasTildadas.length > 0 && " + "}
+                  {tareasTildadas.length > 0 &&
+                    `${tareasTildadas.length} tarea${tareasTildadas.length === 1 ? "" : "s"}`}{" "}
+                  a liquidar
+                  {data.fechaDesde && data.fechaHasta
+                    ? ` · del ${formatFecha(data.fechaDesde)} al ${formatFecha(data.fechaHasta)}`
+                    : ""}
+                </p>
+                <p>
+                  Calculado:{" "}
+                  <span className="text-card-foreground">
+                    {numberToCurrency(calculado, options.monedaISO)}
+                  </span>
+                </p>
+              </div>
+            )}
 
-          <NumberField
-            label="Monto"
-            value={data.montoOrigen}
-            onChange={(v) => handleSetData({ montoOrigen: v })}
-          />
+            <DateField
+              label="Fecha del cobro"
+              value={data.fecha}
+              onChange={(v) => handleSetData({ fecha: v })}
+            />
 
-          {/* Precarga del monto declarado (2026-09-26): el último cobro del
-              trabajo. Si nunca se cobró, el campo queda vacío. */}
-          {declarada && ultimoCobro > 0 && (
-            <p className="text-[12px] text-subtitle">
-              Precargado con el último cobro ({numberToCurrency(ultimoCobro)}):
-              podés editarlo.
-            </p>
-          )}
+            <SelectField
+              label="Cuenta"
+              value={data.cuentaOrigen ? String(data.cuentaOrigen) : ""}
+              onChange={(v) => handleSetData({ cuentaOrigen: Number(v) })}
+              options={options.cuentas.map((c) => ({
+                value: String(c.id),
+                label: c.moneda ? `${c.nombre} (${c.moneda.codigoISO})` : c.nombre,
+              }))}
+            />
 
-          {declarada && esHorasFijas && (
-            <p className="text-[12px] text-subtitle">
-              Calculado: {data.horasPeriodo} h ×{" "}
-              {numberToCurrency(trabajo?.precioHora ?? 0)} ={" "}
-              {numberToCurrency(calculado)}
-            </p>
-          )}
-        </>
+            {/* Precarga del monto declarado (2026-09-26): el último cobro del
+                trabajo. Si nunca se cobró, el campo queda vacío. */}
+            {declarada && ultimoCobro > 0 && (
+              <p className="text-[12px] text-subtitle">
+                Precargado con el último cobro (
+                {numberToCurrency(ultimoCobro, options.monedaISO)}): podés
+                editarlo.
+              </p>
+            )}
+
+            {declarada && esHorasFijas && (
+              <p className="text-[12px] text-subtitle">
+                Calculado: {data.horasPeriodo} h ×{" "}
+                {numberToCurrency(trabajo?.precioHora ?? 0, options.monedaISO)} ={" "}
+                {numberToCurrency(calculado, options.monedaISO)}
+              </p>
+            )}
+          </div>
+        </div>
       )}
-    </StepShell>
+    </StepShellFintech>
   );
 }

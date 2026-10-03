@@ -1,4 +1,5 @@
 // Capa de datos del wizard de Movimientos (se ejecuta en Server Component).
+import { getSessionUser } from "@/backend/src/lib/auth";
 import { getAllCuentas } from "@/backend/src/queries/maestros";
 import {
   getAllJornadasTrabajo,
@@ -35,6 +36,7 @@ export async function getMovimientoOptions(): Promise<MovimientoOptions> {
     jornadas,
     itemsPendientes,
     ultimosCobros,
+    usuario,
   ] = await Promise.all([
     getAllCuentas(),
     getAllPeriodosTrabajo(),
@@ -45,12 +47,16 @@ export async function getMovimientoOptions(): Promise<MovimientoOptions> {
     getAllJornadasTrabajo(),
     getItemsPendientesCobro(),
     getUltimosCobrosPorTrabajo(),
+    // Moneda predeterminada del usuario: la usan los héroes del wizard que no
+    // cuelgan de una cuenta (jornada y tarea).
+    getSessionUser(),
   ]);
 
   return {
     // Excluye las cuentas sintéticas de TODOS los selects de cuenta del
     // stepper (wizard y modo directo /movimientos/nuevo/<tipo>).
     cuentas: cuentas.filter((c) => !NOMBRES_CUENTAS_SINTETICAS.has(c.nombre)),
+    monedaISO: usuario?.monedaPredeterminada?.codigoISO ?? "USD",
     trabajos,
     // Último cobro de cada trabajo (precarga del monto en `fijo`/`horas_fijas`).
     ultimosCobros,

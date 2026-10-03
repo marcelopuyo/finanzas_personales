@@ -2,14 +2,15 @@
 
 import { useMovimientoStepper } from "./stepper-context";
 import {
-  StepShell,
-  NavButtons,
+  StepShellFintech,
+  HeroeFintech,
+  BotonPrincipal,
   DateField,
   SelectField,
   NumberField,
   formatFecha,
 } from "./ui";
-import { numberToCurrency } from "@/lib/utils";
+import { numberToCurrency, simboloMoneda } from "@/lib/utils";
 import { STEP_CONFIRMACION } from "./types";
 
 export function PagoGasto() {
@@ -18,51 +19,66 @@ export function PagoGasto() {
   const isValid =
     !!data.idGasto && data.cuentaOrigen > 0 && data.montoOrigen > 0;
 
+  // Moneda de la cuenta elegida: da el símbolo del héroe (monto a pagar).
+  const isoCuenta =
+    options.cuentas.find((c) => c.id === data.cuentaOrigen)?.moneda
+      ?.codigoISO ?? "";
+
   return (
-    <StepShell
-      title="Por favor ingrese la información del pago de gasto:"
+    <StepShellFintech
+      titulo="Pago de gasto"
       step={2}
       total={3}
+      heroe={
+        <HeroeFintech
+          etiqueta={`Monto a pagar${isoCuenta ? ` · ${isoCuenta}` : ""}`}
+        >
+          <NumberField
+            hero
+            heroPrefix={isoCuenta ? simboloMoneda(isoCuenta) : ""}
+            label="Monto a pagar"
+            value={data.montoOrigen}
+            onChange={(v) => handleSetData({ montoOrigen: v })}
+          />
+        </HeroeFintech>
+      }
       footer={
-        <NavButtons
-          onBack={() => navigateTo(0)}
-          onNext={() => navigateTo(STEP_CONFIRMACION)}
-          nextDisabled={!isValid}
-        />
+        <BotonPrincipal
+          onClick={() => navigateTo(STEP_CONFIRMACION)}
+          disabled={!isValid}
+        >
+          Siguiente
+        </BotonPrincipal>
       }
     >
-      <DateField
-        label="Fecha"
-        value={data.fecha}
-        onChange={(v) => handleSetData({ fecha: v })}
-      />
+      <div className="space-y-4 rounded-xl border border-border bg-card p-4">
+        <DateField
+          label="Fecha"
+          value={data.fecha}
+          onChange={(v) => handleSetData({ fecha: v })}
+        />
 
-      <SelectField
-        label="Cuenta"
-        value={data.cuentaOrigen ? String(data.cuentaOrigen) : ""}
-        onChange={(v) => handleSetData({ cuentaOrigen: Number(v) })}
-        options={options.cuentas.map((c) => ({
-          value: String(c.id),
-          label: c.moneda ? `${c.nombre} (${c.moneda.codigoISO})` : c.nombre,
-        }))}
-      />
+        <SelectField
+          label="Cuenta"
+          value={data.cuentaOrigen ? String(data.cuentaOrigen) : ""}
+          onChange={(v) => handleSetData({ cuentaOrigen: Number(v) })}
+          options={options.cuentas.map((c) => ({
+            value: String(c.id),
+            label: c.moneda ? `${c.nombre} (${c.moneda.codigoISO})` : c.nombre,
+          }))}
+        />
 
-      <NumberField
-        label="Monto a pagar"
-        value={data.montoOrigen}
-        onChange={(v) => handleSetData({ montoOrigen: v })}
-      />
-
-      <SelectField
-        label="Gasto a pagar"
-        value={data.idGasto}
-        onChange={(v) => handleSetData({ idGasto: v })}
-        placeholder="Seleccionar gasto..."
-        options={options.gastos.map((g) => ({
-          value: g.id,
-          label: `${g.descripcion ?? "Gasto"} — Monto ${numberToCurrency(g.monto)} · Saldo ${numberToCurrency(g.saldo)} · Vence ${formatFecha(g.fechaVencimiento)} (${g.categoria?.nombre ?? "Sin categoría"})`,
-        }))}
-      />
-    </StepShell>
+        <SelectField
+          label="Gasto a pagar"
+          value={data.idGasto}
+          onChange={(v) => handleSetData({ idGasto: v })}
+          placeholder="Seleccionar gasto..."
+          options={options.gastos.map((g) => ({
+            value: g.id,
+            label: `${g.descripcion ?? "Gasto"} — Monto ${numberToCurrency(g.monto)} · Saldo ${numberToCurrency(g.saldo)} · Vence ${formatFecha(g.fechaVencimiento)} (${g.categoria?.nombre ?? "Sin categoría"})`,
+          }))}
+        />
+      </div>
+    </StepShellFintech>
   );
 }

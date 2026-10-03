@@ -7,8 +7,9 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useMovimientoStepper } from "./stepper-context";
 import {
-  StepShell,
-  NavButtons,
+  StepShellFintech,
+  HeroeFintech,
+  BotonPrincipal,
   DateField,
   TimeField,
   TextField,
@@ -16,7 +17,7 @@ import {
   SelectField,
 } from "./ui";
 import { STEP_CONFIRMACION, type MovimientoData } from "./types";
-import { todayLocalISODate } from "@/lib/utils";
+import { simboloMoneda, todayLocalISODate } from "@/lib/utils";
 import {
   useRegistrarPantallaDictable,
   type PantallaDictable,
@@ -136,75 +137,77 @@ export function CargarTarea() {
   useRegistrarPantallaDictable(pantallaVoz);
 
   return (
-    <StepShell
-      title="Por favor ingrese la información de la tarea:"
+    <StepShellFintech
+      titulo="Tarea"
       step={2}
       total={3}
+      heroe={
+        <HeroeFintech etiqueta={`Monto ganado · ${options.monedaISO}`}>
+          <NumberField
+            hero
+            heroPrefix={simboloMoneda(options.monedaISO)}
+            label="Monto ganado"
+            value={data.montoTarea}
+            onChange={(v) => handleSetData({ montoTarea: v })}
+          />
+        </HeroeFintech>
+      }
       footer={
-        <NavButtons
-          onBack={() => navigateTo(0)}
-          onNext={() => navigateTo(STEP_CONFIRMACION)}
-          nextDisabled={!isValid}
-        />
+        <BotonPrincipal
+          onClick={() => navigateTo(STEP_CONFIRMACION)}
+          disabled={!isValid}
+        >
+          Siguiente
+        </BotonPrincipal>
       }
     >
       {!trabajosPorTarea.length && (
-        <div className="rounded-md border border-border bg-muted px-3 py-2 text-[13px] text-subtitle">
+        <div className="mb-4 rounded-xl border border-border bg-muted px-3 py-2 text-[13px] text-subtitle">
           No tenés trabajos con modalidad por tarea. Las tareas solo se cargan en
-          ese tipo de trabajo.
+          ese tipo de trabajo: creá uno desde el menú ⋯ de la pantalla y volvé a
+          intentar.
         </div>
       )}
 
-      {/* El **trabajo** es el único vínculo de la tarea: no hay período que
-          elegir (la liquidación nace al cobrar). */}
-      <SelectField
-        label="Trabajo"
-        value={data.idTrabajo ? String(data.idTrabajo) : ""}
-        onChange={(v) => handleSetData({ idTrabajo: Number(v) })}
-        options={trabajosPorTarea.map((t) => ({
-          value: String(t.id),
-          label: t.nombre,
-        }))}
-      />
-
-      <div className="grid grid-cols-2 gap-3">
-        <DateField
-          label="Fecha de la tarea"
-          value={data.fecha}
-          onChange={(v) => definirFechaHora(v, data.horaDesde)}
+      <div className="space-y-4 rounded-xl border border-border bg-card p-4">
+        {/* El **trabajo** es el único vínculo de la tarea: no hay período que
+            elegir (la liquidación nace al cobrar). */}
+        <SelectField
+          label="Trabajo"
+          value={data.idTrabajo ? String(data.idTrabajo) : ""}
+          onChange={(v) => handleSetData({ idTrabajo: Number(v) })}
+          options={trabajosPorTarea.map((t) => ({
+            value: String(t.id),
+            label: t.nombre,
+          }))}
         />
-        <TimeField
-          label="Hora"
-          value={data.horaDesde}
-          onChange={(v) => definirFechaHora(data.fecha, v)}
+
+        <div className="grid grid-cols-2 gap-3">
+          <DateField
+            label="Fecha"
+            value={data.fecha}
+            onChange={(v) => definirFechaHora(v, data.horaDesde)}
+          />
+          <TimeField
+            label="Hora"
+            value={data.horaDesde}
+            onChange={(v) => definirFechaHora(data.fecha, v)}
+          />
+        </div>
+
+        <TextField
+          label="Descripción"
+          value={data.descripcionTarea}
+          onChange={(v) => handleSetData({ descripcionTarea: v })}
+          placeholder="Ej. Logo para cliente X (se precarga con la fecha/hora)"
+        />
+
+        <NumberField
+          label="Horas (informativas)"
+          value={data.horasTarea}
+          onChange={(v) => handleSetData({ horasTarea: v })}
         />
       </div>
-
-      <TextField
-        label="Descripción"
-        value={data.descripcionTarea}
-        onChange={(v) => handleSetData({ descripcionTarea: v })}
-        placeholder="Ej. Logo para cliente X (se precarga con la fecha/hora)"
-      />
-
-      <NumberField
-        label="Monto ganado"
-        value={data.montoTarea}
-        onChange={(v) => handleSetData({ montoTarea: v })}
-      />
-
-      <NumberField
-        label="Horas (informativas)"
-        value={data.horasTarea}
-        onChange={(v) => handleSetData({ horasTarea: v })}
-      />
-
-      {!trabajosPorTarea.length && (
-        <p className="text-[12px] text-subtitle">
-          Creá primero un trabajo con modalidad &quot;Por tarea&quot; para poder
-          cargar tareas.
-        </p>
-      )}
-    </StepShell>
+    </StepShellFintech>
   );
 }

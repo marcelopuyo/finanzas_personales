@@ -70,9 +70,13 @@ export function BottomActionBar({
       <div
         // Marca para el FAB de voz: `globals.css` lo apila arriba cuando esta
         // zona inferior existe (R4 del replanteo de voz).
+        //
+        // ⚠️ El `padding-bottom` del safe-area lo pone `globals.css` y **no** un
+        // estilo inline: cuando además está la barra de navegación, ésa ya cubre la
+        // franja del home indicator y acá hay que **descontarla** (se contaba dos
+        // veces y la barra quedaba flotando 34px de más — reportado 2026-10-03).
         data-barra-inferior=""
         className="fixed bottom-4 right-4 z-30 lg:hidden"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         {fabAction.href ? (
           <Link
@@ -136,9 +140,10 @@ export function BottomActionBar({
   return (
     <div
       // Ídem FAB suelto: el FAB de voz se apila arriba de la barra.
+      // ⚠️ El `padding-bottom` del safe-area lo pone `globals.css` (ver la nota del
+      // FAB suelto: con la barra de navegación presente se descuenta).
       data-barra-inferior=""
       className="fixed inset-x-0 bottom-0 z-30 lg:hidden"
-      style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
     >
       <div className="mx-auto max-w-md px-4">
         <div className="relative">

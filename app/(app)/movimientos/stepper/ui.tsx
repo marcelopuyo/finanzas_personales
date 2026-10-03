@@ -4,17 +4,17 @@
 // compartidas de `components/wizard/ui.tsx` (2026-09-06). Mantiene el export
 // histórico de este módulo (los pasos importan desde "./ui") y agrega SOLO el
 // comportamiento específico del stepper de movimientos: el modo `direct`
-// (ruta /movimientos/nuevo/<tipo>) que oculta el indicador de pasos y cambia
-// "Atrás" por "Cancelar → dashboard".
+// (ruta /movimientos/nuevo/<tipo>) que oculta el indicador de pasos.
+//
+// ⚠️ 2026-10-03: el wizard **completo** pasó al layout "fintech" (diseño D, §210)
+// ⇒ de acá se retiraron el `StepShell` y el `NavButtons` viejos (ya no los usa
+// ningún paso). Las piezas del diseño viven al final de este módulo:
+// `StepShellFintech`, `HeroeFintech`, `HeroeValor`, `BotonPrincipal` y
+// `BotonSecundario`.
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { useMovimientoStepper } from "./stepper-context";
-import { CONCEPTO_TITULO_PAGINA } from "./types";
-import {
-  StepShell as StepShellBase,
-  NavButtons as NavButtonsBase,
-} from "@/components/wizard/ui";
 
 // Primitivas compartidas re-exportadas tal cual (no dependen del contexto).
 export {
@@ -30,87 +30,14 @@ export {
   Fila,
 } from "@/components/wizard/ui";
 
-/** Contenedor del wizard de movimientos: conserva el encabezado "Movimientos"
- * y el indicador de pasos solo en modo stepper (no directo). En modo DIRECTO el
- * encabezado nombra la operación (ej. "Pago de préstamo"): el usuario entró a
- * hacer eso, no a elegir un tipo de movimiento. */
-export function StepShell({
-  title,
-  step,
-  total,
-  children,
-  footer,
-}: {
-  title: string;
-  step: number;
-  total: number;
-  children: ReactNode;
-  footer: ReactNode;
-}) {
-  const { direct, data } = useMovimientoStepper();
-  const tituloPagina = direct
-    ? data.concepto
-      ? CONCEPTO_TITULO_PAGINA[data.concepto]
-      : "Movimientos"
-    : "Movimientos";
-  return (
-    <StepShellBase
-      encabezado={
-        <h1 className="mb-1 text-[18px] text-header">
-          {tituloPagina}
-        </h1>
-      }
-      paso={direct ? undefined : step}
-      total={direct ? undefined : total}
-      titulo={title}
-      footer={footer}
-    >
-      {children}
-    </StepShellBase>
-  );
-}
-
-/** Botones del wizard de movimientos. En modo directo: Cancelar (→ volverA si
- * viene, si no → dashboard) + Siguiente. En modo stepper: Atrás + Siguiente.
- * Con `atrasEnDirecto` el paso pide **también** "Atrás" en modo directo: lo usan
- * los pasos con **sub-pasos internos** (hoy sólo "Cobrar trabajo", 2026-09-26),
- * donde hay que poder volver a la pantalla anterior sin salir del wizard. */
-export function NavButtons({
-  onBack,
-  onNext,
-  nextDisabled = false,
-  nextLabel = "Siguiente",
-  backLabel = "Atrás",
-  atrasEnDirecto = false,
-}: {
-  onBack: () => void;
-  onNext: () => void;
-  nextDisabled?: boolean;
-  nextLabel?: string;
-  backLabel?: string;
-  atrasEnDirecto?: boolean;
-}) {
-  const { direct, volverA } = useMovimientoStepper();
-  const router = useRouter();
-  return (
-    <NavButtonsBase
-      onBack={direct && !atrasEnDirecto ? undefined : onBack}
-      onCancel={
-        direct ? () => router.push(volverA ?? "/dashboard") : undefined
-      }
-      onNext={onNext}
-      nextDisabled={nextDisabled}
-      nextLabel={nextLabel}
-      backLabel={backLabel}
-    />
-  );
-}
-
 /**
  * Shell del paso con el layout **"fintech"** (diseño D, 2026-10-01): cabecera con
  * el `‹` (**cancela y sale**: `volverA`/dashboard; en modo stepper resetea los
- * datos) + título + `N/total`, bloque del **héroe**, contenido agrupado y acción
- * principal full-width en la zona del pulgar. Lo usan gasto, transferencia y ajuste.
+ * datos) + título + `N/total`, bloque del **héroe** (opcional: `null` en los
+ * pasos que no tienen un número protagonista), contenido agrupado y acción
+ * principal full-width en la zona del pulgar.
+ *
+ * Desde el 2026-10-03 lo usan **todos** los pasos del wizard de movimientos.
  */
 export function StepShellFintech({
   titulo,
@@ -178,6 +105,17 @@ export function HeroeFintech({
       {children}
       <p className="mt-2 text-center text-[12px] text-subtitle">{etiqueta}</p>
     </div>
+  );
+}
+
+/** Valor **de sólo lectura** del héroe (mismo tamaño que el input del héroe):
+ *  lo usan la confirmación y los pasos cuyo monto lo calcula el servidor
+ *  (jornada: horas × precio) o se deduce de los ítems tildados (cobro). */
+export function HeroeValor({ children }: { children: ReactNode }) {
+  return (
+    <p className="text-center text-[34px] leading-none tracking-tight text-header">
+      {children}
+    </p>
   );
 }
 

@@ -3,17 +3,20 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Save, X, ArrowLeft } from "lucide-react";
+import { Save, ArrowLeft } from "lucide-react";
 import { useMovimientoStepper } from "./stepper-context";
-import { StepShell, Fila, formatFecha } from "./ui";
 import {
+  Fila,
+  formatFecha,
   StepShellFintech,
   HeroeFintech,
+  HeroeValor,
   BotonPrincipal,
   BotonSecundario,
 } from "./ui";
 import { CONCEPTO_STEP, type MovimientoConcepto } from "./types";
 import { numberToCurrency, timeToDecimal } from "@/lib/utils";
+import { calcularMontoJornada } from "@/backend/src/lib/jornadas";
 import { fraseContraparte } from "@/lib/prestamos";
 import {
   cobrarTrabajo,
@@ -33,17 +36,6 @@ import {
 import { useUltimoDictado } from "@/components/voz/dictado-pantalla";
 import { useVoz } from "@/components/voz/voz-provider";
 import { correccionesDeDictado } from "@/lib/voz/vocabulario";
-
-const TITULOS: Record<MovimientoConcepto, string> = {
-  CobrarTrabajo: "Revisar la información y confirmar el registro del cobro.",
-  PagoPrestamo: "Revisar la información y confirmar el pago de préstamo.",
-  AjusteCuenta: "Revisar la información y confirmar el registro del ajuste.",
-  PagoGasto: "Revisar la información y confirmar el pago de gasto.",
-  GastoDirecto: "Revisar la información y confirmar el gasto directo.",
-  Transferencia: "Revisar la información y confirmar la transferencia.",
-  JornadaTrabajo: "Revisar la información y confirmar la carga de la jornada.",
-  CargarTarea: "Revisar la información y confirmar la carga de la tarea.",
-};
 
 export function Confirmacion() {
   const { data, navigateTo, resetData, options, direct, volverA } =
@@ -364,113 +356,117 @@ export function Confirmacion() {
   // Acción del pie compartida por el layout nuevo y el de siempre.
   const irAtras = () => navigateTo(concepto ? CONCEPTO_STEP[concepto] : 0);
 
-  // ── Confirmación "fintech" (coherente con el paso 2, §210) ─────────────
-  // Gasto, Transferencia y Ajuste: héroe con el monto + resumen en filas +
-  // acciones apiladas. El resto de los movimientos sigue con el `StepShell`.
-  if (
-    concepto === "GastoDirecto" ||
-    concepto === "Transferencia" ||
-    concepto === "AjusteCuenta"
-  ) {
-    const etiquetaHeroe =
-      concepto === "Transferencia" ? "Monto origen" : "Monto";
-    const isoHeroe = cuentaISO(data.cuentaOrigen);
-    // El ajuste distingue el sentido con el signo (igual que en la fila).
-    const valorHeroe = `${
-      concepto === "AjusteCuenta" && data.montoOrigen > 0 ? "+" : ""
-    }${numberToCurrency(data.montoOrigen, isoHeroe)}`;
-    const filasResumen = filas.filter((f) => f.label !== etiquetaHeroe);
-    return (
-      <StepShellFintech
-        titulo="Confirmar"
-        step={3}
-        total={3}
-        cancelDisabled={submitting}
-        heroe={
-          <HeroeFintech etiqueta={`${etiquetaHeroe} · ${isoHeroe}`}>
-            <p className="text-center text-[34px] leading-none tracking-tight text-header">
-              {valorHeroe}
-            </p>
-          </HeroeFintech>
-        }
-        footer={
-          <>
-            <BotonPrincipal onClick={guardar} disabled={submitting}>
-              <Save className="h-4 w-4" />
-              {submitting ? "Guardando..." : "Guardar"}
-            </BotonPrincipal>
-            <BotonSecundario onClick={irAtras} disabled={submitting}>
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Atrás
-            </BotonSecundario>
-          </>
-        }
-      >
-        {filasResumen.length > 0 && (
-          <div className="rounded-xl border border-border bg-card px-4 py-1">
-            {filasResumen.map((f) => (
-              <Fila key={f.label} label={f.label} value={f.value} />
-            ))}
-          </div>
-        )}
-      </StepShellFintech>
-    );
-  }
+  // ── Confirmación "fintech" (diseño D, §210) ─────────────────────────────
+  // TODOS los flujos: héroe con el número protagonista + resumen en filas +
+  // acciones apiladas (Guardar full-width + Atrás). El `‹` de la cabecera sigue
+  // siendo el "Cancelar" del wizard.
+  //
+  // El héroe es el MISMO dato que la fila equivalente del resumen (por eso esa
+  // fila se omite abajo para no repetirla): el monto cobrado en el cobro, el
+  // monto a pagar en los pagos, lo ganado en la tarea y el **estimado** en la
+  // jornada (que el backend calcula con el mismo helper).
+  const heroe = ((): { etiqueta: string; iso: string; valor: string } => {
+    const iso = cuentaISO(data.cuentaOrigen);
+    switch (concepto) {
+      case "Transferencia":
+        return {
+          etiqueta: "Monto origen",
+          iso,
+          valor: numberToCurrency(data.montoOrigen, iso),
+        };
+      case "AjusteCuenta":
+        // El ajuste distingue el sentido con el signo (igual que en la fila).
+        return {
+          etiqueta: "Monto",
+          iso,
+          valor: `${data.montoOrigen > 0 ? "+" : ""}${numberToCurrency(
+            data.montoOrigen,
+            iso
+          )}`,
+        };
+      case "PagoGasto":
+      case "PagoPrestamo":
+        return {
+          etiqueta: "Monto a pagar",
+          iso,
+          valor: numberToCurrency(data.montoOrigen, iso),
+        };
+      case "CobrarTrabajo":
+        return {
+          etiqueta: "Cobrado",
+          iso,
+          valor: numberToCurrency(data.montoOrigen, iso),
+        };
+      case "CargarTarea":
+        return {
+          etiqueta: "Monto ganado",
+          iso: options.monedaISO,
+          valor: numberToCurrency(data.montoTarea, options.monedaISO),
+        };
+      case "JornadaTrabajo": {
+        // El monto de la jornada NO se carga en el wizard: se muestra el mismo
+        // estimado que el paso 2 para que el usuario sepa qué va a sumar.
+        const trabajoJ = options.trabajos.find((t) => t.id === data.idTrabajo);
+        const estimado =
+          trabajoJ && data.horaDesde && data.horaHasta
+            ? calcularMontoJornada(
+                timeToDecimal(data.horaDesde),
+                timeToDecimal(data.horaHasta),
+                trabajoJ.precioHora
+              )
+            : 0;
+        return {
+          etiqueta: "Monto estimado",
+          iso: options.monedaISO,
+          valor:
+            estimado > 0 ? numberToCurrency(estimado, options.monedaISO) : "—",
+        };
+      }
+      default:
+        return {
+          etiqueta: "Monto",
+          iso,
+          valor: numberToCurrency(data.montoOrigen, iso),
+        };
+    }
+  })();
+  const filasResumen = filas.filter((f) => f.label !== heroe.etiqueta);
 
   return (
-    <StepShell
-      title={concepto ? TITULOS[concepto] : "Confirmar movimiento"}
+    <StepShellFintech
+      titulo="Confirmar"
       step={3}
       total={3}
+      cancelDisabled={submitting}
+      heroe={
+        <HeroeFintech etiqueta={`${heroe.etiqueta} · ${heroe.iso}`}>
+          <HeroeValor>{heroe.valor}</HeroeValor>
+        </HeroeFintech>
+      }
       footer={
-        <div className="flex items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={() => navigateTo(concepto ? CONCEPTO_STEP[concepto] : 0)}
-            disabled={submitting}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-2 text-[13px] font-medium text-subtitle transition-colors hover:bg-muted hover:text-header disabled:opacity-50"
-          >
+        <>
+          <BotonPrincipal onClick={guardar} disabled={submitting}>
+            <Save className="h-4 w-4" />
+            {submitting ? "Guardando..." : "Guardar"}
+          </BotonPrincipal>
+          <BotonSecundario onClick={irAtras} disabled={submitting}>
             <ArrowLeft className="h-3.5 w-3.5" />
             Atrás
-          </button>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                if (direct) {
-                  router.push(volverA ?? "/dashboard");
-                  return;
-                }
-                resetData();
-                navigateTo(0);
-              }}
-              disabled={submitting}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-2 text-[13px] font-medium text-subtitle transition-colors hover:bg-muted hover:text-header disabled:opacity-50"
-            >
-              <X className="h-3.5 w-3.5" />
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={guardar}
-              disabled={submitting}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
-            >
-              <Save className="h-3.5 w-3.5" />
-              {submitting ? "Guardando..." : "Guardar"}
-            </button>
-          </div>
-        </div>
+          </BotonSecundario>
+        </>
       }
     >
-      {filas.length > 0 ? (
-        filas.map((f) => <Fila key={f.label} label={f.label} value={f.value} />)
+      {filasResumen.length > 0 ? (
+        <div className="rounded-xl border border-border bg-card px-4 py-1">
+          {filasResumen.map((f) => (
+            <Fila key={f.label} label={f.label} value={f.value} />
+          ))}
+        </div>
       ) : (
         <p className="text-[13px] text-subtitle">
           No hay datos para confirmar.
         </p>
       )}
-    </StepShell>
+    </StepShellFintech>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMovimientoStepper } from "./stepper-context";
-import { StepShell, NavButtons } from "./ui";
+import { StepShellFintech, BotonPrincipal } from "./ui";
 import { CONCEPTO_STEP, type MovimientoConcepto } from "./types";
 import { cn } from "@/lib/utils";
 
@@ -22,18 +22,20 @@ export function Selector() {
   const { data, seleccionarConcepto, navigateTo } = useMovimientoStepper();
 
   return (
-    <StepShell
-      title="Seleccione el tipo de movimiento a realizar"
+    <StepShellFintech
+      titulo="Movimiento"
       step={1}
       total={3}
+      heroe={null}
       footer={
-        <NavButtons
-          onBack={() => navigateTo(0)}
-          onNext={() => {
+        <BotonPrincipal
+          onClick={() => {
             if (data.concepto) navigateTo(CONCEPTO_STEP[data.concepto]);
           }}
-          nextDisabled={!data.concepto}
-        />
+          disabled={!data.concepto}
+        >
+          Siguiente
+        </BotonPrincipal>
       }
     >
       <div className="space-y-2">
@@ -49,20 +51,20 @@ export function Selector() {
                 navigateTo(CONCEPTO_STEP[o.value]);
               }}
               className={cn(
-                "flex w-full items-center rounded-lg border px-3 py-2.5 text-left transition-colors",
+                "flex w-full items-center rounded-xl border px-3 py-2.5 text-left transition-colors",
                 active
                   ? "border-primary bg-primary/10"
                   : "border-border bg-card hover:bg-muted"
               )}
             >
               <div>
-                <p className="text-[13px] font-medium text-header">{o.label}</p>
+                <p className="text-[13px] text-header">{o.label}</p>
                 <p className="text-[12px] text-subtitle">{o.desc}</p>
               </div>
             </button>
           );
         })}
       </div>
-    </StepShell>
+    </StepShellFintech>
   );
 }

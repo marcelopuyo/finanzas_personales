@@ -76,6 +76,9 @@ export interface JornadaWizardOut {
 /** Opciones precargadas en el Server Component para los selects del wizard. */
 export interface MovimientoOptions {
   cuentas: CuentaOut[];
+  /** ISO 4217 de la **moneda predeterminada** del usuario: la de los montos que
+   *  no cuelgan de una cuenta (monto de la jornada y de la tarea). */
+  monedaISO: string;
   /** Solo períodos de trabajo sin fecha de cobro (pendientes de cobrar). */
   periodosTrabajo: LiquidacionOut[];
   /** Trabajos del usuario (libres o usados por la carga de jornada/tarea). */
@@ -140,21 +143,10 @@ export const MOVIMIENTO_TIPO_PARAM: Record<MovimientoConcepto, string> = {
 };
 
 /**
- * Título de PÁGINA (el `<h1>`) del wizard en **modo directo**
- * (`/movimientos/nuevo/<tipo>`): describe la operación que se está haciendo.
- * En modo stepper (`/movimientos`) sigue siendo "Movimientos", porque ahí el
- * usuario todavía está eligiendo el tipo.
+ * ⚠️ `CONCEPTO_TITULO_PAGINA` **se eliminó el 2026-10-03**: era el `<h1>` del
+ * wizard en modo directo ("Pago de préstamo", "Gasto directo"…), que el diseño
+ * "fintech" reemplazó por el título corto de la cabecera del shell.
  */
-export const CONCEPTO_TITULO_PAGINA: Record<MovimientoConcepto, string> = {
-  CobrarTrabajo: "Cobrar trabajo",
-  PagoPrestamo: "Pago de préstamo",
-  AjusteCuenta: "Ajuste de cuenta",
-  PagoGasto: "Pago de gasto",
-  GastoDirecto: "Gasto directo",
-  Transferencia: "Transferencia",
-  JornadaTrabajo: "Jornada de trabajo",
-  CargarTarea: "Carga de tarea",
-};
 
 // ⚠️ Los motivos de transferencia (presets + el prefijo `Transf - ` de los
 // personalizados) viven en el módulo compartido `@/lib/motivos-transferencia`

@@ -240,11 +240,23 @@ html.fp-sin-red [data-app-lock] {
    las pantallas principales llevan la barra de navegación abajo (`data-barra-nav`)
    y algunas traen además su propia barra de acciones inferior
    (`data-barra-inferior`, ver `ui/bottom-action-bar.tsx`). Cuando conviven —hoy en
-   la pantalla de Préstamos, con la grilla embebida— la de acciones **sube** para no
-   taparla (mismo criterio que tenía el FAB de voz). */
+   la Préstamos y en los **wizards** (`/movimientos/nuevo/*`)— la de acciones **sube**
+   para no taparla (mismo criterio que tenía el FAB de voz).
+
+   ⚠️ **El safe-area se cuenta UNA sola vez** (bug reportado el 2026-10-03: al
+   cargar una jornada la barra quedaba "despegada" 34px de más): antes el
+   `padding-bottom: env(safe-area-inset-bottom)` venía **inline** desde el componente
+   y el `bottom` de acá también lo sumaba ⇒ se aplicaba dos veces. Por eso el
+   padding vive **sólo acá** y cuando la barra de navegación está presente se
+   reduce a la separación visual entre las dos barras, porque la franja del home
+   indicator ya la cubre la de navegación. */
+[data-barra-inferior] {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
 @media (max-width: 1023.98px) {
   html:has([data-barra-nav]) [data-barra-inferior] {
     bottom: calc(3.5rem + min(env(safe-area-inset-bottom), 2.5rem));
+    padding-bottom: 0.75rem;
   }
 }
 
