@@ -1,5 +1,7 @@
 import TopBar from "./top-bar";
 import BottomNav from "./bottom-nav";
+import { AnclajeBarras } from "./anclaje-barras";
+import { ZoomContenido } from "./zoom-contenido";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { NavProgress } from "@/components/ui/nav-progress";
 import { OfflineNotice } from "@/components/pwa/offline-notice";
@@ -28,7 +30,7 @@ export default function AppLayout({
   userLabel?: string;
 }) {
   return (
-    <div className="h-dvh overflow-hidden bg-background">
+    <div data-app-shell="" className="h-dvh overflow-hidden bg-background">
       <TopBar initial={initial} userLabel={userLabel} />
       {/* Barra de progreso global de navegación (2026-09-14): se enciende con
           `startNav()`/`usePendingNav()` y se apaga al cambiar de ruta. */}
@@ -47,7 +49,11 @@ export default function AppLayout({
         {/* Aviso "sin conexión": es `sticky`, así que empuja el contenido solo
             cuando está visible. */}
         <OfflineNotice />
-        {children}
+        {/* Zoom propio del contenido (2026-10-04): la capa que recibe el `zoom` de
+            CSS. Deja afuera las barras y los FAB (que van fuera del `<main>`) y el
+            espaciador del pie, que tiene que seguir midiendo lo mismo que la barra
+            inferior **sin** escalar. Se apaga con `ZOOM_ACTIVO = false`. */}
+        <ZoomContenido>{children}</ZoomContenido>
         {/* Espaciador del pie: reserva la **barra inferior** (4rem) + la franja de
             los FAB (el "+" de Inicio) para que el último elemento del contenido —
             típicamente los botones "Siguiente"/"Guardar" de los formularios, que van
@@ -63,6 +69,11 @@ export default function AppLayout({
       {/* Barra inferior de navegación (2026-10-01, rama `rediseno-ui`): 5 destinos
           de primer nivel. Va FUERA de PullToRefresh para no participar del gesto. */}
       <BottomNav />
+      {/* Anclaje de las barras a los bordes **visibles** (2026-10-04): con
+          pinch-zoom, teclado o un viewport trabado, `fixed` deja de coincidir con
+          lo que se ve y las barras “se despegan”. No dibuja nada: publica dos
+          variables CSS que consumen la barra de arriba y la de abajo. */}
+      <AnclajeBarras />
       {/* FAB 🎤 global (2026-09-23, fase G1 del replanteo de la voz). Va FUERA de
           PullToRefresh porque maneja sus propios touch events y no debe disparar
           el gesto de "tirar para actualizar".

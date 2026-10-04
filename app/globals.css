@@ -61,6 +61,15 @@
      (app-layout.tsx), el banner "sin conexión" y el indicador del pull-to-refresh. */
   --app-top: calc(3.5rem + env(safe-area-inset-top));
 
+  /* Desfase de anclaje de las barras fijas (2026-10-04). Valen `0px` en el caso
+     normal —mismo comportamiento de siempre— y las escribe `AnclajeBarras`
+     (`components/layout/anclaje-barras.tsx`) cuando el borde **visible** no
+     coincide con el del layout: pinch-zoom, teclado en pantalla o un viewport
+     trabado (el bug reportado: la barra inferior quedaba “despegada” hasta
+     reiniciar la app). Positivo = el anclaje se mueve hacia adentro del layout. */
+  --fp-desfase-superior: 0px;
+  --fp-desfase-inferior: 0px;
+
   /* DeepSeek semantic tokens — Light */
   --sidebar: #ffffff;
   --sidebar-foreground: #1f2937;
@@ -250,18 +259,52 @@ html.fp-sin-red [data-app-lock] {
    padding vive **sólo acá** y cuando la barra de navegación está presente se
    reduce a la separación visual entre las dos barras, porque la franja del home
    indicator ya la cubre la de navegación. */
+/* Barras fijas: el anclaje se mide contra el borde VISIBLE, no contra el layout
+   viewport (ver `components/layout/anclaje-barras.tsx`). Sin desfase las dos
+   variables valen `0px` ⇒ mismo resultado que antes. Después de la importación de
+   Tailwind, así que gana sobre `top-0` / `bottom-0` de las utilidades. */
+[data-topbar] {
+  top: var(--fp-desfase-superior, 0px);
+}
+
 [data-barra-inferior] {
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
 }
 @media (max-width: 1023.98px) {
   html:has([data-barra-nav]) [data-barra-inferior] {
-    bottom: calc(3.5rem + min(env(safe-area-inset-bottom), 2.5rem));
+    bottom: calc(
+      3.5rem + min(env(safe-area-inset-bottom), 2.5rem) +
+        var(--fp-desfase-inferior, 0px)
+    );
     padding-bottom: 0.75rem;
   }
 }
 
 .fp-voz-fab {
   top: calc(var(--app-top) + 0.5rem);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   ZOOM PROPIO DEL CONTENIDO (2026-10-04)
+
+   Con la feature activa (`AnclajeBarras`/`ZoomContenido` marcan `data-zoom` en
+   el `<html>`) se **bloquea el pinch nativo** del navegador: si no, el zoom del
+   navegador y el de la app se sumarían. `pan-x pan-y` deja intacto el scroll (y
+   el pull-to-refresh) y saca el pinch y el doble-tap.
+   ⚠️ Se desactiva entero con `ZOOM_ACTIVO = false` (`lib/zoom-contenido.ts`).
+   ───────────────────────────────────────────────────────────────────────── */
+html[data-zoom="on"] [data-app-shell] {
+  touch-action: pan-x pan-y;
+}
+
+/* El zoom fraccionario deja 1-3 px de desborde horizontal por redondeo de la
+   escala ⇒ aparecía la barra de scroll horizontal del `<main>`, que **roba alto**
+   (el contenido "salta" ~15 px). Se recorta: a nivel página nada scrollea en
+   horizontal (cada grilla y el carrusel de Inicio tienen su propio scroller), y
+   `<main>` ya es el contenedor de scroll vertical, así que el `sticky` de adentro
+   no cambia. */
+html[data-zoom="on"] [data-app-shell] main {
+  overflow-x: hidden;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

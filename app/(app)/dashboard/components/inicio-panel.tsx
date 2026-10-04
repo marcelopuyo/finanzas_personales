@@ -374,12 +374,18 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
   return (
     // A sangre: cancela el padding del `<main>` (px-4/lg:px-6 + pt-[--app-top])
     // para que la banda llegue hasta los bordes y hasta arriba de todo.
-    <div className="-mx-4 -mt-[var(--app-top)] lg:-mx-6">
+    //
+    // ⚠️ `--app-top` está en px de **dispositivo** (tiene que coincidir con la
+    // barra superior, que no se escala) y estas dos medidas viven **dentro** de la
+    // capa de zoom ⇒ se dividen por `--fp-zoom` (zoom propio del contenido,
+    // `components/layout/zoom-contenido.tsx`). Sin la división, con zoom 200 % la
+    // banda dejaba 3.5rem de aire de más arriba.
+    <div className="-mx-4 -mt-[calc(var(--app-top)/var(--fp-zoom,1))] lg:-mx-6">
       {/* ───────── BANDA (hero) ───────── */}
       <div
         data-inicio-hero=""
         className="relative border-b border-border bg-muted"
-        style={{ paddingTop: "var(--app-top)" }}
+        style={{ paddingTop: "calc(var(--app-top) / var(--fp-zoom, 1))" }}
       >
         {/* Carrusel: full-width, una tarjeta por vista, snap sin peek ni gap. */}
         <div

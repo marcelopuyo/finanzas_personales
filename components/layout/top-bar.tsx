@@ -51,6 +51,8 @@ export default function TopBar({
 
   return (
     <header
+      // `data-topbar` lo usa `AnclajeBarras` (anclaje al borde visible).
+      data-topbar=""
       className={cn(
         "fixed top-0 right-0 left-0 z-50 border-b transition-[background-color,border-color] duration-200",
         // Resto de la app: la barra sólida de siempre. En Inicio manda
