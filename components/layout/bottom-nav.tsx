@@ -13,7 +13,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   AltArrowRightIcon,
   BillListIcon as BillListLinear,
-  ChartIcon as ChartLinear,
+  GraphUpIcon as GraphUpLinear,
   HamburgerMenuIcon as HamburgerMenuLinear,
   HandMoneyIcon,
   HomeIcon as HomeLinear,
@@ -21,7 +21,7 @@ import {
 } from "@solar-icons/react/linear";
 import {
   BillListIcon as BillListDuotone,
-  ChartIcon as ChartDuotone,
+  GraphUpIcon as GraphUpDuotone,
   HamburgerMenuIcon as HamburgerMenuDuotone,
   HomeIcon as HomeDuotone,
   MoneyBagIcon as MoneyBagDuotone,
@@ -69,6 +69,11 @@ import { usePrefetchNav } from "@/components/ui/nav-progress";
  * 50% de opacidad ⇒ blanco pleno el trazo principal y gris el relleno).
  * ⚠️ **Ingresos** usa `money-bag` (bolsa de dinero): el set **no tiene** iconos de
  * monedas/billetes apilados y ésta es la variante “dinero” más legible a 21px.
+ * 🔑 **Resultados usa `graph-up`** (2026-10-04, elegido por el usuario sobre un
+ * preview con 22 opciones del set): el `chart` original se **confundía con
+ * `bill-list`** de Gastos —a 21 px los dos son “líneas apiladas”— y `graph-up`
+ * (línea que sube dentro del cuadrado redondeado) es el que dice **resultado mes a
+ * mes**, que es lo que muestra el tab (gráfico de línea + listado mensual).
  * ⚠️ El resto de la app sigue con **lucide**: acá sólo se cambió la barra.
  */
 const TABS = [
@@ -93,8 +98,8 @@ const TABS = [
   {
     href: "/dashboard/resultados",
     label: "Resultados",
-    icono: ChartLinear,
-    iconoActivo: ChartDuotone,
+    icono: GraphUpLinear,
+    iconoActivo: GraphUpDuotone,
   },
 ] as const;
 

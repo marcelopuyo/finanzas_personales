@@ -77,24 +77,24 @@ export function AporteCuentasLista({
     },
   ];
 
-  /** Título: **dentro del panel** («ningún título fuera de los paneles»). */
-  const titulo = <h2 className="text-[15.5px] text-header">Aporte al balance</h2>;
+  /**
+   * ⚠️ **Sin título** (decisión del usuario, 2026-10-04): el listado va pelado — la
+   * **barra de aporte** de la tarjeta de arriba ya dice de qué se trata. Si en algún
+   * momento se quiere volver a rotular, el `h2` de los otros paneles es
+   * `text-[15.5px] text-header`.
+   */
 
   return (
     <>
       {data.length === 0 ? (
-        <div className="rounded-lg border border-border bg-card p-4">
-          {titulo}
-          <div className="flex h-32 items-center justify-center text-[13px] text-subtitle">
-            Sin datos disponibles
-          </div>
+        <div className="flex h-32 items-center justify-center rounded-lg border border-border bg-card text-[13px] text-subtitle">
+          Sin datos disponibles
         </div>
       ) : (
         <>
           {/* ── MOBILE (<sm): mismas filas que los movimientos ── */}
           <div className="sm:hidden">
             <div className="overflow-hidden rounded-lg border border-border bg-card">
-              <div className="border-b border-border px-3 py-2.5">{titulo}</div>
               <ul>
                 {data.map((c) => {
                   const id = c.id;
@@ -145,7 +145,6 @@ export function AporteCuentasLista({
           {/* ── Desde sm (640px): la tabla ── */}
           <div className="hidden sm:block">
             <div className="rounded-lg border border-border bg-card p-4">
-              <div className="mb-3">{titulo}</div>
               <DataTable
                 columns={columns}
                 data={data}
