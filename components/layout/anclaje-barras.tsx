@@ -46,6 +46,23 @@ export function AnclajeBarras() {
     const plausible = (v: number) =>
       Number.isFinite(v) && Math.abs(v) <= window.innerHeight;
 
+    /**
+     * **Re-enganche** de un `fixed` que el motor dejó “colgado” (bug conocido de
+     * iOS después de un pinch o del teclado): cambiar el `transform` y **forzar un
+     * reflow** hace que el compositor lo vuelva a posicionar. Va rate-limited porque
+     * es un parche de último recurso, no parte del cálculo normal.
+     */
+    let ultimoReenganche = 0;
+    const reenganchar = (el: HTMLElement) => {
+      const ahora = Date.now();
+      if (ahora - ultimoReenganche < 1500) return;
+      ultimoReenganche = ahora;
+      const previo = el.style.transform;
+      el.style.transform = "translateZ(0)";
+      void el.offsetHeight;
+      el.style.transform = previo;
+    };
+
     const escribir = (variable: string, valor: number) => {
       raiz.style.setProperty(variable, `${valor}px`);
     };
@@ -70,14 +87,31 @@ export function AnclajeBarras() {
 
     const revisar = () => {
       const vv = window.visualViewport;
+      const escala = vv?.scale ?? 1;
       // Bordes VISIBLES en las mismas coordenadas que `getBoundingClientRect()`.
+      const altoVisible = vv && vv.height > 0 ? vv.height : window.innerHeight;
       const bordeSup = vv ? vv.offsetTop : 0;
-      const bordeInf = vv
-        ? vv.offsetTop + vv.height
-        : window.innerHeight;
+      const bordeInf = (vv ? vv.offsetTop : 0) + altoVisible;
+
+      const nav = document.querySelector<HTMLElement>("[data-barra-nav]");
+      const top = document.querySelector<HTMLElement>("[data-topbar]");
+
+      /**
+       * ⚠️ Con **zoom nativo** (`scale ≠ 1`) no se corrige: las coordenadas del
+       * `visualViewport` y las del `getBoundingClientRect` dejan de ser comparables
+       * y en iOS el `visualViewport` puede quedar **viejo** después del pinch ⇒ una
+       * medición mala quedaba aplicada hasta reiniciar la app (comprobado en el
+       * celular el 2026-10-04). El pinch nativo se bloquea en
+       * `components/layout/zoom-contenido.tsx`; acá sólo se intenta **re-enganchar**
+       * el `fixed` que el motor haya dejado colgado.
+       */
+      if (Math.abs(escala - 1) > 0.001) {
+        if (nav) reenganchar(nav);
+        if (top) reenganchar(top);
+        return;
+      }
 
       // ── Barra inferior ──
-      const nav = document.querySelector<HTMLElement>("[data-barra-nav]");
       if (nav) {
         const r = nav.getBoundingClientRect();
         // `bottom: var(--fp-desfase-inferior)` ⇒ el borde medido ya incluye lo
@@ -86,17 +120,25 @@ export function AnclajeBarras() {
         if (plausible(nuevo) && nuevo !== aplicadoInf) {
           aplicadoInf = nuevo;
           escribir("--fp-desfase-inferior", nuevo);
+        } else if (
+          aplicadoInf === 0 &&
+          Math.abs(r.bottom - window.innerHeight) > 1
+        ) {
+          // Sin compensación nuestra y, aun así, el `fixed` no está en el borde del
+          // layout ⇒ lo dejó corrido el motor (bug de iOS): se re-engancha.
+          reenganchar(nav);
         }
       }
 
       // ── Barra superior (mismo fenómeno, mismo mecanismo) ──
-      const top = document.querySelector<HTMLElement>("[data-topbar]");
       if (top) {
         const r = top.getBoundingClientRect();
         const nuevo = Math.round(bordeSup - (r.top - aplicadoSup));
         if (plausible(nuevo) && nuevo !== aplicadoSup) {
           aplicadoSup = nuevo;
           escribir("--fp-desfase-superior", nuevo);
+        } else if (aplicadoSup === 0 && Math.abs(r.top) > 1) {
+          reenganchar(top);
         }
       }
     };

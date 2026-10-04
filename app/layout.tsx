@@ -10,6 +10,7 @@ import { AppLock } from "@/components/auth/app-lock";
 import { SwRegister } from "@/components/pwa/sw-register";
 import { biometriaParaBloqueo } from "@/backend/src/queries/webauthn";
 import { THEME_COOKIE } from "@/lib/theme";
+import { ZOOM_ACTIVO } from "@/lib/zoom-contenido";
 import "./globals.css";
 
 const inter = Inter({
@@ -50,6 +51,15 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // ⚠️ CON EL ZOOM PROPIO ACTIVO (`ZOOM_ACTIVO` en `lib/zoom-contenido.ts`) se
+  // capa el zoom del navegador: no hay CSS/HTML que exceptúe un elemento del pinch
+  // nativo (escala TODO el visual viewport, barras incluidas) y además ese pinch es
+  // el que dejaba la barra inferior despegada hasta reiniciar la app.
+  // Con `maximum-scale=1` el navegador no zoomea y el zoom de la app (capa de
+  // contenido, botones en «Más» y pinch propio) es el único que hay.
+  // 🔧 Al apagar la feature, volver a `maximumScale: 5, userScalable: true`.
+  maximumScale: ZOOM_ACTIVO ? 1 : 5,
+  userScalable: !ZOOM_ACTIVO,
   // PWA standalone: el contenido ocupa también las áreas seguras (notch y barra
   // inferior). Sin esto iOS deja una banda muerta arriba; con esto, cada parte de
   // la chrome suma su `env(safe-area-inset-*)` (top bar, bottom bar, FAB).

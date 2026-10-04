@@ -55,13 +55,29 @@ export function ZoomContenido({ children }: { children: ReactNode }) {
     if (!ZOOM_ACTIVO) return;
     const capa = capaRef.current;
     if (!capa) return;
+    const shell = document.querySelector<HTMLElement>("[data-app-shell]");
+    // Los gestos se escuchan en **todo el shell** (no sólo en la capa): así un
+    // pellizco que arranca sobre una barra también zoomea el contenido y, sobre
+    // todo, también se bloquea el pinch nativo en ese caso.
+    const zona = shell ?? capa;
 
-    // Marca para el CSS (`globals.css`): mientras está activo se bloquea el pinch
-    // nativo. Si no, el zoom del navegador y el nuestro se sumarían.
+    // Marca para el CSS (`globals.css`): bloquea el pinch nativo en los motores
+    // que respetan `touch-action`.
     document.documentElement.dataset.zoom = "on";
 
     const distancia = (t: TouchList) =>
       Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+
+    /**
+     * ⚠️ **iOS ignora `touch-action`** (comprobado en el celular el 2026-10-04:
+     * el pinch del navegador escalaba todo, barras incluidas). El único bloqueo que
+     * funciona ahí es `preventDefault()` en un `touchmove` **no pasivo**, y ese
+     * listener se pone **sólo mientras hay 2 dedos** para no castigar el scroll
+     * normal con un listener no pasivo permanente.
+     */
+    const bloquearPinchNativo = (e: TouchEvent) => {
+      if (e.touches.length >= 2) e.preventDefault();
+    };
 
     /** Zoom previo y separación inicial del pellizco en curso. */
     let separacion0 = 0;
@@ -76,12 +92,9 @@ export function ZoomContenido({ children }: { children: ReactNode }) {
 
     const alIniciarToque = (e: TouchEvent) => {
       if (e.touches.length !== 2) return;
-      // ⚠️ iOS puede ignorar `touch-action` y pellizcar igual: si el navegador ya
-      // está zoomeando, no se suma (las barras las ancla `AnclajeBarras`).
-      if ((window.visualViewport?.scale ?? 1) !== 1) {
-        separacion0 = 0;
-        return;
-      }
+      shell?.addEventListener("touchmove", bloquearPinchNativo, {
+        passive: false,
+      });
       separacion0 = distancia(e.touches);
       zoom0 = zoomRef.current;
     };
@@ -95,9 +108,9 @@ export function ZoomContenido({ children }: { children: ReactNode }) {
 
     /** Al soltar: se confirma en el store (una sola escritura, una sola persistencia). */
     const alTerminarToque = (e: TouchEvent) => {
-      if (separacion0 === 0) return;
-      // Se espera a que quede **un** dedo (o ninguno) para dar el gesto por cerrado.
       if (e.touches.length >= 2) return;
+      shell?.removeEventListener("touchmove", bloquearPinchNativo);
+      if (separacion0 === 0) return;
       separacion0 = 0;
       fijarZoom(zoomRef.current);
     };
@@ -109,18 +122,19 @@ export function ZoomContenido({ children }: { children: ReactNode }) {
       fijarZoom(zoomRef.current - e.deltaY * 0.0025);
     };
 
-    capa.addEventListener("touchstart", alIniciarToque, { passive: true });
-    capa.addEventListener("touchmove", alMoverToque, { passive: true });
-    capa.addEventListener("touchend", alTerminarToque, { passive: true });
-    capa.addEventListener("touchcancel", alTerminarToque, { passive: true });
     capa.addEventListener("wheel", alRodar, { passive: false });
+    zona.addEventListener("touchstart", alIniciarToque, { passive: true });
+    zona.addEventListener("touchmove", alMoverToque, { passive: true });
+    zona.addEventListener("touchend", alTerminarToque, { passive: true });
+    zona.addEventListener("touchcancel", alTerminarToque, { passive: true });
 
     return () => {
-      capa.removeEventListener("touchstart", alIniciarToque);
-      capa.removeEventListener("touchmove", alMoverToque);
-      capa.removeEventListener("touchend", alTerminarToque);
-      capa.removeEventListener("touchcancel", alTerminarToque);
       capa.removeEventListener("wheel", alRodar);
+      zona.removeEventListener("touchstart", alIniciarToque);
+      zona.removeEventListener("touchmove", alMoverToque);
+      zona.removeEventListener("touchend", alTerminarToque);
+      zona.removeEventListener("touchcancel", alTerminarToque);
+      shell?.removeEventListener("touchmove", bloquearPinchNativo);
       delete document.documentElement.dataset.zoom;
     };
   }, []);
