@@ -20,10 +20,16 @@ import type { AporteCuenta } from "../aportes-balance";
 export function AporteCuentasLista({
   data,
   currency,
+  onIrACuenta,
 }: {
   data: AporteCuenta[];
   /** ISO de la moneda de los saldos (la predeterminada del usuario). */
   currency: string;
+  /**
+   * Tocar una fila **desplaza el carrusel** a la tarjeta de esa cuenta (pedido del
+   * usuario, 2026-10-03). Si no se pasa, las filas no son interactivas.
+   */
+  onIrACuenta?: (cuentaId: number) => void;
 }) {
   const monto = (v: number) => numberToCurrency(v, currency);
   const aporte = (p: number) => `${p.toFixed(1).replace(/\.0$/, "")} %`;
@@ -90,35 +96,48 @@ export function AporteCuentasLista({
             <div className="overflow-hidden rounded-lg border border-border bg-card">
               <div className="border-b border-border px-3 py-2.5">{titulo}</div>
               <ul>
-                {data.map((c) => (
-                  <li
-                    key={c.name}
-                    className="border-b border-border px-3 py-2.5 last:border-0"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <span
-                        className="h-2.5 w-2.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: c.color }}
-                      />
-                      <p className="min-w-0 flex-1 truncate text-[13px] font-medium leading-4.25 text-card-foreground">
-                        {c.name}
-                      </p>
-                      <div className="shrink-0 text-right">
-                        <p
-                          className={cn(
-                            "text-[15px] leading-4.75 tabular-nums",
-                            c.value < 0 ? "text-danger" : "text-card-foreground"
-                          )}
-                        >
-                          {monto(c.value)}
+                {data.map((c) => {
+                  const id = c.id;
+                  const irA =
+                    id != null && onIrACuenta
+                      ? () => onIrACuenta(id)
+                      : undefined;
+                  return (
+                    <li key={c.name} className="border-b border-border last:border-0">
+                      <button
+                        type="button"
+                        onClick={irA}
+                        className={cn(
+                          "flex w-full items-center gap-2.5 px-3 py-2.5 text-left",
+                          irA && "transition-colors hover:bg-muted/40"
+                        )}
+                      >
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: c.color }}
+                        />
+                        <p className="min-w-0 flex-1 truncate text-[13px] font-medium leading-4.25 text-card-foreground">
+                          {c.name}
                         </p>
-                        <p className="text-[11px] leading-3.5 tabular-nums text-subtitle">
-                          {aporte(c.percent)}
-                        </p>
-                      </div>
-                    </div>
-                  </li>
-                ))}
+                        <div className="shrink-0 text-right">
+                          <p
+                            className={cn(
+                              "text-[15px] leading-4.75 tabular-nums",
+                              c.value < 0
+                                ? "text-danger"
+                                : "text-card-foreground"
+                            )}
+                          >
+                            {monto(c.value)}
+                          </p>
+                          <p className="text-[11px] leading-3.5 tabular-nums text-subtitle">
+                            {aporte(c.percent)}
+                          </p>
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           </div>
@@ -127,7 +146,19 @@ export function AporteCuentasLista({
           <div className="hidden sm:block">
             <div className="rounded-lg border border-border bg-card p-4">
               <div className="mb-3">{titulo}</div>
-              <DataTable columns={columns} data={data} pageSize={20} />
+              <DataTable
+                columns={columns}
+                data={data}
+                pageSize={20}
+                getRowId={(r) => String(r.id ?? r.name)}
+                onRowClick={
+                  onIrACuenta
+                    ? (r) => {
+                        if (r.id != null) onIrACuenta(r.id);
+                      }
+                    : undefined
+                }
+              />
             </div>
           </div>
         </>

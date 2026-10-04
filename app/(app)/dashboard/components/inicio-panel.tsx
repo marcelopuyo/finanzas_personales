@@ -139,6 +139,8 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
    * actualiza en el ref callback y en el scroll, no en el render.
    */
   const focoIdRef = useRef<number | null>(null);
+  /** Desplazamiento programático del carrusel en curso (`irACuenta`). */
+  const saltoRef = useRef(false);
   /**
    * ¿Ya manda la caché de primeras páginas? Antes de hidratar se leen las props
    * del server (evita desajuste de hidratación); después manda solo la caché, así
@@ -202,7 +204,6 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
     const clave = faltantes.join(",");
     if (precargaClaveRef.current === clave) return;
     precargaClaveRef.current = clave;
-    let cancelado = false;
     alIdle(() => {
       void (async () => {
         try {
@@ -210,7 +211,12 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
             faltantes,
             PRIMERA_PAGINA_FILAS
           );
-          if (cancelado) return;
+          // Se guardan SIEMPRE, aunque el efecto se haya limpiado mientras
+          // viajaba el pedido (doble montaje de `StrictMode` en dev): la caché es
+          // de módulo y el trabajo ya está hecho — lo que sigue es una mutación
+          // de la caché, no un `setState`, así que no hay nada que cancelar.
+          // Descartarlo dejaba la caché vacía y el listado volvía a pedir su
+          // primera página al server al enfocar cada cuenta (medido 2026-10-03).
           for (const [id, pagina] of Object.entries(paginas)) {
             guardarPrimeraPagina(Number(id), pagina);
           }
@@ -221,9 +227,6 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
         }
       })();
     });
-    return () => {
-      cancelado = true;
-    };
   }, [cuentas, historialesIniciales]);
 
   /**
@@ -269,7 +272,11 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
    * Índice enfocado a partir del scroll del carrusel. Cada slide ocupa el **100 %
    * del ancho** (sin *peek* y sin gap) ⇒ el paso es `clientWidth`.
    */
-  const onScroll = () => {
+  /**
+   * **Índice enfocado a partir del scroll** del carrusel. Cada slide ocupa el
+   * **100 % del ancho** (sin *peek* y sin gap) ⇒ el paso es `clientWidth`.
+   */
+  const sincronizarIndice = useCallback(() => {
     const el = trackRef.current;
     if (!el) return;
     const paso = el.clientWidth || 1;
@@ -282,7 +289,68 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
     setFoco(i);
     setMontadosHasta((v) => Math.max(v, i + 1));
     guardarFoco(i);
+  }, [cuentas, foco, totalTarjetas]);
+
+  const onScroll = () => {
+    // Desplazamiento programático en curso (ver `irACuenta`): el destino ya está
+    // fijado ⇒ no se recalcula el foco con los pasos intermedios (evita que el
+    // detalle de abajo se monte cuenta por cuenta durante la animación).
+    if (saltoRef.current) return;
+    sincronizarIndice();
   };
+
+  /**
+   * **Tocar una fila del listado de aporte** (tarjeta de *Balance Actual*)
+   * desplaza el carrusel a la tarjeta de esa cuenta (pedido del usuario,
+   * 2026-10-03): el detalle de abajo pasa a ser su historial de movimientos.
+   */
+  const irACuenta = useCallback(
+    (cuentasId: number) => {
+      const i = cuentas.findIndex((c) => c.id === cuentasId);
+      if (i < 0) return;
+      const destino = i + 1;
+      setFoco(destino);
+      focoIdRef.current = cuentasId;
+      setMontadosHasta((v) => Math.max(v, destino + 1));
+      guardarFoco(destino);
+      const el = trackRef.current;
+      if (!el) return;
+      // Posición del slide (no `destino * clientWidth`): es exacta y no acumula
+      // el redondeo del ancho.
+      const slide = el.children[destino] as HTMLElement | undefined;
+      el.scrollTo({
+        left: slide ? slide.offsetLeft : destino * (el.clientWidth || 1),
+        behavior: "smooth",
+      });
+      // Se ignora el `onScroll` hasta que la animación termina (o casi): si no,
+      // los pasos intermedios re-montarían el detalle de cada cuenta.
+      saltoRef.current = true;
+      window.setTimeout(() => {
+        saltoRef.current = false;
+        // **Re-afinado**: al aterrizar, el detail de abajo cambia de alto y
+        // puede aparecer/desaparecer la barra de scroll ⇒ el carrusel se angosta
+        // **a mitad del desplazamiento** y la tarjeta queda corrida (~15 px por
+        // tarjeta, medido el 2026-10-03 en un viewport de 390 px). Se corrige sin
+        // animación, y **solo** si el desfase es chico: si el usuario ya se movió
+        // por su cuenta, su gesto manda.
+        const track = trackRef.current;
+        const objetivo = track?.children[destino] as HTMLElement | undefined;
+        if (track && objetivo) {
+          const desfase =
+            objetivo.getBoundingClientRect().left -
+            track.getBoundingClientRect().left;
+          if (
+            Math.abs(desfase) > 1 &&
+            Math.abs(desfase) < track.clientWidth / 2
+          ) {
+            track.scrollLeft += desfase;
+          }
+        }
+        sincronizarIndice();
+      }, 800);
+    },
+    [cuentas, sincronizarIndice]
+  );
 
   /**
    * **Top bar**: marca en el `<html>` si el contenido salió del tope (para que la
@@ -323,7 +391,7 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
             titulo="Balance Actual"
             monto={numberToCurrency(data.balance, data.monedaPredeterminadaISO)}
             esBalance
-            donut={aportes}
+            aporte={aportes}
             monedaISO={data.monedaPredeterminadaISO}
             conGrafico
           />
@@ -377,6 +445,7 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
           <AporteCuentasLista
             data={aportes}
             currency={data.monedaPredeterminadaISO}
+            onIrACuenta={irACuenta}
           />
         ) : cuenta ? (
           <MovimientosCuentaClient

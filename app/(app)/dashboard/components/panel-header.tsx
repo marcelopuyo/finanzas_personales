@@ -61,13 +61,19 @@ export function PanelHeader({
         )}
       </div>
 
-      {/* Línea 2: el número protagonista + las pestañas del panel. */}
-      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <p className="text-[22px] leading-7 tracking-tight text-value tabular-nums">
-          {numero}
-        </p>
-        {tabs && <div className="ml-auto">{tabs}</div>}
-      </div>
+      {/* Línea 2: el número protagonista + las pestañas del panel. **Sin número ni
+          pestañas no se pinta**: si no, quedaría una línea vacía de 28 px (caso del
+          panel Resultados, que ahora va solo con el rótulo — §216). */}
+      {(numero != null || tabs) && (
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
+          {numero != null && (
+            <p className="text-[22px] leading-7 tracking-tight text-value tabular-nums">
+              {numero}
+            </p>
+          )}
+          {tabs && <div className="ml-auto">{tabs}</div>}
+        </div>
+      )}
     </div>
   );
 }

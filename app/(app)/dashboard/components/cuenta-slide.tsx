@@ -2,7 +2,7 @@
 
 import { Settings2 } from "lucide-react";
 import { AccionCirculo } from "./accion-circulo";
-import { AporteDonut } from "./aporte-donut";
+import { AporteBarra } from "./aporte-barra";
 import { EvolutionChart } from "./line-chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePrefetchNav } from "@/components/ui/nav-progress";
@@ -45,9 +45,9 @@ interface CuentaSlideProps {
   /** Serie del gráfico de línea: la evolución de la cuenta. No se usa si viene
       `donut` (la tarjeta de *Balance Actual* pinta la dona de aportes). */
   evolucion?: { name: string; value: number }[];
-  /** **Donut de aporte por cuenta** (solo la tarjeta de *Balance Actual*): si
-      viene, el área del gráfico muestra la dona en vez de la línea. */
-  donut?: AporteCuenta[];
+  /** **Aporte por cuenta** (solo la tarjeta de *Balance Actual*): si viene, el
+      área del gráfico muestra la **barra apilada** en vez de la línea. */
+  aporte?: AporteCuenta[];
   /** ISO 4217 (formatea el tooltip del gráfico). */
   monedaISO: string;
   /** Cuenta a precargar en el wizard (solo cuentas). */
@@ -61,7 +61,7 @@ export function CuentaSlide({
   monto,
   esBalance,
   evolucion,
-  donut,
+  aporte,
   monedaISO,
   cuentaId,
   conGrafico,
@@ -86,9 +86,9 @@ export function CuentaSlide({
 
       {/* Gráfico: más abajo del saldo (pedido del usuario) y en modo **mínimo**
           — solo la serie, sin rótulos de ejes ni líneas horizontales.
-          ⚠️ El resumen muestra la **dona de aporte por cuenta** (decisión del
-          usuario 2026-10-03; antes era la evolución de Resultados); las cuentas,
-          su propia evolución.
+          ⚠️ El resumen muestra la **barra de aporte por cuenta** (decisión del
+          usuario 2026-10-03, diseño C; antes era la evolución de Resultados y,
+          por un rato, una dona); las cuentas, su propia evolución.
           📏 Alto **fijo en px** (no `%` ni `vh`): con `min(128px,16vh)` el 2026-10-03
           el gráfico no se pintó en el celular y la banda quedaba en más de media
           pantalla. 96px deja la banda cómoda y la serie se lee bien. */}
@@ -98,9 +98,9 @@ export function CuentaSlide({
           // ⇒ quedaba **invisible** y el hueco se leía como "gráfico roto". Con
           // `bg-card/40` se ve como un bloque en carga.
           <Skeleton className="h-24 rounded-xl bg-card/40" />
-        ) : donut ? (
-          // Tarjeta de **Balance Actual**: la dona de aporte por cuenta.
-          <AporteDonut data={donut} currency={monedaISO} height={96} />
+        ) : aporte ? (
+          // Tarjeta de **Balance Actual**: la barra de aporte por cuenta.
+          <AporteBarra data={aporte} height={96} />
         ) : (
           <EvolutionChart
             data={evolucion ?? []}

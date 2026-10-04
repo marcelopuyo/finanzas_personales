@@ -1,0 +1,320 @@
+﻿<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Preview · Balance Actual — ideas de encabezado + aporte por cuenta</title>
+<style>
+  :root{
+    /* Tokens REALES del tema oscuro (app/globals.css .dark) */
+    --bg:#151517; --card:#353638; --muted:#1e1e20; --border:#3e3f42;
+    --header:#ffffff; --subtitle:#808185; --label:#9a9b9e;
+    --fg:#e2e4f0; --primary:#4c6ef5; --success:#51cf66; --warning:#ffd43b;
+    --c1:#4c6ef5; --c2:#22c55e; --c3:#f59e0b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#0e0e10;color:var(--fg);
+       font:14px/1.5 -apple-system,"SF Pro Display",Inter,"Segoe UI",Roboto,sans-serif;
+       padding:26px 22px 70px}
+  h1{font-size:19px;margin:0 0 6px;color:#fff}
+  .lead{color:var(--subtitle);margin:0 0 10px;max-width:1080px}
+  .lead b{color:var(--fg)}
+  .meta{color:#6a6b6f;font-size:11.5px;margin:0 0 26px}
+  .meta code{color:#9a9b9e}
+  .row{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start;margin:0 0 38px}
+  .col{display:flex;flex-direction:column;gap:9px}
+  .col h2{font-size:13px;margin:0;color:#fff;font-weight:600;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .cap{font-size:11.5px;color:var(--subtitle);max-width:352px}
+  .cap b{color:var(--fg)}
+  .cap ul{margin:6px 0 0;padding-left:16px}
+  .cap li{margin:3px 0}
+  .tag{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.07em;
+       text-transform:uppercase;padding:2px 7px;border-radius:999px;border:1px solid var(--border);
+       color:var(--subtitle);white-space:nowrap}
+  .tag.now{border-color:#5b5c60;color:#b9babd}
+  .tag.a{border-color:rgba(76,110,245,.6);color:#93a8ff;background:rgba(76,110,245,.12)}
+  .tag.b{border-color:rgba(81,207,102,.5);color:#8fe39b;background:rgba(81,207,102,.1)}
+  .tag.c{border-color:rgba(245,158,11,.5);color:#f3c168;background:rgba(245,158,11,.1)}
+  .tag.d{border-color:rgba(139,92,246,.5);color:#c4b0ff;background:rgba(139,92,246,.12)}
+
+  /* ────────── teléfono ────────── */
+  .phone{position:relative;width:352px;background:var(--bg);border:1px solid var(--border);
+         border-radius:26px;overflow:hidden;box-shadow:0 22px 55px rgba(0,0,0,.55)}
+
+  /* ────────── BANDA (hero) ────────── */
+  .hero{background:var(--muted);border-bottom:1px solid var(--border);padding:0 16px 10px}
+  .status{height:24px;display:flex;align-items:center;justify-content:space-between;font-size:10.5px;color:#c9cad0}
+  .topbar{display:flex;align-items:center;gap:8px;padding:1px 0 6px}
+  .logo{font-size:13px;font-weight:700;line-height:1.05;color:#fff}
+  .logo span{display:block;font-weight:400;color:var(--subtitle);font-size:11.5px}
+  .sp{flex:1}
+  .icobtn{width:28px;height:28px;border-radius:999px;border:1px solid rgba(255,255,255,.14);
+          display:flex;align-items:center;justify-content:center;font-size:12px}
+  .avatar{width:26px;height:26px;border-radius:999px;background:var(--primary);color:#fff;
+          display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600}
+
+  /* textos del hero */
+  .hname{font-size:12.5px;color:var(--label);text-align:center;margin:2px 0 0}
+  .hname.left{text-align:left}
+  .hbal{font-size:28px;font-weight:700;letter-spacing:-.03em;text-align:center;color:#fff;margin:2px 0 0;font-variant-numeric:tabular-nums}
+  .hbal.left{text-align:left}
+  .hsub{font-size:10.5px;color:var(--subtitle);text-align:center;margin:3px 0 0}
+  .hsub.left{text-align:left}
+
+  /* gráfico */
+  .chart{margin-top:8px;display:flex;justify-content:center}
+  .chart svg{display:block}
+  .hbal.ring{font-size:23px;margin:0;line-height:1.1}
+  .ringcap{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--subtitle)}
+
+  /* acciones */
+  .actions{display:flex;justify-content:center;gap:14px;margin-top:12px}
+  .act{width:70px;display:flex;flex-direction:column;align-items:center;gap:6px;
+       font-size:9.5px;line-height:1.15;text-align:center;color:#e2e4f0;text-decoration:none}
+  .act .circ{width:36px;height:36px;border-radius:999px;background:rgba(255,255,255,.07);
+             border:1px solid rgba(255,255,255,.10);display:flex;align-items:center;justify-content:center;color:#fff}
+
+  /* dots */
+  .dots{display:flex;justify-content:center;gap:6px;padding:12px 0 2px}
+  .dots i{display:block;width:6px;height:6px;border-radius:999px;background:#3e3f42}
+  .dots i.on{width:16px;background:#fff}
+
+  /* leyenda compacta dentro de la banda */
+  .legend{display:flex;justify-content:center;gap:12px;margin-top:9px;flex-wrap:wrap}
+  .legend span{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--subtitle)}
+  .cd{width:8px;height:8px;border-radius:999px;display:inline-block;flex:none}
+  .legend b{color:#e2e4f0;font-weight:600;font-variant-numeric:tabular-nums}
+
+  /* barra apilada 100% */
+  .stack{display:flex;height:12px;border-radius:999px;overflow:hidden;margin-top:12px;background:#2a2b2d}
+  .stack i{display:block;height:100%}
+
+  /* panel de abajo */
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:16px;margin:12px 14px 0;padding:11px 12px}
+  .panel h3{margin:0 0 6px;font-size:12.5px;color:#fff;font-weight:600}
+  .rowitem{display:flex;align-items:center;gap:8px;padding:8px 1px;border-top:1px solid var(--border);font-size:12px}
+  .rowitem:first-of-type{border-top:0}
+  .rowitem .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rowitem .m{margin-left:auto;text-align:right;font-variant-numeric:tabular-nums}
+  .rowitem .m b{display:block;font-weight:600}
+  .rowitem .m em{display:block;font-style:normal;font-size:10.5px;color:var(--subtitle)}
+  svg{display:block}
+
+  .divider{border-top:1px solid #26262a;margin:4px 0 30px}
+  .dec{border:1px solid var(--border);border-radius:16px;padding:16px 18px;max-width:1080px;background:#17171a}
+  .dec h3{margin:0 0 10px;font-size:14px;color:#fff}
+  .dec ul{margin:0;padding-left:18px;font-size:12.5px;color:var(--subtitle)}
+  .dec ul li{margin:7px 0}
+  .dec b{color:var(--fg)}
+  .ok{color:var(--success);font-weight:700}
+</style>
+</head>
+<body>
+
+<h1>Balance Actual · ideas de <b>encabezado + aporte</b></h1>
+<p class="lead">La dona chica, centrada y sola debajo del monto <b>no se lee</b>: no aporta y deja la tarjeta más alta.
+Estas 4 propuestas revisan cómo <b>jerarquizar el monto</b> y dónde poner el <b>aporte por cuenta</b>. Datos reales de DEV
+(Balance <b>US$ 578,45</b> · Bco Galicia ARS 51,6 % · Caja 1 34,6 % · Billetera 13,8 %).</p>
+<p class="meta">Preview descartable · 2026-10-03 · mock estático (no es la app) · <code>favicons/preview-balance-aporte.html</code></p>
+
+<div class="row">
+
+  <!-- ══════════════ ACTUAL ══════════════ -->
+  <div class="col">
+    <h2><span class="tag now">Actual</span> como quedó</h2>
+    <div class="phone">
+      <div class="hero">
+        <div class="status"><span>6:33</span><span>▮▮ ▮</span></div>
+        <div class="topbar"><div class="logo">finanzas<span>personales</span></div><div class="sp"></div><div class="icobtn">🎤</div><div class="avatar">A</div></div>
+        <p class="hname">Balance Actual</p>
+        <p class="hbal">US$ 578,45</p>
+        <div class="chart">
+          <svg width="96" height="96" viewBox="0 0 100 100">
+            <g transform="rotate(-90 50 50)" fill="none" stroke-width="13" stroke-linecap="butt">
+              <circle cx="50" cy="50" r="40" stroke="#4c6ef5" stroke-dasharray="127.68 1000" stroke-dashoffset="-1"/>
+              <circle cx="50" cy="50" r="40" stroke="#22c55e" stroke-dasharray="84.96 1000" stroke-dashoffset="-130.68"/>
+              <circle cx="50" cy="50" r="40" stroke="#f59e0b" stroke-dasharray="32.68 1000" stroke-dashoffset="-217.64"/>
+            </g>
+          </svg>
+        </div>
+        <div class="actions"><a class="act" href="#"><span class="circ">⚙</span>Cuentas</a></div>
+        <div class="dots"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="panel">
+        <h3>Aporte al balance</h3>
+        <div class="rowitem"><span class="cd" style="background:var(--c1)"></span><span class="nm">Bco Galicia ARS</span><span class="m"><b>US$ 298,45</b><em>51,6 %</em></span></div>
+        <div class="rowitem"><span class="cd" style="background:var(--c2)"></span><span class="nm">Caja 1</span><span class="m"><b>US$ 200,00</b><em>34,6 %</em></span></div>
+        <div class="rowitem"><span class="cd" style="background:var(--c3)"></span><span class="nm">Billetera</span><span class="m"><b>US$ 80,00</b><em>13,8 %</em></span></div>
+      </div>
+    </div>
+    <p class="cap"><b>Problema:</b> el monto manda, pero la dona queda huérfana (sin referencia) y estira la tarjeta ~96 px.
+    La fila de acciones y los dots quedan muy abajo respecto del número.</p>
+  </div>
+
+  <!-- ══════════════ A ══════════════ -->
+  <div class="col">
+    <h2><span class="tag a">A</span> Dona <b>héroe</b> (monto al centro)</h2>
+    <div class="phone">
+      <div class="hero">
+        <div class="status"><span>6:33</span><span>▮▮ ▮</span></div>
+        <div class="topbar"><div class="logo">finanzas<span>personales</span></div><div class="sp"></div><div class="icobtn">🎤</div><div class="avatar">A</div></div>
+        <p class="hname">Balance Actual</p>
+        <div class="chart">
+          <svg width="140" height="140" viewBox="0 0 100 100">
+            <g transform="rotate(-90 50 50)" fill="none" stroke-width="11" stroke-linecap="butt">
+              <circle cx="50" cy="50" r="40" stroke="#4c6ef5" stroke-dasharray="127.68 1000" stroke-dashoffset="-1"/>
+              <circle cx="50" cy="50" r="40" stroke="#22c55e" stroke-dasharray="84.96 1000" stroke-dashoffset="-130.68"/>
+              <circle cx="50" cy="50" r="40" stroke="#f59e0b" stroke-dasharray="32.68 1000" stroke-dashoffset="-217.64"/>
+            </g>
+            <text x="50" y="47" text-anchor="middle" fill="#fff" font-size="13.5" font-weight="700" letter-spacing="-.4">US$ 578,45</text>
+            <text x="50" y="57" text-anchor="middle" fill="#808185" font-size="6.4" letter-spacing="1">BALANCE</text>
+          </svg>
+        </div>
+        <div class="legend">
+          <span><i class="cd" style="background:var(--c1)"></i>ARS <b>51,6 %</b></span>
+          <span><i class="cd" style="background:var(--c2)"></i>Caja 1 <b>34,6 %</b></span>
+          <span><i class="cd" style="background:var(--c3)"></i>Billetera <b>13,8 %</b></span>
+        </div>
+        <div class="actions"><a class="act" href="#"><span class="circ">⚙</span>Cuentas</a></div>
+        <div class="dots"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="panel">
+        <h3>Aporte al balance</h3>
+        <div class="rowitem"><span class="cd" style="background:var(--c1)"></span><span class="nm">Bco Galicia ARS</span><span class="m"><b>US$ 298,45</b><em>51,6 %</em></span></div>
+        <div class="rowitem"><span class="cd" style="background:var(--c2)"></span><span class="nm">Caja 1</span><span class="m"><b>US$ 200,00</b><em>34,6 %</em></span></div>
+        <div class="rowitem"><span class="cd" style="background:var(--c3)"></span><span class="nm">Billetera</span><span class="m"><b>US$ 80,00</b><em>13,8 %</em></span></div>
+      </div>
+    </div>
+    <p class="cap"><b>La dona pasa a ser el héroe</b> y el monto vive en su centro (deja de estar dos veces).
+    La leyenda de 3 colores da la referencia que hoy falta.
+    <ul><li>➕ Una sola pieza visual, el número “pertenece” al gráfico.</li>
+    <li>➖ La tarjeta sigue alta (dona 140 px).</li>
+    <li>➖ La leyenda de la banda duplica el listado de abajo (se puede sacar).</li></ul></p>
+  </div>
+
+  <!-- ══════════════ B ══════════════ -->
+  <div class="col">
+    <h2><span class="tag b">B</span> <b>Split</b>: monto ↔ dona</h2>
+    <div class="phone">
+      <div class="hero">
+        <div class="status"><span>6:33</span><span>▮▮ ▮</span></div>
+        <div class="topbar"><div class="logo">finanzas<span>personales</span></div><div class="sp"></div><div class="icobtn">🎤</div><div class="avatar">A</div></div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
+          <div style="flex:1;min-width:0">
+            <p class="hname left">Balance Actual</p>
+            <p class="hbal left">US$ 578,45</p>
+            <p class="hsub left">3 cuentas · 100 %</p>
+          </div>
+          <svg width="104" height="104" viewBox="0 0 100 100" style="flex:none">
+            <g transform="rotate(-90 50 50)" fill="none" stroke-width="12" stroke-linecap="butt">
+              <circle cx="50" cy="50" r="40" stroke="#4c6ef5" stroke-dasharray="127.68 1000" stroke-dashoffset="-1"/>
+              <circle cx="50" cy="50" r="40" stroke="#22c55e" stroke-dasharray="84.96 1000" stroke-dashoffset="-130.68"/>
+              <circle cx="50" cy="50" r="40" stroke="#f59e0b" stroke-dasharray="32.68 1000" stroke-dashoffset="-217.64"/>
+            </g>
+          </svg>
+        </div>
+        <div class="actions"><a class="act" href="#"><span class="circ">⚙</span>Cuentas</a></div>
+        <div class="dots"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="panel">
+        <h3>Aporte al balance</h3>
+        <div class="rowitem"><span class="cd" style="background:var(--c1)"></span><span class="nm">Bco Galicia ARS</span><span class="m"><b>US$ 298,45</b><em>51,6 %</em></span></div>
+        <div class="rowitem"><span class="cd" style="background:var(--c2)"></span><span class="nm">Caja 1</span><span class="m"><b>US$ 200,00</b><em>34,6 %</em></span></div>
+        <div class="rowitem"><span class="cd" style="background:var(--c3)"></span><span class="nm">Billetera</span><span class="m"><b>US$ 80,00</b><em>13,8 %</em></span></div>
+      </div>
+    </div>
+    <p class="cap"><b>Monto a la izquierda (estilo “app bancaria”), dona a la derecha.</b> Rompe el centrado actual y gana aire vertical.
+    <ul><li>➕ La tarjeta baja ~40 px (los dots suben).</li>
+    <li>➕ El ojo lee “número ➜ composición”.</li>
+    <li>➖ El monto deja de estar centrado (cambia el lenguaje del carrusel: las otras 5 tarjetas siguen centradas).</li></ul></p>
+  </div>
+
+  <!-- ══════════════ C ══════════════ -->
+  <div class="col">
+    <h2><span class="tag c">C</span> <b>Barra 100 %</b> (sin dona)</h2>
+    <div class="phone">
+      <div class="hero">
+        <div class="status"><span>6:33</span><span>▮▮ ▮</span></div>
+        <div class="topbar"><div class="logo">finanzas<span>personales</span></div><div class="sp"></div><div class="icobtn">🎤</div><div class="avatar">A</div></div>
+        <p class="hname">Balance Actual</p>
+        <p class="hbal">US$ 578,45</p>
+        <div class="stack" style="margin-top:12px">
+          <i style="width:51.6%;background:var(--c1)"></i>
+          <i style="width:34.6%;background:var(--c2)"></i>
+          <i style="width:13.8%;background:var(--c3)"></i>
+        </div>
+        <div class="legend">
+          <span><i class="cd" style="background:var(--c1)"></i>ARS <b>51,6 %</b></span>
+          <span><i class="cd" style="background:var(--c2)"></i>Caja 1 <b>34,6 %</b></span>
+          <span><i class="cd" style="background:var(--c3)"></i>Billetera <b>13,8 %</b></span>
+        </div>
+        <div class="actions"><a class="act" href="#"><span class="circ">⚙</span>Cuentas</a></div>
+        <div class="dots"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="panel">
+        <h3>Aporte al balance</h3>
+        <div class="rowitem"><span class="cd" style="background:var(--c1)"></span><span class="nm">Bco Galicia ARS</span><span class="m"><b>US$ 298,45</b><em>51,6 %</em></span></div>
+        <div class="rowitem"><span class="cd" style="background:var(--c2)"></span><span class="nm">Caja 1</span><span class="m"><b>US$ 200,00</b><em>34,6 %</em></span></div>
+        <div class="rowitem"><span class="cd" style="background:var(--c3)"></span><span class="nm">Billetera</span><span class="m"><b>US$ 80,00</b><em>13,8 %</em></span></div>
+      </div>
+    </div>
+    <p class="cap"><b>Se cambia la dona por una barra apilada al 100 %</b> (12 px de alto): dice lo mismo ocupando casi nada y no “compite” con el monto.
+    <ul><li>➕ La tarjeta queda baja y el monto vuelve a ser el protagonista.</li>
+    <li>➕ Más legible que una dona de 90 px (los tramos se comparan de un vistazo).</li>
+    <li>➖ Menos “gráfico” y más “indicador”; sin total al centro.</li></ul></p>
+  </div>
+
+  <!-- ══════════════ D ══════════════ -->
+  <div class="col">
+    <h2><span class="tag d">D</span> Monto + <b>mini-dona</b> inline</h2>
+    <div class="phone">
+      <div class="hero">
+        <div class="status"><span>6:33</span><span>▮▮ ▮</span></div>
+        <div class="topbar"><div class="logo">finanzas<span>personales</span></div><div class="sp"></div><div class="icobtn">🎤</div><div class="avatar">A</div></div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:4px">
+          <div style="text-align:right">
+            <p class="hname" style="text-align:right">Balance Actual</p>
+            <p class="hbal" style="text-align:right;font-size:26px">US$ 578,45</p>
+          </div>
+          <svg width="62" height="62" viewBox="0 0 100 100" style="flex:none">
+            <g transform="rotate(-90 50 50)" fill="none" stroke-width="16" stroke-linecap="butt">
+              <circle cx="50" cy="50" r="40" stroke="#4c6ef5" stroke-dasharray="127.68 1000" stroke-dashoffset="-1"/>
+              <circle cx="50" cy="50" r="40" stroke="#22c55e" stroke-dasharray="84.96 1000" stroke-dashoffset="-130.68"/>
+              <circle cx="50" cy="50" r="40" stroke="#f59e0b" stroke-dasharray="32.68 1000" stroke-dashoffset="-217.64"/>
+            </g>
+          </svg>
+        </div>
+        <p class="hsub">3 cuentas aportan · <b style="color:#e2e4f0">ARS 51,6 %</b></p>
+        <div class="actions"><a class="act" href="#"><span class="circ">⚙</span>Cuentas</a></div>
+        <div class="dots"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="panel">
+        <h3>Aporte al balance</h3>
+        <div class="rowitem"><span class="cd" style="background:var(--c1)"></span><span class="nm">Bco Galicia ARS</span><span class="m"><b>US$ 298,45</b><em>51,6 %</em></span></div>
+        <div class="rowitem"><span class="cd" style="background:var(--c2)"></span><span class="nm">Caja 1</span><span class="m"><b>US$ 200,00</b><em>34,6 %</em></span></div>
+        <div class="rowitem"><span class="cd" style="background:var(--c3)"></span><span class="nm">Billetera</span><span class="m"><b>US$ 80,00</b><em>13,8 %</em></span></div>
+      </div>
+    </div>
+    <p class="cap"><b>Mini-dona de 62 px al lado del monto</b> (no debajo): el gráfico pasa a ser un “chip” y el conjunto queda compacto.
+    <ul><li>➕ Es la variante más baja de todas.</li>
+    <li>➕ Se puede tocar la mini-dona para abrir el detalle (o dejarla solo informativa).</li>
+    <li>➖ A 62 px los tramos chicos (13,8 %) se leen poco; el listado hace el trabajo fino.</li></ul></p>
+  </div>
+
+</div>
+
+<div class="divider"></div>
+
+<div class="dec">
+  <h3>Mi recomendación</h3>
+  <ul>
+    <li><b>A (dona héroe + monto al centro)</b> si querés que el aporte <b>sea</b> el contenido de la tarjeta: es la lectura más “dashboard” y el número queda anclado al gráfico. Se puede sacar la leyenda de la banda (el listado de abajo ya la cubre) y bajar la dona a ~120 px.</li>
+    <li><b>C (barra 100 %)</b> si preferís <b>bajar la tarjeta</b> y que el monto siga siendo el protagonista del carrusel, sin romper el centrado del resto de las tarjetas.</li>
+    <li><b>B (split)</b> es la más “bancaria”, pero <b>rompe el lenguaje centrado</b> del carrusel (las otras 5 tarjetas quedan distintas). Si se elige, convendría centrar también las cuentas (cambio más grande).</li>
+    <li><b>D</b> solo si lo que buscás es <b>ocupar el menor alto posible</b>; a ese tamaño la dona pierde detalle.</li>
+    <li>En <b>todas</b>: el “aporte” son las 3 cuentas que suman al balance (100 %); la tarjeta muestra el <b>Balance</b>, que además <b>resta gastos pendientes</b> y suma el neto de préstamos ⇒ los dos números no coinciden (matiz ya documentado).</li>
+  </ul>
+</div>
+
+</body>
+</html>

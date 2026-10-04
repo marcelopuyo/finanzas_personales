@@ -195,7 +195,6 @@ export function DashboardClient({
       return {
         gastos: data.gastosTotal,
         ingresos: data.ingresosMesActual,
-        resultados: data.resultadosMesActual,
       };
     }
 
@@ -217,10 +216,6 @@ export function DashboardClient({
     return {
       gastos: numberToCurrency(totalG, iso),
       ingresos: numberToCurrency(totalI, iso),
-      // Badge "Mes actual" de Resultados: ingresos del mes − gastos del mes
-      // (misma ventana [desde, hoy] que los badges anteriores, para que la
-      // resta sea coherente con los montos que muestran Ingresos y Gastos).
-      resultados: numberToCurrency(totalI - totalG, iso),
     };
   }, [
     montado,
@@ -228,7 +223,6 @@ export function DashboardClient({
     fuenteIngresos,
     data.gastosTotal,
     data.ingresosMesActual,
-    data.resultadosMesActual,
     data.monedaPredeterminadaISO,
   ]);
 
@@ -604,14 +598,13 @@ export function DashboardClient({
     />
   );
 
-  /** **Encabezado del panel Resultados** (diseño C): contexto + resultado del mes. */
+  /**
+   * **Encabezado del panel Resultados**: solo el nombre — sin `· mes actual`,
+   * porque el panel ahora muestra el **histórico** (gráfico de línea + listado
+   * mes a mes), no un mes en particular (pedido del usuario, 2026-10-03).
+   */
   const resultadosPanelHeader = (
-    <PanelHeader
-      className="mb-4"
-      titulo="Resultados"
-      contexto="mes actual"
-      numero={badges.resultados}
-    />
+    <PanelHeader className="mb-4" titulo="Resultados" />
   );
 
   return (

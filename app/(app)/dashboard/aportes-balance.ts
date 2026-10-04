@@ -5,11 +5,13 @@ import { DONUT_PALETTE } from "./components/donut-chart";
 export interface AporteCuenta {
   /** Nombre de la cuenta (rótulo del donut y de la lista). */
   name: string;
+  /** Id de la cuenta real (queda `undefined` en las tarjetas sintéticas). */
+  id?: number;
   /** Saldo en la **moneda predeterminada** del usuario. */
   value: number;
   /** Aporte sobre el **total de las cuentas que aportan** (0-100). */
   percent: number;
-  /** Color del segmento: el **mismo** en el donut y en el listado. */
+  /** Color del segmento: el **mismo** en la barra y en el listado. */
   color: string;
 }
 
@@ -36,7 +38,7 @@ export function calcularAportes(
 ): AporteCuenta[] {
   const queAportan = cuentas
     .filter((c) => c.aportaAlBalance)
-    .map((c) => ({ name: c.title, value: c.saldoPredeterminado }))
+    .map((c) => ({ name: c.title, id: c.id, value: c.saldoPredeterminado }))
     .sort((a, b) => b.value - a.value);
 
   const total = queAportan.reduce((acc, c) => acc + c.value, 0);
