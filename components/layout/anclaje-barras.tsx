@@ -18,49 +18,63 @@ import { useEffect } from "react";
  *   scrollear el documento — las barras quedan corridas hasta **reiniciar la app**
  *   (era el síntoma reportado: era la única forma de restablecerlas).
  *
- * ✅ La corrección es **medida, no asumida**: se compara el borde visible
- * (`visualViewport.offsetTop` / `height`, la única fuente que refleja el estado
- * real) contra la posición real del anclaje (`getBoundingClientRect()`) y se
- * publica la diferencia en dos variables CSS que consumen las barras
- * (`--fp-desfase-superior` / `--fp-desfase-inferior`). Así el mecanismo se
- * autocorrige sin conocer la causa ni las unidades del zoom.
+ * ✅ La corrección se **calcula desde el borde visible** (`visualViewport.offsetTop`
+ * / `height`, la única fuente que refleja el estado real) y se publica en dos
+ * variables CSS que consumen las barras (`--fp-desfase-superior` /
+ * `--fp-desfase-inferior`). Cuando **no hay ningún campo enfocado** el teclado está
+ * cerrado y el borde visible es, sin discusión, el del layout: ahí **no** se
+ * consulta el `visualViewport`.
  *
  * ⚠️ En el caso normal las dos variables valen `0px` ⇒ **cero cambios** respecto
- * del comportamiento actual. Sólo se escribe cuando la medición da distinto de
- * cero, y se ignoran los valores absurdos (una medición a medio camino entre
- * eventos no debe mandar la barra a la loma del molino).
+ * del comportamiento actual. Sólo se escribe cuando el valor cambia.
  *
- * ⚠️ Si el browser YA movió el elemento (caso iOS con teclado) la medición da 0 y
- * el mecanismo no interfiere: no hay doble desplazamiento.
+ * 🔑 **Teclado (2026-10-04)**: en iOS, al **cerrar** el teclado el `visualViewport`
+ * puede quedar **viejo** (sigue reportando el alto con teclado) y la barra quedaba
+ * arriba hasta reiniciar la app. Por eso, **sin campo enfocado** (con una breve
+ * histéresis para no parpadear al saltar entre campos), la barra va al borde del
+ * layout y, si el motor la dejó pintada donde estaba, se **re-engancha**.
  */
 export function AnclajeBarras() {
   useEffect(() => {
     const raiz = document.documentElement;
-    /** Desfases aplicados hoy en las variables (para poder medir la base real). */
+    /** Desfases aplicados hoy (para no escribir la variable si no cambió). */
     let aplicadoSup = 0;
     let aplicadoInf = 0;
+    /**
+     * Momento del **último cambio de foco de un campo**. El teclado tarda en
+     * abrir/cerrar: sin esto, un `focusout` entre dos campos (con el teclado
+     * todavía abierto) se leería como “teclado cerrado” y la barra bajaría y
+     * subiría. Ver `revisar`.
+     */
+    let ultimoCampo = 0;
+    /** ¿En la pasada anterior se creía que el teclado podía estar abierto? */
+    let conTecladoAntes = false;
     /** Timers del “asentamiento” (los estados de estos bugs tardan en estabilizar). */
     const timers: number[] = [];
 
-    /** ¿El valor es plausible? (evita saltos por mediciones a mitad de animación). */
-    const plausible = (v: number) =>
-      Number.isFinite(v) && Math.abs(v) <= window.innerHeight;
+    /** ¿Ese elemento es un campo que abre el teclado en pantalla? */
+    const editable = (el: Element | null) =>
+      el instanceof HTMLElement &&
+      (el.isContentEditable ||
+        ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
 
     /**
      * **Re-enganche** de un `fixed` que el motor dejó “colgado” (bug conocido de
-     * iOS después de un pinch o del teclado): cambiar el `transform` y **forzar un
-     * reflow** hace que el compositor lo vuelva a posicionar. Va rate-limited porque
-     * es un parche de último recurso, no parte del cálculo normal.
+     * iOS después del teclado o de un pinch): sacarlo y volver a ponerlo en el
+     * layout **sincrónicamente** (sin `display` intermedio visible) obliga al
+     * compositor a volver a pintarlo en su posición. Va rate-limited: es un parche
+     * de último recurso, no parte del cálculo normal.
      */
-    let ultimoReenganche = 0;
+    const ultimoReenganche = new WeakMap<HTMLElement, number>();
     const reenganchar = (el: HTMLElement) => {
       const ahora = Date.now();
-      if (ahora - ultimoReenganche < 1500) return;
-      ultimoReenganche = ahora;
-      const previo = el.style.transform;
-      el.style.transform = "translateZ(0)";
+      if (ahora - (ultimoReenganche.get(el) ?? 0) < 1200) return;
+      ultimoReenganche.set(el, ahora);
+      const previo = el.style.display;
+      el.style.display = "none";
       void el.offsetHeight;
-      el.style.transform = previo;
+      el.style.display = previo;
+      void el.offsetHeight;
     };
 
     const escribir = (variable: string, valor: number) => {
@@ -77,31 +91,20 @@ export function AnclajeBarras() {
      */
     const saneadoElScroll = () => {
       if (window.scrollY === 0) return;
-      const activo = document.activeElement;
-      const editando =
-        activo instanceof HTMLElement &&
-        (activo.isContentEditable ||
-          ["INPUT", "TEXTAREA", "SELECT"].includes(activo.tagName));
-      if (!editando) window.scrollTo(0, 0);
+      if (!editable(document.activeElement)) window.scrollTo(0, 0);
     };
 
     const revisar = () => {
       const vv = window.visualViewport;
       const escala = vv?.scale ?? 1;
-      // Bordes VISIBLES en las mismas coordenadas que `getBoundingClientRect()`.
-      const altoVisible = vv && vv.height > 0 ? vv.height : window.innerHeight;
-      const bordeSup = vv ? vv.offsetTop : 0;
-      const bordeInf = (vv ? vv.offsetTop : 0) + altoVisible;
-
       const nav = document.querySelector<HTMLElement>("[data-barra-nav]");
       const top = document.querySelector<HTMLElement>("[data-topbar]");
 
       /**
        * ⚠️ Con **zoom nativo** (`scale ≠ 1`) no se corrige: las coordenadas del
-       * `visualViewport` y las del `getBoundingClientRect` dejan de ser comparables
-       * y en iOS el `visualViewport` puede quedar **viejo** después del pinch ⇒ una
-       * medición mala quedaba aplicada hasta reiniciar la app (comprobado en el
-       * celular el 2026-10-04). El pinch nativo se bloquea en
+       * `visualViewport` dejan de ser comparables y en iOS pueden quedar **viejas**
+       * ⇒ una medición mala quedaría aplicada hasta reiniciar la app (comprobado en
+       * el celular el 2026-10-04). El pinch nativo se bloquea en
        * `components/layout/zoom-contenido.tsx`; acá sólo se intenta **re-enganchar**
        * el `fixed` que el motor haya dejado colgado.
        */
@@ -111,23 +114,49 @@ export function AnclajeBarras() {
         return;
       }
 
+      const altoLayout = window.innerHeight;
+      const enfocado = editable(document.activeElement);
+      if (enfocado) ultimoCampo = Date.now();
+      /**
+       * 🔑 **La clave del bug del teclado**: en iOS el `visualViewport` puede quedar
+       * **viejo** después de cerrarlo (sigue reportando el alto con teclado) y
+       * entonces la corrección dejaba la barra **arriba para siempre** (sólo se
+       * arreglaba reiniciando la app). Por eso, **sin campo enfocado** y pasado el
+       * asentamiento, la conclusión es firme: el teclado está cerrado ⇒ el borde
+       * visible es el del layout, **aunque** el `visualViewport` diga otra cosa. La
+       * histéresis (`ultimoCampo`) evita el parpadeo al saltar entre campos.
+       */
+      const puedeEstarConTeclado =
+        enfocado || Date.now() - ultimoCampo < 400;
+
+      // Borde visible OBJETIVO (en coordenadas del layout, como `getBoundingClientRect`).
+      let bordeSup = 0;
+      let bordeInf = altoLayout;
+      if (puedeEstarConTeclado && vv && vv.height > 0) {
+        bordeSup = Math.max(0, vv.offsetTop);
+        bordeInf = vv.offsetTop + vv.height;
+      }
+
+      /** ¿La corrección es plausible? (evita saltos por mediciones a mitad de animación). */
+      const plausible = (v: number) =>
+        Number.isFinite(v) && Math.abs(v) <= altoLayout;
+
+      // ¿El teclado se acaba de cerrar? ⇒ hay que bajar la barra sí o sí y, por si
+      // el motor la dejó pintada donde estaba, re-engancharla.
+      const volvioAlBorde = conTecladoAntes && !puedeEstarConTeclado;
+      conTecladoAntes = puedeEstarConTeclado;
+
       // ── Barra inferior ──
       if (nav) {
+        // Se mide la posición real y se descuenta lo ya aplicado: la corrección
+        // autocorrige también si el motor dejó el `fixed` corrido (bug de iOS).
         const r = nav.getBoundingClientRect();
-        // `bottom: var(--fp-desfase-inferior)` ⇒ el borde medido ya incluye lo
-        // aplicado: se descuenta para obtener la posición “base” sin compensar.
         const nuevo = Math.round(r.bottom + aplicadoInf - bordeInf);
         if (plausible(nuevo) && nuevo !== aplicadoInf) {
           aplicadoInf = nuevo;
           escribir("--fp-desfase-inferior", nuevo);
-        } else if (
-          aplicadoInf === 0 &&
-          Math.abs(r.bottom - window.innerHeight) > 1
-        ) {
-          // Sin compensación nuestra y, aun así, el `fixed` no está en el borde del
-          // layout ⇒ lo dejó corrido el motor (bug de iOS): se re-engancha.
-          reenganchar(nav);
         }
+        if (volvioAlBorde) reenganchar(nav);
       }
 
       // ── Barra superior (mismo fenómeno, mismo mecanismo) ──
@@ -137,9 +166,8 @@ export function AnclajeBarras() {
         if (plausible(nuevo) && nuevo !== aplicadoSup) {
           aplicadoSup = nuevo;
           escribir("--fp-desfase-superior", nuevo);
-        } else if (aplicadoSup === 0 && Math.abs(r.top) > 1) {
-          reenganchar(top);
         }
+        if (volvioAlBorde) reenganchar(top);
       }
     };
 
@@ -163,7 +191,12 @@ export function AnclajeBarras() {
     window.addEventListener("scroll", programar);
     window.addEventListener("pageshow", programar);
     window.addEventListener("focusin", programar);
-    window.addEventListener("focusout", programar);
+    // `focusout` arranca la histéresis (ver `revisar`) antes de reprogramar.
+    const alPerderCampo = () => {
+      ultimoCampo = Date.now();
+      programar();
+    };
+    document.addEventListener("focusout", alPerderCampo);
     window.addEventListener("orientationchange", programar);
     document.addEventListener("visibilitychange", programar);
     vv?.addEventListener("resize", programar);
@@ -185,7 +218,7 @@ export function AnclajeBarras() {
       window.removeEventListener("scroll", programar);
       window.removeEventListener("pageshow", programar);
       window.removeEventListener("focusin", programar);
-      window.removeEventListener("focusout", programar);
+      document.removeEventListener("focusout", alPerderCampo);
       window.removeEventListener("orientationchange", programar);
       document.removeEventListener("visibilitychange", programar);
       vv?.removeEventListener("resize", programar);
