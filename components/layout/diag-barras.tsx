@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 
+/** Clave de `localStorage`: deja el panel encendido también en la **PWA instalada**
+ *  (standalone), donde no hay barra de direcciones para escribir `?diag=1`. */
+const CLAVE_DIAG = "fp_diag_barras";
+
 /**
  * ⚠️ **TEMPORAL — panel de diagnóstico del anclaje de las barras** (2026-10-04).
  *
@@ -13,15 +17,22 @@ import { useEffect, useState } from "react";
  * re-engancha el `fixed` en ese motor.
  *
  * Se abre agregando **`?diag=1`** a cualquier pantalla del área protegida
- * (ej. `https://…/dashboard?diag=1`).
+ * (ej. `https://…/dashboard?diag=1`); desde ahí queda **persistido** en
+ * `localStorage` para poder verlo en la **PWA instalada**. **`?diag=0`** lo apaga.
+ *
+ * El panel arranca **minimizado como una pestañita al costado** (no tapa la
+ * interfaz): se toca para expandir y se puede **copiar todo** al portapapeles.
  *
  * 🔧 **Borrar este archivo y su `<DiagBarras />` en `app-layout.tsx` cuando el bug
  * quede resuelto**: no forma parte de la app.
  */
 export function DiagBarras() {
   const [visible, setVisible] = useState(false);
+  // Arranca **minimizado**: así no tapa la interfaz mientras se reproduce el bug.
+  const [abierto, setAbierto] = useState(false);
   const [datos, setDatos] = useState<[string, string][]>([]);
   const [log, setLog] = useState<string[]>([]);
+  const [copiado, setCopiado] = useState(false);
 
   /** `env(safe-area-inset-bottom)` medido con una sonda descartable. */
   const medirSafeArea = () => {
@@ -36,8 +47,30 @@ export function DiagBarras() {
 
   // El `setState` va diferido para no dispararlo dentro del cuerpo del efecto
   // (`react-hooks/set-state-in-effect`, §114).
+  //
+  // 🔑 `?diag=1` enciende el panel y lo **persiste** en `localStorage`: así se ve
+  // dentro de la **PWA instalada** (standalone), que es donde aparece el bug y
+  // donde NO hay barra de direcciones. `?diag=0` lo apaga y limpia la clave.
   useEffect(() => {
-    if (!new URLSearchParams(window.location.search).has("diag")) return;
+    const q = new URLSearchParams(window.location.search);
+    if (q.has("diag")) {
+      const encender = q.get("diag") !== "0";
+      try {
+        if (encender) window.localStorage.setItem(CLAVE_DIAG, "1");
+        else window.localStorage.removeItem(CLAVE_DIAG);
+      } catch {
+        /* modo privado */
+      }
+      const t = setTimeout(() => setVisible(encender), 0);
+      return () => clearTimeout(t);
+    }
+    let guardado = false;
+    try {
+      guardado = window.localStorage.getItem(CLAVE_DIAG) === "1";
+    } catch {
+      /* modo privado */
+    }
+    if (!guardado) return;
     const t = setTimeout(() => setVisible(true), 0);
     return () => clearTimeout(t);
   }, []);
@@ -49,6 +82,7 @@ export function DiagBarras() {
       const nav = document.querySelector<HTMLElement>("[data-barra-nav]");
       const top = document.querySelector<HTMLElement>("[data-topbar]");
       const main = document.querySelector<HTMLElement>("main");
+      const shell = document.querySelector<HTMLElement>("[data-app-shell]");
       const vv = window.visualViewport;
       const rn = nav?.getBoundingClientRect();
       const rt = top?.getBoundingClientRect();
@@ -57,8 +91,10 @@ export function DiagBarras() {
       setDatos([
         ["standalone", String(window.matchMedia("(display-mode: standalone)").matches)],
         ["innerH / clientH", `${window.innerHeight} / ${raiz.clientHeight}`],
+        ["app-shell h / bottom", shell ? `${Math.round(shell.getBoundingClientRect().height)} / ${Math.round(shell.getBoundingClientRect().bottom)}` : "?"],
         ["screen.h / availH", `${window.screen.height} / ${window.screen.availHeight}`],
         ["vv.h / vv.top / scale", vv ? `${Math.round(vv.height)} / ${Math.round(vv.offsetTop)} / ${vv.scale}` : "sin visualViewport"],
+        ["vv.pageTop / vv.pageLeft", vv ? `${Math.round(vv.pageTop)} / ${Math.round(vv.pageLeft)}` : "sin visualViewport"],
         ["scrollY / main.scrollTop", `${window.scrollY} / ${main?.scrollTop ?? "?"}`],
         ["nav bottom / h", `${rn ? Math.round(rn.bottom) : "?"} / ${rn ? Math.round(rn.height) : "?"}`],
         ["nav top rect / offsetH", `${rn ? Math.round(rn.top) : "?"} / ${nav?.offsetHeight ?? "?"}`],
@@ -190,16 +226,68 @@ export function DiagBarras() {
     ],
   ];
 
+  const copiar = () => {
+    const texto = [...datos.map(([k, v]) => `${k}: ${v}`), ...log].join("\n");
+    const p = navigator.clipboard?.writeText(texto);
+    if (p) {
+      p.then(
+        () => {
+          setCopiado(true);
+          window.setTimeout(() => setCopiado(false), 1500);
+        },
+        () => {}
+      );
+    }
+  };
+
+  const apagar = () => {
+    try {
+      window.localStorage.removeItem(CLAVE_DIAG);
+    } catch {
+      /* modo privado */
+    }
+    setVisible(false);
+  };
+
+  // Minimizado: una pestañita al costado, para poder interactuar con la app.
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        aria-label="Mostrar diagnóstico de barras"
+        className="fixed right-0 top-1/2 z-100 -translate-y-1/2 rounded-l border border-r-0 border-danger bg-background px-0.5 py-2 text-[9px] font-bold text-danger"
+        style={{ writingMode: "vertical-rl" }}
+      >
+        DIAG
+      </button>
+    );
+  }
+
   return (
-    <div className="fixed inset-x-0 top-0 z-100 max-h-[75vh] overflow-auto border-b border-danger bg-background p-2 text-[10px] leading-tight shadow-lg">
+    <div className="fixed inset-x-0 top-0 z-100 max-h-[45vh] overflow-auto border-b border-danger bg-background p-2 text-[10px] leading-tight shadow-lg">
       <div className="mb-1 flex items-center gap-2">
         <strong className="text-[11px] text-danger">DIAG BARRAS</strong>
         <button
           type="button"
-          onClick={() => setVisible(false)}
+          onClick={copiar}
+          className="rounded border border-border px-2 py-0.5 text-[10px]"
+        >
+          {copiado ? "copiado ✓" : "copiar todo"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setAbierto(false)}
           className="ml-auto rounded border border-border px-2 py-0.5 text-[10px]"
         >
-          cerrar
+          minimizar
+        </button>
+        <button
+          type="button"
+          onClick={apagar}
+          className="rounded border border-border px-2 py-0.5 text-[10px]"
+        >
+          apagar
         </button>
       </div>
       <table className="w-full">
