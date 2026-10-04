@@ -49,8 +49,12 @@ interface DonutChartProps {
   invertTrend?: boolean;
 }
 
-/** Paleta para los segmentos: tonos 500, legibles en tema claro y oscuro. */
-const PALETTE = [
+/**
+ * Paleta para los segmentos de un donut: tonos 500, legibles en tema claro y
+ * oscuro. **Exportada** para que otros gráficos de aporte (el donut de la tarjeta
+ * *Balance Actual* y su listado) usen **los mismos colores** por segmento.
+ */
+export const DONUT_PALETTE = [
   "var(--primary)",
   "#22c55e",
   "#f59e0b",
@@ -76,7 +80,7 @@ function buildSlices(data: DonutDatum[]): Slice[] {
 
   return pos.map((d, i) => ({
     ...d,
-    color: PALETTE[i % PALETTE.length],
+    color: DONUT_PALETTE[i % DONUT_PALETTE.length],
     percent: total > 0 ? (d.value / total) * 100 : 0,
   }));
 }

@@ -14,6 +14,7 @@ import { TrabajosActionsMenu } from "./components/trabajos-actions-menu";
 import { DonutChart } from "./components/donut-chart";
 import { EvolutionChart } from "./components/line-chart";
 import { PrestamosChart } from "./components/prestamos-chart";
+import { ResultadosMensuales } from "./components/resultados-mensuales";
 import { PrestamosActionsMenu } from "./components/prestamos-actions-menu";
 import { GastosActionsMenu } from "./components/gastos-actions-menu";
 import { GastosClient } from "@/app/(app)/gastos/gastos-client";
@@ -780,6 +781,14 @@ export function DashboardClient({
         currency={data.monedaPredeterminadaISO}
       />
       </div>
+      {/* Listado mes a mes (mismo dato que el gráfico), movido acá desde la
+          tarjeta de *Balance Actual* de Inicio el 2026-10-03: la tarjeta pasó a
+          mostrar el aporte por cuenta, así el tab **Resultados** recupera sentido
+          y tiene lo que antes vivía en Inicio. */}
+      <ResultadosMensuales
+        data={data.evolucionResultados}
+        monedaISO={data.monedaPredeterminadaISO}
+      />
       </Solo>
 
       {/* Panel de préstamos: se muestra SIEMPRE (también sin préstamos

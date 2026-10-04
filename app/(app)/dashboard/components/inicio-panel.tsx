@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CuentaSlide } from "./cuenta-slide";
-import { ResultadosMensuales } from "./resultados-mensuales";
+import { AporteCuentasLista } from "./aporte-cuentas-lista";
 import { MovimientosCuentaClient } from "@/app/(app)/cuentas/[id]/movimientos-client";
+import { calcularAportes } from "../aportes-balance";
 import { getHistorialesPrimerasPaginasAction } from "@/backend/src/actions/historial-movimientos";
 import type { HistorialPagina } from "@/backend/src/queries/movimientos";
 import {
@@ -32,13 +33,14 @@ import { setTopbarScrolled } from "@/lib/topbar-scroll";
  * 3. **Dots** dentro de la banda, abajo de las acciones.
  * 4. Debajo de la banda, el **detalle de la tarjeta en foco**: el historial de la
  *    cuenta (`MovimientosCuentaClient` de `/cuentas/[id]`, con scroll infinito) o,
- *    si el foco es el resumen, los **resultados mensuales** (mismo dato del panel
- *    Resultados, del mes más actual al más antiguo).
+ *    si el foco es el resumen, el **aporte de cada cuenta al balance** (saldo + %,
+ *    de mayor a menor — `aporte-cuentas-lista.tsx`).
  *
  * 🔑 La tarjeta en foco la define **solo el swipe** (se guarda en `sessionStorage`
  *    para volver a la misma cuenta tras remontar). La **primera** tarjeta es el
- *    **resumen (Balance Actual)**, con el gráfico de **evolución de Resultados**
- *    (decisión del usuario 2026-10-02: antes eran barras de aporte por cuenta).
+ *    **resumen (Balance Actual)**, con la **dona de aporte por cuenta** (decisión
+ *    del usuario 2026-10-03: antes era la evolución de Resultados, que pasó al
+ *    panel **Resultados** de la barra inferior).
  *
  * ⚠️ **Lazy "sticky"**: el gráfico se monta al acercarse el foco y, una vez
  * montado, **no se desmonta** (montar Recharts es lo caro ⇒ evita el skeleton al
@@ -116,6 +118,11 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
       ),
     [data.cuentas]
   );
+  /**
+   * **Aporte de cada cuenta al Balance Actual** (ordenado de mayor a menor):
+   * alimenta la **dona** de la tarjeta 0 y su **listado** de abajo.
+   */
+  const aportes = useMemo(() => calcularAportes(data.cuentas), [data.cuentas]);
   const [foco, setFoco] = useState(0);
   /**
    * Índice más alto cuyos **gráficos** deben estar montados. Crece con el foco (y
@@ -316,7 +323,7 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
             titulo="Balance Actual"
             monto={numberToCurrency(data.balance, data.monedaPredeterminadaISO)}
             esBalance
-            evolucion={data.evolucionResultados}
+            donut={aportes}
             monedaISO={data.monedaPredeterminadaISO}
             conGrafico
           />
@@ -366,10 +373,10 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
           </p>
         )}
         {indice === 0 ? (
-          /* Foco = resumen: los resultados mes a mes, en la grilla de movimientos. */
-          <ResultadosMensuales
-            data={data.evolucionResultados}
-            monedaISO={data.monedaPredeterminadaISO}
+          /* Foco = resumen: el aporte de cada cuenta al balance, de mayor a menor. */
+          <AporteCuentasLista
+            data={aportes}
+            currency={data.monedaPredeterminadaISO}
           />
         ) : cuenta ? (
           <MovimientosCuentaClient

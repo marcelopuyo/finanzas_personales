@@ -13,6 +13,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   AltArrowRightIcon,
   BillListIcon as BillListLinear,
+  ChartIcon as ChartLinear,
   HamburgerMenuIcon as HamburgerMenuLinear,
   HandMoneyIcon,
   HomeIcon as HomeLinear,
@@ -20,6 +21,7 @@ import {
 } from "@solar-icons/react/linear";
 import {
   BillListIcon as BillListDuotone,
+  ChartIcon as ChartDuotone,
   HamburgerMenuIcon as HamburgerMenuDuotone,
   HomeIcon as HomeDuotone,
   MoneyBagIcon as MoneyBagDuotone,
@@ -31,18 +33,18 @@ import { usePrefetchNav } from "@/components/ui/nav-progress";
 /**
  * **Barra inferior de navegación** (2026-10-01, rama `rediseno-ui`) — reemplaza la
  * navegación que hoy vive DENTRO del dashboard (7 paneles apilados en una sola
- * página) por **4 destinos de primer nivel**, cada uno con su pantalla:
+ * página) por **destinos de primer nivel**, cada uno con su pantalla:
  *
- *   Inicio · Gastos · Ingresos · Más
+ *   Inicio · Gastos · Ingresos · Resultados · Más
  *
- * ⚠️ **El tab "Resultados" se quitó el 2026-10-02** (pedido del usuario): el
- * resumen de Inicio ya muestra el gráfico de **Resultados** y el listado mes a mes
- * (`resultados-mensuales.tsx`) ⇒ entrar a otra pantalla para ver lo mismo dejó de
- * tener sentido. La ruta `/dashboard/resultados` **sigue viva** (la usa la voz
- * "mostrame los resultados"), pero ya no tiene punto de entrada en la barra.
+ * 🔑 **"Resultados" volvió el 2026-10-03** (había salido el 2026-10-02): con el
+ * cambio de la tarjeta *Balance Actual* (que pasó a mostrar el **aporte por
+ * cuenta**), el gráfico de resultados y el listado mes a mes dejaron de vivir en
+ * Inicio ⇒ el tab recupera su contenido propio (`/dashboard/resultados`: gráfico
+ * de línea + `resultados-mensuales.tsx`).
  *
  * 🔑 **Alcance**: se muestra **solo en las pantallas principales** (decisión del
- * usuario, 2026-10-01): los 3 tabs de arriba y las sub-pantallas del hub "Más
+ * usuario, 2026-10-01): los 4 tabs de arriba y las sub-pantallas del hub "Más
  * opciones" (ej. Préstamos). En wizards, CRUDs y pantallas de detalle manda el `‹`
  * de la cabecera (§210), así no quedan 3 elementos fijos apilados en un celular.
  *
@@ -87,6 +89,12 @@ const TABS = [
     label: "Ingresos",
     icono: MoneyBagLinear,
     iconoActivo: MoneyBagDuotone,
+  },
+  {
+    href: "/dashboard/resultados",
+    label: "Resultados",
+    icono: ChartLinear,
+    iconoActivo: ChartDuotone,
   },
 ] as const;
 
@@ -172,7 +180,7 @@ export default function BottomNav() {
         );
       })}
 
-      {/* Último botón (4º desde que se quitó "Resultados"): **popup**, no pantalla.
+      {/* Último botón (5º, después de "Resultados"): **popup**, no pantalla.
           Queda marcado como activo cuando estamos en alguna de sus opciones
           (ej. /dashboard/prestamos).
           🔑 El icono es **3 líneas apiladas (hamburguesa)** y no el ⋯ elíptico
