@@ -4,7 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CuentaSlide } from "./cuenta-slide";
 import { ResultadosMensuales } from "./resultados-mensuales";
 import { MovimientosCuentaClient } from "@/app/(app)/cuentas/[id]/movimientos-client";
+import { getHistorialesPrimerasPaginasAction } from "@/backend/src/actions/historial-movimientos";
 import type { HistorialPagina } from "@/backend/src/queries/movimientos";
+import {
+  PRIMERA_PAGINA_FILAS,
+  guardarPrimeraPagina,
+  leerPrimeraPagina,
+  suscribirHistoriales,
+} from "@/lib/historial-cuentas";
 import type { DashboardData } from "../dashboard-data";
 import { cn, numberToCurrency } from "@/lib/utils";
 import { setTopbarScrolled } from "@/lib/topbar-scroll";
@@ -33,8 +40,10 @@ import { setTopbarScrolled } from "@/lib/topbar-scroll";
  *    **resumen (Balance Actual)**, con el gráfico de **evolución de Resultados**
  *    (decisión del usuario 2026-10-02: antes eran barras de aporte por cuenta).
  *
- * ⚠️ **Lazy**: el gráfico se monta solo en el **foco ± 1** (`conGrafico` del slide);
- * el resto reserva el alto con un `Skeleton` hasta acercarse.
+ * ⚠️ **Lazy "sticky"**: el gráfico se monta al acercarse el foco y, una vez
+ * montado, **no se desmonta** (montar Recharts es lo caro ⇒ evita el skeleton al
+ * volver a una tarjeta). El resto se premonta en segundo plano; solo los nunca
+ * vistos reservan el alto con un `Skeleton` hasta acercarse.
  *
  * ⚠️ Se eliminaron los **FAB** de Inicio: las acciones viven **dentro de cada
  * slide** (mismas 3 del FAB "+" en las cuentas y `Gestionar cuentas` en el resumen).
@@ -43,6 +52,23 @@ const PAGINA_VACIA: HistorialPagina = { rows: [], total: 0, hayMas: true };
 
 /** Px de scroll a partir de los cuales la top bar se "despega" (translúcida). */
 const UMBRAL_TOPBAR_PX = 8;
+
+/** `window` con `requestIdleCallback` (no está en todos los navegadores). */
+type VentanaIdle = Window & {
+  requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number;
+};
+
+/**
+ * Ejecuta `fn` cuando el hilo principal queda libre, para no competir con el
+ * primer pintado. Respaldo con `setTimeout` en navegadores sin
+ * `requestIdleCallback` (p. ej. Safari).
+ */
+function alIdle(fn: () => void) {
+  if (typeof window === "undefined") return;
+  const ric = (window as VentanaIdle).requestIdleCallback;
+  if (typeof ric === "function") ric(() => fn(), { timeout: 1500 });
+  else setTimeout(fn, 200);
+}
 
 /**
  * Clave de `sessionStorage` con la **tarjeta en foco** (`"0"` = Balance,
@@ -72,20 +98,46 @@ function guardarFoco(indice: number) {
 
 interface InicioPanelProps {
   data: DashboardData;
-  /** Primera tanda del historial de la **primera** cuenta, resuelta en el server. */
-  historialInicial: HistorialPagina | null;
+  /**
+   * Primera página del historial de las **2 primeras** cuentas, resuelta en el
+   * server (así Inicio abre con datos y la vecina ya está lista). El resto se
+   * precarga en segundo plano desde el cliente.
+   */
+  historialesIniciales: Record<number, HistorialPagina>;
 }
 
-export function InicioPanel({ data, historialInicial }: InicioPanelProps) {
+export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
   // Solo cuentas reales (las tarjetas sin `id` no tienen historial que mostrar).
   const cuentas = useMemo(
-    () => data.cuentas.filter((c) => c.id != null),
+    () =>
+      data.cuentas.filter(
+        (c): c is DashboardData["cuentas"][number] & { id: number } =>
+          c.id != null
+      ),
     [data.cuentas]
   );
   const [foco, setFoco] = useState(0);
+  /**
+   * Índice más alto cuyos **gráficos** deben estar montados. Crece con el foco (y
+   * en segundo plano) y **nunca decrece**: una vez montado, el gráfico no se
+   * desmonta, así volver a una tarjeta ya vista no vuelve a mostrar el skeleton.
+   */
+  const [montadosHasta, setMontadosHasta] = useState(1);
   const trackRef = useRef<HTMLDivElement | null>(null);
   /** ¿Ya se intentó restaurar la tarjeta guardada? (una sola vez por montaje). */
   const restauradoRef = useRef(false);
+  /**
+   * Cuenta en foco, en un **ref**: la precarga no debe pedir la cuenta que el
+   * listado ya está pidiendo por su cuenta (evita el pedido duplicado). Se
+   * actualiza en el ref callback y en el scroll, no en el render.
+   */
+  const focoIdRef = useRef<number | null>(null);
+  /**
+   * ¿Ya manda la caché de primeras páginas? Antes de hidratar se leen las props
+   * del server (evita desajuste de hidratación); después manda solo la caché, así
+   * una invalidación por mutación **no** revive la página vieja de las props.
+   */
+  const [listo, setListo] = useState(false);
 
   /**
    * Tarjetas del carrusel: la **0 es el Balance Actual** (siempre la primera, la
@@ -95,6 +147,94 @@ export function InicioPanel({ data, historialInicial }: InicioPanelProps) {
   const indice = Math.min(foco, Math.max(0, totalTarjetas - 1));
   /** Cuenta en foco (`undefined` cuando la tarjeta en foco es la del balance). */
   const cuenta = indice === 0 ? undefined : cuentas[indice - 1];
+
+  /** Re-render cuando cambia la caché de primeras páginas (precarga, fetch...). */
+  const [, bump] = useState(0);
+  useEffect(() => suscribirHistoriales(() => bump((n) => n + 1)), []);
+
+  /**
+   * Siembra la caché con las páginas que resolvió el server y enciende `listo`
+   * (a partir de ahí la caché es la única fuente). Va diferido con `setTimeout`
+   * para mantener los `setState` fuera del cuerpo del efecto
+   * (`react-hooks/set-state-in-effect`, §114).
+   */
+  useEffect(() => {
+    const t = setTimeout(() => {
+      for (const [id, pagina] of Object.entries(historialesIniciales)) {
+        guardarPrimeraPagina(Number(id), pagina);
+      }
+      setListo(true);
+    }, 0);
+    return () => clearTimeout(t);
+  }, [historialesIniciales]);
+
+  /**
+   * Clave de la última precarga disparada: evita repetirla cuando el efecto
+   * vuelve a correr con el mismo conjunto de cuentas (el doble montaje de
+   * `StrictMode` en dev haría 2 llamadas idénticas).
+   */
+  const precargaClaveRef = useRef<string | null>(null);
+
+  /**
+   * Precarga en segundo plano la 1ª página de las cuentas que **falten**: ni las
+   * 2 que ya sembró el server (`historialesIniciales`), ni la que está en foco
+   * (el listado la pide por su cuenta), ni las que ya estén en caché. Todo en
+   * **una sola** llamada, así el 3er swipe y siguientes abren con datos.
+   */
+  useEffect(() => {
+    const faltantes = cuentas
+      .map((c) => c.id)
+      .filter(
+        (id): id is number =>
+          id != null &&
+          id !== focoIdRef.current &&
+          historialesIniciales[id] == null &&
+          !leerPrimeraPagina(id)
+      );
+    if (faltantes.length === 0) return;
+    const clave = faltantes.join(",");
+    if (precargaClaveRef.current === clave) return;
+    precargaClaveRef.current = clave;
+    let cancelado = false;
+    alIdle(() => {
+      void (async () => {
+        try {
+          const paginas = await getHistorialesPrimerasPaginasAction(
+            faltantes,
+            PRIMERA_PAGINA_FILAS
+          );
+          if (cancelado) return;
+          for (const [id, pagina] of Object.entries(paginas)) {
+            guardarPrimeraPagina(Number(id), pagina);
+          }
+        } catch {
+          // Falla la precarga: se libera la clave para reintentar y el listado
+          // pedirá su primera página al enfocarse.
+          precargaClaveRef.current = null;
+        }
+      })();
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [cuentas, historialesIniciales]);
+
+  /**
+   * Premontaje perezoso del resto de los gráficos, de a uno por vez y en tiempo
+   * libre. Con `montadosHasta` como dependencia, cada ciclo avanza uno más.
+   */
+  useEffect(() => {
+    if (montadosHasta >= totalTarjetas - 1) return;
+    let cancelado = false;
+    alIdle(() => {
+      if (!cancelado) {
+        setMontadosHasta((v) => Math.min(v + 1, totalTarjetas - 1));
+      }
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [montadosHasta, totalTarjetas]);
 
   /**
    * Ref del track del carrusel: guarda el nodo **y restaura la tarjeta en foco**
@@ -109,11 +249,13 @@ export function InicioPanel({ data, historialInicial }: InicioPanelProps) {
       if (!node || restauradoRef.current) return;
       restauradoRef.current = true;
       const i = Math.min(leerFocoGuardado(), totalTarjetas - 1);
+      focoIdRef.current = i === 0 ? null : cuentas[i - 1]?.id ?? null;
       if (i <= 0) return;
       node.scrollLeft = i * node.clientWidth;
       setFoco(i);
+      setMontadosHasta((v) => Math.max(v, i + 1));
     },
-    [totalTarjetas]
+    [totalTarjetas, cuentas]
   );
 
   /**
@@ -128,8 +270,10 @@ export function InicioPanel({ data, historialInicial }: InicioPanelProps) {
       0,
       Math.min(totalTarjetas - 1, Math.round(el.scrollLeft / paso))
     );
+    focoIdRef.current = i === 0 ? null : cuentas[i - 1]?.id ?? null;
     if (i === foco) return;
     setFoco(i);
+    setMontadosHasta((v) => Math.max(v, i + 1));
     guardarFoco(i);
   };
 
@@ -174,7 +318,7 @@ export function InicioPanel({ data, historialInicial }: InicioPanelProps) {
             esBalance
             evolucion={data.evolucionResultados}
             monedaISO={data.monedaPredeterminadaISO}
-            conGrafico={indice <= 1}
+            conGrafico
           />
           {cuentas.map((c, i) => {
             const idx = i + 1;
@@ -190,7 +334,7 @@ export function InicioPanel({ data, historialInicial }: InicioPanelProps) {
                 }))}
                 monedaISO={c.monedaISO ?? data.monedaPredeterminadaISO}
                 cuentaId={c.id ?? undefined}
-                conGrafico={Math.abs(idx - indice) <= 1}
+                conGrafico={idx <= montadosHasta}
               />
             );
           })}
@@ -238,7 +382,9 @@ export function InicioPanel({ data, historialInicial }: InicioPanelProps) {
               monedaISO: cuenta.monedaISO ?? data.monedaPredeterminadaISO,
             }}
             primeraPagina={
-              indice === 1 && historialInicial ? historialInicial : PAGINA_VACIA
+              (listo
+                ? leerPrimeraPagina(cuenta.id)
+                : historialesIniciales[cuenta.id]) ?? PAGINA_VACIA
             }
             monedaPredeterminadaISO={data.monedaPredeterminadaISO}
           />

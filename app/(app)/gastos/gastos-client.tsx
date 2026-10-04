@@ -16,6 +16,7 @@ import { getGastosPaginaAction } from "@/backend/src/actions/gastos-pagina";
 import { eliminarGasto } from "@/backend/src/actions/gastos";
 import type { GastoOut, GastosPagina } from "@/backend/src/queries/gastos";
 import { cn, dateTimeToString, numberToCurrency } from "@/lib/utils";
+import { invalidarHistoriales } from "@/lib/historial-cuentas";
 import { useTap } from "@/lib/tap";
 import { GastoRow } from "./gasto-row";
 
@@ -213,6 +214,9 @@ export function GastosClient({
       setRows((prev) => prev.filter((g) => g.id !== id));
       setTotal((t) => Math.max(0, t - 1));
       setPendiente(null);
+      // El gasto revertido tocó saldos de cuentas: descarta la 1ª página cacheada
+      // del carrusel de Inicio (no se conoce la cuenta acá ⇒ se invalidan todas).
+      invalidarHistoriales();
       // Los saldos de las cuentas cambiaron: refresca los datos del server.
       router.refresh();
     } catch (err) {

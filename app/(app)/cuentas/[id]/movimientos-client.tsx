@@ -18,6 +18,7 @@ import type {
   HistorialMovimientoOut,
   HistorialPagina,
 } from "@/backend/src/queries/movimientos";
+import { invalidarHistoriales, guardarPrimeraPagina } from "@/lib/historial-cuentas";
 import { cn, dateTimeToString, numberToCurrency } from "@/lib/utils";
 import { MovimientoRow } from "./movimiento-row";
 
@@ -113,6 +114,9 @@ export function MovimientosCuentaClient({
         prev.length === offset ? [...prev, ...pagina.rows] : prev
       );
       setHayMas(pagina.hayMas);
+      // La semilla venía vacía ⇒ esta ES la primera página: se deja cacheada
+      // (la comparte el carrusel de Inicio) para no volver a pedirla.
+      if (offset === 0) guardarPrimeraPagina(cuenta.id, pagina);
     } catch {
       toast.error("No se pudieron cargar más movimientos");
     } finally {
@@ -168,6 +172,13 @@ export function MovimientosCuentaClient({
       );
       setRows(pagina.rows);
       setHayMas(pagina.hayMas);
+      // Refresca la 1ª página cacheada (puede haber cargado más de `PAGE` filas:
+      // se recorta a la página 1; `hayMas` es si queda algo más allá de ella).
+      guardarPrimeraPagina(cuenta.id, {
+        rows: pagina.rows.slice(0, PAGE),
+        total: pagina.total,
+        hayMas: pagina.total > PAGE,
+      });
     } catch {
       /* si falla, se mantiene lo que ya estaba en pantalla */
     }
@@ -180,6 +191,9 @@ export function MovimientosCuentaClient({
       await anularMovimiento(pendingAnular.id);
       toast.success("Movimiento eliminado correctamente");
       setPendingAnular(null);
+      // La cuenta cambió: se descarta su 1ª página cacheada (el `recargar` de
+      // abajo la vuelve a dejar al día).
+      invalidarHistoriales([cuenta.id]);
       await recargar();
       // Los saldos de la cuenta cambiaron: refresca el server (dashboard).
       router.refresh();

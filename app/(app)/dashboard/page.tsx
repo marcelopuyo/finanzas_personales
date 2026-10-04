@@ -1,5 +1,9 @@
 import { redirect } from "next/navigation";
-import { getHistorialMovimientosCuentaPaginado } from "@/backend/src/queries/movimientos";
+import {
+  getHistorialMovimientosCuentaPaginado,
+  type HistorialPagina,
+} from "@/backend/src/queries/movimientos";
+import { PRIMERA_PAGINA_FILAS } from "@/lib/historial-cuentas";
 import { fetchDashboardData } from "./dashboard-data";
 import { DashboardScrollKeeper } from "./components/dashboard-scroll-keeper";
 import { InicioPanel } from "./components/inicio-panel";
@@ -25,8 +29,8 @@ const PANEL_A_RUTA: Record<string, string> = {
   prestamos: "/dashboard/prestamos",
 };
 
-/** Filas de la primera tanda del historial de la cuenta en foco. */
-const PRIMERA_PAGINA = 20;
+/** Cuántas cuentas traen su primera página resuelta en el server. */
+const CUENTAS_SEMILLA = 2;
 
 export default async function DashboardPage({
   searchParams,
@@ -57,22 +61,25 @@ export default async function DashboardPage({
     );
   }
 
-  // El historial de la **primera cuenta** se resuelve en el server (así Inicio abre
-  // con datos); el de las demás se pide al deslizar el carrusel.
-  const cuentaInicial = data.cuentas.find((c) => c.id != null);
-  const historialInicial =
-    cuentaInicial?.id != null
-      ? await getHistorialMovimientosCuentaPaginado(cuentaInicial.id, {
-          offset: 0,
-          limit: PRIMERA_PAGINA,
-        })
-      : null;
+  // Las **2 primeras cuentas** traen su primera página resuelta en el server (así
+  // Inicio abre con datos y la vecina ya está lista). El resto se precarga en
+  // segundo plano desde el cliente, en **una sola** llamada.
+  const cuentasConId = data.cuentas.filter((c) => c.id != null);
+  const historialesIniciales: Record<number, HistorialPagina> = {};
+  await Promise.all(
+    cuentasConId.slice(0, CUENTAS_SEMILLA).map(async (c) => {
+      historialesIniciales[c.id!] = await getHistorialMovimientosCuentaPaginado(
+        c.id!,
+        { offset: 0, limit: PRIMERA_PAGINA_FILAS }
+      );
+    })
+  );
 
   return (
     <>
       {/* Restaura el scroll del `<main>` al volver de un CRUD. */}
       <DashboardScrollKeeper panel={panel} />
-      <InicioPanel data={data} historialInicial={historialInicial} />
+      <InicioPanel data={data} historialesIniciales={historialesIniciales} />
     </>
   );
 }

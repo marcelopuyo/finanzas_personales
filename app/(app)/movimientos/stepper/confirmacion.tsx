@@ -36,6 +36,7 @@ import {
 import { useUltimoDictado } from "@/components/voz/dictado-pantalla";
 import { useVoz } from "@/components/voz/voz-provider";
 import { correccionesDeDictado } from "@/lib/voz/vocabulario";
+import { invalidarHistoriales } from "@/lib/historial-cuentas";
 
 export function Confirmacion() {
   const { data, navigateTo, resetData, options, direct, volverA } =
@@ -317,6 +318,14 @@ export function Confirmacion() {
         }
       }
       toast.success("Movimiento guardado correctamente");
+      // El movimiento pudo cambiar los saldos/movimientos de una o dos cuentas:
+      // se descarta su 1ª página cacheada (la del carrusel de Inicio) para que se
+      // vuelva a pedir. Sin esto, al volver a Inicio la caché quedaría vieja.
+      invalidarHistoriales(
+        [data.cuentaOrigen, data.cuentaDestino, data.cuentaPropina].filter(
+          (id): id is number => typeof id === "number" && id > 0
+        )
+      );
       // **Vía B** (aprender la corrección) — movida acá el 2026-09-24: se aprende
       // **al guardar con éxito**, no al tocar Siguiente. Si el guardado falla, no
       // se aprende nada. Compara lo que la voz había llenado contra lo que quedó

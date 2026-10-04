@@ -10,6 +10,8 @@
 // invalidación la decide el `buildId` del deploy (`lib/version.ts` +
 // `/version.json`, ver `sincronizarBuild()` en `public/sw.js`).
 
+import { invalidarHistoriales } from "./historial-cuentas";
+
 /** Ruta del service worker. Va en la raíz para poder controlar todo el sitio. */
 export const PWA_SW_URL = "/sw.js";
 
@@ -58,6 +60,9 @@ export function isIOS(): boolean {
  */
 export async function clearAllCaches(): Promise<void> {
   if (typeof window === "undefined") return;
+  // Caché en memoria de la 1ª página por cuenta (no pasa por el SW): se vacía
+  // acá también para que un logout no deje datos del usuario en la pestaña.
+  invalidarHistoriales();
   try {
     if (typeof caches !== "undefined") {
       const keys = await caches.keys();

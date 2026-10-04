@@ -29,9 +29,9 @@ import {
  * (**Cuentas** → `/cruds/cuentas?origen=dashboard`). Son círculos
  * **semitransparentes** y más chicos que el FAB, como pidió el usuario.
  *
- * ⚠️ El gráfico **no** se monta siempre: el carrusel lo monta solo en el **foco ± 1**
- * (`conGrafico`), para no tener N Recharts vivos. Cuando no corresponde, se reserva
- * el alto con un `Skeleton`.
+ * ⚠️ El gráfico **no** se monta siempre: el carrusel lo monta al acercarse el foco
+ * y lo **deja montado** (`conGrafico`; una vez montado no se desmonta). Mientras
+ * no corresponde, se reserva el alto con un `Skeleton`.
  */
 interface CuentaSlideProps {
   /** Nombre de la cuenta o `"Balance Actual"`. */

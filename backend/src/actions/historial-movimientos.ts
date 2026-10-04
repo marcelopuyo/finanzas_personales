@@ -1,6 +1,9 @@
 "use server";
 
-import { getHistorialMovimientosCuentaPaginado } from "../queries/movimientos";
+import {
+  getHistorialMovimientosCuentaPaginado,
+  type HistorialPagina,
+} from "../queries/movimientos";
 
 /**
  * Server Action de LECTURA: una **tanda** del historial cronológico de
@@ -17,4 +20,25 @@ export async function getHistorialMovimientosCuentaPaginaAction(
   limit: number
 ) {
   return getHistorialMovimientosCuentaPaginado(cuentaId, { offset, limit });
+}
+
+/**
+ * La **primera página** (offset 0) de VARIAS cuentas de una vez. La usa el
+ * carrusel de Inicio para precargar en segundo plano el historial de las cuentas
+ * restantes en **una sola** ida al server, en vez de N llamadas.
+ */
+export async function getHistorialesPrimerasPaginasAction(
+  cuentaIds: number[],
+  limit: number
+): Promise<Record<number, HistorialPagina>> {
+  const resultado: Record<number, HistorialPagina> = {};
+  await Promise.all(
+    cuentaIds.map(async (id) => {
+      resultado[id] = await getHistorialMovimientosCuentaPaginado(id, {
+        offset: 0,
+        limit,
+      });
+    })
+  );
+  return resultado;
 }
