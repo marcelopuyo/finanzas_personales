@@ -371,3 +371,26 @@ html.fp-inicio-scrolled .topbar-inicio {
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   iOS — EVITAR EL ZOOM AUTOMÁTICO AL ENFOCAR UN CAMPO (2026-10-05)
+
+   Al enfocar un campo de formulario cuyo texto mide **menos de 16px**, iOS
+   Safari hace un **zoom automático** (≈ `16 / font-size`, p. ej. ~1.15 con 14px)
+   **aunque** el viewport declare `maximum-scale=1, user-scalable=no` (iOS lo
+   ignora para este caso). En la **PWA instalada** el zoom **no siempre se
+   revierte** al cerrar el teclado ⇒ el `visualViewport.scale` quedaba en ~1.15
+   y la barra inferior se veía **despegada del borde hasta reiniciar la app**
+   (diagnóstico §221: `?diag=1` mostraba `scale 1.15`).
+
+   Con **16px** en los controles, iOS no zoomea y el problema desaparece de raíz.
+   Solo en punteros "coarse" (celular/tablet): el escritorio no cambia.
+   ⚠️ Si se baja de 16px, el bug vuelve.
+   ───────────────────────────────────────────────────────────────────────── */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
