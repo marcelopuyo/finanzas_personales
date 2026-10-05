@@ -19,7 +19,12 @@
  */
 
 /** Interruptor general de la feature (ver «cómo deshacerlo» arriba). */
-export const ZOOM_ACTIVO = true;
+// ⚠️ PRUEBA 2026-10-05 (§221): APAGADO para ver si el bloqueo del pinch +
+// `maximum-scale=1` son los que dejan el viewport "trabado" tras el teclado en la
+// PWA de iOS (la barra inferior quedaba despegada y solo se arreglaba reiniciando).
+// Si la prueba confirma que el problema desaparece, la feature se rediseña; si NO,
+// se vuelve a poner `true` (y el bug es de iOS, no nuestro).
+export const ZOOM_ACTIVO = false;
 
 export const ZOOM_MIN = 0.8;
 export const ZOOM_MAX = 2;
