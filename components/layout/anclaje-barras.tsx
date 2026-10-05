@@ -95,6 +95,66 @@ export function AnclajeBarras() {
     };
 
     /**
+     * 🔑 **Franja de la app instalada** (bug de iOS, WebKit 317749).
+     *
+     * En la PWA instalada, tras usar el teclado el *layout viewport* de iOS queda
+     * **más corto que la pantalla y no se recupera** (probado en el celular:
+     * ninguna de las salidas conocidas —re-medir, ciclo de teclado, recargar— lo
+     * devuelve; sólo reiniciar la app). Medido: en una pantalla de 812 px el área
+     * útil queda en 660 (`100dvh` / `100svh`), pero **`100lvh` sigue sabiendo el
+     * alto real** (706).
+     *
+     * Esa franja la pinta el **fondo del documento**, no un elemento nuestro: el
+     * faldón de la barra (`bg-sidebar`) y el contenido **no** se ven ahí. Se
+     * comprobó en el celular pintando el fondo de magenta: la franja se pinta,
+     * el contenido no (o sea que la franja está fuera del layout, pero dentro del
+     * área que el motor pinta).
+     *
+     * Como no se puede poner contenido ahí, se pinta la franja **con el color de
+     * la barra**: el conjunto se lee como una sola barra pegada al borde.
+     *
+     * La reserva se mide en CSS puro (`100lvh - 100svh`) y sólo en la PWA
+     * instalada: en Safari el navegador reserva su propia barra a propósito, y ahí
+     * la franja no existe. Sano = 0 ⇒ no se pinta nada (comportamiento de siempre).
+     */
+    const COLOR_FRANJA =
+      "color-mix(in srgb, var(--sidebar) 78%, var(--background))";
+    const esInstalada = () =>
+      window.matchMedia("(display-mode: standalone)").matches;
+    /** Alto de una caja de prueba (fuerza una lectura de layout por llamada). */
+    const medirPx = (css: string) => {
+      const d = document.createElement("div");
+      d.style.cssText = `position:fixed;top:0;left:0;visibility:hidden;${css}`;
+      document.body.appendChild(d);
+      const h = Math.round(d.getBoundingClientRect().height);
+      d.remove();
+      return h;
+    };
+    let reservaCache = 0;
+    let reservaMedidaEn = 0;
+    /** Espacio que el motor reserva y no usa (`100lvh - 100svh`). Cacheado 1 s. */
+    const reserva = () => {
+      const ahora = Date.now();
+      if (ahora - reservaMedidaEn > 1000) {
+        reservaMedidaEn = ahora;
+        reservaCache = esInstalada()
+          ? medirPx("width:0;height:100lvh") - medirPx("width:0;height:100svh")
+          : 0;
+      }
+      return reservaCache;
+    };
+    let franjaPintada = false;
+    const pintarFranja = (activo: boolean) => {
+      if (activo === franjaPintada) return;
+      franjaPintada = activo;
+      const color = activo ? COLOR_FRANJA : "";
+      raiz.style.background = color;
+      document.body.style.background = color;
+    };
+    /** Pinta o despinta la franja según lo que el motor reserve hoy. */
+    const ajustarFranja = () => pintarFranja(reserva() > 4);
+
+    /**
      * **Modo “zoom nativo”** (best effort; §221). iOS **no** expone ninguna API para
      * volver a `scale = 1` (es de sólo lectura) y, mientras la app mantiene el
      * bloqueo de gestos (§219), el usuario **no puede pellizcar para salir**.
@@ -134,6 +194,10 @@ export function AnclajeBarras() {
       const escala = vv?.scale ?? 1;
       const nav = document.querySelector<HTMLElement>("[data-barra-nav]");
       const top = document.querySelector<HTMLElement>("[data-topbar]");
+
+      // La franja la pinta el fondo del documento: se ajusta siempre, también con
+      // zoom nativo (no depende de medir la barra).
+      ajustarFranja();
 
       /**
        * ⚠️ Con **zoom nativo** (`scale ≠ 1`) no se corrige: las coordenadas del
@@ -256,6 +320,7 @@ export function AnclajeBarras() {
     return () => {
       for (const t of timers) window.clearTimeout(t);
       window.clearInterval(vigilante);
+      pintarFranja(false);
       window.removeEventListener("resize", programar);
       window.removeEventListener("scroll", programar);
       window.removeEventListener("pageshow", programar);

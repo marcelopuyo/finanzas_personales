@@ -50,8 +50,6 @@ export function DiagBarras() {
   const [copiado, setCopiado] = useState(false);
   /** Versión/commit publicada (`/version.json`), para saber qué build corre. */
   const [version, setVersion] = useState("?");
-  /** ¿Está puesto el fondo magenta de prueba? (ver `pintarFondo`). */
-  const [pintado, setPintado] = useState(false);
   /**
    * Cronología de eventos (`focusin`, `focusout`, `resize`…). Es lo que dice
    * **en qué momento exacto** se pierde la altura: si baja al enfocar y no vuelve
@@ -249,6 +247,10 @@ export function DiagBarras() {
         ["vv.w x vv.h", vv ? `${Math.round(vv.width)} x ${Math.round(vv.height)}` : "sin visualViewport"],
         ["100vh / 100dvh", `${medirAlto("width:0;height:100vh")} / ${medirAlto("width:0;height:100dvh")}`],
         ["100svh / 100lvh", `${medirAlto("width:0;height:100svh")} / ${medirAlto("width:0;height:100lvh")}`],
+        [
+          "reserva (100lvh - 100svh)",
+          `${medirAlto("width:0;height:100lvh") - medirAlto("width:0;height:100svh")}`,
+        ],
         ["caja fixed inset:0", `${medirAlto("inset:0")}`],
         ["html scrollH / body scrollH", `${raiz.scrollHeight} / ${document.body.scrollHeight}`],
         ["hueco abajo (screen - innerH)", `${window.screen.height - window.innerHeight}`],
@@ -421,64 +423,94 @@ export function DiagBarras() {
         n.style.height = h;
       },
     ],
-    [
-      // El re-medido tiene que hacerse sobre un elemento de ALTO DE PANTALLA
-      // COMPLETA: WebKit recalcula el viewport a partir de ese hijo. Hacerlo sobre
-      // la barra (lo que hacíamos) no alcanza. Es el workaround documentado.
-      "re-medir shell",
-      () => {
-        const s = document.querySelector<HTMLElement>("[data-app-shell]");
-        if (!s) return;
-        const m = document.querySelector<HTMLElement>("main");
-        const scroll = m?.scrollTop ?? 0;
-        const previo = s.style.display;
-        s.style.display = "none";
-        void s.offsetHeight;
-        s.style.display = previo;
-        void s.offsetHeight;
-        if (m) m.scrollTop = scroll;
-      },
-    ],
-    [
-      // Variante sin tocar la app: una sonda propia de alto completo que se saca
-      // y se vuelve a poner. Si esto alcanza, es la versión más segura del arreglo.
-      "re-medir sonda dvh",
-      () => {
-        const d = document.createElement("div");
-        d.style.cssText =
-          "position:fixed;top:0;left:0;width:0;height:100dvh;visibility:hidden";
-        document.body.appendChild(d);
-        d.style.display = "none";
-        void d.offsetHeight;
-        d.style.display = "";
-        void d.offsetHeight;
-        d.remove();
-      },
-    ],
   ];
 
   /**
-   * “Ciclo de teclado”: según el reporte de WebKit, abrir y cerrar un teclado
-   * **dentro de la página** es lo único que devuelve el viewport trabado a su
-   * tamaño. El campo sintético se enfoca acá mismo, dentro del toque, porque iOS
-   * sólo abre el teclado si el `focus()` viene de un gesto del usuario.
+   * Prueba **temporal**: aplica un cambio, deja ver el resultado 6 s y lo deshace
+   * sola. Es para mirar, no para arreglar: así no se puede quedar trabada.
    */
-  const cicloTeclado = () => {
+  const probarTemporal = (
+    nombre: string,
+    aplicar: () => void,
+    deshacer: () => void
+  ) => {
     const antes = linea();
-    const i = document.createElement("input");
-    i.setAttribute("type", "text");
-    // 16px: con menos, iOS zoomea la página al enfocar.
-    i.style.cssText =
-      "position:fixed;top:50%;left:50%;width:1px;height:1px;opacity:0;font-size:16px";
-    document.body.appendChild(i);
-    i.focus();
+    try {
+      aplicar();
+    } catch (e) {
+      setLog((l) => [`${nombre}: ERROR ${String(e)}`, ...l].slice(0, 14));
+      return;
+    }
     window.setTimeout(() => {
-      i.blur();
-      i.remove();
+      const durante = linea();
+      deshacer();
       window.setTimeout(() => {
-        setLog((l) => [`ciclo de teclado: ${antes} → ${linea()}`, ...l].slice(0, 14));
-      }, 600);
-    }, 800);
+        setLog((l) =>
+          [`${nombre}: ${antes} → ${durante} → ${linea()}`, ...l].slice(0, 14)
+        );
+      }, 500);
+    }, 6000);
+  };
+
+  /**
+   * ¿Se puede pintar **contenido** en la franja? Una franja verde fija, 46 px más
+   * abajo del borde del layout (`bottom: 100dvh - 100lvh`). Si se ve verde al pie
+   * de la pantalla, se puede mover la barra ahí; si no se ve, la franja sólo
+   * admite el fondo del documento (y ahí la solución es pintarla del color de la
+   * barra).
+   */
+  const franjaVerde = () => {
+    const d = document.createElement("div");
+    d.style.cssText = [
+      "position:fixed",
+      "left:0",
+      "right:0",
+      "height:46px",
+      "bottom:calc(100dvh - 100lvh)",
+      "background:#00ff00",
+      "z-index:9999",
+      "pointer-events:none",
+    ].join(";");
+    probarTemporal(
+      "franja verde abajo (6s)",
+      () => document.body.appendChild(d),
+      () => d.remove()
+    );
+  };
+
+  /** Mueve la barra de verdad a la franja (inline, 6 s) para ver cómo quedaría. */
+  const barraAbajo = () => {
+    const n = nav();
+    if (!n) return;
+    probarTemporal(
+      "barra abajo (6s)",
+      () => {
+        n.style.bottom = "calc(100dvh - 100lvh)";
+      },
+      () => {
+        n.style.bottom = "";
+      }
+    );
+  };
+
+  /**
+   * ¿La barra sigue al *shell*? Si el shell es el bloque contenedor de los `fixed`
+   * (algo arriba puede crearlo con un `transform` o un `contain`), estirar el shell
+   * al alto real (`100lvh`) baja la barra **sola** hasta el borde: sería el arreglo
+   * exacto, sin pintar nada.
+   */
+  const shellAltoReal = () => {
+    const s = document.querySelector<HTMLElement>("[data-app-shell]");
+    if (!s) return;
+    probarTemporal(
+      "shell alto 100lvh (6s)",
+      () => {
+        s.style.height = "100lvh";
+      },
+      () => {
+        s.style.height = "";
+      }
+    );
   };
 
   const copiar = () => {
@@ -514,18 +546,6 @@ export function DiagBarras() {
       /* modo privado */
     }
     setVisible(false);
-  };
-
-  /**
-   * Prueba clave para decidir si hay algo que arreglar por CSS: pinta de magenta
-   * `<html>` y `<body>`. Si la franja de abajo **también** se pone magenta, esa
-   * zona es nuestra y se puede cubrir; si la franja **queda igual**, el recorte lo
-   * hizo la app instalada (fuera del alcance del CSS).
-   */
-  const pintarFondo = (on: boolean) => {
-    document.documentElement.style.background = on ? "#ff00ff" : "";
-    document.body.style.background = on ? "#ff00ff" : "";
-    setPintado(on);
   };
 
   /** Último valor medido de una fila, por nombre. */
@@ -631,24 +651,24 @@ export function DiagBarras() {
         ))}
         <button
           type="button"
-          onClick={cicloTeclado}
+          onClick={franjaVerde}
           className="rounded border border-danger bg-danger/10 px-1.5 py-1 text-[10px] font-bold text-danger"
         >
-          ciclo de teclado
+          franja verde abajo (6s)
         </button>
         <button
           type="button"
-          onClick={() => pintarFondo(!pintado)}
+          onClick={barraAbajo}
           className="rounded border border-danger bg-danger/10 px-1.5 py-1 text-[10px] font-bold text-danger"
         >
-          {pintado ? "quitar magenta" : "pintar fondo magenta"}
+          barra abajo (6s)
         </button>
         <button
           type="button"
-          onClick={() => window.location.reload()}
+          onClick={shellAltoReal}
           className="rounded border border-danger bg-danger/10 px-1.5 py-1 text-[10px] font-bold text-danger"
         >
-          recargar la app
+          shell alto 100lvh (6s)
         </button>
       </div>
       {logEv.length > 0 && (
