@@ -68,10 +68,6 @@ export function ZoomContenido({ children }: { children: ReactNode }) {
     const distancia = (t: TouchList) =>
       Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
 
-    /** ¿El navegador tiene un **zoom nativo** activo (`visualViewport.scale ≠ 1`)? */
-    const zoomeadoNativo = () =>
-      Math.abs((window.visualViewport?.scale ?? 1) - 1) > 0.01;
-
     /**
      * ⚠️ **iOS ignora `touch-action`** (comprobado en el celular el 2026-10-04:
      * el pinch del navegador escalaba todo, barras incluidas). El único bloqueo que
@@ -79,15 +75,18 @@ export function ZoomContenido({ children }: { children: ReactNode }) {
      * listener se pone **sólo mientras hay 2 dedos** para no castigar el scroll
      * normal con un listener no pasivo permanente.
      *
-     * 🔑 **Si la página ya está zoomeada por el navegador, se DEJA el pellizco**: el
-     * zoom nativo (por el foco de un campo o por doble toque) queda pegado en iOS y,
-     * sin esto, el usuario **no puede deshacerlo** — queda atrapado hasta reiniciar
-     * la app (WebKit bug 325368). Se bloquea sólo en escala 1; ya zoomeado, el
-     * pellizco hacia afuera siempre funciona.
+     * 🔑 Se bloquea **siempre** (no sólo en escala 1). Durante un tiempo esto se
+     * condicionó a que el navegador no estuviera zoomeado —para que el pellizco
+     * sirviera de salida de un zoom nativo pegado—, pero en la PWA instalada iOS
+     * devuelve un `scale` **viejo o inventado** (WebKit 218983; se midió `1.15`
+     * durante días, que es justo `16/14` del zoom automático al enfocar un campo de
+     * 14px): con ese dato la app se creía zoomeada por el navegador y **apagaba su
+     * propio zoom para siempre** — el usuario pellizcaba y no pasaba nada (bug
+     * reportado el 2026-10-05). El zoom de la app es el único que hay: se bloquea el
+     * del navegador acá y se aplica el propio.
      */
     const bloquearPinchNativo = (e: TouchEvent) => {
       if (e.touches.length < 2) return;
-      if (zoomeadoNativo()) return;
       e.preventDefault();
     };
 
@@ -104,9 +103,6 @@ export function ZoomContenido({ children }: { children: ReactNode }) {
 
     const alIniciarToque = (e: TouchEvent) => {
       if (e.touches.length !== 2) return;
-      // Con un zoom nativo activo el pellizco lo maneja el navegador (es la vía de
-      // salida del zoom pegado): no se aplica acá el zoom propio ni se bloquea.
-      if (zoomeadoNativo()) return;
       shell?.addEventListener("touchmove", bloquearPinchNativo, {
         passive: false,
       });
@@ -115,7 +111,6 @@ export function ZoomContenido({ children }: { children: ReactNode }) {
     };
 
     const alMoverToque = (e: TouchEvent) => {
-      if (zoomeadoNativo()) return;
       if (separacion0 === 0 || e.touches.length !== 2) return;
       const d = distancia(e.touches);
       if (d === 0) return;

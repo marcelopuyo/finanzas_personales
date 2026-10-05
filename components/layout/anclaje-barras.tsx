@@ -173,39 +173,17 @@ export function AnclajeBarras() {
     };
 
     /**
-     * **Modo “zoom nativo”** (best effort; §221). iOS **no** expone ninguna API para
-     * volver a `scale = 1` (es de sólo lectura) y, mientras la app mantiene el
-     * bloqueo de gestos (§219), el usuario **no puede pellizcar para salir**.
+     * **Modo “zoom nativo”**: ya **no** existe.
      *
-     * Cuando se detecta `scale ≠ 1` se **relaja** el bloqueo:
-     * - el `<meta viewport>` pasa a `maximum-scale=5, user-scalable=yes` (además de
-     *   forzar a WebKit a re-parsear y re-aplicar la escala inicial), y
-     * - se marca `<html data-gestos-nativos>` para que el CSS devuelva el
-     *   `touch-action` a `auto` en el shell (ver `globals.css`).
-     *
-     * Al volver a `scale = 1` se restaura todo.
+     * Antes, al detectar `visualViewport.scale ≠ 1` (§221) se **relajaba** el
+     * `<meta viewport>` y se devolvía el `touch-action` (`<html data-gestos-nativos>`,
+     * ver `globals.css`) para que el usuario pudiera pellizcar y salir de un zoom
+     * nativo pegado. Se sacó el 2026-10-05 (§228): en la PWA instalada iOS devuelve
+     * un `scale` viejo o inventado (WebKit 218983), así que la app **apagaba su
+     * propio zoom para siempre** (el bug reportado: “el zoom quedó deshabilitado”).
+     * El zoom propio es hoy el único que hay y el pellizco lo maneja él
+     * (`components/layout/zoom-contenido.tsx`).
      */
-    let metaZoomActivo = false;
-    let metaOriginal = "";
-    const modoZoomNativo = (activo: boolean) => {
-      const meta = document.querySelector<HTMLMetaElement>(
-        'meta[name="viewport"]'
-      );
-      if (activo && !metaZoomActivo && meta) {
-        metaOriginal = meta.getAttribute("content") ?? "";
-        meta.setAttribute(
-          "content",
-          "width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes, viewport-fit=cover"
-        );
-        metaZoomActivo = true;
-        raiz.dataset.gestosNativos = "1";
-        window.scrollTo(0, 0);
-      } else if (!activo && metaZoomActivo && meta) {
-        meta.setAttribute("content", metaOriginal);
-        metaZoomActivo = false;
-        delete raiz.dataset.gestosNativos;
-      }
-    };
 
     const revisar = () => {
       const vv = window.visualViewport;
@@ -226,17 +204,12 @@ export function AnclajeBarras() {
        * el `fixed` que el motor haya dejado colgado.
        */
       if (Math.abs(escala - 1) > 0.001) {
-        // Zoom nativo pegado: se libera el bloqueo de gestos (para que el usuario
-        // pueda pellizcar y salir) y, si el motor dejó los `fixed` colgados, se
-        // re-enganchan.
-        modoZoomNativo(true);
+        // Si el motor dejó los `fixed` colgados, se re-enganchan. No se toca el
+        // `<meta viewport>` ni los gestos: el pellizco lo maneja el zoom propio.
         if (nav) reenganchar(nav);
         if (top) reenganchar(top);
         return;
       }
-
-      // De vuelta en escala 1: se restaura el bloqueo de gestos de §219.
-      modoZoomNativo(false);
 
       const altoLayout = window.innerHeight;
 
