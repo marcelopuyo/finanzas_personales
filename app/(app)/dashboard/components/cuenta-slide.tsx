@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Settings2 } from "lucide-react";
 import { AccionCirculo } from "./accion-circulo";
 import { AporteBarra } from "./aporte-barra";
@@ -80,11 +80,36 @@ export function CuentaSlide({
   const prefetch = usePrefetchNav();
   /** Franja del gráfico: sirve para apagar su tooltip al hacer un flick. */
   const franjaRef = useRef<HTMLDivElement | null>(null);
+  /**
+   * Mientras vale `true` el gráfico se monta **sin tooltip** (ver `EvolutionChart`).
+   * Es la parte determinista del arreglo del flick: apagar el estado interno de
+   * Recharts con un `mouseout` no alcanzaba porque iOS emite eventos de mouse
+   * **emulados** después del toque y cualquiera de esos lo vuelve a encender.
+   */
+  const [sinTooltip, setSinTooltip] = useState(false);
+  /** Timer de la ventana sin tooltip (se reinicia en cada gesto rápido). */
+  const finSinTooltipRef = useRef<number | undefined>(undefined);
+  /** Timers de apagado del gráfico (se limpian al desmontar). */
+  const timersRef = useRef<number[]>([]);
+
+  /** Cuánto dura la ventana sin tooltip: cubre el deslizamiento y los emulados. */
+  const VENTANA_SIN_TOOLTIP_MS = 1500;
+
+  useEffect(
+    () => () => {
+      if (finSinTooltipRef.current !== undefined) {
+        window.clearTimeout(finSinTooltipRef.current);
+      }
+      for (const t of timersRef.current) window.clearTimeout(t);
+    },
+    []
+  );
 
   /**
    * Apaga el tooltip del gráfico. Es el mismo truco que usa
    * `useHideTooltipOnTouch`: Recharts limpia su estado de interacción con el
-   * `mouseout` del `.recharts-wrapper`.
+   * `mouseout` del `.recharts-wrapper` (sirve para que también se vaya el punto
+   * activo de la serie).
    */
   const apagarTooltips = () => {
     const raiz = franjaRef.current;
@@ -95,23 +120,39 @@ export function CuentaSlide({
   };
 
   /**
-   * Flick sobre la franja: **antes** de mover el carrusel hay que apagar el tooltip
-   * y **volver a apagarlo** un par de veces mientras la tarjeta se desliza: iOS
-   * emite eventos de mouse emulados después del `touchend` y cualquiera de esos lo
-   * vuelve a encender (era lo que se veía al hacer el flick, 2026-10-05).
+   * Deja la franja **sin tooltip** un rato: se usa al detectar que el gesto va
+   * rápido (antes de soltar) y al disparar el flick. Al ser un cambio de render y no
+   * un `preventDefault`/`mouseout`, no depende de los tiempos de iOS.
+   */
+  const silenciarTooltip = () => {
+    setSinTooltip(true);
+    if (finSinTooltipRef.current !== undefined) {
+      window.clearTimeout(finSinTooltipRef.current);
+    }
+    finSinTooltipRef.current = window.setTimeout(
+      () => setSinTooltip(false),
+      VENTANA_SIN_TOOLTIP_MS
+    );
+  };
+
+  /**
+   * Flick sobre la franja: se silencia el tooltip (ya se hizo apenas el gesto se
+   * puso rápido, se repite acá por las dudas) y se lo vuelve a apagar a los 200 y
+   * 550 ms, mientras la tarjeta se desliza.
    */
   const alFlickDeLaFranja = (dir: 1 | -1) => {
+    silenciarTooltip();
     apagarTooltips();
-    window.setTimeout(apagarTooltips, 200);
-    window.setTimeout(apagarTooltips, 550);
+    timersRef.current.push(
+      window.setTimeout(apagarTooltips, 200),
+      window.setTimeout(apagarTooltips, 550)
+    );
     alFlick?.(dir);
   };
 
   const flick = useFlickLateral({
     alFlick: alFlickDeLaFranja,
-    // Apenas el gesto viene rápido, se apaga el tooltip: si va a terminar en flick,
-    // no tiene sentido verlo durante el arrastre.
-    alRapido: apagarTooltips,
+    alRapido: silenciarTooltip,
   });
   /**
    * Los gestos de flick se enganchan **sólo en la franja del gráfico**, que es
@@ -173,6 +214,7 @@ export function CuentaSlide({
             sinRecuadro
             minimo
             sinScrollLateral
+            sinTooltip={sinTooltip}
           />
         )}
       </div>

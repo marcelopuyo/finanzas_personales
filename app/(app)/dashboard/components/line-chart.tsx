@@ -52,7 +52,19 @@ interface EvolutionChartProps {
    * usuario (2026-10-03) es que el gesto lateral sobre el gráfico **scrubbee el
    * tooltip en vez de mover el carrusel**. El scroll vertical sigue normal.
    */
-  sinScrollLateral?: boolean;}
+  sinScrollLateral?: boolean;
+  /**
+   * **No montar el tooltip** (`2026-10-05`). Lo usa la franja del gráfico del
+   * carrusel de Inicio **mientras dura un gesto rápido**: si el deslizamiento va a
+   * terminar en flick, el tooltip no tiene por qué verse.
+   *
+   * Es **determinista** a propósito: apagar el estado interno de Recharts con un
+   * `mouseout` sintético no alcanzaba, porque iOS emite eventos de mouse
+   * **emulados** después del toque y cualquiera de esos lo vuelve a encender. Sin el
+   * `<Tooltip>` montado no hay nada que encender.
+   */
+  sinTooltip?: boolean;
+}
 
 export function EvolutionChart({
   title,
@@ -66,7 +78,10 @@ export function EvolutionChart({
   currency,
   encabezado,
   sinRecuadro = false,
-  minimo = false,  sinScrollLateral = false,}: EvolutionChartProps) {
+  minimo = false,
+  sinScrollLateral = false,
+  sinTooltip = false,
+}: EvolutionChartProps) {
   /** Wrapper: con `sinRecuadro` queda transparente (banda de Inicio). */
   const caja = sinRecuadro
     ? className
@@ -170,7 +185,7 @@ export function EvolutionChart({
             axisLine={false}
             tickLine={false}
           />
-          <Tooltip content={<ChartTooltip currency={currency} />} />
+          {!sinTooltip && <Tooltip content={<ChartTooltip currency={currency} />} />}
           {area ? (
             <>
               <defs>
