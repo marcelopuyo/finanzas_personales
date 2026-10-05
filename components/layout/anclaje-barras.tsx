@@ -95,35 +95,38 @@ export function AnclajeBarras() {
     };
 
     /**
-     * **“Sanar” el zoom nativo pegado** (best effort; §221). iOS **no** expone
-     * ninguna API para volver a `scale = 1` (es de sólo lectura). Lo único que
-     * funciona —según las implementaciones de referencia— es **mutar el
-     * `<meta viewport>`**: obliga a WebKit a re-parsear y re-aplicar la escala
-     * inicial; se acompaña con `scrollTo(0,0)` y un reflow. No se ejecuta con un
-     * campo enfocado (ahí el zoom puede ser intencional) y va rate-limited.
+     * **Modo “zoom nativo”** (best effort; §221). iOS **no** expone ninguna API para
+     * volver a `scale = 1` (es de sólo lectura) y, mientras la app mantiene el
+     * bloqueo de gestos (§219), el usuario **no puede pellizcar para salir**.
+     *
+     * Cuando se detecta `scale ≠ 1` se **relaja** el bloqueo:
+     * - el `<meta viewport>` pasa a `maximum-scale=5, user-scalable=yes` (además de
+     *   forzar a WebKit a re-parsear y re-aplicar la escala inicial), y
+     * - se marca `<html data-gestos-nativos>` para que el CSS devuelva el
+     *   `touch-action` a `auto` en el shell (ver `globals.css`).
+     *
+     * Al volver a `scale = 1` se restaura todo.
      */
-    let ultimoSaneo = 0;
-    const sanarZoomNativo = () => {
-      if (editable(document.activeElement)) return;
-      const ahora = Date.now();
-      if (ahora - ultimoSaneo < 1000) return;
-      ultimoSaneo = ahora;
+    let metaZoomActivo = false;
+    let metaOriginal = "";
+    const modoZoomNativo = (activo: boolean) => {
       const meta = document.querySelector<HTMLMetaElement>(
         'meta[name="viewport"]'
       );
-      if (!meta) return;
-      const original = meta.getAttribute("content") ?? "";
-      meta.setAttribute(
-        "content",
-        /maximum-scale=[\d.]+/.test(original)
-          ? original.replace(/maximum-scale=[\d.]+/, "maximum-scale=5")
-          : `${original}, maximum-scale=5`
-      );
-      requestAnimationFrame(() => {
-        meta.setAttribute("content", original);
-        void document.body.offsetHeight;
+      if (activo && !metaZoomActivo && meta) {
+        metaOriginal = meta.getAttribute("content") ?? "";
+        meta.setAttribute(
+          "content",
+          "width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes, viewport-fit=cover"
+        );
+        metaZoomActivo = true;
+        raiz.dataset.gestosNativos = "1";
         window.scrollTo(0, 0);
-      });
+      } else if (!activo && metaZoomActivo && meta) {
+        meta.setAttribute("content", metaOriginal);
+        metaZoomActivo = false;
+        delete raiz.dataset.gestosNativos;
+      }
     };
 
     const revisar = () => {
@@ -141,13 +144,17 @@ export function AnclajeBarras() {
        * el `fixed` que el motor haya dejado colgado.
        */
       if (Math.abs(escala - 1) > 0.001) {
-        // Zoom nativo pegado (iOS no lo revierte solo): se intenta “sanar” y, si el
-        // motor dejó los `fixed` colgados, re-engancharlos.
-        sanarZoomNativo();
+        // Zoom nativo pegado: se libera el bloqueo de gestos (para que el usuario
+        // pueda pellizcar y salir) y, si el motor dejó los `fixed` colgados, se
+        // re-enganchan.
+        modoZoomNativo(true);
         if (nav) reenganchar(nav);
         if (top) reenganchar(top);
         return;
       }
+
+      // De vuelta en escala 1: se restaura el bloqueo de gestos de §219.
+      modoZoomNativo(false);
 
       const altoLayout = window.innerHeight;
       const enfocado = editable(document.activeElement);

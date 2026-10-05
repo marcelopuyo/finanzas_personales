@@ -297,6 +297,14 @@ html[data-zoom="on"] [data-app-shell] {
   touch-action: pan-x pan-y;
 }
 
+/* Zoom NATIVO pegado (§221): mientras iOS tenga la página zoomeada se devuelve el
+   `touch-action` para que el usuario pueda **pellizcar y salir** del zoom (si no,
+   queda atrapado: el bloqueo de §219 le prohíbe el gesto). Lo marca
+   `anclaje-barras.tsx` en `<html data-gestos-nativos>`. */
+html[data-gestos-nativos] [data-app-shell] {
+  touch-action: auto !important;
+}
+
 /* El zoom fraccionario deja 1-3 px de desborde horizontal por redondeo de la
    escala ⇒ aparecía la barra de scroll horizontal del `<main>`, que **roba alto**
    (el contenido "salta" ~15 px). Se recorta: a nivel página nada scrollea en
