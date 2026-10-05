@@ -1,7 +1,6 @@
 import TopBar from "./top-bar";
 import BottomNav from "./bottom-nav";
 import { AnclajeBarras } from "./anclaje-barras";
-import { DiagBarras } from "./diag-barras";
 import { ZoomContenido } from "./zoom-contenido";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { NavProgress } from "@/components/ui/nav-progress";
@@ -75,8 +74,11 @@ export default function AppLayout({
           lo que se ve y las barras “se despegan”. No dibuja nada: publica dos
           variables CSS que consumen la barra de arriba y la de abajo. */}
       <AnclajeBarras />
-      {/* ⚠️ TEMPORAL: panel de diagnóstico con `?diag=1` (ver el archivo). */}
-      <DiagBarras />
+      {/* Panel de diagnóstico de las barras: ⚠️ **queda en el repo pero NO montado**
+          (2026-10-05, al cerrar el caso de la barra despegada en iOS). Para volver a
+          usarlo, montá `<DiagBarras />` acá y abrí la app con `?diag=1` (en la PWA
+          instalada se enciende solo). Ver `components/layout/diag-barras.tsx` y
+          `DeepSeek/bitacora.md` §224-§225. */}
       {/* FAB 🎤 global (2026-09-23, fase G1 del replanteo de la voz). Va FUERA de
           PullToRefresh porque maneja sus propios touch events y no debe disparar
           el gesto de "tirar para actualizar".

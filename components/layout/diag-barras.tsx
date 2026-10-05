@@ -28,8 +28,11 @@ const CLAVE_DIAG = "fp_diag_barras";
  * El panel arranca **minimizado**: se toca para expandir y se puede **copiar todo**
  * al portapapeles.
  *
- * 🔧 **Borrar este archivo y su `<DiagBarras />` en `app-layout.tsx` cuando el bug
- * quede resuelto**: no forma parte de la app.
+ * 🔧 **No está montado** (2026-10-05, al cerrar el caso de la barra despegada en
+ * iOS): se conserva para futuras pruebas. Para usarlo, montá `<DiagBarras />` en
+ * `components/layout/app-layout.tsx` y abrí la app con `?diag=1` (en la PWA
+ * instalada se enciende solo). Grabación, modos y botones: ver `DeepSeek/bitacora.md`
+ * §222-§225.
  */
 export function DiagBarras() {
   const [visible, setVisible] = useState(false);
