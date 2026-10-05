@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Settings2 } from "lucide-react";
 import { AccionCirculo } from "./accion-circulo";
 import { AporteBarra } from "./aporte-barra";
@@ -64,6 +64,25 @@ interface CuentaSlideProps {
    * Ver `use-flick-lateral.ts`.
    */
   alFlick?: (dir: 1 | -1) => void;
+  /**
+   * La **banda entera** está silenciada: ningún gráfico de la banda monta su
+   * tooltip. Ver `inicio-panel.tsx`, que es quien la comanda.
+   */
+  silenciada?: boolean;
+  /**
+   * Avisa al carrusel que hay que **silenciar la banda entera**. Lo dispara
+   * `useFlickLateral` apenas el gesto viene rápido (`alRapido`), al confirmarse el
+   * flick (`alFlick`) y **siempre al soltar** (`alSoltar`, sea flick o un arrastre
+   * lento): sin eso, los `mouse*` **emulados** de iOS volvían a encender el tooltip
+   * y quedaba pegado hasta el toque siguiente. El **toque siguiente** despierta la
+   * banda (ver `inicio-panel.tsx`).
+   *
+   * 🔑 **Por qué la banda y no solo esta tarjeta** (2026-10-05): al hacer flick el
+   * carrusel queda en **otra** tarjeta, y esos `mouseover`/`mousemove` **emulados**
+   * caen **ahí** ⇒ el tooltip aparecía en la tarjeta nueva, que nadie había
+   * silenciado.
+   */
+  alSilenciar?: () => void;
 }
 
 export function CuentaSlide({
@@ -76,30 +95,17 @@ export function CuentaSlide({
   cuentaId,
   conGrafico,
   alFlick,
+  silenciada = false,
+  alSilenciar,
 }: CuentaSlideProps) {
   const prefetch = usePrefetchNav();
   /** Franja del gráfico: sirve para apagar su tooltip al hacer un flick. */
   const franjaRef = useRef<HTMLDivElement | null>(null);
-  /**
-   * Mientras vale `true` el gráfico se monta **sin tooltip** (ver `EvolutionChart`).
-   * Es la parte determinista del arreglo del flick: apagar el estado interno de
-   * Recharts con un `mouseout` no alcanzaba porque iOS emite eventos de mouse
-   * **emulados** después del toque y cualquiera de esos lo vuelve a encender.
-   */
-  const [sinTooltip, setSinTooltip] = useState(false);
-  /** Timer de la ventana sin tooltip (se reinicia en cada gesto rápido). */
-  const finSinTooltipRef = useRef<number | undefined>(undefined);
   /** Timers de apagado del gráfico (se limpian al desmontar). */
   const timersRef = useRef<number[]>([]);
 
-  /** Cuánto dura la ventana sin tooltip: cubre el deslizamiento y los emulados. */
-  const VENTANA_SIN_TOOLTIP_MS = 1500;
-
   useEffect(
     () => () => {
-      if (finSinTooltipRef.current !== undefined) {
-        window.clearTimeout(finSinTooltipRef.current);
-      }
       for (const t of timersRef.current) window.clearTimeout(t);
     },
     []
@@ -120,28 +126,12 @@ export function CuentaSlide({
   };
 
   /**
-   * Deja la franja **sin tooltip** un rato: se usa al detectar que el gesto va
-   * rápido (antes de soltar) y al disparar el flick. Al ser un cambio de render y no
-   * un `preventDefault`/`mouseout`, no depende de los tiempos de iOS.
-   */
-  const silenciarTooltip = () => {
-    setSinTooltip(true);
-    if (finSinTooltipRef.current !== undefined) {
-      window.clearTimeout(finSinTooltipRef.current);
-    }
-    finSinTooltipRef.current = window.setTimeout(
-      () => setSinTooltip(false),
-      VENTANA_SIN_TOOLTIP_MS
-    );
-  };
-
-  /**
-   * Flick sobre la franja: se silencia el tooltip (ya se hizo apenas el gesto se
-   * puso rápido, se repite acá por las dudas) y se lo vuelve a apagar a los 200 y
-   * 550 ms, mientras la tarjeta se desliza.
+   * Flick sobre la franja: se silencia la banda entera (ya se hizo apenas el gesto
+   * se puso rápido, se repite acá por las dudas) y se vuelve a apagar el punto
+   * activo a los 200 y 550 ms, mientras la tarjeta se desliza.
    */
   const alFlickDeLaFranja = (dir: 1 | -1) => {
-    silenciarTooltip();
+    alSilenciar?.();
     apagarTooltips();
     timersRef.current.push(
       window.setTimeout(apagarTooltips, 200),
@@ -152,7 +142,8 @@ export function CuentaSlide({
 
   const flick = useFlickLateral({
     alFlick: alFlickDeLaFranja,
-    alRapido: silenciarTooltip,
+    alRapido: alSilenciar,
+    alSoltar: alSilenciar,
   });
   /**
    * Los gestos de flick se enganchan **sólo en la franja del gráfico**, que es
@@ -214,7 +205,7 @@ export function CuentaSlide({
             sinRecuadro
             minimo
             sinScrollLateral
-            sinTooltip={sinTooltip}
+            sinTooltip={silenciada}
           />
         )}
       </div>

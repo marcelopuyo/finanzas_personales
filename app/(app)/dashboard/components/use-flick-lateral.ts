@@ -31,6 +31,17 @@ interface OpcionesFlick {
    * durante el arrastre (pedido del usuario, 2026-10-05).
    */
   alRapido?: () => void;
+  /**
+   * Se llama **siempre** al soltar (o cancelar) un gesto que empezó en la franja,
+   * sea flick o no.
+   *
+   * 🔑 Es la parte que faltaba (2026-10-05): iOS emite eventos de mouse **emulados**
+   * después del `touchend` y cualquiera de ellos vuelve a encender el tooltip, que
+   * queda **pegado hasta el toque siguiente**. Con esto, la banda queda sin tooltips
+   * apenas se levanta el dedo (y el segundo toque la despierta: ver
+   * `inicio-panel.tsx`), así que tampoco queda pegado un **arrastre lento**.
+   */
+  alSoltar?: () => void;
 }
 
 /**
@@ -42,14 +53,18 @@ interface OpcionesFlick {
  * (2026-10-05) es que un deslizamiento **lento** siga mostrando el tooltip y uno
  * **rápido** pase de tarjeta, como al deslizar en el resto del encabezado.
  *
- * 🔑 **La decisión se toma al soltar**, no al cruzar un umbral en movimiento:
+ * 🔑 **La decisión del flick se toma al soltar**, no al cruzar un umbral en movimiento:
  * mientras el dedo está apoyado el gesto es del gráfico, y recién al soltar se
  * sabe si fue un *scrub* (queda el tooltip) o un *flick* (cambia de tarjeta). La
  * velocidad se mide sobre los **últimos** `VENTANA_MS`, igual que la inercia
  * nativa: un arrastre lento que termina en un latigazo cuenta como flick, y uno
  * rápido que se frena antes de soltar no.
+ *
+ * ⚠️ **Al soltar se avisa siempre** (`alSoltar`), sea flick o no: en iOS, si no, los
+ * eventos de mouse **emulados** que llegan después del `touchend` vuelven a encender
+ * el tooltip y queda **pegado hasta el toque siguiente**. Ver `alSoltar`.
  */
-export function useFlickLateral({ alFlick, alRapido }: OpcionesFlick = {}) {
+export function useFlickLateral({ alFlick, alRapido, alSoltar }: OpcionesFlick = {}) {
   const muestrasRef = useRef<Muestra[]>([]);
   /** ¿Ya se avisó `alRapido` en este gesto? (se llama una sola vez) */
   const avisadoRef = useRef(false);
@@ -85,6 +100,9 @@ export function useFlickLateral({ alFlick, alRapido }: OpcionesFlick = {}) {
     (e: TouchEvent<HTMLElement>) => {
       const muestras = muestrasRef.current;
       muestrasRef.current = [];
+      // Se soltó el dedo: la banda queda sin tooltips (ver `alSoltar`), incluso si el
+      // gesto **no** llega a ser un flick.
+      alSoltar?.();
       if (!alFlick || !esFlick(muestras, e.changedTouches[0])) return;
       const t = e.changedTouches[0];
       const desde = muestras[0];
@@ -102,14 +120,16 @@ export function useFlickLateral({ alFlick, alRapido }: OpcionesFlick = {}) {
         /* listener pasivo */
       }
     },
-    [alFlick]
+    [alFlick, alSoltar]
   );
 
   /** Cancelado (el navegador se quedó con el gesto): no cuenta como flick. */
   const onTouchCancel = useCallback(() => {
     muestrasRef.current = [];
     avisadoRef.current = false;
-  }, []);
+    // También acá: el gesto terminó ⇒ la banda queda sin tooltips.
+    alSoltar?.();
+  }, [alSoltar]);
 
   return { onTouchStart, onTouchMove, onTouchEnd, onTouchCancel };
 }

@@ -55,6 +55,24 @@ const PAGINA_VACIA: HistorialPagina = { rows: [], total: 0, hayMas: true };
 /** Px de scroll a partir de los cuales la top bar se "despega" (translúcida). */
 const UMBRAL_TOPBAR_PX = 8;
 
+/**
+ * Cada cuánto se borra el estado de interacción de Recharts **mientras la banda
+ * está silenciada** (ver `silenciarBanda`, 2026-10-05).
+ */
+const LATIDO_SIN_TOOLTIP_MS = 200;
+
+/**
+ * Cuánto dura ese "latido". 🔑 **El silencio en sí no se levanta solo**: dura hasta
+ * que el usuario vuelve a **tocar** la banda (ver `silenciarBanda`). Esto solo acota
+ * el repaso periódico, que hace falta durante el deslizamiento de la tarjeta, el
+ * **re-afinado** del carrusel (a los 800 ms, ver `irASlide`) y los `mouse*`
+ * **emulados** que iOS emite después de soltar el dedo.
+ */
+const LATIDO_DURACION_MS = 1500;
+
+/** Red de seguridad al volver a la normalidad (ver `volverALaNormalidad`). */
+const RED_SEGURIDAD_MS = 150;
+
 /** `window` con `requestIdleCallback` (no está en todos los navegadores). */
 type VentanaIdle = Window & {
   requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number;
@@ -131,6 +149,13 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
    */
   const [montadosHasta, setMontadosHasta] = useState(1);
   const trackRef = useRef<HTMLDivElement | null>(null);
+  /** **Banda** (hero) del carrusel: contiene los gráficos de **todas** las tarjetas. */
+  const bandaRef = useRef<HTMLDivElement | null>(null);
+  /** ¿La banda está silenciada? (flick en curso o tarjeta deslizándose). */
+  const [bandaSilenciada, setBandaSilenciada] = useState(false);
+  /** Timers del silencio y de su "latido" (se limpian al desmontar). */
+  const finLatidoRef = useRef<number | undefined>(undefined);
+  const latidoSilencioRef = useRef<number | undefined>(undefined);
   /** ¿Ya se intentó restaurar la tarjeta guardada? (una sola vez por montaje). */
   const restauradoRef = useRef(false);
   /**
@@ -384,6 +409,102 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
   );
 
   /**
+   * Apaga el estado de interacción de **todos** los gráficos de la banda (tooltip y
+   * punto activo). Es el `mouseout` sintético sobre el `.recharts-wrapper` que
+   * entiende Recharts (ver `line-chart.tsx` y `use-hide-tooltip-on-touch.ts`).
+   */
+  const apagarTooltipsDeLaBanda = useCallback(() => {
+    const raiz = bandaRef.current;
+    if (!raiz) return;
+    for (const wrapper of raiz.querySelectorAll(".recharts-wrapper")) {
+      wrapper.dispatchEvent(new MouseEvent("mouseout", { bubbles: true }));
+    }
+  }, []);
+
+  /**
+   * **Silencia la banda entera** (2026-10-05). Lo pide cada `CuentaSlide` apenas el
+   * gesto sobre la franja viene rápido, al confirmarse el flick y **siempre al
+   * soltar** (ver `alSilenciar` en `cuenta-slide.tsx`).
+   *
+   * 🔑 Es la banda **entera** y no solo la tarjeta tocada: al hacer flick el carrusel
+   * queda en **otra** tarjeta, y los `mouse*` **emulados** que iOS emite después de
+   * soltar el dedo caen ahí ⇒ el tooltip terminaba apareciendo en la tarjeta nueva,
+   * que nadie había silenciado.
+   *
+   * ⚠️ **El silencio NO se levanta por tiempo** (ese era el agujero que quedaba): al
+   * terminar una ventana corta, el `<Tooltip>` volvía a montarse y **reaparecía
+   * solo**, con el índice activo que Recharts hubiera guardado. Ahora dura hasta que
+   * el usuario **vuelve a tocar la banda** (`volverALaNormalidad`), así que después de
+   * un flick no puede dibujarse ningún tooltip sin una interacción nueva. El
+   * "latido" solo borra el estado de Recharts durante el deslizamiento y los
+   * emulados.
+   */
+  const silenciarBanda = useCallback(() => {
+    setBandaSilenciada(true);
+    if (finLatidoRef.current !== undefined) {
+      window.clearTimeout(finLatidoRef.current);
+    }
+    if (latidoSilencioRef.current === undefined) {
+      latidoSilencioRef.current = window.setInterval(
+        apagarTooltipsDeLaBanda,
+        LATIDO_SIN_TOOLTIP_MS
+      );
+    }
+    finLatidoRef.current = window.setTimeout(() => {
+      if (latidoSilencioRef.current !== undefined) {
+        window.clearInterval(latidoSilencioRef.current);
+        latidoSilencioRef.current = undefined;
+      }
+    }, LATIDO_DURACION_MS);
+  }, [apagarTooltipsDeLaBanda]);
+
+  /**
+   * Devuelve la banda a la normalidad: lo llama el **primer toque nuevo** en la
+   * banda (efecto de abajo). Primero se borra el estado de Recharts y **después** se
+   * vuelve a montar el `<Tooltip>` (al revés, aparecería con el índice viejo); la red
+   * de seguridad cubre un evento emulado que llegue justo en el medio.
+   */
+  const volverALaNormalidad = useCallback(() => {
+    if (latidoSilencioRef.current !== undefined) {
+      window.clearInterval(latidoSilencioRef.current);
+      latidoSilencioRef.current = undefined;
+    }
+    if (finLatidoRef.current !== undefined) {
+      window.clearTimeout(finLatidoRef.current);
+      finLatidoRef.current = undefined;
+    }
+    apagarTooltipsDeLaBanda();
+    setBandaSilenciada(false);
+    window.setTimeout(apagarTooltipsDeLaBanda, RED_SEGURIDAD_MS);
+  }, [apagarTooltipsDeLaBanda]);
+
+  /**
+   * Mientras la banda está silenciada, **el primer toque** la despierta: es el mismo
+   * gesto con el que el usuario va a scrubear, así que el tooltip aparece cuando él
+   * lo pide y nunca antes.
+   */
+  useEffect(() => {
+    if (!bandaSilenciada) return;
+    const raiz = bandaRef.current;
+    if (!raiz) return;
+    const alTocar = () => volverALaNormalidad();
+    raiz.addEventListener("touchstart", alTocar, { capture: true, passive: true });
+    return () => raiz.removeEventListener("touchstart", alTocar, { capture: true });
+  }, [bandaSilenciada, volverALaNormalidad]);
+
+  useEffect(
+    () => () => {
+      if (finLatidoRef.current !== undefined) {
+        window.clearTimeout(finLatidoRef.current);
+      }
+      if (latidoSilencioRef.current !== undefined) {
+        window.clearInterval(latidoSilencioRef.current);
+      }
+    },
+    []
+  );
+
+  /**
    * **Top bar**: marca en el `<html>` si el contenido salió del tope (para que la
    * barra pase de transparente a translúcida — ver `globals.css`). Se escucha el
    * `scroll` del **`<main>` interno** (es quien scrollea; la ventana no) y se llama
@@ -414,6 +535,7 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
     <div className="-mx-4 -mt-[calc(var(--app-top)/var(--fp-zoom,1))] lg:-mx-6">
       {/* ───────── BANDA (hero) ───────── */}
       <div
+        ref={bandaRef}
         data-inicio-hero=""
         className="relative border-b border-border bg-muted"
         style={{ paddingTop: "calc(var(--app-top) / var(--fp-zoom, 1))" }}
@@ -431,6 +553,7 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
             aporte={aportes}
             monedaISO={data.monedaPredeterminadaISO}
             conGrafico
+            silenciada={bandaSilenciada}
           />
           {cuentas.map((c, i) => {
             const idx = i + 1;
@@ -441,6 +564,8 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
                 monto={c.value}
                 esBalance={false}
                 alFlick={desplazarTarjeta}
+                alSilenciar={silenciarBanda}
+                silenciada={bandaSilenciada}
                 evolucion={(c.values ?? []).map((v, k) => ({
                   name: c.labels?.[k] ?? "",
                   value: v,
