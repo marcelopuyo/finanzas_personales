@@ -38,6 +38,17 @@ export function DiagBarras() {
   const [datos, setDatos] = useState<[string, string][]>([]);
   const [log, setLog] = useState<string[]>([]);
   const [copiado, setCopiado] = useState(false);
+  /** Versión/commit publicada (`/version.json`), para saber qué build corre. */
+  const [version, setVersion] = useState("?");
+
+  useEffect(() => {
+    fetch("/version.json", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j: { version?: string; commit?: string }) =>
+        setVersion(`${j.version ?? "?"} ${j.commit ?? ""}`.trim())
+      )
+      .catch(() => {});
+  }, []);
 
   /** `env(safe-area-inset-bottom)` medido con una sonda descartable. */
   const medirSafeArea = () => {
@@ -86,8 +97,15 @@ export function DiagBarras() {
       const rt = top?.getBoundingClientRect();
       const cs = nav ? getComputedStyle(nav) : null;
       const raiz = document.documentElement;
+      const campo = document.querySelector<HTMLElement>(
+        'input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), textarea, select'
+      );
+      const activo = document.activeElement;
       setDatos([
+        ["version", version],
         ["standalone", String(window.matchMedia("(display-mode: standalone)").matches)],
+        ["campo font-size", campo ? getComputedStyle(campo).fontSize : "?"],
+        ["active (tag / font)", activo ? `${activo.tagName} / ${getComputedStyle(activo).fontSize}` : "?"],
         ["innerH / clientH", `${window.innerHeight} / ${raiz.clientHeight}`],
         ["app-shell h / bottom", shell ? `${Math.round(shell.getBoundingClientRect().height)} / ${Math.round(shell.getBoundingClientRect().bottom)}` : "?"],
         ["screen.h / availH", `${window.screen.height} / ${window.screen.availHeight}`],
@@ -122,7 +140,7 @@ export function DiagBarras() {
       window.visualViewport?.removeEventListener("resize", medir);
       window.visualViewport?.removeEventListener("scroll", medir);
     };
-  }, [visible]);
+  }, [visible, version]);
 
   if (!visible) return null;
 
@@ -288,16 +306,14 @@ export function DiagBarras() {
           apagar
         </button>
       </div>
-      <table className="w-full">
-        <tbody>
-          {datos.map(([k, v]) => (
-            <tr key={k}>
-              <td className="w-40 pr-2 text-subtitle">{k}</td>
-              <td className="tabular-nums break-all">{v}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="tabular-nums">
+        {datos.map(([k, v]) => (
+          <div key={k} className="break-all">
+            <span className="text-subtitle">{k}: </span>
+            {v}
+          </div>
+        ))}
+      </div>
       <div className="mt-1 flex flex-wrap gap-1">
         {kicks.map(([nombre, fn]) => (
           <button

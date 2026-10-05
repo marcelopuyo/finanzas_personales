@@ -94,6 +94,38 @@ export function AnclajeBarras() {
       if (!editable(document.activeElement)) window.scrollTo(0, 0);
     };
 
+    /**
+     * **“Sanar” el zoom nativo pegado** (best effort; §221). iOS **no** expone
+     * ninguna API para volver a `scale = 1` (es de sólo lectura). Lo único que
+     * funciona —según las implementaciones de referencia— es **mutar el
+     * `<meta viewport>`**: obliga a WebKit a re-parsear y re-aplicar la escala
+     * inicial; se acompaña con `scrollTo(0,0)` y un reflow. No se ejecuta con un
+     * campo enfocado (ahí el zoom puede ser intencional) y va rate-limited.
+     */
+    let ultimoSaneo = 0;
+    const sanarZoomNativo = () => {
+      if (editable(document.activeElement)) return;
+      const ahora = Date.now();
+      if (ahora - ultimoSaneo < 1000) return;
+      ultimoSaneo = ahora;
+      const meta = document.querySelector<HTMLMetaElement>(
+        'meta[name="viewport"]'
+      );
+      if (!meta) return;
+      const original = meta.getAttribute("content") ?? "";
+      meta.setAttribute(
+        "content",
+        /maximum-scale=[\d.]+/.test(original)
+          ? original.replace(/maximum-scale=[\d.]+/, "maximum-scale=5")
+          : `${original}, maximum-scale=5`
+      );
+      requestAnimationFrame(() => {
+        meta.setAttribute("content", original);
+        void document.body.offsetHeight;
+        window.scrollTo(0, 0);
+      });
+    };
+
     const revisar = () => {
       const vv = window.visualViewport;
       const escala = vv?.scale ?? 1;
@@ -109,6 +141,9 @@ export function AnclajeBarras() {
        * el `fixed` que el motor haya dejado colgado.
        */
       if (Math.abs(escala - 1) > 0.001) {
+        // Zoom nativo pegado (iOS no lo revierte solo): se intenta “sanar” y, si el
+        // motor dejó los `fixed` colgados, re-engancharlos.
+        sanarZoomNativo();
         if (nav) reenganchar(nav);
         if (top) reenganchar(top);
         return;

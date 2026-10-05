@@ -394,3 +394,25 @@ html.fp-inicio-scrolled .topbar-inicio {
   }
 }
 
+/* -------------------------------------------------------------------------
+   iOS — EVITAR EL ZOOM POR DOBLE TOQUE (2026-10-05)
+
+   En iOS, el `touch-action` de un **contenedor** no alcanza para sacar el zoom
+   por doble toque: hay que declararlo en los elementos **CLICABLES** (WebKit bug
+   149854). `manipulation` desactiva el doble-toque-zoom sin bloquear el scroll
+   ni el pellizco.
+   ⚠️ No pisa los casos que necesitan otra cosa: los handles de arrastre usan
+   `touch-none` y los gráficos `touch-action: pan-y` inline (ganan por
+   especificidad).
+   ------------------------------------------------------------------------- */
+a,
+button,
+[role="button"],
+summary,
+label,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+

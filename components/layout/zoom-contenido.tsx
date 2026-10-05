@@ -68,15 +68,27 @@ export function ZoomContenido({ children }: { children: ReactNode }) {
     const distancia = (t: TouchList) =>
       Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
 
+    /** ¿El navegador tiene un **zoom nativo** activo (`visualViewport.scale ≠ 1`)? */
+    const zoomeadoNativo = () =>
+      Math.abs((window.visualViewport?.scale ?? 1) - 1) > 0.01;
+
     /**
      * ⚠️ **iOS ignora `touch-action`** (comprobado en el celular el 2026-10-04:
      * el pinch del navegador escalaba todo, barras incluidas). El único bloqueo que
      * funciona ahí es `preventDefault()` en un `touchmove` **no pasivo**, y ese
      * listener se pone **sólo mientras hay 2 dedos** para no castigar el scroll
      * normal con un listener no pasivo permanente.
+     *
+     * 🔑 **Si la página ya está zoomeada por el navegador, se DEJA el pellizco**: el
+     * zoom nativo (por el foco de un campo o por doble toque) queda pegado en iOS y,
+     * sin esto, el usuario **no puede deshacerlo** — queda atrapado hasta reiniciar
+     * la app (WebKit bug 325368). Se bloquea sólo en escala 1; ya zoomeado, el
+     * pellizco hacia afuera siempre funciona.
      */
     const bloquearPinchNativo = (e: TouchEvent) => {
-      if (e.touches.length >= 2) e.preventDefault();
+      if (e.touches.length < 2) return;
+      if (zoomeadoNativo()) return;
+      e.preventDefault();
     };
 
     /** Zoom previo y separación inicial del pellizco en curso. */
@@ -92,6 +104,9 @@ export function ZoomContenido({ children }: { children: ReactNode }) {
 
     const alIniciarToque = (e: TouchEvent) => {
       if (e.touches.length !== 2) return;
+      // Con un zoom nativo activo el pellizco lo maneja el navegador (es la vía de
+      // salida del zoom pegado): no se aplica acá el zoom propio ni se bloquea.
+      if (zoomeadoNativo()) return;
       shell?.addEventListener("touchmove", bloquearPinchNativo, {
         passive: false,
       });
@@ -100,6 +115,7 @@ export function ZoomContenido({ children }: { children: ReactNode }) {
     };
 
     const alMoverToque = (e: TouchEvent) => {
+      if (zoomeadoNativo()) return;
       if (separacion0 === 0 || e.touches.length !== 2) return;
       const d = distancia(e.touches);
       if (d === 0) return;
