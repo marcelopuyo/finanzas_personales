@@ -16,12 +16,17 @@ const CLAVE_DIAG = "fp_diag_barras";
  * `getBoundingClientRect`) y ofrece **botones de “kick”** para descubrir cuál
  * re-engancha el `fixed` en ese motor.
  *
- * Se abre agregando **`?diag=1`** a cualquier pantalla del área protegida
- * (ej. `https://…/dashboard?diag=1`); desde ahí queda **persistido** en
- * `localStorage` para poder verlo en la **PWA instalada**. **`?diag=0`** lo apaga.
+ * Se abre agregando **`?diag=1`** a cualquier pantalla (ej.
+ * `https://…/dashboard?diag=1`). **`?diag=0`** lo apaga (y lo recuerda).
  *
- * El panel arranca **minimizado como una pestañita al costado** (no tapa la
- * interfaz): se toca para expandir y se puede **copiar todo** al portapapeles.
+ * ⚠️ Por ahora se muestra **solo en la PWA instalada** (standalone): en iOS el
+ * almacenamiento de la PWA está separado del navegador ⇒ el `?diag=1` puesto en
+ * Safari **no llega** a la app del acceso directo (y ahí no hay barra de
+ * direcciones para escribirlo). Con `?diag=1` también se puede abrir en el
+ * navegador; `?diag=0` lo apaga y lo recuerda.
+ *
+ * El panel arranca **minimizado**: se toca para expandir y se puede **copiar todo**
+ * al portapapeles.
  *
  * 🔧 **Borrar este archivo y su `<DiagBarras />` en `app-layout.tsx` cuando el bug
  * quede resuelto**: no forma parte de la app.
@@ -48,30 +53,23 @@ export function DiagBarras() {
   // El `setState` va diferido para no dispararlo dentro del cuerpo del efecto
   // (`react-hooks/set-state-in-effect`, §114).
   //
-  // 🔑 `?diag=1` enciende el panel y lo **persiste** en `localStorage`: así se ve
-  // dentro de la **PWA instalada** (standalone), que es donde aparece el bug y
-  // donde NO hay barra de direcciones. `?diag=0` lo apaga y limpia la clave.
+  // ⚠️ TEMPORAL: se enciende **solo en la PWA instalada** (standalone) —que es
+  // donde aparece el bug y donde no hay barra de direcciones— o con `?diag=1`.
+  // `?diag=0` lo apaga y lo recuerda.
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
-    if (q.has("diag")) {
-      const encender = q.get("diag") !== "0";
-      try {
-        if (encender) window.localStorage.setItem(CLAVE_DIAG, "1");
-        else window.localStorage.removeItem(CLAVE_DIAG);
-      } catch {
-        /* modo privado */
-      }
-      const t = setTimeout(() => setVisible(encender), 0);
-      return () => clearTimeout(t);
-    }
-    let guardado = false;
+    let encender =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      q.get("diag") === "1";
+    if (q.get("diag") === "0") encender = false;
     try {
-      guardado = window.localStorage.getItem(CLAVE_DIAG) === "1";
+      if (encender && window.localStorage.getItem(CLAVE_DIAG) === "0") {
+        encender = false;
+      }
     } catch {
       /* modo privado */
     }
-    if (!guardado) return;
-    const t = setTimeout(() => setVisible(true), 0);
+    const t = setTimeout(() => setVisible(encender), 0);
     return () => clearTimeout(t);
   }, []);
 
@@ -242,7 +240,7 @@ export function DiagBarras() {
 
   const apagar = () => {
     try {
-      window.localStorage.removeItem(CLAVE_DIAG);
+      window.localStorage.setItem(CLAVE_DIAG, "0");
     } catch {
       /* modo privado */
     }
