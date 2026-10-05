@@ -17,6 +17,13 @@ export function etiquetaConteoItems(jornadas: number, tareas: number): string {
   return partes.join(" y ");
 }
 
+/**
+ * "1 ítem" / "3 ítems" (cantidad de ítems = jornadas + tareas de una sección).
+ */
+export function etiquetaCantidadItems(n: number): string {
+  return `${n} ${n === 1 ? "ítem" : "ítems"}`;
+}
+
 /** "dd-mm" de una fecha "YYYY-MM-DD" (se corta el string: nunca se parsea, así
  *  no hay corrimiento de día por zona horaria). */
 export function corta(iso: string): string {

@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import {
   estimarCobros,
+  type BloqueCobro,
   type EstimacionTrabajo,
   type ItemPendienteFuente,
   type LiquidacionCerradaFuente,
@@ -10,6 +11,19 @@ import {
 import { useMontado } from "@/lib/use-cliente";
 import { todayLocalISODate } from "@/lib/utils";
 import type { FechaCobroEstimada } from "./periodos-grid";
+
+/** Monto y **cantidad de ítems** (jornadas + tareas) de una sección del resumen. */
+export interface ResumenVentana {
+  monto: number;
+  items: number;
+}
+
+/** Suma un bloque al resumen de su sección (los bloques nulos no existen). */
+function sumarBloque(acc: ResumenVentana, b: BloqueCobro | null): void {
+  if (!b) return;
+  acc.monto += b.monto;
+  acc.items += b.jornadas + b.tareas;
+}
 
 /**
  * **Ventanas de cobro por trabajo**, calculadas con la fecha **LOCAL** del
@@ -25,8 +39,8 @@ import type { FechaCobroEstimada } from "./periodos-grid";
  * la del server.
  *
  * Devuelve, por trabajo, la **fecha estimada de cobro** (opción A, 2026-10-02) más
- * el **total cobrable ahora** (Σ de los bloques `porCobrar`), para la línea
- * "Por cobrar" del resumen de `TrabajoClient`.
+ * el **resumen de las dos ventanas** (`porCobrar` / `enCurso`: monto + cantidad de
+ * ítems) que pinta `TrabajoClient` arriba de la grilla.
  */
 export function useVentanasCobro({
   estimacionesSSR,
@@ -49,7 +63,11 @@ export function useVentanasCobro({
    * **todos** los pendientes— no sirven y hay que repartir solo los filtrados.
    */
   forzar?: boolean;
-}): { fechas: Record<string, FechaCobroEstimada>; totalPorCobrar: number } {
+}): {
+  fechas: Record<string, FechaCobroEstimada>;
+  porCobrar: ResumenVentana;
+  enCurso: ResumenVentana;
+} {
   const montado = useMontado();
 
   const estimaciones = useMemo(() => {
@@ -61,12 +79,15 @@ export function useVentanasCobro({
 
   return useMemo(() => {
     const fechas: Record<string, FechaCobroEstimada> = {};
-    let totalPorCobrar = 0;
+    // Resumen de las dos ventanas: los bloques vienen **partidos por sección** ⇒
+    // cada monto es exacto aunque el trabajo tenga ítems en las dos (el caso
+    // Atlas). ⚠️ Los ítems **sin cadencia** (`sinPeriodo`) no entran: sin
+    // estimación no hay sección que mostrar.
+    const porCobrar: ResumenVentana = { monto: 0, items: 0 };
+    const enCurso: ResumenVentana = { monto: 0, items: 0 };
     for (const e of estimaciones) {
-      // Total cobrable AHORA: Σ de los ítems cuya ventana ya cerró. Los bloques
-      // vienen **partidos por ventana** ⇒ el monto es exacto aunque el trabajo
-      // tenga también ítems en curso (el caso Atlas).
-      totalPorCobrar += e.porCobrar?.monto ?? 0;
+      sumarBloque(porCobrar, e.porCobrar);
+      sumarBloque(enCurso, e.enCurso);
       // Opción A (2026-10-02): manda la ventana **en curso/futura** ("cobro
       // estimado"); si no hay, se muestra la ya cerrada ("venció el"). Sin
       // cadencia (`sinPeriodo`) no hay fecha ⇒ no se muestra nada.
@@ -76,6 +97,6 @@ export function useVentanasCobro({
         fechas[e.trabajo] = { tipo: "porCobrar", cierre: e.porCobrar.cierre };
       }
     }
-    return { fechas, totalPorCobrar };
+    return { fechas, porCobrar, enCurso };
   }, [estimaciones]);
 }
