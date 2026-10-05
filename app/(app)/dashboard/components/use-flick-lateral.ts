@@ -26,9 +26,12 @@ interface OpcionesFlick {
   alFlick?: (dir: 1 | -1) => void;
   /**
    * Se llama **una vez por gesto**, en cuanto el movimiento ya viene rápido y
-   * horizontal (todavía con el dedo apoyado). Sirve para **apagar el tooltip** del
+   * horizontal (todavía con el dedo apoyado). Sirve para **tapar el tooltip** del
    * gráfico: si el gesto va a terminar en flick, no tiene sentido ver el tooltip
    * durante el arrastre (pedido del usuario, 2026-10-05).
+   *
+   * ⚠️ Lo que se llame acá tiene que ser **barato y sin estado de React** (ver
+   * `CuentaSlide` y la nota de arriba): un atributo de DOM alcanza.
    */
   alRapido?: () => void;
   /**
@@ -63,6 +66,12 @@ interface OpcionesFlick {
  * ⚠️ **Al soltar se avisa siempre** (`alSoltar`), sea flick o no: en iOS, si no, los
  * eventos de mouse **emulados** que llegan después del `touchend` vuelven a encender
  * el tooltip y queda **pegado hasta el toque siguiente**. Ver `alSoltar`.
+ *
+ * ⚠️🔑 **Nada de lo que se llame desde acá puede hacer trabajo de React** (estado,
+ * re-render, montar/desmontar el `<Tooltip>`): eso atrasa los `touchmove`, la
+ * velocidad medida cae por debajo del umbral y **el flick deja de detectarse**. Pasó
+ * el 2026-10-05 y se revirtió en §234: ahora todo se resuelve con **DOM** (atributo
+ * + `mouseout`) y el silencio de la banda es un `ref`.
  */
 export function useFlickLateral({ alFlick, alRapido, alSoltar }: OpcionesFlick = {}) {
   const muestrasRef = useRef<Muestra[]>([]);

@@ -154,6 +154,19 @@ body {
   z-index: 50;
 }
 
+/* Recharts: **tapar** el tooltip de la franja del gráfico del carrusel de Inicio
+   (`app/(app)/dashboard/components/cuenta-slide.tsx`) mientras el gesto es un flick o
+   acaba de soltarse (2026-10-05).
+
+   🔑 Se hace con un atributo y CSS **a propósito**, y no dejando de montar el
+   `<Tooltip>`: apagarlo por render obliga a un re-render durante el gesto, eso atrasa
+   los `touchmove` y el flick deja de detectarse (§234). Un atributo no re-renderiza
+   nada y tapa igual lo que ya esté activo. */
+[data-sin-tooltip] .recharts-tooltip-wrapper,
+[data-sin-tooltip] .recharts-active-dot {
+  display: none !important;
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
    TRANSICIONES DE PÁGINA (2026-09-14)
 

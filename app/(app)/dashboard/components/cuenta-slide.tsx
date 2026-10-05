@@ -65,22 +65,13 @@ interface CuentaSlideProps {
    */
   alFlick?: (dir: 1 | -1) => void;
   /**
-   * La **banda entera** está silenciada: ningún gráfico de la banda monta su
-   * tooltip. Ver `inicio-panel.tsx`, que es quien la comanda.
-   */
-  silenciada?: boolean;
-  /**
-   * Avisa al carrusel que hay que **silenciar la banda entera**. Lo dispara
-   * `useFlickLateral` apenas el gesto viene rápido (`alRapido`), al confirmarse el
-   * flick (`alFlick`) y **siempre al soltar** (`alSoltar`, sea flick o un arrastre
-   * lento): sin eso, los `mouse*` **emulados** de iOS volvían a encender el tooltip
-   * y quedaba pegado hasta el toque siguiente. El **toque siguiente** despierta la
-   * banda (ver `inicio-panel.tsx`).
+   * Avisa al carrusel que la **banda** tiene que quedar sin tooltips (bloquea los
+   * eventos de mouse **emulados** que iOS emite después del toque). Se dispara apenas
+   * el gesto viene rápido, al confirmarse el flick y **siempre al soltar**.
    *
-   * 🔑 **Por qué la banda y no solo esta tarjeta** (2026-10-05): al hacer flick el
-   * carrusel queda en **otra** tarjeta, y esos `mouseover`/`mousemove` **emulados**
-   * caen **ahí** ⇒ el tooltip aparecía en la tarjeta nueva, que nadie había
-   * silenciado.
+   * Es un `ref` en el carrusel (no estado): durante el gesto **no puede haber ni un
+   * re-render**, porque eso atrasa los `touchmove` y el flick deja de detectarse
+   * (pasó el 2026-10-05).
    */
   alSilenciar?: () => void;
 }
@@ -95,18 +86,27 @@ export function CuentaSlide({
   cuentaId,
   conGrafico,
   alFlick,
-  silenciada = false,
   alSilenciar,
 }: CuentaSlideProps) {
   const prefetch = usePrefetchNav();
-  /** Franja del gráfico: sirve para apagar su tooltip al hacer un flick. */
+  /** Franja del gráfico: sirve para tapar su tooltip al hacer un flick. */
   const franjaRef = useRef<HTMLDivElement | null>(null);
-  /** Timers de apagado del gráfico (se limpian al desmontar). */
+  /** Timers de apagado del gráfico y de la ventana tapada. */
   const timersRef = useRef<number[]>([]);
+  /**
+   * Cuánto queda **tapado** el tooltip después de soltar: cubre el deslizamiento de la
+   * tarjeta y los `mouse*` **emulados** de iOS.
+   */
+  const VENTANA_TAPADO_MS = 900;
+  /** Timer de la ventana tapada. */
+  const finTapadoRef = useRef<number | undefined>(undefined);
 
   useEffect(
     () => () => {
       for (const t of timersRef.current) window.clearTimeout(t);
+      if (finTapadoRef.current !== undefined) {
+        window.clearTimeout(finTapadoRef.current);
+      }
     },
     []
   );
@@ -126,12 +126,58 @@ export function CuentaSlide({
   };
 
   /**
-   * Flick sobre la franja: se silencia la banda entera (ya se hizo apenas el gesto
-   * se puso rápido, se repite acá por las dudas) y se vuelve a apagar el punto
-   * activo a los 200 y 550 ms, mientras la tarjeta se desliza.
+   * Tapa el tooltip de esta franja con un **atributo de DOM** (la regla vive en
+   * `globals.css`).
+   *
+   * 🔑 **Por qué CSS y no dejar de montar el `<Tooltip>`**: apagarlo por render (lo que
+   * se hizo el 2026-10-05) obliga a un re-render **durante el gesto**, y eso atrasa los
+   * `touchmove` ⇒ la velocidad medida cae por debajo del umbral y **el flick deja de
+   * detectarse** (§234). Un atributo no re-renderiza nada y tapa igual lo que ya esté
+   * activo.
+   */
+  const taparTooltip = () => {
+    franjaRef.current?.setAttribute("data-sin-tooltip", "");
+  };
+
+  const destaparTooltip = () => {
+    franjaRef.current?.removeAttribute("data-sin-tooltip");
+  };
+
+  /**
+   * Gesto **ya rápido** (va a terminar en flick): se silencia la banda y se **tapa** el
+   * tooltip del gráfico. Todo es DOM (`ref` + atributo): **ni un re-render**, que es la
+   * condición para que el flick siga detectándose (§234).
+   */
+  const alGestoRapido = () => {
+    alSilenciar?.();
+    taparTooltip();
+  };
+
+  /**
+   * Se soltó el dedo ⇒ esta franja queda tapada un rato (cubre el deslizamiento de la
+   * tarjeta y los `mouse*` **emulados** de iOS) y se apaga el estado de Recharts, así
+   * al destapar no reaparece nada. La banda queda silenciada hasta el **toque
+   * siguiente** (ver `inicio-panel.tsx`).
+   */
+  const alSoltarLaFranja = () => {
+    alSilenciar?.();
+    apagarTooltips();
+    taparTooltip();
+    if (finTapadoRef.current !== undefined) {
+      window.clearTimeout(finTapadoRef.current);
+    }
+    finTapadoRef.current = window.setTimeout(
+      () => destaparTooltip(),
+      VENTANA_TAPADO_MS
+    );
+  };
+
+  /**
+   * Flick sobre la franja: lo mismo y, además, se vuelve a apagar el punto activo a los
+   * 200 y 550 ms, mientras la tarjeta se desliza.
    */
   const alFlickDeLaFranja = (dir: 1 | -1) => {
-    alSilenciar?.();
+    alGestoRapido();
     apagarTooltips();
     timersRef.current.push(
       window.setTimeout(apagarTooltips, 200),
@@ -142,8 +188,8 @@ export function CuentaSlide({
 
   const flick = useFlickLateral({
     alFlick: alFlickDeLaFranja,
-    alRapido: alSilenciar,
-    alSoltar: alSilenciar,
+    alRapido: alGestoRapido,
+    alSoltar: alSoltarLaFranja,
   });
   /**
    * Los gestos de flick se enganchan **sólo en la franja del gráfico**, que es
@@ -205,7 +251,6 @@ export function CuentaSlide({
             sinRecuadro
             minimo
             sinScrollLateral
-            sinTooltip={silenciada}
           />
         )}
       </div>

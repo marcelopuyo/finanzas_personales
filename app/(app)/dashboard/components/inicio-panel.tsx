@@ -56,22 +56,21 @@ const PAGINA_VACIA: HistorialPagina = { rows: [], total: 0, hayMas: true };
 const UMBRAL_TOPBAR_PX = 8;
 
 /**
- * Cada cuánto se borra el estado de interacción de Recharts **mientras la banda
- * está silenciada** (ver `silenciarBanda`, 2026-10-05).
+ * Cuánto dura el "silencio" de la banda si **no** llega un toque nuevo (red de
+ * seguridad para un dispositivo con mouse: que un `hover` no quede bloqueado).
+ * Lo normal es que lo levante el toque siguiente.
  */
-const LATIDO_SIN_TOOLTIP_MS = 200;
+const SILENCIO_MAX_MS = 2000;
 
 /**
- * Cuánto dura ese "latido". 🔑 **El silencio en sí no se levanta solo**: dura hasta
- * que el usuario vuelve a **tocar** la banda (ver `silenciarBanda`). Esto solo acota
- * el repaso periódico, que hace falta durante el deslizamiento de la tarjeta, el
- * **re-afinado** del carrusel (a los 800 ms, ver `irASlide`) y los `mouse*`
- * **emulados** que iOS emite después de soltar el dedo.
+ * Eventos que **sólo** puede emitir un mouse (o iOS **emulándolo** después de un
+ * toque). Mientras la banda está silenciada se cortan en la fase de captura: así no
+ * llegan a Recharts y no pueden volver a encender el tooltip (2026-10-05).
+ *
+ * ⚠️ **No** se cortan `touch*` (son los reales: el gesto de la franja sigue andando) ni
+ * `click`/`mousedown` (los botones de la tarjeta tienen que responder).
  */
-const LATIDO_DURACION_MS = 1500;
-
-/** Red de seguridad al volver a la normalidad (ver `volverALaNormalidad`). */
-const RED_SEGURIDAD_MS = 150;
+const EVENTOS_EMULADOS = ["mousemove", "mouseover", "pointermove", "pointerover"];
 
 /** `window` con `requestIdleCallback` (no está en todos los navegadores). */
 type VentanaIdle = Window & {
@@ -151,11 +150,14 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
   const trackRef = useRef<HTMLDivElement | null>(null);
   /** **Banda** (hero) del carrusel: contiene los gráficos de **todas** las tarjetas. */
   const bandaRef = useRef<HTMLDivElement | null>(null);
-  /** ¿La banda está silenciada? (flick en curso o tarjeta deslizándose). */
-  const [bandaSilenciada, setBandaSilenciada] = useState(false);
-  /** Timers del silencio y de su "latido" (se limpian al desmontar). */
-  const finLatidoRef = useRef<number | undefined>(undefined);
-  const latidoSilencioRef = useRef<number | undefined>(undefined);
+  /**
+   * ¿La banda está silenciada? Va en un **`ref`** a propósito (no estado): durante el
+   * gesto **no puede haber ni un re-render**, porque atrasa los `touchmove` y el flick
+   * deja de detectarse (pasó el 2026-10-05, cuando esto era `useState` + timers).
+   */
+  const silenciadoRef = useRef(false);
+  /** Timer de la red de seguridad del silencio (se limpia al desmontar). */
+  const finSilencioRef = useRef<number | undefined>(undefined);
   /** ¿Ya se intentó restaurar la tarjeta guardada? (una sola vez por montaje). */
   const restauradoRef = useRef(false);
   /**
@@ -409,96 +411,65 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
   );
 
   /**
-   * Apaga el estado de interacción de **todos** los gráficos de la banda (tooltip y
-   * punto activo). Es el `mouseout` sintético sobre el `.recharts-wrapper` que
-   * entiende Recharts (ver `line-chart.tsx` y `use-hide-tooltip-on-touch.ts`).
+   * **Silencia la banda** (2026-10-05): mientras lo esté, los eventos que **sólo**
+   * puede emitir un mouse quedan cortados (ver el efecto de abajo), así que los
+   * `mouse*`/`pointer*` **emulados** que iOS emite después de soltar el dedo **no
+   * llegan a Recharts** y no pueden volver a encender el tooltip.
+   *
+   * 🔑 Es la banda entera (no sólo la tarjeta tocada: al hacer flick el carrusel queda
+   * en **otra** tarjeta y esos eventos caen ahí) y es un **`ref`**: silenciar **no**
+   * re-renderiza nada. Lo pide cada `CuentaSlide` al detectar el gesto rápido, al
+   * confirmarse el flick y al soltar.
    */
-  const apagarTooltipsDeLaBanda = useCallback(() => {
-    const raiz = bandaRef.current;
-    if (!raiz) return;
-    for (const wrapper of raiz.querySelectorAll(".recharts-wrapper")) {
-      wrapper.dispatchEvent(new MouseEvent("mouseout", { bubbles: true }));
+  const silenciarBanda = useCallback(() => {
+    silenciadoRef.current = true;
+    if (finSilencioRef.current !== undefined) {
+      window.clearTimeout(finSilencioRef.current);
     }
+    // Red de seguridad: si no llega ningún toque nuevo, el silencio se levanta solo
+    // (que un `hover` no quede bloqueado para siempre en un equipo con mouse).
+    finSilencioRef.current = window.setTimeout(() => {
+      silenciadoRef.current = false;
+    }, SILENCIO_MAX_MS);
   }, []);
 
   /**
-   * **Silencia la banda entera** (2026-10-05). Lo pide cada `CuentaSlide` apenas el
-   * gesto sobre la franja viene rápido, al confirmarse el flick y **siempre al
-   * soltar** (ver `alSilenciar` en `cuenta-slide.tsx`).
+   * Un **solo** par de listeners para todo el panel (se monta una vez: nada que
+   * agregar ni quitar durante los gestos):
    *
-   * 🔑 Es la banda **entera** y no solo la tarjeta tocada: al hacer flick el carrusel
-   * queda en **otra** tarjeta, y los `mouse*` **emulados** que iOS emite después de
-   * soltar el dedo caen ahí ⇒ el tooltip terminaba apareciendo en la tarjeta nueva,
-   * que nadie había silenciado.
+   * - `touchstart` (captura, pasivo) ⇒ **despierta** la banda. Un toque real es la
+   *   señal de que el usuario vuelve a interactuar, y de paso el tooltip queda
+   *   disponible para ese gesto.
+   * - `EVENTOS_EMULADOS` ⇒ se **cortan** mientras la banda está silenciada.
    *
-   * ⚠️ **El silencio NO se levanta por tiempo** (ese era el agujero que quedaba): al
-   * terminar una ventana corta, el `<Tooltip>` volvía a montarse y **reaparecía
-   * solo**, con el índice activo que Recharts hubiera guardado. Ahora dura hasta que
-   * el usuario **vuelve a tocar la banda** (`volverALaNormalidad`), así que después de
-   * un flick no puede dibujarse ningún tooltip sin una interacción nueva. El
-   * "latido" solo borra el estado de Recharts durante el deslizamiento y los
-   * emulados.
-   */
-  const silenciarBanda = useCallback(() => {
-    setBandaSilenciada(true);
-    if (finLatidoRef.current !== undefined) {
-      window.clearTimeout(finLatidoRef.current);
-    }
-    if (latidoSilencioRef.current === undefined) {
-      latidoSilencioRef.current = window.setInterval(
-        apagarTooltipsDeLaBanda,
-        LATIDO_SIN_TOOLTIP_MS
-      );
-    }
-    finLatidoRef.current = window.setTimeout(() => {
-      if (latidoSilencioRef.current !== undefined) {
-        window.clearInterval(latidoSilencioRef.current);
-        latidoSilencioRef.current = undefined;
-      }
-    }, LATIDO_DURACION_MS);
-  }, [apagarTooltipsDeLaBanda]);
-
-  /**
-   * Devuelve la banda a la normalidad: lo llama el **primer toque nuevo** en la
-   * banda (efecto de abajo). Primero se borra el estado de Recharts y **después** se
-   * vuelve a montar el `<Tooltip>` (al revés, aparecería con el índice viejo); la red
-   * de seguridad cubre un evento emulado que llegue justo en el medio.
-   */
-  const volverALaNormalidad = useCallback(() => {
-    if (latidoSilencioRef.current !== undefined) {
-      window.clearInterval(latidoSilencioRef.current);
-      latidoSilencioRef.current = undefined;
-    }
-    if (finLatidoRef.current !== undefined) {
-      window.clearTimeout(finLatidoRef.current);
-      finLatidoRef.current = undefined;
-    }
-    apagarTooltipsDeLaBanda();
-    setBandaSilenciada(false);
-    window.setTimeout(apagarTooltipsDeLaBanda, RED_SEGURIDAD_MS);
-  }, [apagarTooltipsDeLaBanda]);
-
-  /**
-   * Mientras la banda está silenciada, **el primer toque** la despierta: es el mismo
-   * gesto con el que el usuario va a scrubear, así que el tooltip aparece cuando él
-   * lo pide y nunca antes.
+   * ⚠️ **No** se despierta con `mousedown`/`pointerdown` a propósito: iOS los emite
+   * **emulados** después del toque y volverían a habilitar el tooltip pegado.
    */
   useEffect(() => {
-    if (!bandaSilenciada) return;
     const raiz = bandaRef.current;
     if (!raiz) return;
-    const alTocar = () => volverALaNormalidad();
+    const alTocar = () => {
+      silenciadoRef.current = false;
+    };
+    const tragar = (e: Event) => {
+      if (silenciadoRef.current) e.stopPropagation();
+    };
     raiz.addEventListener("touchstart", alTocar, { capture: true, passive: true });
-    return () => raiz.removeEventListener("touchstart", alTocar, { capture: true });
-  }, [bandaSilenciada, volverALaNormalidad]);
+    for (const tipo of EVENTOS_EMULADOS) {
+      raiz.addEventListener(tipo, tragar, { capture: true });
+    }
+    return () => {
+      raiz.removeEventListener("touchstart", alTocar, { capture: true });
+      for (const tipo of EVENTOS_EMULADOS) {
+        raiz.removeEventListener(tipo, tragar, { capture: true });
+      }
+    };
+  }, []);
 
   useEffect(
     () => () => {
-      if (finLatidoRef.current !== undefined) {
-        window.clearTimeout(finLatidoRef.current);
-      }
-      if (latidoSilencioRef.current !== undefined) {
-        window.clearInterval(latidoSilencioRef.current);
+      if (finSilencioRef.current !== undefined) {
+        window.clearTimeout(finSilencioRef.current);
       }
     },
     []
@@ -553,7 +524,6 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
             aporte={aportes}
             monedaISO={data.monedaPredeterminadaISO}
             conGrafico
-            silenciada={bandaSilenciada}
           />
           {cuentas.map((c, i) => {
             const idx = i + 1;
@@ -565,7 +535,6 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
                 esBalance={false}
                 alFlick={desplazarTarjeta}
                 alSilenciar={silenciarBanda}
-                silenciada={bandaSilenciada}
                 evolucion={(c.values ?? []).map((v, k) => ({
                   name: c.labels?.[k] ?? "",
                   value: v,
