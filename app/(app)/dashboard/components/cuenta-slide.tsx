@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { Settings2 } from "lucide-react";
 import { AccionCirculo } from "./accion-circulo";
 import { AporteBarra } from "./aporte-barra";
@@ -77,7 +78,41 @@ export function CuentaSlide({
   alFlick,
 }: CuentaSlideProps) {
   const prefetch = usePrefetchNav();
-  const flick = useFlickLateral(alFlick);
+  /** Franja del gráfico: sirve para apagar su tooltip al hacer un flick. */
+  const franjaRef = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * Apaga el tooltip del gráfico. Es el mismo truco que usa
+   * `useHideTooltipOnTouch`: Recharts limpia su estado de interacción con el
+   * `mouseout` del `.recharts-wrapper`.
+   */
+  const apagarTooltips = () => {
+    const raiz = franjaRef.current;
+    if (!raiz) return;
+    for (const wrapper of raiz.querySelectorAll(".recharts-wrapper")) {
+      wrapper.dispatchEvent(new MouseEvent("mouseout", { bubbles: true }));
+    }
+  };
+
+  /**
+   * Flick sobre la franja: **antes** de mover el carrusel hay que apagar el tooltip
+   * y **volver a apagarlo** un par de veces mientras la tarjeta se desliza: iOS
+   * emite eventos de mouse emulados después del `touchend` y cualquiera de esos lo
+   * vuelve a encender (era lo que se veía al hacer el flick, 2026-10-05).
+   */
+  const alFlickDeLaFranja = (dir: 1 | -1) => {
+    apagarTooltips();
+    window.setTimeout(apagarTooltips, 200);
+    window.setTimeout(apagarTooltips, 550);
+    alFlick?.(dir);
+  };
+
+  const flick = useFlickLateral({
+    alFlick: alFlickDeLaFranja,
+    // Apenas el gesto viene rápido, se apaga el tooltip: si va a terminar en flick,
+    // no tiene sentido verlo durante el arrastre.
+    alRapido: apagarTooltips,
+  });
   /**
    * Los gestos de flick se enganchan **sólo en la franja del gráfico**, que es
    * donde el gesto lateral está tomado (`pan-y`). En la barra de aporte de la
@@ -118,7 +153,7 @@ export function CuentaSlide({
           📏 Alto **fijo en px** (no `%` ni `vh`): con `min(128px,16vh)` el 2026-10-03
           el gráfico no se pintó en el celular y la banda quedaba en más de media
           pantalla. 96px deja la banda cómoda y la serie se lee bien. */}
-      <div className="mt-3" {...gestosFlick}>
+      <div className="mt-3" ref={franjaRef} {...gestosFlick}>
         {!conGrafico ? (
           // ⚠️ El fondo de la banda es `bg-muted` y el skeleton por defecto también
           // ⇒ quedaba **invisible** y el hueco se leía como "gráfico roto". Con

@@ -21,6 +21,18 @@ interface Muestra {
   t: number;
 }
 
+interface OpcionesFlick {
+  /** Se llama cuando el gesto **resulta** un flick (al soltar). */
+  alFlick?: (dir: 1 | -1) => void;
+  /**
+   * Se llama **una vez por gesto**, en cuanto el movimiento ya viene rápido y
+   * horizontal (todavía con el dedo apoyado). Sirve para **apagar el tooltip** del
+   * gráfico: si el gesto va a terminar en flick, no tiene sentido ver el tooltip
+   * durante el arrastre (pedido del usuario, 2026-10-05).
+   */
+  alRapido?: () => void;
+}
+
 /**
  * Detecta un **flick lateral** (deslizamiento rápido) y avisa hacia dónde.
  *
@@ -37,44 +49,58 @@ interface Muestra {
  * nativa: un arrastre lento que termina en un latigazo cuenta como flick, y uno
  * rápido que se frena antes de soltar no.
  */
-export function useFlickLateral(alFlick?: (dir: 1 | -1) => void) {
+export function useFlickLateral({ alFlick, alRapido }: OpcionesFlick = {}) {
   const muestrasRef = useRef<Muestra[]>([]);
+  /** ¿Ya se avisó `alRapido` en este gesto? (se llama una sola vez) */
+  const avisadoRef = useRef(false);
 
   const onTouchStart = useCallback((e: TouchEvent<HTMLElement>) => {
     const t = e.touches[0];
     muestrasRef.current = t
       ? [{ x: t.clientX, y: t.clientY, t: performance.now() }]
       : [];
+    avisadoRef.current = false;
   }, []);
 
-  const onTouchMove = useCallback((e: TouchEvent<HTMLElement>) => {
-    const t = e.touches[0];
-    if (!t) return;
-    const ahora = performance.now();
-    const muestras = muestrasRef.current;
-    muestras.push({ x: t.clientX, y: t.clientY, t: ahora });
-    // Sólo interesa la ventana reciente (más una muestra de borde).
-    while (muestras.length > 2 && ahora - muestras[0].t > VENTANA_MS) {
-      muestras.shift();
-    }
-  }, []);
+  const onTouchMove = useCallback(
+    (e: TouchEvent<HTMLElement>) => {
+      const t = e.touches[0];
+      if (!t) return;
+      const ahora = performance.now();
+      const muestras = muestrasRef.current;
+      muestras.push({ x: t.clientX, y: t.clientY, t: ahora });
+      // Sólo interesa la ventana reciente (más una muestra de borde).
+      while (muestras.length > 2 && ahora - muestras[0].t > VENTANA_MS) {
+        muestras.shift();
+      }
+      if (alRapido && !avisadoRef.current && esFlick(muestras)) {
+        avisadoRef.current = true;
+        alRapido();
+      }
+    },
+    [alRapido]
+  );
 
   const onTouchEnd = useCallback(
     (e: TouchEvent<HTMLElement>) => {
       const muestras = muestrasRef.current;
       muestrasRef.current = [];
-      if (!alFlick) return;
+      if (!alFlick || !esFlick(muestras, e.changedTouches[0])) return;
       const t = e.changedTouches[0];
-      if (!t || muestras.length < 2) return;
       const desde = muestras[0];
-      const dx = t.clientX - desde.x;
-      const dy = t.clientY - desde.y;
-      // Gestos verticales (el gráfico deja scrollear la página) no cambian tarjeta.
-      if (Math.abs(dx) < RECORRIDO_MINIMO) return;
-      if (Math.abs(dx) < Math.abs(dy)) return;
-      const ms = Math.max(performance.now() - desde.t, 1);
-      if (Math.abs(dx) / ms < VELOCIDAD_MINIMA) return;
-      alFlick(dx < 0 ? 1 : -1);
+      alFlick(t.clientX - desde.x < 0 ? 1 : -1);
+      /**
+       * Se cancela el `touchend` para que iOS **no emita sus eventos de mouse
+       * emulados**: llegan después de soltar y vuelven a encender el tooltip
+       * justo cuando la tarjeta está deslizándose. Es seguro acá porque sólo se
+       * llega a este punto con un gesto **horizontal** (no hay inercia de scroll
+       * vertical que perder).
+       */
+      try {
+        e.preventDefault();
+      } catch {
+        /* listener pasivo */
+      }
     },
     [alFlick]
   );
@@ -82,7 +108,27 @@ export function useFlickLateral(alFlick?: (dir: 1 | -1) => void) {
   /** Cancelado (el navegador se quedó con el gesto): no cuenta como flick. */
   const onTouchCancel = useCallback(() => {
     muestrasRef.current = [];
+    avisadoRef.current = false;
   }, []);
 
   return { onTouchStart, onTouchMove, onTouchEnd, onTouchCancel };
+}
+
+/**
+ * ¿Las muestras describen un flick? Sin posición final (durante el arrastre) se
+ * usa la última muestra como referencia.
+ */
+function esFlick(muestras: Muestra[], fin?: { clientX: number; clientY: number }) {
+  if (muestras.length < 2) return false;
+  const desde = muestras[0];
+  const hasta = fin
+    ? { x: fin.clientX, y: fin.clientY, t: performance.now() }
+    : muestras[muestras.length - 1];
+  const dx = hasta.x - desde.x;
+  const dy = hasta.y - desde.y;
+  // Gestos verticales (el gráfico deja scrollear la página) no cuentan.
+  if (Math.abs(dx) < RECORRIDO_MINIMO) return false;
+  if (Math.abs(dx) < Math.abs(dy)) return false;
+  const ms = Math.max(hasta.t - desde.t, 1);
+  return Math.abs(dx) / ms >= VELOCIDAD_MINIMA;
 }
