@@ -40,6 +40,14 @@ export function DiagBarras() {
   const [copiado, setCopiado] = useState(false);
   /** Versión/commit publicada (`/version.json`), para saber qué build corre. */
   const [version, setVersion] = useState("?");
+  /** ¿Está puesto el fondo magenta de prueba? (ver `pintarFondo`). */
+  const [pintado, setPintado] = useState(false);
+  /**
+   * Cronología de eventos (`focusin`, `focusout`, `resize`…). Es lo que dice
+   * **en qué momento exacto** se pierde la altura: si baja al enfocar y no vuelve
+   * al cerrar el teclado, el motor nunca avisó de la restauración.
+   */
+  const [logEv, setLogEv] = useState<string[]>([]);
 
   useEffect(() => {
     fetch("/version.json", { cache: "no-store" })
@@ -59,6 +67,21 @@ export function DiagBarras() {
     const h = d.getBoundingClientRect().height;
     d.remove();
     return `${Math.round(h)}px`;
+  };
+
+  /**
+   * Alto real de una caja de prueba. Sirve para comparar **el viewport que el
+   * motor cree que tiene** (`100vh`, `100dvh`, `inset:0`) contra la pantalla
+   * física: si los tres miden 660 en una pantalla de 812, el recorte lo hizo el
+   * motor y **ningún CSS nuestro puede pintar la franja**.
+   */
+  const medirAlto = (css: string) => {
+    const d = document.createElement("div");
+    d.style.cssText = `position:fixed;top:0;left:0;visibility:hidden;${css}`;
+    document.body.appendChild(d);
+    const h = Math.round(d.getBoundingClientRect().height);
+    d.remove();
+    return h;
   };
 
   // El `setState` va diferido para no dispararlo dentro del cuerpo del efecto
@@ -107,6 +130,13 @@ export function DiagBarras() {
         ["campo font-size", campo ? getComputedStyle(campo).fontSize : "?"],
         ["active (tag / font)", activo ? `${activo.tagName} / ${getComputedStyle(activo).fontSize}` : "?"],
         ["innerH / clientH", `${window.innerHeight} / ${raiz.clientHeight}`],
+        ["innerW / clientW / screen.w", `${window.innerWidth} / ${raiz.clientWidth} / ${window.screen.width}`],
+        ["vv.w x vv.h", vv ? `${Math.round(vv.width)} x ${Math.round(vv.height)}` : "sin visualViewport"],
+        ["100vh / 100dvh", `${medirAlto("width:0;height:100vh")} / ${medirAlto("width:0;height:100dvh")}`],
+        ["100svh / 100lvh", `${medirAlto("width:0;height:100svh")} / ${medirAlto("width:0;height:100lvh")}`],
+        ["caja fixed inset:0", `${medirAlto("inset:0")}`],
+        ["html scrollH / body scrollH", `${raiz.scrollHeight} / ${document.body.scrollHeight}`],
+        ["hueco abajo (screen - innerH)", `${window.screen.height - window.innerHeight}`],
         ["app-shell h / bottom", shell ? `${Math.round(shell.getBoundingClientRect().height)} / ${Math.round(shell.getBoundingClientRect().bottom)}` : "?"],
         ["screen.h / availH", `${window.screen.height} / ${window.screen.availHeight}`],
         ["vv.h / vv.top / scale", vv ? `${Math.round(vv.height)} / ${Math.round(vv.offsetTop)} / ${vv.scale}` : "sin visualViewport"],
@@ -127,11 +157,32 @@ export function DiagBarras() {
 
     medir();
     const t = setInterval(medir, 500);
+
+    /** Deja una línea por evento, con la altura del momento. */
+    const anotar = (etiqueta: string) => {
+      const vv = window.visualViewport;
+      const hora = new Date().toLocaleTimeString();
+      setLogEv((l) =>
+        [
+          ...l,
+          `${hora} ${etiqueta} · innerH=${window.innerHeight} clientH=${document.documentElement.clientHeight} vv=${vv ? Math.round(vv.height) : "-"}`,
+        ].slice(-40)
+      );
+    };
+    const alFocusIn = () => anotar(`focusin ${document.activeElement?.tagName ?? "?"}`);
+    const alFocusOut = () => anotar("focusout");
+    const alResize = () => anotar("resize");
+
     for (const ev of ["resize", "scroll", "focusin", "focusout", "orientationchange"]) {
       window.addEventListener(ev, medir);
     }
     window.visualViewport?.addEventListener("resize", medir);
     window.visualViewport?.addEventListener("scroll", medir);
+    window.addEventListener("focusin", alFocusIn);
+    window.addEventListener("focusout", alFocusOut);
+    window.addEventListener("resize", alResize);
+    window.addEventListener("orientationchange", alResize);
+    window.visualViewport?.addEventListener("resize", alResize);
     return () => {
       clearInterval(t);
       for (const ev of ["resize", "scroll", "focusin", "focusout", "orientationchange"]) {
@@ -139,6 +190,11 @@ export function DiagBarras() {
       }
       window.visualViewport?.removeEventListener("resize", medir);
       window.visualViewport?.removeEventListener("scroll", medir);
+      window.removeEventListener("focusin", alFocusIn);
+      window.removeEventListener("focusout", alFocusOut);
+      window.removeEventListener("resize", alResize);
+      window.removeEventListener("orientationchange", alResize);
+      window.visualViewport?.removeEventListener("resize", alResize);
     };
   }, [visible, version]);
 
@@ -243,7 +299,11 @@ export function DiagBarras() {
   ];
 
   const copiar = () => {
-    const texto = [...datos.map(([k, v]) => `${k}: ${v}`), ...log].join("\n");
+    const texto = [
+      ...datos.map(([k, v]) => `${k}: ${v}`),
+      ...log,
+      ...logEv,
+    ].join("\n");
     const p = navigator.clipboard?.writeText(texto);
     if (p) {
       p.then(
@@ -265,6 +325,18 @@ export function DiagBarras() {
     setVisible(false);
   };
 
+  /**
+   * Prueba clave para decidir si hay algo que arreglar por CSS: pinta de magenta
+   * `<html>` y `<body>`. Si la franja de abajo **también** se pone magenta, esa
+   * zona es nuestra y se puede cubrir; si la franja **queda igual**, el recorte lo
+   * hizo la app instalada (fuera del alcance del CSS).
+   */
+  const pintarFondo = (on: boolean) => {
+    document.documentElement.style.background = on ? "#ff00ff" : "";
+    document.body.style.background = on ? "#ff00ff" : "";
+    setPintado(on);
+  };
+
   // Minimizado: una pestañita al costado, para poder interactuar con la app.
   if (!abierto) {
     return (
@@ -281,7 +353,12 @@ export function DiagBarras() {
   }
 
   return (
-    <div className="fixed inset-x-0 top-0 z-100 max-h-[45vh] overflow-auto border-b border-danger bg-background p-2 text-[10px] leading-tight shadow-lg">
+    <div
+      className="fixed inset-x-0 top-0 z-100 max-h-[45vh] overflow-auto border-b border-danger bg-background p-2 text-[10px] leading-tight shadow-lg"
+      // En la PWA el contenido pasa por debajo de la barra de estado del teléfono:
+      // sin este margen los botones de arriba quedaban tapados y no se podían tocar.
+      style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 0.5rem)" }}
+    >
       <div className="mb-1 flex items-center gap-2">
         <strong className="text-[11px] text-danger">DIAG BARRAS</strong>
         <button
@@ -325,7 +402,30 @@ export function DiagBarras() {
             {nombre}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => pintarFondo(!pintado)}
+          className="rounded border border-danger bg-danger/10 px-1.5 py-1 text-[10px] font-bold text-danger"
+        >
+          {pintado ? "quitar magenta" : "pintar fondo magenta"}
+        </button>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="rounded border border-danger bg-danger/10 px-1.5 py-1 text-[10px] font-bold text-danger"
+        >
+          recargar la app
+        </button>
       </div>
+      {logEv.length > 0 && (
+        <div className="mt-1 border-t border-border pt-1">
+          {logEv.map((l, i) => (
+            <div key={i} className="tabular-nums">
+              {l}
+            </div>
+          ))}
+        </div>
+      )}
       {log.length > 0 && (
         <div className="mt-1 border-t border-border pt-1">
           {log.map((l, i) => (
