@@ -46,6 +46,8 @@ export function CategoriasGastoListClient({ initialData, origen }: Props) {
       title="Categorías de Gasto"
       columns={columns}
       initialData={initialData}
+      // Sin paginación: la lista va completa y se scrollea (pedido del usuario).
+      sinPaginacion
       deleteItem={eliminarCategoriaGasto}
       searchPlaceholder="Buscar categoría..."
       createHref={`/cruds/categorias-gasto/nuevo${origenQ}`}

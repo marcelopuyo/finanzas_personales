@@ -54,6 +54,8 @@ export function PersonasListClient({ initialData }: Props) {
       title="Personas"
       columns={columns}
       initialData={initialData}
+      // Sin paginación: la lista va completa y se scrollea (pedido del usuario).
+      sinPaginacion
       deleteItem={eliminarPersona}
       searchPlaceholder="Buscar persona..."
       createHref="/cruds/personas/nuevo"

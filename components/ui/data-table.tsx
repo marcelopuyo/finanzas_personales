@@ -33,6 +33,14 @@ interface DataTableProps<TData, TValue> {
   data: TData[];
   emptyMessage?: string;
   pageSize?: number;
+  /**
+   * **Sin paginación** (2026-10-05, pedido del usuario): la tabla pinta **todas** las
+   * filas y el scroll lo maneja la página, sin pie de "Anterior/Siguiente".
+   *
+   * Lo usan los listados de los CRUD, que ya tienen **todos** los registros
+   * cargados (las queries `getAll*` no paginan).
+   */
+  sinPaginacion?: boolean;
   /** Devuelve un id estable por fila (default: índice). Evita que React reutilice
    * filas equivocadas cuando el orden de los datos cambia (p. ej. switches). */
   getRowId?: (originalRow: TData, index: number) => string;
@@ -66,6 +74,7 @@ export function DataTable<TData, TValue>({
   data,
   emptyMessage = "Sin datos disponibles",
   pageSize = 10,
+  sinPaginacion = false,
   getRowId,
   rowClassName,
   onRowClick,
@@ -88,14 +97,16 @@ export function DataTable<TData, TValue>({
   const table = useReactTable({
     data,
     columns,
-    state: { sorting, pagination },
+    state: sinPaginacion ? { sorting } : { sorting, pagination },
     onSortingChange: setSorting,
     onPaginationChange: setPagination,
     getRowId,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    // Sin paginación no se registra el modelo de páginas ⇒ `getRowModel()` devuelve
+    // todas las filas y el scroll queda a cargo de la página.
+    ...(sinPaginacion ? {} : { getPaginationRowModel: getPaginationRowModel() }),
   });
 
   const hasFooter = columns.some((c) => c.footer != null);
@@ -260,14 +271,17 @@ export function DataTable<TData, TValue>({
         )}
       </div>
 
-      {/* Paginación (componente compartido con las demás grillas) */}
-      <TablePagination
-        pageIndex={table.getState().pagination.pageIndex}
-        pageCount={table.getPageCount()}
-        onPrev={() => table.previousPage()}
-        onNext={() => table.nextPage()}
-        className="px-3 py-2"
-      />
+      {/* Paginación (componente compartido con las demás grillas): con
+          `sinPaginacion` no se pinta — la lista se scrollea completa. */}
+      {!sinPaginacion && (
+        <TablePagination
+          pageIndex={table.getState().pagination.pageIndex}
+          pageCount={table.getPageCount()}
+          onPrev={() => table.previousPage()}
+          onNext={() => table.nextPage()}
+          className="px-3 py-2"
+        />
+      )}
     </>
   );
 }

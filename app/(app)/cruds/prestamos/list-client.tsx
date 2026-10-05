@@ -198,6 +198,8 @@ export function PrestamosListClient({ initialData, origen, embebido = false }: P
       columns={columns}
       trailingColumns={pagarColumn}
       initialData={initialData}
+      // Sin paginación: la lista va completa y se scrollea (pedido del usuario).
+      sinPaginacion
       deleteItem={eliminarPrestamo}
       searchPlaceholder="Buscar préstamo..."
       createHref={`/cruds/prestamos/nuevo${origenQ}`}

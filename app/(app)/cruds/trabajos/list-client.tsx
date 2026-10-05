@@ -79,5 +79,5 @@ export function TrabajosListClient({ initialData, origen }: Props) {
   const origenQ = desdeDashboard ? "?origen=dashboard" : "";
   // Navegación con feedback (barra de progreso global) para el toque de fila.
   const { go: nav } = usePendingNav();
-  return <CrudTable<TrabajoOut> title="Trabajos" columns={columns} mobileRow={(t) => <TrabajoCard t={t} />} initialData={initialData} deleteItem={eliminarTrabajo} searchPlaceholder="Buscar trabajo..." createHref={`/cruds/trabajos/nuevo${origenQ}`} editHref={(id) => `/cruds/trabajos/${id}/editar${origenQ}`} getId={(i) => i.id} searchPredicate={(i, q) => i.nombre.toLowerCase().includes(q)} mobileBottomNav mobileSwipe={{ onRowTap: (id) => nav(`/cruds/trabajos/${id}/editar${origenQ}`, "row") }} backHref="/dashboard" />;
+  return <CrudTable<TrabajoOut> title="Trabajos" columns={columns} mobileRow={(t) => <TrabajoCard t={t} />} initialData={initialData} sinPaginacion deleteItem={eliminarTrabajo} searchPlaceholder="Buscar trabajo..." createHref={`/cruds/trabajos/nuevo${origenQ}`} editHref={(id) => `/cruds/trabajos/${id}/editar${origenQ}`} getId={(i) => i.id} searchPredicate={(i, q) => i.nombre.toLowerCase().includes(q)} mobileBottomNav mobileSwipe={{ onRowTap: (id) => nav(`/cruds/trabajos/${id}/editar${origenQ}`, "row") }} backHref="/dashboard" />;
 }

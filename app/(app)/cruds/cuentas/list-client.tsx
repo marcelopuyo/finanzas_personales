@@ -333,6 +333,8 @@ export function CuentasListClient({
         />
       )}
       initialData={dataGrilla}
+      // Sin paginación: la lista va completa y se scrollea (pedido del usuario).
+      sinPaginacion
       currency={currency}
       deleteItem={eliminarCuenta}
       searchPlaceholder="Buscar cuenta..."

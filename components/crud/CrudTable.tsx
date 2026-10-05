@@ -51,6 +51,17 @@ interface CrudTableProps<T, TId = number> {
   currency?: string;
   /** Filas por página de la grilla (mobile y desktop). Default 10. */
   rowsPerPage?: number;
+  /**
+   * **Sin paginación** (2026-10-05, pedido del usuario): la lista pinta **todos** los
+   * registros —la tabla de escritorio y las tarjetas mobile— y el scroll lo maneja la
+   * página: no hay páginas ni pie de "Anterior/Siguiente". `rowsPerPage` queda sin
+   * efecto.
+   *
+   * 🔑 Se puede porque los listados de los CRUD ya tienen **todos** los registros
+   * cargados (las queries `getAll*` no paginan): «scroll infinito» acá es no cortar la
+   * lista en páginas. Los CRUD de **admin** siguen paginados.
+   */
+  sinPaginacion?: boolean;
   /** Filas "label: valor" que se exportan al PDF **arriba de la grilla** (debajo
       del título). Sirve para que el PDF lleve la CABECERA del contexto y no sólo
       la grilla (p. ej. los datos del período de trabajo: trabajo, rango de
@@ -198,6 +209,7 @@ export function CrudTable<T, TId = number>({
   backHref,
   currency = "ARS",
   rowsPerPage = 10,
+  sinPaginacion = false,
   exportInfo,
   mobileBottomNav = false,
   mobileHint,
@@ -528,11 +540,14 @@ export function CrudTable<T, TId = number>({
     Math.ceil(itemsTarjetas.length / rowsPerPage)
   );
   const pagina = Math.min(mobilePage, totalPaginas - 1);
+  /** Con `sinPaginacion` se pintan **todas** las tarjetas (scroll de la página). */
   const itemsPagina = mobileRow
-    ? itemsTarjetas.slice(
-        pagina * rowsPerPage,
-        pagina * rowsPerPage + rowsPerPage
-      )
+    ? sinPaginacion
+      ? itemsTarjetas
+      : itemsTarjetas.slice(
+          pagina * rowsPerPage,
+          pagina * rowsPerPage + rowsPerPage
+        )
     : [];
 
   // Encabezado mobile: título (+ contador de filas visibles).
@@ -815,16 +830,19 @@ export function CrudTable<T, TId = number>({
                       })}
                     </div>
                   )}
-                  {/* Paginación: mismo componente que la grilla de escritorio. */}
-                  <TablePagination
-                    pageIndex={pagina}
-                    pageCount={totalPaginas}
-                    onPrev={() => setMobilePage(Math.max(0, pagina - 1))}
-                    onNext={() =>
-                      setMobilePage(Math.min(totalPaginas - 1, pagina + 1))
-                    }
-                    className="mt-3 pt-2"
-                  />
+                  {/* Paginación: mismo componente que la grilla de escritorio (con
+                      `sinPaginacion` no se pinta: la lista va completa). */}
+                  {!sinPaginacion && (
+                    <TablePagination
+                      pageIndex={pagina}
+                      pageCount={totalPaginas}
+                      onPrev={() => setMobilePage(Math.max(0, pagina - 1))}
+                      onNext={() =>
+                        setMobilePage(Math.min(totalPaginas - 1, pagina + 1))
+                      }
+                      className="mt-3 pt-2"
+                    />
+                  )}
                   {/* Contenido propio de la vista debajo de la lista (p. ej. el
                       conmutador "Ver todos los préstamos"). */}
                   {mobileRowFooter}
@@ -834,6 +852,7 @@ export function CrudTable<T, TId = number>({
                 columns={mobileColumns}
                 data={filtered}
                 pageSize={rowsPerPage}
+                sinPaginacion={sinPaginacion}
                 dense
                 getRowId={(row) => String(getId(row))}
                 // El tinte por estado va primero: así el resaltado de la fila
@@ -916,6 +935,7 @@ export function CrudTable<T, TId = number>({
             columns={allColumns}
             data={filtered}
             pageSize={rowsPerPage}
+            sinPaginacion={sinPaginacion}
             // Row key estable por id real (evita que los switches/estado de cada
             // fila "salten" a otra cuenta si el orden de los datos cambia).
             getRowId={(row) => String(getId(row))}

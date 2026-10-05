@@ -92,7 +92,7 @@ const TONE_BG: Record<SwipeTone, string> = {
   primary: "bg-primary",
   success: "bg-success",
   danger: "bg-danger",
-  warning: "bg-amber-500",
+  warning: "bg-warning",
 };
 
 /** Color por defecto de una acción según su `key` (una acción puede pisarlo con
