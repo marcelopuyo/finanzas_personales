@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /** Clave de `localStorage`: deja el panel encendido también en la **PWA instalada**
  *  (standalone), donde no hay barra de direcciones para escribir `?diag=1`. */
@@ -33,8 +33,18 @@ const CLAVE_DIAG = "fp_diag_barras";
  */
 export function DiagBarras() {
   const [visible, setVisible] = useState(false);
-  // Arranca **minimizado**: así no tapa la interfaz mientras se reproduce el bug.
-  const [abierto, setAbierto] = useState(false);
+  /**
+   * Cómo se ve el panel:
+   * - `tab`: pestañita al costado (lo más discreto).
+   * - `linea`: **una sola línea** con los números clave, pegada arriba. Es la
+   *   forma de mirar los valores **mientras se usa la app**: no tapa el formulario,
+   *   así que el bug del teclado se puede desencadenar con el panel encendido.
+   * - `panel`: panel completo, con las medidas y los botones de prueba.
+   *
+   * Con un campo enfocado pasa solo a `linea` y, al cerrar el teclado, vuelve solo
+   * a `panel` (ver `alEnfocar` / `alPerderCampo`).
+   */
+  const [modo, setModo] = useState<"tab" | "linea" | "panel">("tab");
   const [datos, setDatos] = useState<[string, string][]>([]);
   const [log, setLog] = useState<string[]>([]);
   const [copiado, setCopiado] = useState(false);
@@ -48,6 +58,24 @@ export function DiagBarras() {
    * al cerrar el teclado, el motor nunca avisó de la restauración.
    */
   const [logEv, setLogEv] = useState<string[]>([]);
+  /** Espejo de `modo` para leerlo desde las escuchas del efecto (que no se re-crean). */
+  const modoRef = useRef<"tab" | "linea" | "panel">("tab");
+  /** ¿El panel estaba abierto cuando se empezó a escribir? (para volver solo). */
+  const volverAPanel = useRef(false);
+  /**
+   * Cronología grabada. Se llena **siempre**, aunque el panel esté cerrado o
+   * apagado: el bug se reproduce usando la app, así que no se puede depender de
+   * tener el panel abierto para grabar. Va en un `ref` (sin `setState`) para no
+   * re-renderizar la app ni una vez de más.
+   */
+  const registroRef = useRef<string[]>([]);
+  /** Última muestra registrada, para no repetir las idénticas (el `tick`). */
+  const ultimaFirmaRef = useRef("");
+
+  const cambiarModo = (m: "tab" | "linea" | "panel") => {
+    modoRef.current = m;
+    setModo(m);
+  };
 
   useEffect(() => {
     fetch("/version.json", { cache: "no-store" })
@@ -103,8 +131,95 @@ export function DiagBarras() {
     } catch {
       /* modo privado */
     }
-    const t = setTimeout(() => setVisible(encender), 0);
+    const t = setTimeout(() => {
+      setVisible(encender);
+      // `?modo=linea|panel` abre el panel ya en ese modo (para probarlo rápido).
+      const m = q.get("modo");
+      if (m === "linea" || m === "panel") {
+        modoRef.current = m;
+        setModo(m);
+      }
+    }, 0);
     return () => clearTimeout(t);
+  }, []);
+
+  /**
+   * **Grabador siempre activo** (no depende de que el panel esté visible).
+   *
+   * El problema se reproduce mientras se usa la app —cargar un gasto, cerrar el
+   * teclado— así que el registro tiene que estar corriendo desde que arranca la
+   * app. Cuando el usuario termina, abre el panel y con «copiar todo» se lleva
+   * toda la cronología junta.
+   *
+   * Sólo escribe en un `ref`: cero re-renders mientras la app se usa.
+   */
+  useEffect(() => {
+    /** Una muestra: los números que permiten reconstruir el caso. */
+    const firma = (etiqueta: string) => {
+      const vv = window.visualViewport;
+      const nav = document.querySelector<HTMLElement>("[data-barra-nav]");
+      const shell = document.querySelector<HTMLElement>("[data-app-shell]");
+      const rn = nav?.getBoundingClientRect();
+      const rs = shell?.getBoundingClientRect();
+      const act = document.activeElement;
+      return [
+        etiqueta,
+        `innerH=${window.innerHeight}`,
+        `clientH=${document.documentElement.clientHeight}`,
+        `vvH=${vv ? Math.round(vv.height) : "-"}`,
+        `vvTop=${vv ? Math.round(vv.offsetTop) : "-"}`,
+        `esc=${vv ? vv.scale.toFixed(2) : "-"}`,
+        `shellH=${rs ? Math.round(rs.height) : "-"}`,
+        `navB=${rn ? Math.round(rn.bottom) : "-"}`,
+        `screenH=${window.screen.height}`,
+        `act=${act && act !== document.body ? act.tagName : "-"}`,
+      ].join(" ");
+    };
+
+    const registrar = (etiqueta: string, forzar = false) => {
+      const f = firma(etiqueta);
+      if (!forzar && f === ultimaFirmaRef.current) return;
+      ultimaFirmaRef.current = f;
+      registroRef.current.push(`${new Date().toLocaleTimeString()} ${f}`);
+      // Tope: la app puede quedar abierta horas.
+      if (registroRef.current.length > 400) registroRef.current.shift();
+    };
+
+    registrar("arranque", true);
+    const alFocusIn = () =>
+      registrar(`focusin ${document.activeElement?.tagName ?? "?"}`, true);
+    const alFocusOut = () => registrar("focusout", true);
+    const alResize = () => registrar("resize", true);
+    const alOrient = () => registrar("orientationchange", true);
+    const alVis = () => registrar(`visibility ${document.visibilityState}`, true);
+    const alPageshow = () => registrar("pageshow", true);
+    const alVv = () => registrar("vv", true);
+
+    // `focusin`/`focusout` en captura: interesa aunque alguien corte la propagación.
+    window.addEventListener("focusin", alFocusIn, true);
+    window.addEventListener("focusout", alFocusOut, true);
+    window.addEventListener("resize", alResize);
+    window.addEventListener("orientationchange", alOrient);
+    document.addEventListener("visibilitychange", alVis);
+    window.addEventListener("pageshow", alPageshow);
+    window.visualViewport?.addEventListener("resize", alVv);
+    window.visualViewport?.addEventListener("scroll", alVv);
+    // Muestreo perezoso: detecta cambios que **no** disparan ningún evento.
+    const t = window.setInterval(() => {
+      if (document.visibilityState === "visible") registrar("tick");
+    }, 2000);
+
+    return () => {
+      window.clearInterval(t);
+      window.removeEventListener("focusin", alFocusIn, true);
+      window.removeEventListener("focusout", alFocusOut, true);
+      window.removeEventListener("resize", alResize);
+      window.removeEventListener("orientationchange", alOrient);
+      document.removeEventListener("visibilitychange", alVis);
+      window.removeEventListener("pageshow", alPageshow);
+      window.visualViewport?.removeEventListener("resize", alVv);
+      window.visualViewport?.removeEventListener("scroll", alVv);
+    };
   }, []);
 
   useEffect(() => {
@@ -155,46 +270,55 @@ export function DiagBarras() {
       ]);
     };
 
+    /** Copia la cronología grabada (siempre activa) al estado que muestra el panel. */
+    const sincronizar = () => setLogEv(registroRef.current.slice(-80));
+
     medir();
-    const t = setInterval(medir, 500);
+    sincronizar();
+    const t = setInterval(() => {
+      medir();
+      sincronizar();
+    }, 500);
 
-    /** Deja una línea por evento, con la altura del momento. */
-    const anotar = (etiqueta: string) => {
-      const vv = window.visualViewport;
-      const hora = new Date().toLocaleTimeString();
-      setLogEv((l) =>
-        [
-          ...l,
-          `${hora} ${etiqueta} · innerH=${window.innerHeight} clientH=${document.documentElement.clientHeight} vv=${vv ? Math.round(vv.height) : "-"}`,
-        ].slice(-40)
-      );
+    /**
+     * Con un campo enfocado el panel completo **tapa el formulario** y no se puede
+     * desencadenar el bug. Por eso se achica solo a una línea mientras se escribe y
+     * vuelve solo al cerrar el teclado (§222).
+     */
+    let tVolver: number | undefined;
+    const alEnfocar = () => {
+      if (modoRef.current === "panel") {
+        volverAPanel.current = true;
+        cambiarModo("linea");
+      }
     };
-    const alFocusIn = () => anotar(`focusin ${document.activeElement?.tagName ?? "?"}`);
-    const alFocusOut = () => anotar("focusout");
-    const alResize = () => anotar("resize");
-
+    const alPerderCampo = () => {
+      if (tVolver !== undefined) window.clearTimeout(tVolver);
+      // El teclado tarda en cerrarse: se espera antes de volver a abrir el panel.
+      tVolver = window.setTimeout(() => {
+        if (volverAPanel.current) {
+          volverAPanel.current = false;
+          cambiarModo("panel");
+        }
+      }, 700);
+    };
     for (const ev of ["resize", "scroll", "focusin", "focusout", "orientationchange"]) {
       window.addEventListener(ev, medir);
     }
     window.visualViewport?.addEventListener("resize", medir);
     window.visualViewport?.addEventListener("scroll", medir);
-    window.addEventListener("focusin", alFocusIn);
-    window.addEventListener("focusout", alFocusOut);
-    window.addEventListener("resize", alResize);
-    window.addEventListener("orientationchange", alResize);
-    window.visualViewport?.addEventListener("resize", alResize);
+    window.addEventListener("focusin", alEnfocar);
+    window.addEventListener("focusout", alPerderCampo);
     return () => {
       clearInterval(t);
+      if (tVolver !== undefined) window.clearTimeout(tVolver);
       for (const ev of ["resize", "scroll", "focusin", "focusout", "orientationchange"]) {
         window.removeEventListener(ev, medir);
       }
       window.visualViewport?.removeEventListener("resize", medir);
       window.visualViewport?.removeEventListener("scroll", medir);
-      window.removeEventListener("focusin", alFocusIn);
-      window.removeEventListener("focusout", alFocusOut);
-      window.removeEventListener("resize", alResize);
-      window.removeEventListener("orientationchange", alResize);
-      window.visualViewport?.removeEventListener("resize", alResize);
+      window.removeEventListener("focusin", alEnfocar);
+      window.removeEventListener("focusout", alPerderCampo);
     };
   }, [visible, version]);
 
@@ -204,7 +328,8 @@ export function DiagBarras() {
   const linea = () => {
     const n = nav();
     const r = n?.getBoundingClientRect();
-    return r ? `bottom=${Math.round(r.bottom)} h=${Math.round(r.height)}` : "sin nav";
+    const vv = window.visualViewport;
+    return `innerH=${window.innerHeight} clientH=${document.documentElement.clientHeight} vvH=${vv ? Math.round(vv.height) : "-"} navBottom=${r ? Math.round(r.bottom) : "?"}`;
   };
 
   /** Ejecuta un “kick” y registra el antes/después de la barra. */
@@ -296,13 +421,79 @@ export function DiagBarras() {
         n.style.height = h;
       },
     ],
+    [
+      // El re-medido tiene que hacerse sobre un elemento de ALTO DE PANTALLA
+      // COMPLETA: WebKit recalcula el viewport a partir de ese hijo. Hacerlo sobre
+      // la barra (lo que hacíamos) no alcanza. Es el workaround documentado.
+      "re-medir shell",
+      () => {
+        const s = document.querySelector<HTMLElement>("[data-app-shell]");
+        if (!s) return;
+        const m = document.querySelector<HTMLElement>("main");
+        const scroll = m?.scrollTop ?? 0;
+        const previo = s.style.display;
+        s.style.display = "none";
+        void s.offsetHeight;
+        s.style.display = previo;
+        void s.offsetHeight;
+        if (m) m.scrollTop = scroll;
+      },
+    ],
+    [
+      // Variante sin tocar la app: una sonda propia de alto completo que se saca
+      // y se vuelve a poner. Si esto alcanza, es la versión más segura del arreglo.
+      "re-medir sonda dvh",
+      () => {
+        const d = document.createElement("div");
+        d.style.cssText =
+          "position:fixed;top:0;left:0;width:0;height:100dvh;visibility:hidden";
+        document.body.appendChild(d);
+        d.style.display = "none";
+        void d.offsetHeight;
+        d.style.display = "";
+        void d.offsetHeight;
+        d.remove();
+      },
+    ],
   ];
+
+  /**
+   * “Ciclo de teclado”: según el reporte de WebKit, abrir y cerrar un teclado
+   * **dentro de la página** es lo único que devuelve el viewport trabado a su
+   * tamaño. El campo sintético se enfoca acá mismo, dentro del toque, porque iOS
+   * sólo abre el teclado si el `focus()` viene de un gesto del usuario.
+   */
+  const cicloTeclado = () => {
+    const antes = linea();
+    const i = document.createElement("input");
+    i.setAttribute("type", "text");
+    // 16px: con menos, iOS zoomea la página al enfocar.
+    i.style.cssText =
+      "position:fixed;top:50%;left:50%;width:1px;height:1px;opacity:0;font-size:16px";
+    document.body.appendChild(i);
+    i.focus();
+    window.setTimeout(() => {
+      i.blur();
+      i.remove();
+      window.setTimeout(() => {
+        setLog((l) => [`ciclo de teclado: ${antes} → ${linea()}`, ...l].slice(0, 14));
+      }, 600);
+    }, 800);
+  };
 
   const copiar = () => {
     const texto = [
+      "=== DIAG BARRAS ===",
+      `copiado: ${new Date().toLocaleString()}`,
+      `lineas de cronologia: ${registroRef.current.length} (tope 400)`,
+      "",
       ...datos.map(([k, v]) => `${k}: ${v}`),
+      "",
+      "=== CRONOLOGIA (se graba siempre, tambien con el panel cerrado) ===",
+      ...registroRef.current,
+      "",
+      "=== PRUEBAS HECHAS A MANO ===",
       ...log,
-      ...logEv,
     ].join("\n");
     const p = navigator.clipboard?.writeText(texto);
     if (p) {
@@ -337,18 +528,47 @@ export function DiagBarras() {
     setPintado(on);
   };
 
-  // Minimizado: una pestañita al costado, para poder interactuar con la app.
-  if (!abierto) {
+  /** Último valor medido de una fila, por nombre. */
+  const dato = (clave: string) => datos.find(([k]) => k === clave)?.[1] ?? "?";
+
+  /** Línea única: los números que importan, sin tapar el formulario. */
+  const resumen = `h ${dato("innerH / clientH")} · vv ${dato("vv.h / vv.top / scale")} · nav ${dato("nav bottom / h")} · hueco ${dato("hueco abajo (screen - innerH)")}`;
+
+  // Modo `tab`: una pestañita al costado, para poder interactuar con la app.
+  if (modo === "tab") {
     return (
       <button
         type="button"
-        onClick={() => setAbierto(true)}
+        onClick={() => cambiarModo("panel")}
         aria-label="Mostrar diagnóstico de barras"
         className="fixed right-0 top-1/2 z-100 -translate-y-1/2 rounded-l border border-r-0 border-danger bg-background px-0.5 py-2 text-[9px] font-bold text-danger"
         style={{ writingMode: "vertical-rl" }}
       >
         DIAG
       </button>
+    );
+  }
+
+  /**
+   * Modo `linea`: una sola franja con los números clave. Es la forma de ver los
+   * valores **mientras se usa la app** (con un campo enfocado el panel se achica
+   * solo a esto), así el formulario queda utilizable y el bug se puede reproducir.
+   */
+  if (modo === "linea") {
+    return (
+      <div
+        className="fixed inset-x-0 top-0 z-100 flex items-center gap-1 border-b border-danger bg-background/95 px-1 py-0.5 text-[9px] leading-none"
+        style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 0.25rem)" }}
+      >
+        <span className="truncate tabular-nums text-danger">{resumen}</span>
+        <button
+          type="button"
+          onClick={() => cambiarModo("panel")}
+          className="ml-auto shrink-0 rounded border border-danger px-1 py-0.5 text-[9px] font-bold text-danger"
+        >
+          panel
+        </button>
+      </div>
     );
   }
 
@@ -359,7 +579,7 @@ export function DiagBarras() {
       // sin este margen los botones de arriba quedaban tapados y no se podían tocar.
       style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 0.5rem)" }}
     >
-      <div className="mb-1 flex items-center gap-2">
+      <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
         <strong className="text-[11px] text-danger">DIAG BARRAS</strong>
         <button
           type="button"
@@ -370,10 +590,17 @@ export function DiagBarras() {
         </button>
         <button
           type="button"
-          onClick={() => setAbierto(false)}
+          onClick={() => cambiarModo("linea")}
           className="ml-auto rounded border border-border px-2 py-0.5 text-[10px]"
         >
-          minimizar
+          a una línea
+        </button>
+        <button
+          type="button"
+          onClick={() => cambiarModo("tab")}
+          className="rounded border border-border px-2 py-0.5 text-[10px]"
+        >
+          ocultar
         </button>
         <button
           type="button"
@@ -402,6 +629,13 @@ export function DiagBarras() {
             {nombre}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={cicloTeclado}
+          className="rounded border border-danger bg-danger/10 px-1.5 py-1 text-[10px] font-bold text-danger"
+        >
+          ciclo de teclado
+        </button>
         <button
           type="button"
           onClick={() => pintarFondo(!pintado)}
