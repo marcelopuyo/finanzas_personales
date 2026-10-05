@@ -10,8 +10,9 @@
  *
  * 🔧 **Cómo deshacerlo** (el usuario lo pidió explícitamente): poner
  * `ZOOM_ACTIVO = false` en este archivo deja todo como estaba (la capa no se
- * monta, no se bloquea el pinch y el control desaparece de «Más»). El detalle de
- * los archivos involucrados está en `DeepSeek/bitacora.md` §218.
+ * monta, no se bloquea el pinch y el control desaparece del Perfil). El detalle de
+ * los archivos involucrados está en `DeepSeek/bitacora.md` §218, y el pase del
+ * control de «Más» al Perfil en §233.
  *
  * Estado compartido por dos componentes que no son parientes (la capa y el control
  * de «Más») ⇒ mismo patrón de store de módulo con suscriptores que

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 // 🎨 **Set de iconos de la barra: Solar** (decisión del usuario, 2026-10-02).
@@ -29,16 +29,6 @@ import {
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
 import { usePrefetchNav } from "@/components/ui/nav-progress";
-import {
-  ZOOM_ACTIVO,
-  ZOOM_MAX,
-  ZOOM_MIN,
-  ZOOM_PASO,
-  etiquetaZoom,
-  fijarZoom,
-  hidratarZoom,
-  suscribirZoom,
-} from "@/lib/zoom-contenido";
 
 /**
  * **Barra inferior de navegación** (2026-10-01, rama `rediseno-ui`) — reemplaza la
@@ -142,15 +132,6 @@ export default function BottomNav() {
   const [abierto, setAbierto] = useState(false);
   /** ¿Estamos en alguna de las pantallas que cuelgan de "Más"? */
   const masActivo = OPCIONES_MAS.some((o) => ruta.startsWith(o.href));
-
-  /** Zoom del contenido (preferencia del dispositivo): ver `lib/zoom-contenido.ts`. */
-  const [zoom, setZoom] = useState(1);
-  useEffect(() => {
-    if (!ZOOM_ACTIVO) return;
-    const desuscribir = suscribirZoom(setZoom);
-    hidratarZoom();
-    return desuscribir;
-  }, []);
 
   return (
     <>
@@ -261,73 +242,7 @@ export default function BottomNav() {
           );
         })}
       </div>
-
-      {/* Zoom del contenido (2026-10-04): sube/baja `zoom` de CSS SOLO a la capa
-          de contenido (`components/layout/zoom-contenido.tsx`), así las barras no
-          cambian de tamaño. También se maneja con pinch / Ctrl+rueda.
-          ⚠️ Se apaga entero con `ZOOM_ACTIVO = false` (`lib/zoom-contenido.ts`). */}
-      {ZOOM_ACTIVO && (
-        <div className="mt-2 border-t border-border pt-3">
-          <div className="flex items-center gap-2 px-1">
-            <span className="flex-1 text-[13px] text-subtitle">
-              Zoom del contenido
-            </span>
-            <BotonZoom
-              etiqueta="Alejar"
-              onClick={() => fijarZoom(zoom - ZOOM_PASO)}
-              disabled={zoom <= ZOOM_MIN}
-            >
-              −
-            </BotonZoom>
-            <span className="w-12 text-center text-[13px] tabular-nums text-card-foreground">
-              {etiquetaZoom(zoom)}
-            </span>
-            <BotonZoom
-              etiqueta="Acercar"
-              onClick={() => fijarZoom(zoom + ZOOM_PASO)}
-              disabled={zoom >= ZOOM_MAX}
-            >
-              +
-            </BotonZoom>
-          </div>
-          {zoom !== 1 && (
-            <button
-              type="button"
-              onClick={() => fijarZoom(1)}
-              className="mt-2 w-full rounded-lg border border-border px-3 py-2 text-[13px] text-subtitle transition-colors hover:bg-muted"
-            >
-              Restablecer al 100 %
-            </button>
-          )}
-        </div>
-      )}
     </Modal>
     </>
-  );
-}
-
-/** Botón redondo `−`/`+` del control de zoom. */
-function BotonZoom({
-  etiqueta,
-  onClick,
-  disabled,
-  children,
-}: {
-  etiqueta: string;
-  onClick: () => void;
-  disabled?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={etiqueta}
-      title={etiqueta}
-      onClick={onClick}
-      disabled={disabled}
-      className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-[15px] text-card-foreground transition-colors hover:bg-muted disabled:opacity-40"
-    >
-      {children}
-    </button>
   );
 }

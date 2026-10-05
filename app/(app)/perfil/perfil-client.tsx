@@ -10,6 +10,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { InstallButton } from "@/components/pwa/install-button";
 import { PasskeysSection } from "./components/passkeys-section";
 import { AppLockSection } from "./components/app-lock-section";
+import { ZoomSection } from "./components/zoom-section";
 import { cambiarPassword, actualizarMonedaPredeterminada } from "@/backend/src/actions/cuenta";
 import type { CredencialWebauthnOut } from "@/backend/src/queries/webauthn";
 import { NO_REMEMBER, PENDING_CLEAR } from "@/lib/session-flags";
@@ -214,6 +215,9 @@ export default function PerfilClient({
 
         {/* Bloqueo de la app (volver del segundo plano en el celular) */}
         <AppLockSection graciaInicial={graciaBloqueo} />
+
+        {/* Zoom del contenido (preferencia de ESTE equipo) */}
+        <ZoomSection />
 
         {/* Opciones */}
         <section className="rounded-xl border border-border bg-card p-2">
