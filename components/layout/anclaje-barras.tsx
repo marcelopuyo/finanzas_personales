@@ -113,6 +113,10 @@ export function AnclajeBarras() {
      * Como no se puede poner contenido ahí, se pinta la franja **con el color de
      * la barra**: el conjunto se lee como una sola barra pegada al borde.
      *
+     * ⚠️ Desde que el shell se estira a `100lvh` (`globals.css`, §224) esta franja
+     * ya no queda descubierta en el iPhone del caso: esto queda como **red de
+     * seguridad** para un dispositivo donde `lvh` no mida el alto real.
+     *
      * La reserva se mide en CSS puro (`100lvh - 100svh`) y sólo en la PWA
      * instalada: en Safari el navegador reserva su propia barra a propósito, y ahí
      * la franja no existe. Sano = 0 ⇒ no se pinta nada (comportamiento de siempre).
@@ -153,6 +157,20 @@ export function AnclajeBarras() {
     };
     /** Pinta o despinta la franja según lo que el motor reserve hoy. */
     const ajustarFranja = () => pintarFranja(reserva() > 4);
+
+    /**
+     * Marca en `<html>` que hay un teclado en pantalla. Con el teclado arriba el
+     * shell vuelve a `dvh` (ver `globals.css`): ahí el layout **sí** coincide con
+     * el teclado, y si el shell quedara en `100lvh` desbordaría y la página
+     * scrollearía mientras se escribe.
+     */
+    let tecladoMarcado = false;
+    const marcarTeclado = (activo: boolean) => {
+      if (activo === tecladoMarcado) return;
+      tecladoMarcado = activo;
+      if (activo) raiz.dataset.teclado = "1";
+      else delete raiz.dataset.teclado;
+    };
 
     /**
      * **Modo “zoom nativo”** (best effort; §221). iOS **no** expone ninguna API para
@@ -221,6 +239,22 @@ export function AnclajeBarras() {
       modoZoomNativo(false);
 
       const altoLayout = window.innerHeight;
+
+      /**
+       * 🔑 **Borde inferior de referencia: el del shell, no el del viewport.**
+       *
+       * En la PWA instalada iOS deja el layout más corto que la pantalla (§224) y
+       * el shell se estira al alto real por CSS (`100lvh`, ver `globals.css`): los
+       * `fixed` de adentro se posicionan contra el shell, así que su borde es el
+       * borde real de la pantalla. Si acá se midiera contra `innerHeight` (660), la
+       * corrección "arreglaría" la barra subiéndola 46 px y volvería la franja.
+       * En un navegador el shell es `h-dvh` y los dos bordes coinciden.
+       */
+      const shell = document.querySelector<HTMLElement>("[data-app-shell]");
+      const bordeShell = shell
+        ? Math.round(shell.getBoundingClientRect().height)
+        : altoLayout;
+
       const enfocado = editable(document.activeElement);
       if (enfocado) ultimoCampo = Date.now();
       /**
@@ -234,18 +268,22 @@ export function AnclajeBarras() {
        */
       const puedeEstarConTeclado =
         enfocado || Date.now() - ultimoCampo < 400;
+      // Con el teclado arriba el shell vuelve a `dvh` (ver `globals.css`): ahí el
+      // borde de referencia es el del viewport otra vez.
+      marcarTeclado(puedeEstarConTeclado);
 
       // Borde visible OBJETIVO (en coordenadas del layout, como `getBoundingClientRect`).
       let bordeSup = 0;
-      let bordeInf = altoLayout;
+      let bordeInf = bordeShell;
       if (puedeEstarConTeclado && vv && vv.height > 0) {
         bordeSup = Math.max(0, vv.offsetTop);
         bordeInf = vv.offsetTop + vv.height;
       }
 
       /** ¿La corrección es plausible? (evita saltos por mediciones a mitad de animación). */
+      const limiteDesfase = Math.max(altoLayout, bordeShell);
       const plausible = (v: number) =>
-        Number.isFinite(v) && Math.abs(v) <= altoLayout;
+        Number.isFinite(v) && Math.abs(v) <= limiteDesfase;
 
       // ¿El teclado se acaba de cerrar? ⇒ hay que bajar la barra sí o sí y, por si
       // el motor la dejó pintada donde estaba, re-engancharla.
@@ -256,8 +294,14 @@ export function AnclajeBarras() {
       if (nav) {
         // Se mide la posición real y se descuenta lo ya aplicado: la corrección
         // autocorrige también si el motor dejó el `fixed` corrido (bug de iOS).
+        //
+        // ⚠️ Sólo se **sube** la barra (`Math.max(0, …)`): moverla hacia afuera del
+        // layout viewport no está garantizado que se pinte —el motor recorta lo que
+        // se posiciona fuera de él, comprobado con una franja de prueba en el
+        // celular (§224)—. Cuando hay que bajarla, el trabajo lo hace el shell
+        // estirado a `100lvh` (ver `globals.css`), no el desfase.
         const r = nav.getBoundingClientRect();
-        const nuevo = Math.round(r.bottom + aplicadoInf - bordeInf);
+        const nuevo = Math.max(0, Math.round(r.bottom + aplicadoInf - bordeInf));
         if (plausible(nuevo) && nuevo !== aplicadoInf) {
           aplicadoInf = nuevo;
           escribir("--fp-desfase-inferior", nuevo);
@@ -321,6 +365,7 @@ export function AnclajeBarras() {
       for (const t of timers) window.clearTimeout(t);
       window.clearInterval(vigilante);
       pintarFranja(false);
+      marcarTeclado(false);
       window.removeEventListener("resize", programar);
       window.removeEventListener("scroll", programar);
       window.removeEventListener("pageshow", programar);

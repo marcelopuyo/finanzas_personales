@@ -280,6 +280,36 @@ html.fp-sin-red [data-app-lock] {
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   ALTO DEL SHELL EN LA PWA INSTALADA (2026-10-05 · §224 del historial)
+
+   🔑 El bug de la barra despegada en iOS **no era del anclaje**: iOS deja el
+   *layout viewport* de la app instalada más corto que la pantalla (46 px en un
+   iPhone de 812) y no lo recupera hasta destruir la vista web. Medido en el
+   celular: `100dvh` / `100svh` / `innerHeight` / `clientHeight` daban 660
+   mientras **`100lvh` seguía midiendo el alto real** (706). Ver
+   `components/layout/anclaje-barras.tsx` y `DeepSeek/bitacora.md` §224.
+
+   El `<nav>` (y el resto de los `fixed` del shell) se posicionan contra el
+   **shell**, no contra el viewport: estirando el shell al alto real, la barra
+   baja sola hasta el borde de la pantalla. Comprobado en el dispositivo: era la
+   única de las salidas probadas que devolvía la barra a su lugar.
+
+   ⚠️ Con el teclado abierto se vuelve a `dvh`: ahí el layout **sí** coincide con
+   el teclado y el shell no debe desbordar (si no, la página scrollea mientras se
+   escribe). Lo marca `anclaje-barras.tsx` en `<html data-teclado>`.
+
+   En un navegador estas reglas no aplican: sin app instalada no hay franja y el
+   shell sigue siendo `h-dvh` de siempre. */
+@media (display-mode: standalone) {
+  [data-app-shell] {
+    height: 100lvh;
+  }
+  html[data-teclado] [data-app-shell] {
+    height: 100dvh;
+  }
+}
+
 .fp-voz-fab {
   top: calc(var(--app-top) + 0.5rem);
 }

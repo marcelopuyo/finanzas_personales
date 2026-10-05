@@ -266,7 +266,12 @@ export function DiagBarras() {
         ["desfase aplicado (superior)", raiz.style.getPropertyValue("--fp-desfase-superior") || "(vacío)"],
         ["--fp-zoom", raiz.style.getPropertyValue("--fp-zoom") || "(vacío)"],
         ["top rect.top / h", `${rt ? Math.round(rt.top) : "?"} / ${rt ? Math.round(rt.height) : "?"}`],
-        ["desfase NAV (medido)", rn ? `${Math.round(rn.bottom - window.innerHeight)}` : "?"],
+        [
+          "desfase NAV (shell / innerH)",
+          rn
+            ? `${Math.round(rn.bottom - (shell ? shell.getBoundingClientRect().height : window.innerHeight))} / ${Math.round(rn.bottom - window.innerHeight)}`
+            : "?",
+        ],
         ["safe-area-inset-bottom", medirSafeArea()],
         ["userAgent", navigator.userAgent.slice(0, 110)],
       ]);
@@ -453,59 +458,17 @@ export function DiagBarras() {
   };
 
   /**
-   * ¿Se puede pintar **contenido** en la franja? Una franja verde fija, 46 px más
-   * abajo del borde del layout (`bottom: 100dvh - 100lvh`). Si se ve verde al pie
-   * de la pantalla, se puede mover la barra ahí; si no se ve, la franja sólo
-   * admite el fondo del documento (y ahí la solución es pintarla del color de la
-   * barra).
+   * Prueba **temporal** del arreglo: devuelve el shell al alto del viewport (el
+   * comportamiento viejo) por 6 s para poder comparar. Se deshace sola: no se
+   * puede quedar trabada.
    */
-  const franjaVerde = () => {
-    const d = document.createElement("div");
-    d.style.cssText = [
-      "position:fixed",
-      "left:0",
-      "right:0",
-      "height:46px",
-      "bottom:calc(100dvh - 100lvh)",
-      "background:#00ff00",
-      "z-index:9999",
-      "pointer-events:none",
-    ].join(";");
-    probarTemporal(
-      "franja verde abajo (6s)",
-      () => document.body.appendChild(d),
-      () => d.remove()
-    );
-  };
-
-  /** Mueve la barra de verdad a la franja (inline, 6 s) para ver cómo quedaría. */
-  const barraAbajo = () => {
-    const n = nav();
-    if (!n) return;
-    probarTemporal(
-      "barra abajo (6s)",
-      () => {
-        n.style.bottom = "calc(100dvh - 100lvh)";
-      },
-      () => {
-        n.style.bottom = "";
-      }
-    );
-  };
-
-  /**
-   * ¿La barra sigue al *shell*? Si el shell es el bloque contenedor de los `fixed`
-   * (algo arriba puede crearlo con un `transform` o un `contain`), estirar el shell
-   * al alto real (`100lvh`) baja la barra **sola** hasta el borde: sería el arreglo
-   * exacto, sin pintar nada.
-   */
-  const shellAltoReal = () => {
+  const shellDvh = () => {
     const s = document.querySelector<HTMLElement>("[data-app-shell]");
     if (!s) return;
     probarTemporal(
-      "shell alto 100lvh (6s)",
+      "shell 100dvh (6s)",
       () => {
-        s.style.height = "100lvh";
+        s.style.height = "100dvh";
       },
       () => {
         s.style.height = "";
@@ -651,24 +614,10 @@ export function DiagBarras() {
         ))}
         <button
           type="button"
-          onClick={franjaVerde}
+          onClick={shellDvh}
           className="rounded border border-danger bg-danger/10 px-1.5 py-1 text-[10px] font-bold text-danger"
         >
-          franja verde abajo (6s)
-        </button>
-        <button
-          type="button"
-          onClick={barraAbajo}
-          className="rounded border border-danger bg-danger/10 px-1.5 py-1 text-[10px] font-bold text-danger"
-        >
-          barra abajo (6s)
-        </button>
-        <button
-          type="button"
-          onClick={shellAltoReal}
-          className="rounded border border-danger bg-danger/10 px-1.5 py-1 text-[10px] font-bold text-danger"
-        >
-          shell alto 100lvh (6s)
+          shell 100dvh (6s)
         </button>
       </div>
       {logEv.length > 0 && (
