@@ -4,6 +4,7 @@ import { Settings2 } from "lucide-react";
 import { AccionCirculo } from "./accion-circulo";
 import { AporteBarra } from "./aporte-barra";
 import { EvolutionChart } from "./line-chart";
+import { useFlickLateral } from "./use-flick-lateral";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePrefetchNav } from "@/components/ui/nav-progress";
 import type { AporteCuenta } from "../aportes-balance";
@@ -54,6 +55,14 @@ interface CuentaSlideProps {
   cuentaId?: number;
   /** ¿Montar el gráfico? (`true` solo en el foco ± 1). */
   conGrafico: boolean;
+  /**
+   * **Flick lateral sobre la franja del gráfico** (2026-10-05): el gráfico toma el
+   * gesto lateral para scrubear el tooltip (`touch-action: pan-y`), así que un
+   * deslizamiento **rápido** se le avisa acá para que el carrusel pase de tarjeta,
+   * como al deslizar en el resto del encabezado. `1` = siguiente, `-1` = anterior.
+   * Ver `use-flick-lateral.ts`.
+   */
+  alFlick?: (dir: 1 | -1) => void;
 }
 
 export function CuentaSlide({
@@ -65,8 +74,25 @@ export function CuentaSlide({
   monedaISO,
   cuentaId,
   conGrafico,
+  alFlick,
 }: CuentaSlideProps) {
   const prefetch = usePrefetchNav();
+  const flick = useFlickLateral(alFlick);
+  /**
+   * Los gestos de flick se enganchan **sólo en la franja del gráfico**, que es
+   * donde el gesto lateral está tomado (`pan-y`). En la barra de aporte de la
+   * tarjeta de resumen el swipe nativo ya mueve el carrusel: engancharlos ahí
+   * pasaría de tarjeta dos veces.
+   */
+  const gestosFlick =
+    alFlick && conGrafico && !aporte
+      ? {
+          onTouchStart: flick.onTouchStart,
+          onTouchMove: flick.onTouchMove,
+          onTouchEnd: flick.onTouchEnd,
+          onTouchCancel: flick.onTouchCancel,
+        }
+      : undefined;
   // El resumen no ofrece el registro (no hay cuenta que precargar): su acción es
   // gestionar las cuentas que lo componen.
   const acciones = esBalance ? [] : accionesNuevoMovimiento(cuentaId);
@@ -92,7 +118,7 @@ export function CuentaSlide({
           📏 Alto **fijo en px** (no `%` ni `vh`): con `min(128px,16vh)` el 2026-10-03
           el gráfico no se pintó en el celular y la banda quedaba en más de media
           pantalla. 96px deja la banda cómoda y la serie se lee bien. */}
-      <div className="mt-3">
+      <div className="mt-3" {...gestosFlick}>
         {!conGrafico ? (
           // ⚠️ El fondo de la banda es `bg-muted` y el skeleton por defecto también
           // ⇒ quedaba **invisible** y el hueco se leía como "gráfico roto". Con

@@ -300,17 +300,14 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
   };
 
   /**
-   * **Tocar una fila del listado de aporte** (tarjeta de *Balance Actual*)
-   * desplaza el carrusel a la tarjeta de esa cuenta (pedido del usuario,
-   * 2026-10-03): el detalle de abajo pasa a ser su historial de movimientos.
+   * **Desplaza el carrusel a un slide** con animación y re-afina al aterrizar.
+   * Lo usan el listado de aporte (`irACuenta`, abajo) y el **flick sobre la franja
+   * del gráfico** (`desplazarTarjeta`): en los dos casos el destino es un índice.
    */
-  const irACuenta = useCallback(
-    (cuentasId: number) => {
-      const i = cuentas.findIndex((c) => c.id === cuentasId);
-      if (i < 0) return;
-      const destino = i + 1;
+  const irASlide = useCallback(
+    (destino: number) => {
       setFoco(destino);
-      focoIdRef.current = cuentasId;
+      focoIdRef.current = destino === 0 ? null : cuentas[destino - 1]?.id ?? null;
       setMontadosHasta((v) => Math.max(v, destino + 1));
       guardarFoco(destino);
       const el = trackRef.current;
@@ -350,6 +347,40 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
       }, 800);
     },
     [cuentas, sincronizarIndice]
+  );
+
+  /**
+   * **Tocar una fila del listado de aporte** (tarjeta de *Balance Actual*)
+   * desplaza el carrusel a la tarjeta de esa cuenta (pedido del usuario,
+   * 2026-10-03): el detalle de abajo pasa a ser su historial de movimientos.
+   */
+  const irACuenta = useCallback(
+    (cuentasId: number) => {
+      const i = cuentas.findIndex((c) => c.id === cuentasId);
+      if (i < 0) return;
+      irASlide(i + 1);
+    },
+    [cuentas, irASlide]
+  );
+
+  /**
+   * **Flick lateral sobre la franja del gráfico** (2026-10-05, ver
+   * `use-flick-lateral.ts`). El gráfico toma el gesto lateral para scrubear el
+   * tooltip (`touch-action: pan-y`), así que un deslizamiento **rápido** avisa acá
+   * y el carrusel pasa de tarjeta, igual que al deslizar en el resto del
+   * encabezado. El punto de partida se calcula desde el **scroll real** (no desde
+   * `foco`): así no se desincroniza si el flick cae a mitad de una animación.
+   */
+  const desplazarTarjeta = useCallback(
+    (dir: 1 | -1) => {
+      const el = trackRef.current;
+      if (!el) return;
+      const actual = Math.round(el.scrollLeft / (el.clientWidth || 1));
+      const destino = Math.min(totalTarjetas - 1, Math.max(0, actual + dir));
+      if (destino === actual) return;
+      irASlide(destino);
+    },
+    [irASlide, totalTarjetas]
   );
 
   /**
@@ -409,6 +440,7 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
                 titulo={c.title}
                 monto={c.value}
                 esBalance={false}
+                alFlick={desplazarTarjeta}
                 evolucion={(c.values ?? []).map((v, k) => ({
                   name: c.labels?.[k] ?? "",
                   value: v,
