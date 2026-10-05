@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Check } from "lucide-react";
 import { cn, dateTimeToString, numberToCurrency, simboloMoneda } from "@/lib/utils";
+import { sufijoOrigen } from "@/lib/origen-crud";
 import { crearTrabajo } from "@/backend/src/actions/trabajos";
 import {
   BotonPrincipal,
@@ -93,12 +94,11 @@ export function TrabajoWizard({
   monedaISO: string;
 }) {
   const router = useRouter();
-  // Abierto desde el panel Trabajo del dashboard (?origen=dashboard): al
+  // Abierto desde el CRUD (que a su vez viene de una vista del dashboard): al
   // volver (paso 0) o tras guardar se regresa al listado conservando el origen
-  // (mantiene la flecha volver al dashboard). Desde el CRUD normal vuelve al
+  // (mantiene la flecha "volver" a esa vista). Desde el CRUD normal vuelve al
   // listado tal como antes.
-  const destino =
-    origen === "dashboard" ? "/cruds/trabajos?origen=dashboard" : "/cruds/trabajos";
+  const destino = `/cruds/trabajos${sufijoOrigen(origen)}`;
   const [estado, setEstado] = useState<Estado>({
     nombre: "",
     fechaInicio: "",

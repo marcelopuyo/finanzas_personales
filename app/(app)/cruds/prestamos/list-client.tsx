@@ -10,6 +10,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { cn, dateTimeToString, numberToCurrency } from "@/lib/utils";
 import { fraseContraparte, verboPrestamo } from "@/lib/prestamos";
 import { useTap } from "@/lib/tap";
+import { sufijoOrigen, volverDeOrigen } from "@/lib/origen-crud";
 const columns: ColumnDef<PrestamoOut>[] = [
   { accessorKey: "detalle", header: "Detalle", cell: ({ getValue }) => getValue<string|null>() ?? "—" },
   { accessorKey: "fecha", header: "Fecha", cell: ({ getValue }) => dateTimeToString(getValue<Date>()), meta: { align: "center" as const } },
@@ -130,8 +131,9 @@ function PrestamoCard({ p }: { p: PrestamoOut }) {
 
 interface Props {
   initialData: PrestamoOut[];
-  /** Origen de navegación (?origen=...). Si es "dashboard" se muestra el botón
-      volver al dashboard y el "+"/editar conservan el origen (patrón mobile app). */
+  /** Origen de navegación (?origen=<vista del dashboard>): de ahí sale la flecha
+      "volver" del listado y el origen se propaga al "+"/editar (patrón mobile
+      app). Ver `lib/origen-crud.ts`. */
   origen?: string;
   /**
    * **Modo embebido** (2026-10-01, rama `rediseno-ui`): la grilla se muestra
@@ -141,8 +143,10 @@ interface Props {
   embebido?: boolean;
 }
 export function PrestamosListClient({ initialData, origen, embebido = false }: Props) {
-  const desdeDashboard = origen === "dashboard";
-  const origenQ = desdeDashboard ? "?origen=dashboard" : "";
+  // La flecha "volver" va a la VISTA desde la que se abrió el CRUD (Préstamos, si
+  // se llegó por el ⋯ de su panel); el origen se propaga al "+"/editar.
+  const volver = volverDeOrigen(origen);
+  const origenQ = sufijoOrigen(origen);
   // Navegación con feedback (barra de progreso global).
   const { go: nav } = usePendingNav();
   // Mobile: por defecto solo las tarjetas de los préstamos con SALDO pendiente;
@@ -207,7 +211,7 @@ export function PrestamosListClient({ initialData, origen, embebido = false }: P
       getId={(i) => i.id}
       searchPredicate={(i, q) => (i.detalle ?? "").toLowerCase().includes(q)}
       rowClassName={filaSaldoCls}
-      backHref={embebido ? undefined : desdeDashboard ? "/dashboard" : undefined}
+      backHref={embebido ? undefined : volver}
       mobileBottomNav
       // Mobile: cada préstamo es una TARJETA y se listan solo los que tienen
       // saldo; el pie permite ver también los saldados.

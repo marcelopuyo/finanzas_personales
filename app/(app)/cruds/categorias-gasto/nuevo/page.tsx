@@ -3,17 +3,16 @@ import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { CrudForm } from "@/components/crud/CrudForm";
 import { crearCategoriaGasto } from "@/backend/src/actions/gastos";
+import { sufijoOrigen } from "@/lib/origen-crud";
 import { categoriaGastoSchema, categoriaGastoFields } from "../categoria-gasto-form-config";
 
 function NuevaCategoriaGastoForm() {
   const searchParams = useSearchParams();
-  // Abierto desde el dashboard (?origen=dashboard): Cancelar / volver y el
-  // destino tras guardar van a la grilla CONSERVANDO el origen, para que siga
-  // mostrando el botón "volver" al dashboard (patrón mobile app).
-  const destino =
-    searchParams.get("origen") === "dashboard"
-      ? "/cruds/categorias-gasto?origen=dashboard"
-      : "/cruds/categorias-gasto";
+  // Abierto desde el CRUD (que a su vez viene de una vista del dashboard):
+  // Cancelar / volver y el destino tras guardar van a la grilla CONSERVANDO el
+  // origen, para que siga mostrando la flecha "volver" a esa vista (patrón
+  // mobile app).
+  const destino = `/cruds/categorias-gasto${sufijoOrigen(searchParams.get("origen"))}`;
   return (
     <CrudForm
       title="Nueva Categoría de Gasto"

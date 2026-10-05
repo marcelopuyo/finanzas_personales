@@ -13,6 +13,7 @@ import {
 import { actualizarIncluirPrestamosEnBalance } from "@/backend/src/actions/cuenta";
 import type { ColumnDef } from "@tanstack/react-table";
 import { numberToCurrency } from "@/lib/utils";
+import { sufijoOrigen, volverDeOrigen } from "@/lib/origen-crud";
 import { Switch } from "@/components/ui/switch";
 import { CurrencyFlag } from "@/components/ui/currency-flag";
 import { toast } from "sonner";
@@ -20,8 +21,8 @@ import { OrdenarCuentas } from "./ordenar-cuentas";
 
 interface Props {
   initialData: CuentaOut[];
-  /** Origen de navegación (?origen=...). Si es "dashboard" se muestra el botón
-      volver para regresar al dashboard al estilo mobile app. */
+  /** Origen de navegación (?origen=<vista del dashboard>): de ahí sale la flecha
+      "volver" del listado. Ver `lib/origen-crud.ts`. */
   origen?: string;
   /** ISO 4217 de la moneda predeterminada del usuario (export PDF). */
   currency?: string;
@@ -282,11 +283,11 @@ export function CuentasListClient({
     [cuentas, filaPrestamos]
   );
 
-  // Al venir del dashboard (?origen=dashboard) se propaga el parámetro a
-  // Nuevo/Editar para que, al cancelar/volver, la grilla conserve el botón
-  // "volver" al dashboard (patrón mobile app).
-  const desdeDashboard = origen === "dashboard";
-  const origenQ = desdeDashboard ? "?origen=dashboard" : "";
+  // La flecha "volver" va a la VISTA desde la que se abrió el CRUD (Inicio si
+  // vino de su panel): con `origenQ` esa vista viaja a Nuevo/Editar y vuelve
+  // intacta al cancelar/guardar (patrón mobile app).
+  const volver = volverDeOrigen(origen);
+  const origenQ = sufijoOrigen(origen);
 
   // Modo reordenar: pantalla de arrastre (dnd-kit). Cada arrastre persiste el
   // orden; al cerrar se refresca la grilla para que quede en el nuevo orden.
@@ -345,7 +346,7 @@ export function CuentasListClient({
       // La fila "Préstamos (neto)" no es un registro real: sin acciones y sin
       // selección en mobile.
       isSyntheticRow={(i) => i.id === ID_PRESTAMOS}
-      backHref={desdeDashboard ? "/dashboard" : undefined}
+      backHref={volver}
       mobileBottomNav
       // Mobile: swipe por fila (Editar / Eliminar vienen de `CrudTable`) con
       // **Ordenar** como acción propia; el toque abre la edición.

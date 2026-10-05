@@ -5,6 +5,7 @@ import type { TrabajoOut } from "@/backend/src/queries/trabajos";
 import { eliminarTrabajo } from "@/backend/src/actions/trabajos";
 import type { ColumnDef } from "@tanstack/react-table";
 import { dateTimeToString, numberToCurrency } from "@/lib/utils";
+import { sufijoOrigen, volverDeOrigen } from "@/lib/origen-crud";
 import { MODALIDAD_LABEL } from "./trabajo-form-config";
 const columns: ColumnDef<TrabajoOut>[] = [
   { accessorKey: "nombre", header: "Nombre" },
@@ -66,18 +67,17 @@ function TrabajoCard({ t }: { t: TrabajoOut }) {
 }
 interface Props {
   initialData: TrabajoOut[];
-  /** Origen de navegación (?origen=...). Si es "dashboard" se propaga al
-      Nuevo/Editar (mantiene el contexto al volver). La flecha volver al
-      dashboard es SIEMPRE visible, igual que en Personas. */
+  /** Origen de navegación (?origen=<vista del dashboard>). De ahí sale la flecha
+      "volver" del listado y se propaga al Nuevo/Editar (la mantiene al volver).
+      Ver `lib/origen-crud.ts`. */
   origen?: string;
 }
 export function TrabajosListClient({ initialData, origen }: Props) {
-  // Flecha "volver al dashboard" SIEMPRE visible junto al título (patrón mobile
-  // app, igual que Personas). Cuando se viene del panel Trabajo
-  // (?origen=dashboard) se propaga el origen al "+" (wizard) y al editar.
-  const desdeDashboard = origen === "dashboard";
-  const origenQ = desdeDashboard ? "?origen=dashboard" : "";
+  // La flecha "volver" va a la VISTA desde la que se abrió el CRUD (Ingresos, si
+  // se llegó por el ⋯ de su panel) y el origen se propaga al "+" (wizard) y al editar.
+  const volver = volverDeOrigen(origen);
+  const origenQ = sufijoOrigen(origen);
   // Navegación con feedback (barra de progreso global) para el toque de fila.
   const { go: nav } = usePendingNav();
-  return <CrudTable<TrabajoOut> title="Trabajos" columns={columns} mobileRow={(t) => <TrabajoCard t={t} />} initialData={initialData} sinPaginacion deleteItem={eliminarTrabajo} searchPlaceholder="Buscar trabajo..." createHref={`/cruds/trabajos/nuevo${origenQ}`} editHref={(id) => `/cruds/trabajos/${id}/editar${origenQ}`} getId={(i) => i.id} searchPredicate={(i, q) => i.nombre.toLowerCase().includes(q)} mobileBottomNav mobileSwipe={{ onRowTap: (id) => nav(`/cruds/trabajos/${id}/editar${origenQ}`, "row") }} backHref="/dashboard" />;
+  return <CrudTable<TrabajoOut> title="Trabajos" columns={columns} mobileRow={(t) => <TrabajoCard t={t} />} initialData={initialData} sinPaginacion deleteItem={eliminarTrabajo} searchPlaceholder="Buscar trabajo..." createHref={`/cruds/trabajos/nuevo${origenQ}`} editHref={(id) => `/cruds/trabajos/${id}/editar${origenQ}`} getId={(i) => i.id} searchPredicate={(i, q) => i.nombre.toLowerCase().includes(q)} mobileBottomNav mobileSwipe={{ onRowTap: (id) => nav(`/cruds/trabajos/${id}/editar${origenQ}`, "row") }} backHref={volver} />;
 }

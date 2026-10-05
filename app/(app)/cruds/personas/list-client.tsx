@@ -5,6 +5,7 @@ import { usePendingNav } from "@/components/ui/nav-progress";
 import type { PersonaOut } from "@/backend/src/queries/maestros";
 import { eliminarPersona } from "@/backend/src/actions/maestros";
 import type { ColumnDef } from "@tanstack/react-table";
+import { sufijoOrigen, volverDeOrigen } from "@/lib/origen-crud";
 
 const columns: ColumnDef<PersonaOut>[] = [
   { accessorKey: "nombre", header: "Nombre" },
@@ -44,9 +45,15 @@ function PersonaCard({ p }: { p: PersonaOut }) {
   );
 } interface Props {
   initialData: PersonaOut[];
+  /** Origen de navegación (?origen=<vista del dashboard>): de ahí sale la flecha
+      "volver" del listado (Préstamos, que es su único punto de entrada) y el
+      origen se propaga al "+"/editar. Ver `lib/origen-crud.ts`. */
+  origen?: string;
 }
 
-export function PersonasListClient({ initialData }: Props) {
+export function PersonasListClient({ initialData, origen }: Props) {
+  const volver = volverDeOrigen(origen);
+  const origenQ = sufijoOrigen(origen);
   // Navegación con feedback (barra de progreso global) para el toque de tarjeta.
   const { go: nav } = usePendingNav();
   return (
@@ -58,11 +65,11 @@ export function PersonasListClient({ initialData }: Props) {
       sinPaginacion
       deleteItem={eliminarPersona}
       searchPlaceholder="Buscar persona..."
-      createHref="/cruds/personas/nuevo"
-      editHref={(id) => `/cruds/personas/${id}/editar`}
+      createHref={`/cruds/personas/nuevo${origenQ}`}
+      editHref={(id) => `/cruds/personas/${id}/editar${origenQ}`}
       getId={(i) => i.id}
       searchPredicate={(i, q) => i.nombre.toLowerCase().includes(q)}
-      backHref="/dashboard"
+      backHref={volver}
       mobileBottomNav
       // Mobile: cada persona es una TARJETA y el toque abre la edición; el
       // swipe revela Editar/Eliminar (los aporta `CrudTable`). La barra inferior
@@ -70,7 +77,7 @@ export function PersonasListClient({ initialData }: Props) {
       // ("Tocá una fila para seleccionarla": con swipe la fila no se selecciona).
       mobileRow={(p) => <PersonaCard p={p} />}
       mobileSwipe={{
-        onRowTap: (id) => nav(`/cruds/personas/${id}/editar`, "row"),
+        onRowTap: (id) => nav(`/cruds/personas/${id}/editar${origenQ}`, "row"),
       }}
     />
   );

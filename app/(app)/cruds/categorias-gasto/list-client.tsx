@@ -5,6 +5,7 @@ import { usePendingNav } from "@/components/ui/nav-progress";
 import type { CategoriaGastoOut } from "@/backend/src/queries/gastos";
 import { eliminarCategoriaGasto } from "@/backend/src/actions/gastos";
 import type { ColumnDef } from "@tanstack/react-table";
+import { sufijoOrigen, volverDeOrigen } from "@/lib/origen-crud";
 
 const columns: ColumnDef<CategoriaGastoOut>[] = [
   { accessorKey: "nombre", header: "Nombre" },
@@ -28,17 +29,18 @@ function CategoriaCard({ c }: { c: CategoriaGastoOut }) {
 
 interface Props {
   initialData: CategoriaGastoOut[];
-  /** Origen de navegación (?origen=...). Si es "dashboard" se muestra el botón
-      volver al dashboard y se propaga al "+" y al editar (patrón mobile app). */
+  /** Origen de navegación (?origen=<vista del dashboard>). De ahí sale la flecha
+      "volver" del listado y se propaga al "+" y al editar (patrón mobile app).
+      Ver `lib/origen-crud.ts`. */
   origen?: string;
 }
 
 export function CategoriasGastoListClient({ initialData, origen }: Props) {
-  // Flecha "volver al dashboard" solo cuando se viene del panel del dashboard
-  // (?origen=dashboard); el "+" y el editar conservan el origen para el viaje
-  // de ida y vuelta.
-  const desdeDashboard = origen === "dashboard";
-  const origenQ = desdeDashboard ? "?origen=dashboard" : "";
+  // La flecha "volver" va a la VISTA desde la que se abrió el CRUD (Gastos, si
+  // vino de su panel); el "+" y el editar conservan el origen para el viaje de
+  // ida y vuelta.
+  const volver = volverDeOrigen(origen);
+  const origenQ = sufijoOrigen(origen);
   // Navegación con feedback (barra de progreso global) para el toque de tarjeta.
   const { go: nav } = usePendingNav();
   return (
@@ -56,7 +58,7 @@ export function CategoriasGastoListClient({ initialData, origen }: Props) {
       searchPredicate={(item, query) =>
         item.nombre.toLowerCase().includes(query)
       }
-      backHref={desdeDashboard ? "/dashboard" : undefined}
+      backHref={volver}
       mobileBottomNav
       // Mobile: cada categoría es una TARJETA y el toque abre la edición; el
       // swipe revela Editar/Eliminar (los aporta `CrudTable`). La barra inferior

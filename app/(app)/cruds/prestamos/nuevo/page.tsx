@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { CrudForm } from "@/components/crud/CrudForm";
 import { crearPrestamo } from "@/backend/src/actions/prestamos";
+import { sufijoOrigen } from "@/lib/origen-crud";
 import { prestamoSchema, prestamoFieldsNuevo } from "../prestamo-form-config";
 import { todayLocalISODate } from "@/lib/utils";
 
@@ -11,14 +12,11 @@ function NuevoPrestamoForm() {
   // Permite precargar la cuenta desde el menú de las tarjetas del dashboard
   // (el formulario espera el NOMBRE de la cuenta, igual que sus opciones).
   const cuenta = searchParams.get("cuenta") ?? "";
-  // Cuando el CRUD se abre desde el panel de préstamos del dashboard
-  // (?origen=dashboard), el "+" del listado llega con ese origen: Cancelar y
-  // guardar vuelven al listado CONSERVANDO el origen (mantiene el botón
-  // "Volver" al dashboard). Sin origen, se vuelve al listado normal.
-  const desdeDashboard = searchParams.get("origen") === "dashboard";
-  const destino = desdeDashboard
-    ? "/cruds/prestamos?origen=dashboard"
-    : "/cruds/prestamos";
+  // Cuando el CRUD se abre desde el ⋯ del panel de préstamos (?origen=prestamos),
+  // el "+" del listado llega con ese origen: Cancelar y guardar vuelven al listado
+  // CONSERVANDO el origen (mantiene la flecha "Volver" a esa vista). Sin origen,
+  // se vuelve al listado normal.
+  const destino = `/cruds/prestamos${sufijoOrigen(searchParams.get("origen"))}`;
   return (
     <CrudForm
       title="Nuevo Préstamo"

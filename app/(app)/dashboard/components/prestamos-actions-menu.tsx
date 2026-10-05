@@ -57,8 +57,10 @@ export function PrestamosActionsMenu() {
           role="menu"
           className="absolute right-0 top-full z-20 mt-1 w-52 overflow-hidden rounded-lg border border-border bg-card shadow-lg"
         >
+          {/* `origen=prestamos`: las flechas "volver" de los dos CRUD regresan a
+              ESTA pantalla (no a Inicio). Ver `lib/origen-crud.ts`. */}
           <Link
-            href="/cruds/prestamos?origen=dashboard"
+            href="/cruds/prestamos?origen=prestamos"
             role="menuitem"
             onClick={() => setOpen(false)}
             className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] font-medium text-card-foreground transition-colors hover:bg-muted"
@@ -68,7 +70,7 @@ export function PrestamosActionsMenu() {
             <LinkNavStatus />
           </Link>
           <Link
-            href="/cruds/personas"
+            href="/cruds/personas?origen=prestamos"
             role="menuitem"
             onClick={() => setOpen(false)}
             className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] font-medium text-card-foreground transition-colors hover:bg-muted"

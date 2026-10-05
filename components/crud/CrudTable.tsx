@@ -45,7 +45,8 @@ interface CrudTableProps<T, TId = number> {
   getId: (item: T) => TId;
   searchPredicate: (item: T, query: string) => boolean;
   /** Si se pasa, muestra un botón "volver" (←) a la izquierda del título
-      (patrón mobile app), ej. al entrar al CRUD desde el dashboard. */
+      (patrón mobile app). Es el destino de la vista que abrió el CRUD
+      (`volverDeOrigen`, ver `lib/origen-crud.ts`). */
   backHref?: string;
   /** ISO 4217 para formatear columnas currency en la exportación PDF (default ARS). */
   currency?: string;
@@ -884,9 +885,9 @@ export function CrudTable<T, TId = number>({
 
       {/* ===== Vista clásica (CRUD normal, o desktop dentro de bottomNav) ===== */}
       <div className={mobileBottomNav ? "hidden lg:block" : ""}>
-      {/* Encabezado: si viene con backHref (p. ej. abierto desde el dashboard
-          con ?origen=dashboard) muestra el botón "volver" a la izquierda del
-          título, al estilo mobile app. */}
+      {/* Encabezado: si viene con backHref (p. ej. abierto desde una vista del
+          dashboard con ?origen=<vista>) muestra el botón "volver" a la izquierda
+          del título, al estilo mobile app. */}
       {backHref ? (
         <div className="mb-4 flex items-center gap-3">
           <button

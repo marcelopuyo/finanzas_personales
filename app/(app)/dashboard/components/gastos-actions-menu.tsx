@@ -58,7 +58,9 @@ export function GastosActionsMenu() {
           className="absolute right-0 top-full z-20 mt-1 w-52 overflow-hidden rounded-lg border border-border bg-card shadow-lg"
         >
           <Link
-            href="/cruds/categorias-gasto?origen=dashboard"
+                  // `origen=gastos`: la flecha "volver" del CRUD regresa a ESTA
+            // pantalla (no a Inicio). Ver `lib/origen-crud.ts`.
+            href="/cruds/categorias-gasto?origen=gastos"
             role="menuitem"
             onClick={() => setOpen(false)}
             className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] font-medium text-card-foreground transition-colors hover:bg-muted"
