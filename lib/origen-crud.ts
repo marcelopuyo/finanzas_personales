@@ -29,3 +29,31 @@ export function volverDeOrigen(origen?: string | null): string | undefined {
 export function sufijoOrigen(origen?: string | null): string {
   return volverDeOrigen(origen) ? `?origen=${origen}` : "";
 }
+
+/** ¿Es una ruta interna segura (`/algo`, no `//host`)? */
+function esRutaInterna(url?: string | null): url is string {
+  return !!url && url.startsWith("/") && !url.startsWith("//");
+}
+
+/**
+ * `?volverA=<url>` para que un formulario del CRUD vuelva a una URL concreta.
+ * Lo usa el listado **embebido** en una pantalla (p. ej. `/dashboard/prestamos`):
+ * sin esto, Editar/Nuevo/Cobrar volvían al CRUD suelto `/cruds/prestamos`.
+ * Devuelve `""` si la URL no es una ruta interna.
+ */
+export function sufijoVolverA(url?: string | null): string {
+  return esRutaInterna(url) ? `?volverA=${encodeURIComponent(url)}` : "";
+}
+
+/**
+ * Destino de **Cancelar / guardar** de un formulario del CRUD: si viene
+ * `volverA` (retorno explícito del listado embebido) manda esa URL; si no, el
+ * listado del CRUD conservando el `origen`.
+ */
+export function destinoFormularioCrud(
+  urlCrud: string,
+  origen?: string | null,
+  volverA?: string | null
+): string {
+  return esRutaInterna(volverA) ? volverA : `${urlCrud}${sufijoOrigen(origen)}`;
+}

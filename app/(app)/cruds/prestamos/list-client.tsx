@@ -10,7 +10,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { cn, dateTimeToString, numberToCurrency } from "@/lib/utils";
 import { fraseContraparte, verboPrestamo } from "@/lib/prestamos";
 import { useTap } from "@/lib/tap";
-import { sufijoOrigen, volverDeOrigen } from "@/lib/origen-crud";
+import { sufijoOrigen, sufijoVolverA, volverDeOrigen } from "@/lib/origen-crud";
 const columns: ColumnDef<PrestamoOut>[] = [
   { accessorKey: "detalle", header: "Detalle", cell: ({ getValue }) => getValue<string|null>() ?? "—" },
   { accessorKey: "fecha", header: "Fecha", cell: ({ getValue }) => dateTimeToString(getValue<Date>()), meta: { align: "center" as const } },
@@ -54,9 +54,9 @@ function filaSaldoCls(p: PrestamoOut): string {
  * "Pago Prestamo" según el `sentido`): lo único que cambia es el rótulo, que sale
  * de `verboPrestamo`. Lo usan el botón de la grilla (desktop) y el swipe (mobile).
  */
-function pagarHref(id: string, origenQ: string): string {
+function pagarHref(id: string, volverAUrl: string): string {
   return `/movimientos/nuevo/pago-prestamo?prestamo=${id}&volverA=${encodeURIComponent(
-    `/cruds/prestamos${origenQ}`
+    volverAUrl
   )}`;
 }
 
@@ -141,12 +141,28 @@ interface Props {
    * botón "volver" (ya estamos en su pantalla).
    */
   embebido?: boolean;
+  /**
+   * URL de retorno **explícita** de las acciones del listado (Editar · Nuevo ·
+   * Cobrar/Pagar). La usa la grilla **embebida** en una pantalla (p. ej.
+   * `/dashboard/prestamos`): sin esto, esas acciones volvían al CRUD suelto
+   * `/cruds/prestamos` (otra pantalla, sin el gráfico). Ver `lib/origen-crud.ts`.
+   */
+  volverA?: string;
 }
-export function PrestamosListClient({ initialData, origen, embebido = false }: Props) {
+export function PrestamosListClient({
+  initialData,
+  origen,
+  embebido = false,
+  volverA,
+}: Props) {
   // La flecha "volver" va a la VISTA desde la que se abrió el CRUD (Préstamos, si
   // se llegó por el ⋯ de su panel); el origen se propaga al "+"/editar.
   const volver = volverDeOrigen(origen);
   const origenQ = sufijoOrigen(origen);
+  // A dónde vuelven las acciones del listado: si está EMBEBIDO (`volverA`) a esa
+  // pantalla; si no, al listado del CRUD conservando el `origen`.
+  const volverAUrl = volverA ?? `/cruds/prestamos${origenQ}`;
+  const sufijoForm = volverA ? sufijoVolverA(volverA) : origenQ;
   // Navegación con feedback (barra de progreso global).
   const { go: nav } = usePendingNav();
   // Mobile: por defecto solo las tarjetas de los préstamos con SALDO pendiente;
@@ -179,7 +195,7 @@ export function PrestamosListClient({ initialData, origen, embebido = false }: P
           const verbo = verboPrestamo(p.sentido);
           return (
             <Link
-              href={pagarHref(p.id, origenQ)}
+              href={pagarHref(p.id, volverAUrl)}
               title={`${verbo} préstamo`}
               aria-label={`${verbo} préstamo ${p.detalle ?? ""}`.trim()}
               className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted text-primary transition-colors hover:bg-primary/15"
@@ -191,7 +207,7 @@ export function PrestamosListClient({ initialData, origen, embebido = false }: P
         },
       } as ColumnDef<PrestamoOut>,
     ],
-    [origenQ]
+    [volverAUrl]
   );
   return (
     <CrudTable<PrestamoOut, string>
@@ -206,8 +222,8 @@ export function PrestamosListClient({ initialData, origen, embebido = false }: P
       sinPaginacion
       deleteItem={eliminarPrestamo}
       searchPlaceholder="Buscar préstamo..."
-      createHref={`/cruds/prestamos/nuevo${origenQ}`}
-      editHref={(id) => `/cruds/prestamos/${id}/editar${origenQ}`}
+      createHref={`/cruds/prestamos/nuevo${sufijoForm}`}
+      editHref={(id) => `/cruds/prestamos/${id}/editar${sufijoForm}`}
       getId={(i) => i.id}
       searchPredicate={(i, q) => (i.detalle ?? "").toLowerCase().includes(q)}
       rowClassName={filaSaldoCls}
@@ -238,7 +254,7 @@ export function PrestamosListClient({ initialData, origen, embebido = false }: P
       // `CrudTable`). El toque en la tarjeta abre la edición. El verbo depende de
       // quién debe: me deben ⇒ **Cobrar** · yo debo ⇒ **Pagar** (`verboPrestamo`).
       mobileSwipe={{
-        onRowTap: (id) => nav(`/cruds/prestamos/${id}/editar${origenQ}`, "row"),
+        onRowTap: (id) => nav(`/cruds/prestamos/${id}/editar${sufijoForm}`, "row"),
         extraActions: (id) => {
           const p = initialData.find((x) => x.id === id);
           if (!p || (p.saldo ?? 0) <= 0) return [];
@@ -249,7 +265,7 @@ export function PrestamosListClient({ initialData, origen, embebido = false }: P
               label: verbo,
               icon: HandCoins,
               tone: "success",
-              onClick: () => nav(pagarHref(p.id, origenQ), "pagar"),
+              onClick: () => nav(pagarHref(p.id, volverAUrl), "pagar"),
             },
           ];
         },

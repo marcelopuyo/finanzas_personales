@@ -29,7 +29,11 @@ export default async function PrestamosTabPage() {
       <DashboardClient data={data} solo="prestamos" />
       {/* La grilla va embebida: sin botón "volver" (ya estamos en su pantalla). */}
       <div className="pb-8">
-        <PrestamosListClient initialData={prestamos} embebido />
+        <PrestamosListClient
+          initialData={prestamos}
+          embebido
+          volverA="/dashboard/prestamos"
+        />
       </div>
     </>
   );

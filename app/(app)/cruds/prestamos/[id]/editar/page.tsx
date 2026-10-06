@@ -5,11 +5,11 @@ export default async function EditarPrestamoPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ origen?: string }>;
+  searchParams: Promise<{ origen?: string; volverA?: string }>;
 }) {
   const { id } = await params;
-  const { origen } = await searchParams;
+  const { origen, volverA } = await searchParams;
   const d = await getPrestamoById(String(id));
   if (!d) return <div className="flex h-64 items-center justify-center"><p className="text-danger">Préstamo no encontrado</p></div>;
-  return <EditarPrestamoClient data={d} origen={origen} />;
+  return <EditarPrestamoClient data={d} origen={origen} volverA={volverA} />;
 }

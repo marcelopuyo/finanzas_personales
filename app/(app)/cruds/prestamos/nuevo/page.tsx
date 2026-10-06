@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { CrudForm } from "@/components/crud/CrudForm";
 import { crearPrestamo } from "@/backend/src/actions/prestamos";
-import { sufijoOrigen } from "@/lib/origen-crud";
+import { destinoFormularioCrud } from "@/lib/origen-crud";
 import { prestamoSchema, prestamoFieldsNuevo } from "../prestamo-form-config";
 import { todayLocalISODate } from "@/lib/utils";
 
@@ -16,7 +16,13 @@ function NuevoPrestamoForm() {
   // el "+" del listado llega con ese origen: Cancelar y guardar vuelven al listado
   // CONSERVANDO el origen (mantiene la flecha "Volver" a esa vista). Sin origen,
   // se vuelve al listado normal.
-  const destino = `/cruds/prestamos${sufijoOrigen(searchParams.get("origen"))}`;
+  // `volverA`: retorno EXPLÍCITO del listado embebido (p. ej. `/dashboard/prestamos`);
+  // si no, el listado del CRUD conservando el `origen`.
+  const destino = destinoFormularioCrud(
+    "/cruds/prestamos",
+    searchParams.get("origen"),
+    searchParams.get("volverA")
+  );
   return (
     <CrudForm
       title="Nuevo Préstamo"
