@@ -89,8 +89,6 @@ export interface DashboardData {
   }[];
   ingresosTotal: string;
   ingresosMesActual: string;
-  /** Resultado (ingresos − gastos) del mes actual, formateado (FALLBACK SSR). */
-  resultadosMesActual: string;
   /** Totales de préstamos pendientes por moneda (para el badge del gráfico).
    * Con el modelo de contraparte única es el **saldo neto**: Σ saldo(otorgado)
    * − Σ saldo(obtenido), convertido… no: cada moneda con su propio total (el
@@ -232,26 +230,8 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   )}-${String(hoy.getDate()).padStart(2, "0")}`;
   const totalMesActual = ingresosDelMesActual(fuenteIngresos, hoyKeyMes);
 
-  // --- Resultado del mes actual (ingresos − gastos; FALLBACK SSR) ---
-  // ⚠️ Igual que `ingresosMesActual`, es solo el fallback de SSR: se calcula
-  // con `new Date()` del servidor (Vercel en UTC) y en el límite de mes puede
-  // quedar ±1 día/mes adelantado al usuario. El badge "Mes actual" de
-  // Resultados lo recalcula el cliente tras el montaje con la fecha local del
-  // navegador (dashboard-client.tsx), usando la MISMA ventana que los badges
-  // de Ingresos y Gastos (jornadas del mes − gastos con fechaPago en el mes)
-  // para que la resta sea coherente con lo que muestran esos dos badges.
-  const inicioKey = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-01`;
+  // "Hoy" del servidor: lo expone `hoyServidor` para la primera pintada.
   const hoyKey = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
-  let totalGastosMes = 0;
-  gastosTodos.forEach((g) => {
-    if (!g.fechaPago) return;
-    const f = new Date(g.fechaPago).toISOString().slice(0, 10);
-    if (f >= inicioKey && f <= hoyKey) totalGastosMes += g.monto;
-  });
-  const resultadosMesActual = numberToCurrency(
-    totalMesActual - totalGastosMes,
-    monedaPredeterminadaISO
-  );
 
   // --- Tandas estimadas de cobro (plan-cobros-estimados.md, panel "Trabajo") ---
   // La cadencia de cada trabajo se infiere de sus liquidaciones CERRADAS y los
@@ -402,7 +382,6 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     ingresosResumen,
     ingresosTotal: numberToCurrency(totalIngresos, monedaPredeterminadaISO),
     ingresosMesActual: numberToCurrency(totalMesActual, monedaPredeterminadaISO),
-    resultadosMesActual,
     prestamosTotales,
     prestamosChart: {
       data: prestamosChartData,

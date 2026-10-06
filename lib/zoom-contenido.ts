@@ -42,11 +42,6 @@ const avisar = () => {
   for (const cb of oyentes) cb(actual);
 };
 
-/** Lee el zoom vigente **sin** tocar `localStorage` (seguro en el primer render). */
-export function leerZoom() {
-  return actual;
-}
-
 /**
  * Lee `localStorage` una sola vez y **avisa siempre** (aunque ya esté hidratado):
  * los componentes se suscriben antes de llamarla, así reciben el valor vigente sin
