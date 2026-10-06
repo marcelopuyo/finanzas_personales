@@ -17,6 +17,7 @@ import { PrestamosChart } from "./components/prestamos-chart";
 import { ResultadosMensuales } from "./components/resultados-mensuales";
 import { PrestamosActionsMenu } from "./components/prestamos-actions-menu";
 import { GastosActionsMenu } from "./components/gastos-actions-menu";
+import { DashboardScrollKeeper } from "./components/dashboard-scroll-keeper";
 import { GastosClient } from "@/app/(app)/gastos/gastos-client";
 import { TrabajoClient } from "@/app/(app)/trabajo/trabajo-client";
 import type { DashboardData } from "./dashboard-data";
@@ -609,6 +610,9 @@ export function DashboardClient({
 
   return (
     <div className="space-y-6 pb-8 pt-4 lg:pt-0">
+      {/* Restaura el scroll del `<main>` al volver de un CRUD (igual que en Inicio);
+          `vista` evita arrastrar la posición de otra pestaña del dashboard. */}
+      <DashboardScrollKeeper vista={solo ?? "inicio"} />
       {/* Balance Actual — tarjeta full-width con el MISMO alto que las tarjetas
           de cuentas y su texto centrado en vertical: flex + min-height igual al
           alto fijo de AccountCard (título + importe + área del gráfico h-10).

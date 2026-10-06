@@ -29,6 +29,7 @@ que no afecta al build ni al runtime.
 | `backend/scripts/_shot-balance2.png` | Captura suelta de QA. |
 | `app/(app)/dashboard/components/gastos-detalle.tsx` | `GastosDetalle` (grilla `DataTable` del panel **Gastos → Detalle**) + `gastosDetalleColumns`. La pestaña pasó a **tarjetas de los últimos 3 días** (`gastos-tarjetas.tsx`) y el buscador + la lista completa viven en la pantalla **`/gastos`** (2026-09-30). |
 | `app/(app)/dashboard/components/ingresos-detalle.tsx` | `IngresosDetalle` (grilla `DataTable` del panel **Ingresos → Detalle**, con el sparkline de jornadas/tareas) + `ingresosDetalleColumns` y sus helpers. La pestaña pasó a **tarjetas de los últimos 3 meses** (`ingresos-tarjetas.tsx`, con el modelo de fila en `ingresos-filas.ts`) y la lista completa es la pantalla **`/trabajo`** (2026-09-30). ⚠️ Su otro consumidor era `ActividadCell`, que sólo usaba el `list-client.tsx` **archivado** de `periodos-trabajo` ⇒ si algún día se repone ese CRUD, hay que reponer los dos juntos. |
+| `components/layout/diag-barras.tsx` | Panel **temporal** de diagnóstico del anclaje de las barras (`?diag=1`). Archivado el **2026-10-05** al cerrar el caso de la barra despegada en iOS (§224-§226); estaba **sin montar**. Se conserva por si el síntoma reaparece (reponerlo = `Move-Item` a `components/layout/` + montar `<DiagBarras />`). |
 
 ### Rediseño "períodos gestionados → liquidaciones" (2026-09-26)
 

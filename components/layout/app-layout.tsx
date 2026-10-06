@@ -74,10 +74,11 @@ export default function AppLayout({
           lo que se ve y las barras “se despegan”. No dibuja nada: publica dos
           variables CSS que consumen la barra de arriba y la de abajo. */}
       <AnclajeBarras />
-      {/* Panel de diagnóstico de las barras: ⚠️ **queda en el repo pero NO montado**
-          (2026-10-05, al cerrar el caso de la barra despegada en iOS). Para volver a
-          usarlo, montá `<DiagBarras />` acá y abrí la app con `?diag=1` (en la PWA
-          instalada se enciende solo). Ver `components/layout/diag-barras.tsx` y
+      {/* Panel de diagnóstico de las barras: ⚠️ **archivado** (2026-10-05, al cerrar
+          el caso de la barra despegada en iOS): vive en
+          `archivo/components/layout/diag-barras.tsx` y NO entra al build. Para
+          recuperarlo, movelo de vuelta y montá `<DiagBarras />` acá + abrí con
+          `?diag=1` (en la PWA se enciende solo). Ver `archivo/README.md` y
           `DeepSeek/bitacora.md` §224-§225. */}
       {/* FAB 🎤 global (2026-09-23, fase G1 del replanteo de la voz). Va FUERA de
           PullToRefresh porque maneja sus propios touch events y no debe disparar

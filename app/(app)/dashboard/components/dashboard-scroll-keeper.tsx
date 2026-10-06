@@ -10,6 +10,14 @@ import { ANCLA_TOPE, registrarIrAlPanel } from "@/lib/panel-scroll";
 // localStorage, sessionStorage ni cookies.
 let dashboardScrollTop = 0;
 
+/**
+ * Vista dueña de `dashboardScrollTop`. Al cambiar de pestaña del dashboard
+ * (Gastos → Ingresos, p. ej.) se descarta la posición guardada para no arrastrar
+ * el scroll de la otra pantalla; al volver desde un CRUD la vista NO cambia y la
+ * posición se conserva.
+ */
+let vistaDelScroll = "";
+
 /** Tiempo máximo durante el que se sigue reintentando la restauración (ms). */
 const RESTORE_MS = 2000;
 
@@ -37,10 +45,18 @@ const MARGEN_PANEL = 8;
  * Mientras el dashboard está montado guarda continuamente el scrollTop en la
  * variable interna (leerlo en el unmount no es confiable porque el DOM del
  * <main> ya puede haber cambiado al swap de ruta); al montarse de nuevo (al
- * volver a /dashboard) restaura la posición. Vive únicamente en la página del
- * dashboard.
+ * volver a /dashboard) restaura la posición. Se monta en Inicio (`/dashboard`) y
+ * en las 4 vistas del dashboard (Gastos · Ingresos · Préstamos · Resultados), que
+ * lo traen desde `DashboardClient`.
  */
-export function DashboardScrollKeeper({ panel }: { panel?: string }) {
+export function DashboardScrollKeeper({
+  panel,
+  vista = "inicio",
+}: {
+  panel?: string;
+  /** Pestaña del dashboard dueña de este scroll (evita arrastrarlo entre tabs). */
+  vista?: string;
+}) {
   /**
    * Ancla pedida **sin navegar**: el FAB 🎤 (u otra orden de voz) ya estando en el
    * dashboard pide "llevame al panel X" por `lib/panel-scroll.ts` y se atiende acá.
@@ -66,6 +82,12 @@ export function DashboardScrollKeeper({ panel }: { panel?: string }) {
   );
 
   useEffect(() => {
+    // Cambió la pestaña del dashboard: no arrastrar el scroll de la anterior.
+    if (vistaDelScroll !== vista) {
+      vistaDelScroll = vista;
+      dashboardScrollTop = 0;
+    }
+
     const main = document.querySelector<HTMLElement>("main");
     if (!main) return;
 
@@ -167,7 +189,7 @@ export function DashboardScrollKeeper({ panel }: { panel?: string }) {
     // `ancla` entra en las deps (por `panel` de la URL y por `pedido`): estando ya
     // en el dashboard, pedir un panel (o el mismo otra vez) tiene que volver a
     // correr el efecto.
-  }, [panel, pedido]);
+  }, [panel, pedido, vista]);
 
   return null;
 }
