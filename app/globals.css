@@ -434,9 +434,14 @@ html.fp-inicio-scrolled .topbar-inicio {
    Con **16px** en los controles, iOS no zoomea y el problema desaparece de raíz.
    Solo en punteros "coarse" (celular/tablet): el escritorio no cambia.
    ⚠️ Si se baja de 16px, el bug vuelve.
+   ⚠️ **Excepción**: el selector `input:not(...)` tiene especificidad muy alta
+   (`0,5,1`) y le ganaba a la clase del **héroe** del monto (`text-[34px]`, `0,1,0`)
+   ⇒ en el celular el monto se veía **chico** (bug 2026-10-05). Los controles que
+   manejan su **propio** tamaño y ya son ≥16px se marcan con `data-fuente-grande`
+   y quedan fuera de la regla (hoy: el input del héroe en `wizard/ui.tsx`).
    ───────────────────────────────────────────────────────────────────────── */
 @media (pointer: coarse) {
-  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([data-fuente-grande]),
   textarea,
   select {
     font-size: 16px;

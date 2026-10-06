@@ -320,7 +320,10 @@ export function NumberField({
   placeholder?: string;
   /** Variante **héroe**: input grande y centrado, **sin label**. El llamador
    *  ubica el rótulo (la usan los wizards de gasto/transferencia/ajuste, diseño D
-   *  `2026-10-01`). Default: `false` ⇒ comportamiento de siempre. */
+   *  `2026-10-01`). Default: `false` ⇒ comportamiento de siempre.
+   *  ⚠️ Lleva `data-fuente-grande`: lo exceptúa de la regla de iOS que fuerza
+   *  16px a los controles en el celular (globals.css) — sin eso el héroe se
+   *  veía chico en mobile. */
   hero?: boolean;
   /** Símbolo de moneda que se muestra a la izquierda del héroe (ej. `US$`). */
   heroPrefix?: string;
@@ -391,6 +394,7 @@ export function NumberField({
           value={text}
           onChange={(e) => handleChange(e.target.value)}
           placeholder={placeholder ?? "0"}
+          data-fuente-grande=""
           className="w-45 max-w-full bg-transparent text-center text-[34px] leading-none tracking-tight text-header placeholder:text-subtitle/50 focus:outline-none"
         />
         {allowNegative && (
