@@ -25,8 +25,8 @@ import { VozAlias } from "./entities/voz-alias.entity";
 import { pgSslOption } from "./lib/pg-ssl";
 
 // ============================================================
-// DataSource de MIGRACIONES (apunta a PostgreSQL 18 / puerto 5432).
-// NO se usa en runtime (la app sigue en SQL Server con db.ts).
+// DataSource de MIGRACIONES (PostgreSQL, mismas PG_* de `.env.local`).
+// NO se usa en runtime: el runtime arma su propio DataSource en `db.ts`.
 // Solo lo consume el CLI de TypeORM:
 //   npm run migration:run | migration:revert | migration:show
 //   npm run migration:generate -- backend/src/migrations/<Nombre>
