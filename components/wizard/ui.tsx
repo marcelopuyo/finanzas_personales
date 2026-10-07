@@ -589,6 +589,7 @@ export function StepShellFintech({
   total,
   onCancel,
   cancelDisabled = false,
+  accion,
   heroe,
   children,
   footer,
@@ -601,6 +602,8 @@ export function StepShellFintech({
   onCancel: () => void;
   /** Deshabilita el `‹` (p. ej. mientras se guarda). */
   cancelDisabled?: boolean;
+  /** Acción extra de la cabecera (por convención, un icono a la derecha del título). */
+  accion?: ReactNode;
   /** Bloque del héroe (el monto). Opcional: hay pasos sin número protagonista. */
   heroe?: ReactNode;
   children: ReactNode;
@@ -619,10 +622,15 @@ export function StepShellFintech({
           <ArrowLeft className="h-4 w-4" />
         </button>
         <h1 className="text-[17px] text-header">{titulo}</h1>
-        {paso != null && total != null && (
-          <span className="ml-auto text-[12px] text-subtitle">
-            {paso}/{total}
-          </span>
+        {(accion != null || (paso != null && total != null)) && (
+          <div className="ml-auto flex items-center gap-2">
+            {paso != null && total != null && (
+              <span className="text-[12px] text-subtitle">
+                {paso}/{total}
+              </span>
+            )}
+            {accion}
+          </div>
         )}
       </div>
       {heroe}

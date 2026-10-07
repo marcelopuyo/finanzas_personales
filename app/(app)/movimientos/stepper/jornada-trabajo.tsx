@@ -240,6 +240,20 @@ export function JornadaTrabajo() {
       titulo="Jornada"
       step={2}
       total={3}
+      accion={
+        // Escáner del parte (plan OCR): sólo icono, al ras del título. Completa
+        // Fecha y Horas (y el Trabajo si el nombre coincide con uno de los tuyos).
+        <button
+          type="button"
+          onClick={() => setEscanerAbierto(true)}
+          disabled={!trabajosHoras.length}
+          aria-label="Escanear el parte de trabajo"
+          title="Escanear el parte de trabajo"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-subtitle transition-colors hover:bg-muted hover:text-header disabled:opacity-40"
+        >
+          <Camera className="h-5 w-5" />
+        </button>
+      }
       heroe={
         <HeroeFintech etiqueta={etiquetaEstimado}>
           <HeroeValor>
@@ -266,19 +280,6 @@ export function JornadaTrabajo() {
       )}
 
       <div className="space-y-4 rounded-xl border border-border bg-card p-4">
-        {/* Escáner (plan OCR): el usuario apunta al parte y los campos se
-            completan solos. Va arriba de todo porque es la entrada rápida; quien
-            prefiera tipear simplemente lo ignora. */}
-        <button
-          type="button"
-          onClick={() => setEscanerAbierto(true)}
-          disabled={!trabajosHoras.length}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-primary/40 bg-primary/5 px-3 py-2.5 text-[13px] font-medium text-primary disabled:opacity-50"
-        >
-          <Camera className="h-4 w-4" />
-          Escanear el parte de trabajo
-        </button>
-
         {/* El **trabajo** es el único vínculo de la jornada: no hay período que
             elegir (la liquidación nace al cobrar). Va primero porque de él sale
             el precio de la hora del monto estimado. */}

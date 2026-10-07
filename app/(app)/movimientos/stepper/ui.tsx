@@ -54,6 +54,7 @@ export function StepShellFintech({
   step,
   total,
   heroe,
+  accion,
   cancelDisabled = false,
   children,
   footer,
@@ -62,6 +63,8 @@ export function StepShellFintech({
   step: number;
   total: number;
   heroe: ReactNode;
+  /** Acción extra de la cabecera (icono a la derecha del título). */
+  accion?: ReactNode;
   /** Deshabilita el `‹` de la cabecera (p. ej. mientras se guarda). */
   cancelDisabled?: boolean;
   children: ReactNode;
@@ -80,6 +83,7 @@ export function StepShellFintech({
       total={direct ? undefined : total}
       onCancel={volver}
       cancelDisabled={cancelDisabled}
+      accion={accion}
       heroe={heroe}
       footer={footer}
     >
