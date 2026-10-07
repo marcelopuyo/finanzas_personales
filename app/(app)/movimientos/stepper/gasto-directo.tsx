@@ -30,7 +30,6 @@ import { simboloMoneda, todayLocalISODate } from "@/lib/utils";
 import type { CampoDictable } from "@/lib/voz/tipos";
 import { CamaraEscaner } from "@/components/ocr/camara-escaner";
 import { extraerTicket, type CamposTicket } from "@/lib/ocr/parsear-ticket";
-import { Modal } from "@/components/ui/modal";
 
 /**
  * ¿El formulario **ya tiene** un valor en ese campo?
@@ -63,30 +62,6 @@ export function GastoDirecto() {
   const [buscandoUltimo, setBuscandoUltimo] = useState(false);
   /** Escáner del ticket: se abre con el icono de la cabecera y se cierra al leer. */
   const [escanerAbierto, setEscanerAbierto] = useState(false);
-
-  /**
-   * ⚠️ **TEMPORAL** (diagnóstico del OCR de tickets, 2026-10-07): el texto crudo de
-   * la última lectura, para poder verlo y copiarlo desde el celular y afinar el
-   * parser de la descripción con la captura REAL. **Se borra** en cuanto esté
-   * afinado (junto con el botón y el modal de abajo).
-   */
-  const [textoLeido, setTextoLeido] = useState<string | null>(null);
-  const [verTexto, setVerTexto] = useState(false);
-
-  /** Envuelve al parser para quedarse con el texto crudo (sólo diagnóstico). */
-  const extraerConTexto = useCallback((texto: string) => {
-    setTextoLeido(texto);
-    return extraerTicket(texto);
-  }, []);
-
-  const copiarTexto = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(textoLeido ?? "");
-      toast.success("Texto copiado. Pegalo en el chat.");
-    } catch {
-      toast.error("No se pudo copiar: seleccioná el texto a mano.");
-    }
-  }, [textoLeido]);
 
   /**
    * Al ELEGIR una sugerencia de descripción (no al tipear): completa Categoría y
@@ -219,6 +194,10 @@ export function GastoDirecto() {
 
       if (Object.keys(patch).length > 0) handleSetData(patch);
 
+      // La Descripción puede venir **vacía a propósito**: si el comercio no se leyó
+      // con seguridad se prefiere vacía antes que basura (plan §11.2).
+      const sinDescripcion = !campos.descripcion && !data.descripcion.trim();
+
       if (completados.length === 0 && respetados.length === 0) {
         toast.info("No pude leer datos del ticket. Cargalos a mano.");
         return;
@@ -231,6 +210,9 @@ export function GastoDirecto() {
         `Se completó: ${completados.join(", ")}.` +
           (respetados.length > 0
             ? ` No se tocó ${respetados.join(", ")} (ya lo tenías).`
+            : "") +
+          (sinDescripcion
+            ? " No se leyó el comercio con seguridad: escribí la descripción."
             : "") +
           " Revisá antes de guardar."
       );
@@ -537,40 +519,11 @@ export function GastoDirecto() {
       {escanerAbierto && (
         <CamaraEscaner
           documento="el ticket"
-          extraer={extraerConTexto}
+          extraer={extraerTicket}
           onListo={aplicarTicket}
           onCerrar={() => setEscanerAbierto(false)}
         />
       )}
-
-      {/* ⚠️ TEMPORAL: diagnóstico del OCR (ver y copiar el texto crudo leído). */}
-      {textoLeido !== null && (
-        <button
-          type="button"
-          onClick={() => setVerTexto(true)}
-          className="w-full rounded-xl border border-dashed border-border px-4 py-2 text-xs text-subtitle"
-        >
-          Ver el texto que leyó la cámara
-        </button>
-      )}
-
-      <Modal
-        open={verTexto}
-        onClose={() => setVerTexto(false)}
-        title="Texto que leyó la cámara"
-        footer={
-          <BotonPrincipal onClick={() => void copiarTexto()}>
-            Copiar el texto
-          </BotonPrincipal>
-        }
-      >
-        <textarea
-          readOnly
-          value={textoLeido ?? ""}
-          rows={14}
-          className="w-full resize-none rounded-lg border border-border bg-background p-2 font-mono text-[11px] leading-tight text-header"
-        />
-      </Modal>
     </StepShellFintech>
   );
 }

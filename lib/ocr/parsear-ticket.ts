@@ -81,11 +81,15 @@ const RX_CANDIDATO = /\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{1,2})?|\d+[.,]\d{1,2}|\d+/g
 function montosDeLinea(linea: string): number[] {
   const candidatos: { valor: number; token: string }[] = [];
 
-  for (const m of linea.matchAll(RX_CANDIDATO)) {
+  // El OCR separa a veces el decimal del entero (`$46. 73`). Sin pegarlo, la
+  // línea queda con **dos** importes (46 y 73) y se acaba eligiendo el equivocado.
+  const compacta = linea.replace(/(\d)\s*([.,])\s*(\d)/g, "$1$2$3");
+
+  for (const m of compacta.matchAll(RX_CANDIDATO)) {
     const token = m[0];
     const indice = m.index ?? 0;
-    const antes = linea[indice - 1] ?? " ";
-    const despues = linea[indice + token.length] ?? " ";
+    const antes = compacta[indice - 1] ?? " ";
+    const despues = compacta[indice + token.length] ?? " ";
     // Un número pegado a un separador de fecha (`10/03/2026`) no es un importe.
     if (/[./-]/.test(antes) || /[./-]/.test(despues)) continue;
     const valor = parsearImporte(token);
@@ -107,14 +111,24 @@ function montosDeLinea(linea: string): number[] {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Etiquetas que marcan la línea del **total** (plan §11.2).
+ * Rótulos **fuertes**: la frase completa, que gana incluso si la línea aclara algo
+ * del IVA.
  *
- * ⚠️ Se comparan con `\b`: sin eso, `TOTAL` daría positivo dentro de `SUBTOTAL`.
+ * ⚠️ Van con `\b`: sin eso, `TOTAL` daría positivo dentro de `SUBTOTAL`.
  */
 const RX_TOTAL_FUERTE =
   /\b(?:total\s+a\s+pagar|total\s+a\s+abonar|total\s+compra|total\s+ticket|importe\s+total|gran\s+total|balance\s+due|amount\s+due|total\s+due)\b/;
 
-const RX_TOTAL = /\b(?:total|importe|a\s+pagar|a\s+abonar|suma|amount)\b/;
+/**
+ * El rótulo del total cuando es una **sola palabra** (la frase completa la cubre
+ * `RX_TOTAL_FUERTE`).
+ *
+ * ⚠️ `TOTAL` se **lee mal** de muchas formas: además de `tota1` / `T0TAL` (que
+ * resuelve `plegarRotulo`), el motor devolvió **`Jotal $46.77`** en la medición del
+ * 2026-10-07. Por eso las letras que el OCR confunde van como clases: `t/f/j` en la
+ * primera y tercera letra, y `l/1/i` en la última.
+ */
+const RX_TOTAL = /\b(?:[tfj]o[tf]a[l1i]|importe|suma|amount|a\s+pagar|a\s+abonar)\b/;
 
 /** Etiquetas que **descartan** la línea: es otro importe del ticket. */
 const RX_NO_TOTAL =
@@ -128,12 +142,16 @@ const RX_NO_TOTAL =
  * ⚠️ Hay que plegar **antes** de cortar la etiqueta: en `tota1 $46.77` el primer
  * dígito es ese `1` disfrazado de letra, así que sin plegar la etiqueta quedaría
  * en `tota`.
+ *
+ * ⚠️ Los cierres de paréntesis/corchete y el `!` también salen del motor en lugar
+ * de una `l`: en el ticket medido el total se leyó **`Tota) $46. 73`**.
  */
 function plegarRotulo(linea: string): string {
   return normalizar(linea)
     .replace(/1/g, "l")
     .replace(/0/g, "o")
-    .replace(/5/g, "s");
+    .replace(/5/g, "s")
+    .replace(/[)\]}|!]/g, "l");
 }
 
 /**
@@ -204,12 +222,25 @@ const RX_NO_COMERCIO =
 /** Un importe pegado a la línea: el nombre del comercio nunca lleva precio. */
 const RX_IMPORTE_EN_LINEA = /(?:[$€£]|us\$)\s*\d|\d+[.,]\d{2}(?!\d)/i;
 
+/**
+ * Signos que **no** puede llevar un nombre comercial de verdad.
+ *
+ * ⚠️ Medido sobre la captura real del celular (2026-10-07): el **logo** manglado
+ * sale con signos sueltos de la gráfica (`BESS FOR LE _`, `MITT —`,
+ * `: Pe atl: 3 … +`) y eran justamente los candidatos que ganaban el puntaje. Con
+ * esto la descripción queda **vacía** cuando no hay un nombre legible, en vez de
+ * completarse con basura (el campo es del usuario y tiene el autocompletado del
+ * historial).
+ */
+const RX_SIGNOS_RAROS = /[^\p{L}\p{N} .,'&/()\-]/u;
+
 /** ¿La línea puede ser el nombre del comercio? */
 function esComercioPlausible(linea: string): boolean {
   const t = linea.trim();
   if (t.length < 3 || t.length > COMERCIO_MAX) return false;
   if (/^\d/.test(t)) return false;
   if (RX_IMPORTE_EN_LINEA.test(t)) return false;
+  if (RX_SIGNOS_RAROS.test(t)) return false;
 
   const letras = (t.match(/[a-záéíóúüñ]/gi) ?? []).length;
   if (letras < 3) return false;

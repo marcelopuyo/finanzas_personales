@@ -23,5 +23,13 @@ export const IDIOMAS = "eng+spa";
  */
 export const LADO_LARGO_OCR = 2000;
 
+/**
+ * Lado largo del lienzo **chico** donde se busca el papel antes de leer.
+ *
+ * A este tamaño la detección tarda milisegundos y da el mismo recuadro que a 600
+ * px (medido el 2026-10-07 a 300, 480 y 600: las tres coinciden dentro de ±1 %).
+ */
+export const LADO_ANALISIS_RECORTE = 480;
+
 /** Caracteres admitidos cuando se lee sólo la zona de horas (evita O/0 y l/1). */
 export const WHITELIST_HORAS = "0123456789:.,-/hH";

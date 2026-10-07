@@ -21,8 +21,10 @@ import { marcoDesdeVideo } from "@/lib/ocr/preprocesar";
  *   a 480×640 y no sirve para OCR (§1.6).
  * - **La cámara se apaga en cuanto se dispara**, antes de que arranque el OCR: no
  *   queda encendida mientras el motor piensa.
- * - **Un solo `drawImage`** con la reducción incluida: nunca se materializa un
- *   buffer de 12 MP (memoria en iOS).
+ * - **Un solo `drawImage` del cuadro grande** (con el recorte al papel y la
+ *   reducción incluidos): nunca se materializa un buffer de 12 MP (memoria en
+ *   iOS). Aparte va un dibujo **chico** —480 px— para que el recorte se decida con
+ *   milisegundos de cuentas y no con el cuadro completo (§11.8).
  * - El OCR **nunca bloquea**: si no se lee nada, se devuelven los campos vacíos y
  *   el que decide qué hacer es la pantalla (con un aviso humano).
  */
