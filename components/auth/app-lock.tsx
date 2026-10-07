@@ -28,6 +28,9 @@ import {
  * - Al volver a `visible` se pide la biometría del dispositivo y se verifica
  *   contra el servidor (`/api/auth/webauthn/unlock/*`, con
  *   `userVerification: "required"`) antes de volver a mostrar la pantalla.
+ *   ⚠️ **En iOS/Safari ese intento NO puede abrir el prompt**: WebAuthn exige un
+ *   gesto del usuario, así que el candado pasa a *"Tocá la pantalla"* y **cualquier
+ *   toque** lo dispara (no hace falta apuntar al botón). Ver §251.
  *
  * ⚠️ Alcance (ampliado el 2026-09-17 por decisión del usuario): aplica en
  * **TODOS los dispositivos**, mobile y **escritorio**. Originalmente era solo
@@ -80,6 +83,12 @@ export function AppLock({ habilitado }: { habilitado: boolean }) {
    * aviso y se reintenta solo (decisión del usuario, 2026-09-17).
    */
   const [sinServidor, setSinServidor] = useState(false);
+  /**
+   * El navegador no dejó ni ABRIR el prompt biométrico porque no hubo gesto del
+   * usuario (lo pide iOS/Safari). No es un fallo ni una cancelación: hay que
+   * pedirle un toque. Ver `desbloquear()`.
+   */
+  const [hayQueTocar, setHayQueTocar] = useState(false);
 
   // Espejo de `bloqueado` para leerlo DENTRO del listener de visibilidad sin
   // depender del render (el estado puede cambiar en el mismo evento).
@@ -104,6 +113,7 @@ export function AppLock({ habilitado }: { habilitado: boolean }) {
     bloqueadoRef.current = false;
     setBloqueado(false);
     setError("");
+    setHayQueTocar(false);
   }, []);
 
   /** Marca/limpia el estado "el servidor no responde" (ref + estado). */
@@ -112,47 +122,65 @@ export function AppLock({ habilitado }: { habilitado: boolean }) {
     setSinServidor(v);
   }, []);
 
-  const desbloquear = useCallback(async () => {
-    if (ceremonia.current) return;
+  /**
+   * Pide la biometría y desbloquea.
+   *
+   * `automatico`: lo disparó la APP (arranque, volver del segundo plano, volver
+   * la conexión), sin que el usuario tocara nada. Importa porque **iOS/Safari
+   * exige un gesto del usuario para WebAuthn**: ahí el intento automático siempre
+   * termina en `NotAllowedError` y eso **no** es un fallo ni una biometría que el
+   * usuario canceló ⇒ se pasa a "tocá la pantalla" en vez de mostrar un error que
+   * no corresponde (§102 + §251).
+   */
+  const desbloquear = useCallback(
+    async (automatico = false) => {
+      if (ceremonia.current) return;
 
-    // Si ya sabemos que el servidor no responde, no tiene sentido abrir el
-    // prompt del sistema: se sondea primero y, si ya volvió, seguimos.
-    if (sinServidorRef.current) {
-      if (!(await servidorResponde())) return;
-      marcarSinServidor(false);
-    }
-
-    ceremonia.current = true;
-    setCargando(true);
-    setError("");
-    try {
-      const resultado = await desbloquearConBiometria();
-      // La sesión venció mientras la app estaba en segundo plano: no hay nada
-      // que desbloquear, hay que volver a ingresar.
-      if (resultado.sesionVencida) {
-        window.location.replace("/login");
-        return;
+      // Si ya sabemos que el servidor no responde, no tiene sentido abrir el
+      // prompt del sistema: se sondea primero y, si ya volvió, seguimos.
+      if (sinServidorRef.current) {
+        if (!(await servidorResponde())) return;
+        marcarSinServidor(false);
       }
-      if (!resultado.ok) {
-        // Hay RED pero el SERVIDOR no contesta (app caída, proxy roto, portal
-        // cautivo): el candado NO se libera (decisión del usuario 2026-09-17),
-        // se queda con el aviso y se reintenta solo. La sonda distingue este
-        // caso de un error puntual de la ruta.
-        if (resultado.sinServidor && !(await servidorResponde())) {
-          marcarSinServidor(true);
+
+      ceremonia.current = true;
+      setCargando(true);
+      setError("");
+      setHayQueTocar(false);
+      try {
+        const resultado = await desbloquearConBiometria();
+        // La sesión venció mientras la app estaba en segundo plano: no hay nada
+        // que desbloquear, hay que volver a ingresar.
+        if (resultado.sesionVencida) {
+          window.location.replace("/login");
           return;
         }
-        setError(resultado.error ?? "No pudimos desbloquear");
-        return;
+        if (!resultado.ok) {
+          // Hay RED pero el SERVIDOR no contesta (app caída, proxy roto, portal
+          // cautivo): el candado NO se libera (decisión del usuario 2026-09-17),
+          // se queda con el aviso y se reintenta solo. La sonda distingue este
+          // caso de un error puntual de la ruta.
+          if (resultado.sinServidor && !(await servidorResponde())) {
+            marcarSinServidor(true);
+            return;
+          }
+          if (automatico && resultado.name === "NotAllowedError") {
+            setHayQueTocar(true);
+            return;
+          }
+          setError(resultado.error ?? "No pudimos desbloquear");
+          return;
+        }
+        marcarSinServidor(false);
+        ultimoExito.current = Date.now();
+        soltar();
+      } finally {
+        ceremonia.current = false;
+        setCargando(false);
       }
-      marcarSinServidor(false);
-      ultimoExito.current = Date.now();
-      soltar();
-    } finally {
-      ceremonia.current = false;
-      setCargando(false);
-    }
-  }, [marcarSinServidor, soltar]);
+    },
+    [marcarSinServidor, soltar]
+  );
 
   // CONECTIVIDAD (2026-09-17). Dos cosas:
   // 1) La clase `fp-sin-red` la agrega el script del <head> ANTES del primer
@@ -170,7 +198,7 @@ export function AppLock({ habilitado }: { habilitado: boolean }) {
       );
     const onOnline = () => {
       marcar();
-      if (habilitado && bloqueadoRef.current) void desbloquear();
+      if (habilitado && bloqueadoRef.current) void desbloquear(true);
     };
     const onOffline = () => {
       marcar();
@@ -194,7 +222,7 @@ export function AppLock({ habilitado }: { habilitado: boolean }) {
   // pide la biometría y se desbloquea solo (2026-09-17).
   useEffect(() => {
     if (!bloqueado || !sinServidor) return;
-    const id = setInterval(() => void desbloquear(), SIN_SERVIDOR_REINTENTO_MS);
+    const id = setInterval(() => void desbloquear(true), SIN_SERVIDOR_REINTENTO_MS);
     return () => clearInterval(id);
   }, [bloqueado, sinServidor, desbloquear]);
 
@@ -238,14 +266,14 @@ export function AppLock({ habilitado }: { habilitado: boolean }) {
       // solo falta pedir la biometría. Va ANTES del chequeo de `oculto` porque
       // en un arranque puede no haber habido ningún `hidden` en esta sesión.
       if (bloqueadoRef.current) {
-        void desbloquear();
+        void desbloquear(true);
         return;
       }
 
       if (oculto === null) return;
       if (ahora - oculto < gracia) return;
       bloquear();
-      void desbloquear();
+      void desbloquear(true);
     };
 
     document.addEventListener("visibilitychange", onVisibility);
@@ -276,7 +304,7 @@ export function AppLock({ habilitado }: { habilitado: boolean }) {
       if (document.visibilityState !== "visible") return;
       // Si el servidor no responde, `desbloquear()` lo detecta (sonda) y el
       // candado queda puesto con el aviso + reintento automático.
-      void desbloquear();
+      void desbloquear(true);
     }, ARRANQUE_MS);
     return () => clearTimeout(id);
   }, [habilitado, marcarSinServidor, soltar, desbloquear]);
@@ -325,6 +353,18 @@ export function AppLock({ habilitado }: { habilitado: boolean }) {
       // candado NO se pinta (modo lectura).
       data-app-lock=""
       className="fixed inset-0 z-100 flex flex-col items-center justify-center gap-5 bg-background px-6 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] text-center"
+      /**
+       * Tocar en cualquier parte del candado pide la biometría: en iOS el intento
+       * automático NO puede abrir el prompt (Safari exige un gesto), así que el
+       * toque natural del usuario tiene que servir, en vez de obligarlo a apuntar
+       * al botón. Los toques sobre botones/enlaces quedan para su propio handler
+       * (su `click` burbujea hasta acá, por eso se excluyen).
+       */
+      onClick={(evento) => {
+        if (cargando || sinServidor) return;
+        if ((evento.target as Element).closest("button, a, input, label, select")) return;
+        void desbloquear();
+      }}
     >
       <Logo size={17} />
 
@@ -336,7 +376,9 @@ export function AppLock({ habilitado }: { habilitado: boolean }) {
         <p className="max-w-70 text-[13px] text-subtitle">
           {sinServidor
             ? "El servidor no responde: no podemos verificar tu biometría. Se va a desbloquear solo cuando vuelva la conexión."
-            : "Desbloqueá con biometría para seguir donde estabas."}
+            : hayQueTocar
+              ? "Tocá la pantalla para entrar con la biometría."
+              : "Desbloqueá con biometría para seguir donde estabas."}
         </p>
       </div>
 

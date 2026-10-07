@@ -2,7 +2,10 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getSessionUser } from "@/backend/src/lib/auth";
 import { getAllMonedas } from "@/backend/src/queries/maestros";
-import { getCredencialesWebauthn } from "@/backend/src/queries/webauthn";
+import {
+  getCredencialesWebauthn,
+  passkeyEnEsteDispositivo,
+} from "@/backend/src/queries/webauthn";
 import { LOCK_GRACE_COOKIE, graciaDeValor } from "@/lib/app-lock-prefs";
 import PerfilClient from "./perfil-client";
 
@@ -14,6 +17,8 @@ export default async function PerfilPage() {
   const monedas = await getAllMonedas();
   // Passkeys (biometría) del usuario: se listan en su Perfil.
   const credenciales = await getCredencialesWebauthn();
+  // ¿ESTE equipo ya tiene una passkey? Si es así, la sección no ofrece activarla.
+  const passkeyEnDispositivo = await passkeyEnEsteDispositivo();
   // Gracia del bloqueo de app guardada en este dispositivo (cookie).
   const store = await cookies();
   const graciaBloqueo = graciaDeValor(store.get(LOCK_GRACE_COOKIE)?.value);
@@ -42,6 +47,7 @@ export default async function PerfilPage() {
       }))}
       monedaPredeterminadaId={monedaPredeterminadaId}
       credenciales={credenciales}
+      passkeyEnDispositivo={passkeyEnDispositivo}
       graciaBloqueo={graciaBloqueo}
     />
   );

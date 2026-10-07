@@ -33,6 +33,7 @@ export default function PerfilClient({
   monedas,
   monedaPredeterminadaId,
   credenciales,
+  passkeyEnDispositivo,
   graciaBloqueo,
 }: {
   nombre: string;
@@ -42,6 +43,7 @@ export default function PerfilClient({
   monedas: { id: number; nombre: string; codigoISO: string; codigoPais: string | null }[];
   monedaPredeterminadaId: number;
   credenciales: CredencialWebauthnOut[];
+  passkeyEnDispositivo: boolean;
   graciaBloqueo: number;
 }) {
   const { theme, setTheme } = useTheme();
@@ -211,7 +213,10 @@ export default function PerfilClient({
         </section>
 
         {/* Acceso con biometría (passkeys) */}
-        <PasskeysSection credenciales={credenciales} />
+        <PasskeysSection
+          credenciales={credenciales}
+          passkeyEnDispositivo={passkeyEnDispositivo}
+        />
 
         {/* Bloqueo de la app (volver del segundo plano en el celular) */}
         <AppLockSection graciaInicial={graciaBloqueo} />

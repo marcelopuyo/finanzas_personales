@@ -54,8 +54,11 @@ function mensajeDeBiometria(estado: EstadoBiometria | null): string {
  */
 export function PasskeysSection({
   credenciales,
+  passkeyEnDispositivo,
 }: {
   credenciales: CredencialWebauthnOut[];
+  /** El servidor ya confirmó que ESTE equipo tiene una passkey activa. */
+  passkeyEnDispositivo: boolean;
 }) {
   const router = useRouter();
   const [estado, setEstado] = useState<EstadoBiometria | null>(null);
@@ -189,12 +192,23 @@ export function PasskeysSection({
           </p>
         )}
 
-        {/* Alta de ESTE dispositivo. El botón se muestra si la ceremonia se
-            PUEDE intentar (HTTPS + API): que el sistema no reporte biometría
-            configurada no lo bloquea, porque el navegador puede ofrecer
-            administrar las llaves de acceso igual. */}
+        {/* Alta de ESTE dispositivo. Si este equipo ya tiene una passkey (la misma
+            cookie "pista" que usa el login) no hay nada que activar: se confirma,
+            en vez de ofrecer un botón que sólo puede terminar en "ya existe".
+            Si no, el botón se muestra cuando la ceremonia se PUEDE intentar
+            (HTTPS + API): que el sistema no reporte biometría configurada no lo
+            bloquea, porque el navegador puede ofrecer administrar las llaves de
+            acceso igual. */}
         <div className="mt-3">
-          {estado?.puedeIntentar ? (
+          {passkeyEnDispositivo ? (
+            <p className="flex items-start gap-2 text-[12px] text-subtitle">
+              <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" />
+              <span>
+                Este dispositivo ya está activado: podés entrar con biometría sin
+                escribir la contraseña.
+              </span>
+            </p>
+          ) : estado?.puedeIntentar ? (
             <>
               <button
                 type="button"
