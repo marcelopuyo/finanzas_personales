@@ -30,6 +30,7 @@ import { simboloMoneda, todayLocalISODate } from "@/lib/utils";
 import type { CampoDictable } from "@/lib/voz/tipos";
 import { CamaraEscaner } from "@/components/ocr/camara-escaner";
 import { extraerTicket, type CamposTicket } from "@/lib/ocr/parsear-ticket";
+import { Modal } from "@/components/ui/modal";
 
 /**
  * ¿El formulario **ya tiene** un valor en ese campo?
@@ -62,6 +63,30 @@ export function GastoDirecto() {
   const [buscandoUltimo, setBuscandoUltimo] = useState(false);
   /** Escáner del ticket: se abre con el icono de la cabecera y se cierra al leer. */
   const [escanerAbierto, setEscanerAbierto] = useState(false);
+
+  /**
+   * ⚠️ **TEMPORAL** (diagnóstico del OCR de tickets, 2026-10-07): el texto crudo de
+   * la última lectura, para poder verlo y copiarlo desde el celular y afinar el
+   * parser de la descripción con la captura REAL. **Se borra** en cuanto esté
+   * afinado (junto con el botón y el modal de abajo).
+   */
+  const [textoLeido, setTextoLeido] = useState<string | null>(null);
+  const [verTexto, setVerTexto] = useState(false);
+
+  /** Envuelve al parser para quedarse con el texto crudo (sólo diagnóstico). */
+  const extraerConTexto = useCallback((texto: string) => {
+    setTextoLeido(texto);
+    return extraerTicket(texto);
+  }, []);
+
+  const copiarTexto = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(textoLeido ?? "");
+      toast.success("Texto copiado. Pegalo en el chat.");
+    } catch {
+      toast.error("No se pudo copiar: seleccioná el texto a mano.");
+    }
+  }, [textoLeido]);
 
   /**
    * Al ELEGIR una sugerencia de descripción (no al tipear): completa Categoría y
@@ -411,7 +436,7 @@ export function GastoDirecto() {
           onClick={() => setEscanerAbierto(true)}
           aria-label="Escanear el ticket"
           title="Escanear el ticket"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-subtitle transition-colors hover:bg-muted hover:text-header disabled:opacity-40"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-border bg-muted text-subtitle transition-colors hover:text-header disabled:opacity-50"
         >
           <Camera className="h-5 w-5" />
         </button>
@@ -512,11 +537,40 @@ export function GastoDirecto() {
       {escanerAbierto && (
         <CamaraEscaner
           documento="el ticket"
-          extraer={extraerTicket}
+          extraer={extraerConTexto}
           onListo={aplicarTicket}
           onCerrar={() => setEscanerAbierto(false)}
         />
       )}
+
+      {/* ⚠️ TEMPORAL: diagnóstico del OCR (ver y copiar el texto crudo leído). */}
+      {textoLeido !== null && (
+        <button
+          type="button"
+          onClick={() => setVerTexto(true)}
+          className="w-full rounded-xl border border-dashed border-border px-4 py-2 text-xs text-subtitle"
+        >
+          Ver el texto que leyó la cámara
+        </button>
+      )}
+
+      <Modal
+        open={verTexto}
+        onClose={() => setVerTexto(false)}
+        title="Texto que leyó la cámara"
+        footer={
+          <BotonPrincipal onClick={() => void copiarTexto()}>
+            Copiar el texto
+          </BotonPrincipal>
+        }
+      >
+        <textarea
+          readOnly
+          value={textoLeido ?? ""}
+          rows={14}
+          className="w-full resize-none rounded-lg border border-border bg-background p-2 font-mono text-[11px] leading-tight text-header"
+        />
+      </Modal>
     </StepShellFintech>
   );
 }

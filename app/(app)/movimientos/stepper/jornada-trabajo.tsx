@@ -252,7 +252,7 @@ export function JornadaTrabajo() {
           disabled={!trabajosHoras.length}
           aria-label="Escanear el parte de trabajo"
           title="Escanear el parte de trabajo"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-subtitle transition-colors hover:bg-muted hover:text-header disabled:opacity-40"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-border bg-muted text-subtitle transition-colors hover:text-header disabled:opacity-50"
         >
           <Camera className="h-5 w-5" />
         </button>
