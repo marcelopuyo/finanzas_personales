@@ -121,6 +121,22 @@ const RX_NO_TOTAL =
   /\b(?:sub\s*-?\s*total|iva|i\.v\.a\.?|igic|impuesto|tax|vat|cambio|vuelto|entregado|recibido|efectivo|contado|base|tip|propina|descuento|dto|ahorro|puntos|saldo|gravado)\b/;
 
 /**
+ * Pliega las confusiones típicas del OCR **sólo para leer el rótulo**: `tota1`,
+ * `T0TAL` y `5UBTOTAL` tienen que seguir siendo el rótulo del total. Nunca se usa
+ * para los importes, donde un `1` es un uno.
+ *
+ * ⚠️ Hay que plegar **antes** de cortar la etiqueta: en `tota1 $46.77` el primer
+ * dígito es ese `1` disfrazado de letra, así que sin plegar la etiqueta quedaría
+ * en `tota`.
+ */
+function plegarRotulo(linea: string): string {
+  return normalizar(linea)
+    .replace(/1/g, "l")
+    .replace(/0/g, "o")
+    .replace(/5/g, "s");
+}
+
+/**
  * ¿La línea es la del total?
  *
  * Un rótulo **fuerte** (`TOTAL A PAGAR`, `IMPORTE TOTAL`) manda: gana incluso si
@@ -132,7 +148,7 @@ const RX_NO_TOTAL =
  * (`12,70 TOTAL`).
  */
 function esLineaDeTotal(linea: string): boolean {
-  const n = normalizar(linea);
+  const n = plegarRotulo(linea);
 
   if (RX_TOTAL_FUERTE.test(n)) return true;
 
@@ -185,11 +201,15 @@ const COMERCIO_MAX = 40;
 const RX_NO_COMERCIO =
   /\b(?:cif|nif|rut|ruc|cuit|cuil|tel|telefono|telf|fax|phone|iva|igic|impuesto|factura|fact|ticket|recibo|presupuesto|fecha|hora|caja|cajero|nro|sucursal|cod|total|subtotal|cambio|vuelto|efectivo|tarjeta|visa|mastercard|debito|credito|gracias|www|http|mail|cliente|vendedor|operador|turno|domicilio|direccion|avda|avenida|calle|localidad)\b|@|https?:|\d{3,}/;
 
+/** Un importe pegado a la línea: el nombre del comercio nunca lleva precio. */
+const RX_IMPORTE_EN_LINEA = /(?:[$€£]|us\$)\s*\d|\d+[.,]\d{2}(?!\d)/i;
+
 /** ¿La línea puede ser el nombre del comercio? */
 function esComercioPlausible(linea: string): boolean {
   const t = linea.trim();
   if (t.length < 3 || t.length > COMERCIO_MAX) return false;
   if (/^\d/.test(t)) return false;
+  if (RX_IMPORTE_EN_LINEA.test(t)) return false;
 
   const letras = (t.match(/[a-záéíóúüñ]/gi) ?? []).length;
   if (letras < 3) return false;
@@ -197,6 +217,29 @@ function esComercioPlausible(linea: string): boolean {
   if (letras < t.length / 2) return false;
 
   return !RX_NO_COMERCIO.test(normalizar(t));
+}
+
+/**
+ * Puntaje de una línea como posible comercio (más alto = más creíble).
+ *
+ * El nombre del comercio es **corto, de 1–4 palabras y sin precio**; el OCR del
+ * **logo**, en cambio, produce palabras sueltas de una sola letra. Eso es lo que
+ * se colaba antes: en el ticket medido el logo de Ross se leyó `sew LEE a`,
+ * `AE = S`, `i20SS -` y la "primera línea plausible" era ese ruido.
+ */
+function puntajeComercio(linea: string): number {
+  const t = linea.trim();
+  const letras = (t.match(/[a-záéíóúüñ]/gi) ?? []).length;
+  const palabras = t.split(/\s+/).filter((p) => /[a-záéíóúüñ]/i.test(p));
+  const sueltas = palabras.filter(
+    (p) => p.replace(/[^a-záéíóúüñ]/gi, "").length <= 1
+  ).length;
+
+  let puntaje = letras;
+  if (palabras.length > 4) puntaje -= 20; // es una leyenda, no un nombre
+  puntaje -= sueltas * 8; // ruido del logo
+  if (t === t.toUpperCase()) puntaje += 4; // la cabecera suele venir en caja alta
+  return puntaje;
 }
 
 /**
@@ -214,9 +257,11 @@ function embellecer(texto: string): string {
 }
 
 /**
- * Limpia el comercio: sin símbolos sueltos en los bordes y sin la **forma
- * jurídica** final (`S.A.`, `S.L.`, `Inc.`), que no aporta a la descripción del
- * gasto y estorba para reencontrar el mismo comercio en el historial.
+ * Limpia el comercio: sin símbolos sueltos en los bordes, sin la **forma
+ * jurídica** final (`S.A.`, `S.L.`, `Inc.`) —que no aporta a la descripción del
+ * gasto y estorba para reencontrar el mismo comercio en el historial— y sin las
+ * **letras sueltas** de los bordes, que son ruido del logo (`DRESS FOR LESS E` ⇒
+ * `Dress For Less`).
  */
 function limpiarComercio(linea: string): string {
   const sinBordes = linea
@@ -230,20 +275,38 @@ function limpiarComercio(linea: string): string {
     ""
   );
 
-  return embellecer((sinForma.trim() || sinBordes).trim());
+  const sinSueltas = sinForma
+    .replace(/^[^\p{L}\p{N}]*\p{L}[^\p{L}\p{N}]+/u, "")
+    .replace(/[^\p{L}\p{N}]+\p{L}$/u, "")
+    .trim();
+
+  return embellecer((sinSueltas.length >= 3 ? sinSueltas : sinForma).trim());
 }
 
 /**
- * El comercio: la **primera línea plausible** del encabezado. El ticket lo
- * imprime arriba (o en el logo), así que se miran sólo las primeras líneas.
+ * El comercio: la **mejor** línea plausible del encabezado, no la primera.
+ *
+ * ⚠️ Tomar la primera era el bug medido en un ticket real: el logo manglado por
+ * el OCR (`sew LEE a`) está **antes** del nombre (`DRESS FOR LESS`) y ganaba por
+ * orden. Ahora se puntúa (ver `puntajeComercio`) y una línea de puro ruido ni
+ * siquiera alcanza el mínimo ⇒ se devuelve `undefined` y la descripción queda
+ * vacía antes que mal escrita.
  */
 function buscarComercio(lineas: string[]): string | undefined {
+  let mejor: string | undefined;
+  let mejorPuntaje = 0;
+
   for (const linea of lineas.slice(0, LINEAS_COMERCIO)) {
     if (!esComercioPlausible(linea)) continue;
+    const puntaje = puntajeComercio(linea);
+    if (puntaje <= mejorPuntaje) continue;
     const limpio = limpiarComercio(linea);
-    if (limpio.length >= 3) return limpio;
+    if (limpio.length < 3) continue;
+    mejorPuntaje = puntaje;
+    mejor = limpio;
   }
-  return undefined;
+
+  return mejor;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

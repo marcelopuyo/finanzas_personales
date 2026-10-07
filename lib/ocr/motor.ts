@@ -20,6 +20,14 @@ import type { Worker } from "tesseract.js";
 /** Progreso del motor: `estado` es el texto que reporta Tesseract. */
 export type ProgresoOcr = (datos: { estado: string; progreso: number }) => void;
 
+/**
+ * Ajustes del motor por lectura.
+ *
+ * ⚠️ **Medido el 2026-10-07 sobre un ticket real (térmico de Ross)**: `user_defined_dpi`
+ * `300` **no cambió ni un carácter** del texto y `psm 4` **perdió líneas** (se comió
+ * `Subtotal` y `Total`). El `psm 3` por defecto lee igual de bien el parte **y** el
+ * ticket ⇒ no volver a "optimizar" esto sin una muestra que lo demuestre.
+ */
 export type OpcionesReconocer = {
   /** Si viene, se restringe el charset (útil para leer sólo horas). */
   whitelist?: string;

@@ -52,6 +52,31 @@ function bordeValido(texto: string, inicio: number, fin: number): boolean {
   return !/[\d./-]/.test(anterior) && !/\d/.test(siguiente);
 }
 
+/**
+ * `true` si el candidato está **encadenado a otro número por los dos lados**
+ * (`01-9-09` dentro de `1-01-9-09-004673`): eso es un código o un teléfono, no
+ * una fecha.
+ *
+ * ⚠️ Se exige que esté pegado **a los dos lados** a propósito: un rango de fechas
+ * escrito sin espacios (`05/10/26-06/10/26`) está pegado de un solo lado y sigue
+ * siendo válido.
+ */
+function encadenadoPorAmbosLados(
+  texto: string,
+  inicio: number,
+  largo: number
+): boolean {
+  const encadenado = (separador?: string, digito?: string) =>
+    separador !== undefined &&
+    digito !== undefined &&
+    /[./-]/.test(separador) &&
+    /\d/.test(digito);
+  return (
+    encadenado(texto[inicio - 1], texto[inicio - 2]) &&
+    encadenado(texto[inicio + largo], texto[inicio + largo + 1])
+  );
+}
+
 /** Arma `YYYY-MM-DD` validando de verdad el calendario (rechaza 31/02). */
 function aISO(anio: number, mes: number, dia: number): string | undefined {
   if (mes < 1 || mes > 12 || dia < 1 || dia > 31) return undefined;
@@ -71,22 +96,27 @@ function fechasCandidatas(texto: string): string[] {
 
   // ISO: 2026-10-05
   for (const m of texto.matchAll(/\b(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\b/g)) {
+    if (encadenadoPorAmbosLados(texto, m.index ?? 0, m[0].length)) continue;
     sumar(aISO(Number(m[1]), Number(m[2]), Number(m[3])));
   }
   // Numérica de 3 grupos: 05/10/26 · 5-10-2026 · 05.10.2026
   //
   // ⚠️ Si los dos primeros grupos son ≤ 12 el orden es **ambiguo** (día/mes o
-  // mes/día según el país): se emiten LAS DOS lecturas y decide el paso de
-  // "fecha más cercana a hoy". Medido en un parte de EE.UU. el 2026-10-07:
-  // `10/03/2026` es el 3 de octubre, no el 10 de marzo.
+  // mes/día según el país) y decide el paso de "fecha más cercana a hoy", como se
+  // midió en el parte de EE.UU. del 2026-10-07 (`10/03/2026` es el 3 de octubre).
+  //
+  // 🔴 Se prueban **las dos lecturas siempre** y `aISO` descarta la imposible.
+  // Antes la lectura "mes primero" sólo se emitía **si los dos grupos eran ≤ 12**,
+  // así que un recibo de EE.UU. con el día > 12 (`09/13/26`) no producía
+  // **ninguna** fecha: el único candidato era una fecha inventada de un código de
+  // tique (`1-01-9-09-004673` → 2009-09-01) y esa ganaba.
   for (const m of texto.matchAll(/\b(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})\b/g)) {
+    if (encadenadoPorAmbosLados(texto, m.index ?? 0, m[0].length)) continue;
     const primero = Number(m[1]);
     const segundo = Number(m[2]);
     const anio = Number(m[3]);
     sumar(aISO(anio, segundo, primero)); // día primero
-    if (primero !== segundo && primero <= 12 && segundo <= 12) {
-      sumar(aISO(anio, primero, segundo)); // mes primero
-    }
+    if (primero !== segundo) sumar(aISO(anio, primero, segundo)); // mes primero
   }
   // Mes textual: "5 de octubre de 2026" · "5 oct 26" · "october 5, 2026"
   // ⚠️ `bordeValido` evita que el número salga del medio de otro ("2026" → "26"):
