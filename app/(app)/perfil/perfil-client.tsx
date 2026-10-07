@@ -11,6 +11,7 @@ import { InstallButton } from "@/components/pwa/install-button";
 import { PasskeysSection } from "./components/passkeys-section";
 import { AppLockSection } from "./components/app-lock-section";
 import { ZoomSection } from "./components/zoom-section";
+import { Creditos } from "./components/creditos";
 import { cambiarPassword, actualizarMonedaPredeterminada } from "@/backend/src/actions/cuenta";
 import type { CredencialWebauthnOut } from "@/backend/src/queries/webauthn";
 import { NO_REMEMBER, PENDING_CLEAR } from "@/lib/session-flags";
@@ -235,6 +236,8 @@ export default function PerfilClient({
           </button>
           {/* PWA: instalar la app en el dispositivo (se oculta si ya está instalada). */}
           <InstallButton />
+          {/* Créditos de los recursos de terceros (obligación de CC BY de los iconos Solar). */}
+          <Creditos />
           {esAdmin && (
             <Link
               href="/admin"

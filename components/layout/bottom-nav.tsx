@@ -8,8 +8,9 @@ import { usePathname, useRouter } from "next/navigation";
 // módulo ESM con un componente por icono ⇒ el bundle sólo lleva los 8 que se
 // usan (el paquete declara `sideEffects: false`).
 // ⚠️ Los iconos son de **480 Design (CC BY 4.0)**: el paquete es MIT, pero
-// **CC BY exige atribución** ⇒ falta publicar la línea de créditos (ofrecido al
-// usuario: al pie de `Perfil`, junto a la versión, o en el README).
+// **CC BY exige atribución** ⇒ se publica en el popup **Créditos** del Perfil
+// (`app/(app)/perfil/components/creditos.tsx`, 2026-10-07). Si se cambia este set,
+// hay que actualizar esa lista.
 import {
   AltArrowRightIcon,
   BillListIcon as BillListLinear,
