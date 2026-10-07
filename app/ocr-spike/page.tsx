@@ -40,6 +40,65 @@ const CLAVES_INTERES = [
   "aspectRatio",
 ];
 
+/**
+ * Candidatas de resolución a probar (2026-10-07).
+ *
+ * Medido en el iPhone del usuario: sin constraints de tamaño, iOS abre la cámara
+ * a **480×640** (0,3 MP) aunque el sensor soporte 4032×3024 — insuficiente para
+ * OCR. Estas pruebas averiguan qué tamaño concede realmente con cada `ideal`.
+ */
+const CANDIDATAS: { etiqueta: string; size?: MediaTrackConstraints }[] = [
+  { etiqueta: "por defecto" },
+  {
+    etiqueta: "1280×720 (ideal)",
+    size: { width: { ideal: 1280 }, height: { ideal: 720 } },
+  },
+  {
+    etiqueta: "1920×1080 (ideal)",
+    size: { width: { ideal: 1920 }, height: { ideal: 1080 } },
+  },
+  {
+    etiqueta: "2560×1440 (ideal)",
+    size: { width: { ideal: 2560 }, height: { ideal: 1440 } },
+  },
+  {
+    etiqueta: "3840×2160 (ideal)",
+    size: { width: { ideal: 3840 }, height: { ideal: 2160 } },
+  },
+  {
+    etiqueta: "4032×3024 (ideal · máx del sensor)",
+    size: { width: { ideal: 4032 }, height: { ideal: 3024 } },
+  },
+  { etiqueta: "solo ancho 3840 (ideal)", size: { width: { ideal: 3840 } } },
+  { etiqueta: "solo alto 3024 (ideal)", size: { height: { ideal: 3024 } } },
+];
+
+type ResultadoCalidad = {
+  etiqueta: string;
+  size?: MediaTrackConstraints;
+  res: string;
+  fps: string;
+  ms: number;
+  ok: boolean;
+  err?: string;
+};
+
+/**
+ * `ImageCapture` (si existe) permite una **foto quieta a resolución del sensor**,
+ * por encima del tamaño del track de video. No está garantizado en Safari, así
+ * que se accede por forma propia y se reporta si está o no.
+ */
+type ConstructorImageCapture = new (track: MediaStreamTrack) => {
+  takePhoto: () => Promise<Blob>;
+};
+
+function imageCaptureDisponible(): boolean {
+  return (
+    typeof (window as unknown as { ImageCapture?: unknown }).ImageCapture ===
+    "function"
+  );
+}
+
 function esStandalone(): boolean {
   if (typeof window === "undefined") return false;
   const porMediaQuery = window.matchMedia("(display-mode: standalone)").matches;
@@ -116,6 +175,10 @@ function leerEntorno(): Dato[] {
       k: "constraints soportados",
       v: constraints ? `${constraints} claves` : "—",
     },
+    {
+      k: "ImageCapture (foto nítida)",
+      v: imageCaptureDisponible() ? "disponible" : "NO EXISTE",
+    },
   ];
   return entornoCache;
 }
@@ -144,6 +207,8 @@ export default function OcrSpikePage() {
     h: number;
     kb: number;
   } | null>(null);
+  const [calidades, setCalidades] = useState<ResultadoCalidad[]>([]);
+  const [probando, setProbando] = useState(false);
 
   const registrar = useCallback((msg: string) => {
     const t = new Date().toISOString().slice(11, 23);
@@ -176,12 +241,14 @@ export default function OcrSpikePage() {
     };
   }, []);
 
-  const abrirCamara = useCallback(async () => {
+  const abrirCamara = useCallback(async (size?: MediaTrackConstraints) => {
     setError(null);
     setAperturaMs(null);
     setEstado("pidiendo");
     const t0 = performance.now();
-    registrar("pidiendo cámara (facingMode ideal: environment)");
+    registrar(
+      `pidiendo cámara (facingMode ideal: environment${size ? `, ${JSON.stringify(size)}` : ""})`
+    );
 
     const md = navigator.mediaDevices;
     if (!md?.getUserMedia) {
@@ -198,7 +265,7 @@ export default function OcrSpikePage() {
       let stream: MediaStream;
       try {
         stream = await md.getUserMedia({
-          video: { facingMode: { ideal: "environment" } },
+          video: { facingMode: { ideal: "environment" }, ...size },
           audio: false,
         });
       } catch (e) {
@@ -259,6 +326,106 @@ export default function OcrSpikePage() {
     }
   }, [registrar]);
 
+  /**
+   * Prueba cada candidata de resolución y arma la tabla de lo que iOS concede
+   * de verdad. Al terminar aplica la de **mayor área** para poder disparar una
+   * foto de muestra a esa resolución.
+   */
+  const probarCalidades = useCallback(async () => {
+    const md = navigator.mediaDevices;
+    if (!md?.getUserMedia) return;
+    cerrarCamara();
+    setProbando(true);
+    setCalidades([]);
+    const filas: ResultadoCalidad[] = [];
+    let mejorSize: MediaTrackConstraints | undefined;
+    let mejorEtiqueta = "";
+    let mejorRes = "";
+    let mejorArea = 0;
+
+    for (const c of CANDIDATAS) {
+      const t0 = performance.now();
+      let stream: MediaStream | null = null;
+      try {
+        stream = await md.getUserMedia({
+          video: { facingMode: { ideal: "environment" }, ...c.size },
+          audio: false,
+        });
+        const s = stream.getVideoTracks()[0].getSettings();
+        const res = `${s.width ?? "?"}×${s.height ?? "?"}`;
+        filas.push({
+          etiqueta: c.etiqueta,
+          size: c.size,
+          res,
+          fps: String(s.frameRate ?? "—"),
+          ms: Math.round(performance.now() - t0),
+          ok: true,
+        });
+        registrar(`calidad "${c.etiqueta}" → ${res}`);
+        const area = (s.width ?? 0) * (s.height ?? 0);
+        if (area > mejorArea) {
+          mejorArea = area;
+          mejorSize = c.size;
+          mejorEtiqueta = c.etiqueta;
+          mejorRes = res;
+        }
+      } catch (e) {
+        const nombre = e instanceof DOMException ? e.name : "Error";
+        filas.push({
+          etiqueta: c.etiqueta,
+          res: "—",
+          fps: "—",
+          ms: Math.round(performance.now() - t0),
+          ok: false,
+          err: nombre,
+        });
+        registrar(`calidad "${c.etiqueta}" FALLÓ: ${nombre}`);
+      } finally {
+        stream?.getTracks().forEach((t) => t.stop());
+      }
+      setCalidades([...filas]);
+    }
+    setProbando(false);
+    if (mejorEtiqueta) {
+      registrar(`aplicando la mejor: "${mejorEtiqueta}" (${mejorRes})`);
+      await abrirCamara(mejorSize);
+    }
+  }, [abrirCamara, cerrarCamara, registrar]);
+
+  /**
+   * Foto quieta vía `ImageCapture` (si existe): puede dar la resolución del
+   * **sensor**, por encima del track de video.
+   */
+  const dispararNitido = useCallback(async () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) {
+      registrar("no hay cámara abierta");
+      return;
+    }
+    const Ctor = (
+      window as unknown as { ImageCapture?: ConstructorImageCapture }
+    ).ImageCapture;
+    if (!Ctor) {
+      registrar("ImageCapture NO EXISTE en este dispositivo");
+      return;
+    }
+    try {
+      const blob = await new Ctor(track).takePhoto();
+      const bmp = await createImageBitmap(blob);
+      const kb = Math.round(blob.size / 1024);
+      if (fotoUrlRef.current) URL.revokeObjectURL(fotoUrlRef.current);
+      const url = URL.createObjectURL(blob);
+      fotoUrlRef.current = url;
+      setFoto({ url, w: bmp.width, h: bmp.height, kb });
+      registrar(
+        `foto NÍTIDA (ImageCapture): ${bmp.width}×${bmp.height} · ${kb} KB`
+      );
+    } catch (e) {
+      const nombre = e instanceof DOMException ? e.name : "Error";
+      registrar(`ImageCapture falló: ${nombre}`);
+    }
+  }, [registrar]);
+
   /** Dispara: copia el frame actual a un canvas y lo muestra (verifica orientación). */
   const disparar = useCallback(() => {
     const video = videoRef.current;
@@ -309,6 +476,16 @@ export default function OcrSpikePage() {
     if (dispositivos.length) {
       lineas.push("[DISPOSITIVOS]", ...dispositivos.map((d) => `  ${d}`));
     }
+    if (calidades.length) {
+      lineas.push(
+        "[CALIDADES]",
+        ...calidades.map((c) =>
+          c.ok
+            ? `  ${c.etiqueta}: ${c.res} @ ${c.fps} fps (${c.ms} ms)`
+            : `  ${c.etiqueta}: FALLÓ (${c.err})`
+        )
+      );
+    }
     if (foto) {
       lineas.push(
         "[FOTO]",
@@ -326,6 +503,7 @@ export default function OcrSpikePage() {
     capacidades,
     videoNativo,
     dispositivos,
+    calidades,
     foto,
     error,
     log,
@@ -339,6 +517,10 @@ export default function OcrSpikePage() {
       registrar("no se pudo copiar (revisar permiso de portapapeles)");
     }
   }, [informe, registrar]);
+
+  const hayImageCapture = entorno.some(
+    (d) => d.k === "ImageCapture (foto nítida)" && d.v === "disponible"
+  );
 
   return (
     <main className="min-h-dvh bg-background px-4 py-6 pb-[env(safe-area-inset-bottom)]">
@@ -379,12 +561,30 @@ export default function OcrSpikePage() {
         </button>
         <button
           type="button"
+          onClick={() => void probarCalidades()}
+          disabled={probando || estado === "pidiendo"}
+          className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium disabled:opacity-50"
+        >
+          {probando ? "Probando…" : "Probar calidades"}
+        </button>
+        <button
+          type="button"
           onClick={disparar}
           disabled={estado !== "abierta"}
           className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
           Disparar
         </button>
+        {hayImageCapture && (
+          <button
+            type="button"
+            onClick={() => void dispararNitido()}
+            disabled={estado !== "abierta"}
+            className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium disabled:opacity-50"
+          >
+            Foto nítida (ImageCapture)
+          </button>
+        )}
         <button
           type="button"
           onClick={cerrarCamara}
@@ -432,6 +632,39 @@ export default function OcrSpikePage() {
           titulo="Cámaras"
           datos={dispositivos.map((d, i) => ({ k: String(i + 1), v: d }))}
         />
+      )}
+
+      {calidades.length > 0 && (
+        <section className="mt-4">
+          <h2 className="mb-2 text-sm font-semibold text-foreground">
+            Resoluciones que concede el dispositivo
+          </h2>
+          <div className="overflow-hidden rounded-lg border border-border bg-card">
+            {calidades.map((c) => (
+              <div
+                key={c.etiqueta}
+                className="flex items-center gap-3 border-b border-border px-3 py-2 last:border-b-0"
+              >
+                <span className="min-w-0 flex-1 text-xs text-foreground">
+                  {c.etiqueta}
+                </span>
+                <span
+                  className={`shrink-0 text-right text-xs font-semibold ${
+                    c.ok ? "text-success" : "text-danger"
+                  }`}
+                >
+                  {c.ok
+                    ? `${c.res} · ${c.fps} fps · ${c.ms} ms`
+                    : `falló: ${c.err}`}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Al terminar la prueba se aplica automáticamente la de mayor área:
+            tocá Disparar para ver una foto de muestra a esa resolución.
+          </p>
+        </section>
       )}
 
       {foto && (
