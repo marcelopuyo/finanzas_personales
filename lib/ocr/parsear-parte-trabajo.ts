@@ -90,9 +90,20 @@ function fechasCandidatas(texto: string): string[] {
   for (const m of texto.matchAll(/\b(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\b/g)) {
     sumar(aISO(Number(m[1]), Number(m[2]), Number(m[3])));
   }
-  // Día primero: 05/10/26 · 5-10-2026 · 05.10.2026
+  // Numérica de 3 grupos: 05/10/26 · 5-10-2026 · 05.10.2026
+  //
+  // ⚠️ Si los dos primeros grupos son ≤ 12 el orden es **ambiguo** (día/mes o
+  // mes/día según el país): se emiten LAS DOS lecturas y decide el paso de
+  // "fecha más cercana a hoy". Medido en un parte de EE.UU. el 2026-10-07:
+  // `10/03/2026` es el 3 de octubre, no el 10 de marzo.
   for (const m of texto.matchAll(/\b(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})\b/g)) {
-    sumar(aISO(Number(m[3]), Number(m[2]), Number(m[1])));
+    const primero = Number(m[1]);
+    const segundo = Number(m[2]);
+    const anio = Number(m[3]);
+    sumar(aISO(anio, segundo, primero)); // día primero
+    if (primero !== segundo && primero <= 12 && segundo <= 12) {
+      sumar(aISO(anio, primero, segundo)); // mes primero
+    }
   }
   // Mes textual: "5 de octubre de 2026" · "5 oct 26" · "october 5, 2026"
   // ⚠️ `bordeValido` evita que el número salga del medio de otro ("2026" → "26"):
@@ -115,9 +126,15 @@ function fechasCandidatas(texto: string): string[] {
   return [...new Set(salida)];
 }
 
+/** Una alternativa a más de estos días de distancia ya no compite: elegir es seguro. */
+const DIAS_ALTERNATIVA = 60;
+
 /**
  * Elige la fecha **más cercana a hoy**: un parte de trabajo suele ser del día (o
  * de estos días), y así se descartan fechas viejas impresas en el documento.
+ *
+ * Es también lo que resuelve la **ambigüedad día/mes** (`10/03/2026`): de las dos
+ * lecturas posibles gana la que cae cerca de hoy.
  */
 function buscarFecha(texto: string, hoy: Date): { fecha?: string; avisos: string[] } {
   const candidatas = fechasCandidatas(texto);
@@ -128,10 +145,15 @@ function buscarFecha(texto: string, hoy: Date): { fecha?: string; avisos: string
   const ordenadas = [...candidatas].sort((a, b) => distancia(a) - distancia(b));
   const elegida = ordenadas[0];
 
+  // El aviso sólo importa si había OTRA fecha igual de plausible (ahí la elección
+  // pudo ser discutible); si las demás están lejos, alarmar sería ruido.
+  const limite = DIAS_ALTERNATIVA * 24 * 60 * 60 * 1000;
+  const competidoras = ordenadas.slice(1).filter((iso) => distancia(iso) <= limite);
+
   return {
     fecha: elegida,
     avisos:
-      candidatas.length > 1
+      competidoras.length > 0
         ? [`${candidatas.length} fechas en el texto: se eligió la más cercana a hoy (${elegida})`]
         : [],
   };
@@ -150,21 +172,48 @@ function aDigito(caracter: string): string {
   return caracter;
 }
 
+/** `true` si la hora es una **duración** ("Hours this shift: 08:48"), no un horario. */
+function pareceDuracion(texto: string, indice: number): boolean {
+  const previo = texto.slice(Math.max(0, indice - 30), indice);
+  return /\b(?:horas?|hours?|hrs?|total)\b[^\d:]{0,20}:[^\d]{0,6}$/.test(previo);
+}
+
+/** Sufijo `AM`/`PM` (con o sin puntos) pegado a una hora. */
+const RX_MERIDIANO = /^\s*([ap])\.?\s?m\.?/;
+
 /**
- * Horas con forma `H:MM` / `HH:MM` / `17h30`.
+ * Horas con forma `H:MM` / `HH:MM` / `17h30`, incluyendo el **formato de 12 h**
+ * con `AM`/`PM`.
  *
  * ⚠️ El separador **no incluye el punto** a propósito: `05.10.2026` (una fecha)
  * se leería como la hora 05:10.
+ * ⚠️ Medido en un parte real (2026-10-07): sin `AM`/`PM`, `7:35 AM` y `4:23 PM`
+ * quedaban como 07:35 y 04:23 ⇒ se descartaban por incoherentes.
  */
 function candidatosHora(texto: string): CandidatoHora[] {
   const salida: CandidatoHora[] = [];
   const rx = /([0-9OoIl]{1,2})\s*[:hH]\s*([0-9OoIl]{2})(?!\d)/g;
   for (const m of texto.matchAll(rx)) {
-    const hh = Number([...m[1]].map(aDigito).join(""));
+    const indice = m.index ?? 0;
+    if (pareceDuracion(texto, indice)) continue;
+
+    let hh = Number([...m[1]].map(aDigito).join(""));
     const mm = Number([...m[2]].map(aDigito).join(""));
     if (hh > 23 || mm > 59) continue;
-    const hhmm = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
-    salida.push({ hhmm, minutos: hh * 60 + mm, indice: m.index ?? 0 });
+
+    const meridiano = RX_MERIDIANO.exec(texto.slice(indice + m[0].length));
+    if (meridiano) {
+      if (hh > 12) continue; // "13:00 PM" no existe
+      const esPm = meridiano[1].toLowerCase() === "p";
+      if (esPm && hh < 12) hh += 12;
+      if (!esPm && hh === 12) hh = 0; // 12:30 AM = 00:30
+    }
+
+    salida.push({
+      hhmm: `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`,
+      minutos: hh * 60 + mm,
+      indice,
+    });
   }
   return salida;
 }
@@ -172,6 +221,12 @@ function candidatosHora(texto: string): CandidatoHora[] {
 function aMinutos(hhmm: string): number {
   const [hh, mm] = hhmm.split(":").map(Number);
   return hh * 60 + mm;
+}
+
+function aHora(minutos: number): string {
+  const hh = Math.floor(minutos / 60) % 24;
+  const mm = minutos % 60;
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
 /** Etiquetas que marcan una hora de entrada. */
@@ -320,6 +375,16 @@ function buscarHoras(texto: string): { desde?: string; hasta?: string; avisos: s
     avisos.push("horas sin etiqueta: se tomaron la menor y la mayor");
   }
 
+  // Parte en formato de 12 h **sin AM/PM legible**: si la salida quedó antes que
+  // la entrada y es de mañana, se interpreta como PM (turno mañana→tarde, el caso
+  // normal). Observado en un parte real el 2026-10-07.
+  if (desde && hasta && aMinutos(desde) >= aMinutos(hasta)) {
+    const minutosHasta = aMinutos(hasta);
+    if (minutosHasta < 12 * 60) {
+      hasta = aHora(minutosHasta + 12 * 60);
+      avisos.push(`salida deducida como PM: ${hasta}`);
+    }
+  }
   if (desde && hasta && aMinutos(desde) >= aMinutos(hasta)) {
     avisos.push(`horas incoherentes (${desde} ≥ ${hasta}): se descartan`);
     return { avisos };
