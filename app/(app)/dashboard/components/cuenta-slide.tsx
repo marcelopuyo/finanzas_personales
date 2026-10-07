@@ -65,6 +65,17 @@ interface CuentaSlideProps {
    */
   alFlick?: (dir: 1 | -1) => void;
   /**
+   * **Arrastre con el flick ya reconocido** (§255): llega en cada `touchmove` con el
+   * desplazamiento en px **desde el punto de reconocimiento**, para que la banda **siga
+   * el dedo** en vez de esperar al `touchend`.
+   */
+  alArrastrarFlick?: (dx: number) => void;
+  /**
+   * Se soltó el dedo (o se **canceló** el gesto): el carrusel **resuelve** el arrastre
+   * y aterriza en una tarjeta. Se llama **después** de `alFlick`.
+   */
+  alSoltarArrastre?: () => void;
+  /**
    * Avisa al carrusel que la **banda** tiene que quedar sin tooltips (bloquea los
    * eventos de mouse **emulados** que iOS emite después del toque). Se dispara apenas
    * el gesto viene rápido, al confirmarse el flick y **siempre al soltar**.
@@ -86,6 +97,8 @@ export function CuentaSlide({
   cuentaId,
   conGrafico,
   alFlick,
+  alArrastrarFlick,
+  alSoltarArrastre,
   alSilenciar,
 }: CuentaSlideProps) {
   const prefetch = usePrefetchNav();
@@ -220,7 +233,9 @@ export function CuentaSlide({
     alEmpezar: alEmpezarLaFranja,
     alLento: alGestoLento,
     alRapido: alGestoRapido,
+    alArrastrar: alArrastrarFlick,
     alSoltar: alSoltarLaFranja,
+    alTerminar: alSoltarArrastre,
   });
   /**
    * Los gestos de flick se enganchan **sólo en la franja del gráfico**, que es

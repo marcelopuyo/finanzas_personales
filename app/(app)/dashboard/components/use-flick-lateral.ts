@@ -59,6 +59,21 @@ interface OpcionesFlick {
    */
   alRapido?: () => void;
   /**
+   * Se llama en **cada `touchmove`** posterior al reconocimiento del flick, con el
+   * desplazamiento horizontal en px **desde el punto donde se reconoció** (negativo =
+   * hacia la izquierda). Es para que el carrusel **siga el dedo** en vez de esperar al
+   * `touchend` (§255).
+   *
+   * ⚠️ Misma regla que el resto: acá adentro **nada de React** — el carrusel mueve su
+   * `scrollLeft` a mano (una escritura de DOM).
+   */
+  alArrastrar?: (dx: number) => void;
+  /**
+   * Se llama **al final** del gesto (`touchend` o `touchcancel`), **después** de
+   * `alFlick`: es el momento de **resolver** el arrastre (aterrizar en una tarjeta).
+   */
+  alTerminar?: () => void;
+  /**
    * Se llama **siempre** al soltar (o cancelar) un gesto que empezó en la franja,
    * sea flick o no.
    *
@@ -103,11 +118,15 @@ export function useFlickLateral({
   alEmpezar,
   alLento,
   alRapido,
+  alArrastrar,
   alSoltar,
+  alTerminar,
 }: OpcionesFlick = {}) {
   const muestrasRef = useRef<Muestra[]>([]);
   /** ¿Ya se avisó `alRapido` en este gesto? (se llama una sola vez) */
   const avisadoRef = useRef(false);
+  /** `clientX` del punto donde se reconoció el flick (referencia de `alArrastrar`). */
+  const xReconocidoRef = useRef<number | undefined>(undefined);
   /** Timer de la decisión lento/flick (`DECISION_MS`). */
   const decisionRef = useRef<number | undefined>(undefined);
 
@@ -134,6 +153,7 @@ export function useFlickLateral({
         ? [{ x: t.clientX, y: t.clientY, t: performance.now() }]
         : [];
       avisadoRef.current = false;
+      xReconocidoRef.current = undefined;
       limpiarDecision();
       // Tapa **de entrada**: así no se ve ni el primer cuadro del arrastre, que era
       // justo lo que se filtraba en iOS.
@@ -158,12 +178,17 @@ export function useFlickLateral({
       while (muestras.length > 2 && ahora - muestras[0].t > VENTANA_MS) {
         muestras.shift();
       }
-      if (alRapido && !avisadoRef.current && esFlick(muestras)) {
+      if (!avisadoRef.current && (alRapido || alArrastrar) && esFlick(muestras)) {
+        // Se reconoció el flick: se avisa **una sola vez** y desde acá se mide el
+        // arrastre, así el carrusel sigue el dedo desde este punto (sin "salto").
         avisadoRef.current = true;
-        alRapido();
+        xReconocidoRef.current = t.clientX;
+        alRapido?.();
+      } else if (avisadoRef.current) {
+        alArrastrar?.(t.clientX - (xReconocidoRef.current ?? t.clientX));
       }
     },
-    [alRapido]
+    [alRapido, alArrastrar]
   );
 
   const onTouchEnd = useCallback(
@@ -174,24 +199,28 @@ export function useFlickLateral({
       // Se soltó el dedo: la banda queda sin tooltips (ver `alSoltar`), incluso si el
       // gesto **no** llega a ser un flick.
       alSoltar?.();
-      if (!alFlick || !esFlick(muestras, e.changedTouches[0])) return;
-      const t = e.changedTouches[0];
-      const desde = muestras[0];
-      alFlick(t.clientX - desde.x < 0 ? 1 : -1);
-      /**
-       * Se cancela el `touchend` para que iOS **no emita sus eventos de mouse
-       * emulados**: llegan después de soltar y vuelven a encender el tooltip
-       * justo cuando la tarjeta está deslizándose. Es seguro acá porque sólo se
-       * llega a este punto con un gesto **horizontal** (no hay inercia de scroll
-       * vertical que perder).
-       */
-      try {
-        e.preventDefault();
-      } catch {
-        /* listener pasivo */
+      if (alFlick && esFlick(muestras, e.changedTouches[0])) {
+        const t = e.changedTouches[0];
+        const desde = muestras[0];
+        alFlick(t.clientX - desde.x < 0 ? 1 : -1);
+        /**
+         * Se cancela el `touchend` para que iOS **no emita sus eventos de mouse
+         * emulados**: llegan después de soltar y vuelven a encender el tooltip
+         * justo cuando la tarjeta está deslizándose. Es seguro acá porque sólo se
+         * llega a este punto con un gesto **horizontal** (no hay inercia de scroll
+         * vertical que perder).
+         */
+        try {
+          e.preventDefault();
+        } catch {
+          /* listener pasivo */
+        }
       }
+      // Último aviso del gesto: lo que haya quedado abierto (un arrastre del carrusel,
+      // p. ej.) se resuelve acá, **después** de `alFlick`.
+      alTerminar?.();
     },
-    [alFlick, alSoltar]
+    [alFlick, alSoltar, alTerminar]
   );
 
   /** Cancelado (el navegador se quedó con el gesto): no cuenta como flick. */
@@ -201,7 +230,8 @@ export function useFlickLateral({
     avisadoRef.current = false;
     // También acá: el gesto terminó ⇒ la banda queda sin tooltips.
     alSoltar?.();
-  }, [alSoltar]);
+    alTerminar?.();
+  }, [alSoltar, alTerminar]);
 
   return { onTouchStart, onTouchMove, onTouchEnd, onTouchCancel };
 }

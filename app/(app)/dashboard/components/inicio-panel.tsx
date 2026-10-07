@@ -169,6 +169,15 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
   /** Desplazamiento programático del carrusel en curso (`irACuenta`). */
   const saltoRef = useRef(false);
   /**
+   * **Arrastre en curso** de un flick sobre la franja del gráfico (§255): el carrusel
+   * sigue el dedo a mano. Guarda la posición y la tarjeta de **origen** (la base para
+   * decidir a dónde se aterriza). Va en un `ref` porque durante el gesto **no puede
+   * haber ni un re-render** (ver `silenciadoRef`).
+   */
+  const arrastreRef = useRef<{ base: number; origen: number } | null>(null);
+  /** Timer del "ya se asentó el desplazamiento" (devuelve el `scroll-snap`, §255). */
+  const snapRef = useRef<number | undefined>(undefined);
+  /**
    * ¿Ya manda la caché de primeras páginas? Antes de hidratar se leen las props
    * del server (evita desajuste de hidratación); después manda solo la caché, así
    * una invalidación por mutación **no** revive la página vieja de las props.
@@ -350,6 +359,10 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
       // los pasos intermedios re-montarían el detalle de cada cuenta.
       saltoRef.current = true;
       window.setTimeout(() => {
+        // Hay un **arrastre nuevo** en curso (flick sobre la franja, §255): de esto se
+        // encarga su propio `irASlide`. Tocar el estado acá sería React a mitad de
+        // gesto, que es justo lo que rompe la detección del flick (§234).
+        if (arrastreRef.current) return;
         saltoRef.current = false;
         // **Re-afinado**: al aterrizar, el detail de abajo cambia de alto y
         // puede aparecer/desaparecer la barra de scroll ⇒ el carrusel se angosta
@@ -391,24 +404,113 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
   );
 
   /**
+   * Devuelve el **`scroll-snap`** que apagó el arrastre, recién cuando el desplazamiento
+   * **se asienta**. 🔑 Restaurarlo antes **pierde el destino**: con el snap obligatorio
+   * de vuelta y una animación en curso, el navegador re-snapea a la tarjeta **más
+   * cercana** —que es la de la que veníamos— y el flick no llega a pasar (medido: el
+   * carrusel volvía a la tarjeta de origen). Se sondea con un `setInterval` (no `rAF`)
+   * porque sólo interesa la posición: dos lecturas iguales ⇒ se asentó.
+   */
+  const devolverSnapAlAsentarse = useCallback(() => {
+    if (snapRef.current !== undefined) window.clearInterval(snapRef.current);
+    let previo: number | null = null;
+    snapRef.current = window.setInterval(() => {
+      const el = trackRef.current;
+      if (!el) return;
+      // Hay un **arrastre nuevo** en curso: de devolverlo se encarga el suyo.
+      if (arrastreRef.current) return;
+      if (previo !== null && previo === el.scrollLeft) {
+        el.style.scrollSnapType = "";
+        window.clearInterval(snapRef.current);
+        snapRef.current = undefined;
+        return;
+      }
+      previo = el.scrollLeft;
+    }, 90);
+  }, []);
+
+  /**
    * **Flick lateral sobre la franja del gráfico** (2026-10-05, ver
    * `use-flick-lateral.ts`). El gráfico toma el gesto lateral para scrubear el
    * tooltip (`touch-action: pan-y`), así que un deslizamiento **rápido** avisa acá
    * y el carrusel pasa de tarjeta, igual que al deslizar en el resto del
    * encabezado. El punto de partida se calcula desde el **scroll real** (no desde
    * `foco`): así no se desincroniza si el flick cae a mitad de una animación.
+   *
+   * Con un **arrastre en curso** (§255) la base es la tarjeta de **origen** del
+   * gesto: el carrusel ya viene siguiendo el dedo y `scrollLeft` puede estar en
+   * cualquier punto intermedio, así que un flick corto tiene que pasar **una**
+   * tarjeta y no quedarse a mitad de camino.
    */
   const desplazarTarjeta = useCallback(
     (dir: 1 | -1) => {
       const el = trackRef.current;
       if (!el) return;
-      const actual = Math.round(el.scrollLeft / (el.clientWidth || 1));
-      const destino = Math.min(totalTarjetas - 1, Math.max(0, actual + dir));
-      if (destino === actual) return;
+      const paso = el.clientWidth || 1;
+      const arrastre = arrastreRef.current;
+      arrastreRef.current = null;
+      const actual = Math.round(el.scrollLeft / paso);
+      const destino = Math.min(
+        totalTarjetas - 1,
+        Math.max(0, (arrastre?.origen ?? actual) + dir)
+      );
+      // Sin arrastre, un flick en el extremo no tiene a dónde ir. **Con** arrastre hay
+      // que aterrizar siempre (aunque el destino sea el origen): el carrusel quedó a
+      // mitad de camino y el snap está apagado.
+      if (!arrastre && destino === actual) return;
       irASlide(destino);
+      if (arrastre) devolverSnapAlAsentarse();
     },
-    [irASlide, totalTarjetas]
+    [devolverSnapAlAsentarse, irASlide, totalTarjetas]
   );
+
+  /**
+   * **La banda sigue el dedo** (§255). Llega en cada `touchmove` **con el flick ya
+   * reconocido** (ver `use-flick-lateral.ts`), con el desplazamiento en px desde ese
+   * punto.
+   *
+   * 🔑 Todo es **DOM**: `scrollLeft` a mano y el `scroll-snap` apagado mientras dura el
+   * gesto. Con el snap **obligatorio** activo el navegador **revierte** cualquier
+   * `scrollLeft` escrito a mano (medido: no movía nada), por eso se apaga acá y lo
+   * devuelve `devolverSnapAlAsentarse` al aterrizar. El estado de React se toca recién
+   * al resolver: durante el gesto, ni un re-render (§234) — y el `onScroll` que provocan
+   * estas escrituras se ignora con `saltoRef`.
+   */
+  const arrastrarTarjeta = useCallback(
+    (dx: number) => {
+      const el = trackRef.current;
+      if (!el) return;
+      const paso = el.clientWidth || 1;
+      if (!arrastreRef.current) {
+        arrastreRef.current = {
+          base: el.scrollLeft,
+          origen: Math.round(el.scrollLeft / paso),
+        };
+        saltoRef.current = true;
+        el.style.scrollSnapType = "none";
+      }
+      const max = (totalTarjetas - 1) * paso;
+      el.scrollLeft = Math.min(max, Math.max(0, arrastreRef.current.base - dx));
+    },
+    [totalTarjetas]
+  );
+
+  /**
+   * **Se soltó el dedo** después de un arrastre sobre la franja: se aterriza en la
+   * tarjeta **más cercana**, igual que el snap nativo de afuera de la banda. Si el gesto
+   * terminó siendo un flick, `desplazarTarjeta` ya resolvió y esto no hace nada.
+   */
+  const soltarArrastreTarjeta = useCallback(() => {
+    const el = trackRef.current;
+    const arrastre = arrastreRef.current;
+    if (!el || !arrastre) return;
+    arrastreRef.current = null;
+    const paso = el.clientWidth || 1;
+    irASlide(
+      Math.min(totalTarjetas - 1, Math.max(0, Math.round(el.scrollLeft / paso)))
+    );
+    devolverSnapAlAsentarse();
+  }, [devolverSnapAlAsentarse, irASlide, totalTarjetas]);
 
   /**
    * **Silencia la banda** (2026-10-05): mientras lo esté, los eventos que **sólo**
@@ -470,6 +572,9 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
     () => () => {
       if (finSilencioRef.current !== undefined) {
         window.clearTimeout(finSilencioRef.current);
+      }
+      if (snapRef.current !== undefined) {
+        window.clearInterval(snapRef.current);
       }
     },
     []
@@ -534,6 +639,8 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
                 monto={c.value}
                 esBalance={false}
                 alFlick={desplazarTarjeta}
+                alArrastrarFlick={arrastrarTarjeta}
+                alSoltarArrastre={soltarArrastreTarjeta}
                 alSilenciar={silenciarBanda}
                 evolucion={(c.values ?? []).map((v, k) => ({
                   name: c.labels?.[k] ?? "",
