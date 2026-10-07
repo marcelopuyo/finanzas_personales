@@ -219,6 +219,22 @@ export default function PerfilClient({
         {/* Zoom del contenido (preferencia de ESTE equipo) */}
         <ZoomSection />
 
+        {/* 🔧 TEMPORAL (plan OCR · fase F1): acceso al diagnóstico de cámara.
+            La PWA en standalone no tiene barra de direcciones, así que sin este
+            enlace no hay forma de abrir /ocr-spike en el celular.
+            BORRAR este bloque junto con `app/ocr-spike/` al cerrar F1. */}
+        <section className="rounded-xl border border-dashed border-warning bg-card p-3">
+          <Link
+            href="/ocr-spike"
+            className="text-sm font-medium text-warning"
+          >
+            Diagnóstico de cámara (temporal)
+          </Link>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Página de prueba del plan de OCR. Se elimina al cerrar la fase F1.
+          </p>
+        </section>
+
         {/* Opciones */}
         <section className="rounded-xl border border-border bg-card p-2">
           <button

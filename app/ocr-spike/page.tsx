@@ -343,6 +343,13 @@ export default function OcrSpikePage() {
   return (
     <main className="min-h-dvh bg-background px-4 py-6 pb-[env(safe-area-inset-bottom)]">
       <header className="mb-4">
+        {/* Salida: la PWA en standalone no tiene botón "atrás" ni barra de direcciones. */}
+        <a
+          href="/perfil"
+          className="mb-3 inline-block text-sm font-medium text-primary"
+        >
+          ← Volver al perfil
+        </a>
         <h1 className="text-lg font-semibold text-foreground">
           Spike de cámara · F1
         </h1>
