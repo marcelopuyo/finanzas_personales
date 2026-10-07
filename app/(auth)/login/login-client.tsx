@@ -14,15 +14,16 @@ const inputCls =
   "w-full rounded-md border border-border bg-card px-3 py-2 text-[13px] text-card-foreground placeholder:text-subtitle focus:outline-none focus:ring-2 focus:ring-primary/40";
 
 /**
- * `passkeyEnDispositivo` lo resuelve el servidor (cookie "pista"): el botón de
- * biometría solo aparece en un dispositivo donde ya se activó una passkey. El
- * primer login de un dispositivo es siempre con contraseña.
+ * El botón de biometría se muestra siempre que la ceremonia se pueda intentar
+ * (HTTPS + API de WebAuthn). **No** se exige la cookie "pista" del servidor: era
+ * un atajo que dejaba sin botón a un equipo que SÍ tiene una passkey (pista
+ * perdida, credencial borrada en la base, otro origen…) y en iPhone el botón
+ * explícito es imprescindible, porque la biometría **no puede** arrancar sola
+ * (Safari exige un gesto). La pista sigue sirviendo, pero del lado del servidor:
+ * en `login/options` decide si se manda `allowCredentials` o se cae al flujo
+ * descubrible.
  */
-export default function LoginClient({
-  passkeyEnDispositivo,
-}: {
-  passkeyEnDispositivo: boolean;
-}) {
+export default function LoginClient() {
   const router = useRouter();
   const params = useSearchParams();
   const verificado = params.get("verificado") === "1";
@@ -213,11 +214,13 @@ export default function LoginClient({
           </button>
         </form>
 
-        {/* Login con biometría (passkeys). Solo se muestra si ESTE dispositivo
-            ya tiene una passkey activada (`passkeyEnDispositivo`, que resuelve
-            el servidor) y si el equipo ofrece biometría: así el primer login de
-            un dispositivo nuevo es siempre con contraseña. */}
-        {passkeyEnDispositivo && webAuthn && (
+        {/* Login con biometría (passkeys). Se muestra siempre que la ceremonia se
+            pueda intentar (HTTPS + API). En iPhone es imprescindible: la
+            biometría no puede arrancar sola (Safari exige un gesto), así que el
+            botón explícito es el único camino. Si el equipo no tiene ninguna
+            passkey para este sitio, el intento falla con un mensaje que explica
+            cómo activarla. */}
+        {webAuthn && (
           <div className="mt-4">
             <div className="flex items-center gap-3">
               <span className="h-px flex-1 bg-border" />

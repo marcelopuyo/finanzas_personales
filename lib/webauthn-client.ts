@@ -257,7 +257,13 @@ export async function entrarConBiometria(
     }
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: mensajeDeError(error) };
+    return {
+      ok: false,
+      error: mensajeDeError(error, {
+        cancelado:
+          "No se pudo usar la biometría. Si todavía no la activaste en este dispositivo, entrá con tu contraseña y activala desde Perfil.",
+      }),
+    };
   }
 }
 
@@ -278,7 +284,7 @@ function mensajeDeError(
     );
   }
   if (name === "InvalidStateError") {
-    return "Este dispositivo ya tiene una passkey registrada. Si perdiste el acceso con biometría, revocá esa credencial de la lista y volvé a activarla.";
+    return "Este dispositivo ya tiene una passkey guardada en su llavero. Si en la lista de arriba no aparece ninguna, la del servidor se perdió: borrala en los ajustes del dispositivo (iPhone: Ajustes › Contraseñas) y activala de nuevo desde acá.";
   }
   if (name === "NotSupportedError") {
     return "Este dispositivo o navegador no soporta passkeys.";
