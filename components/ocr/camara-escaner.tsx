@@ -3,15 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { reconocer } from "@/lib/ocr/motor";
 import { marcoDesdeVideo } from "@/lib/ocr/preprocesar";
-import {
-  extraerJornada,
-  type CamposJornada,
-  type TrabajoOpcion,
-} from "@/lib/ocr/parsear-parte-trabajo";
 
 /**
- * Escáner de partes de trabajo: cámara en vivo + disparo manual + OCR en
- * segundo plano (plan `DeepSeek/plan-ocr-tickets.md` · F2/F3/F6).
+ * Escáner de documentos: cámara en vivo + disparo manual + OCR en segundo plano
+ * (plan `DeepSeek/plan-ocr-tickets.md` · F2/F3/F6, generalizado en §11).
+ *
+ * Es **genérico** a propósito: no sabe qué documento está leyendo. Cada pantalla
+ * le pasa su `extraer()` (el parte de trabajo, el ticket de compra, …) y recibe
+ * los campos ya interpretados, así que la cámara y el motor se escriben una sola
+ * vez.
  *
  * Decisiones que se respetan acá (y por qué):
  * - **Sin ningún overlay sobre el video** y **sin pasos intermedios**: el usuario
@@ -33,12 +33,14 @@ const CALIDAD_MAX: MediaTrackConstraints = {
   height: { ideal: 3024 },
 };
 
-type Props = {
-  /** Trabajos entre los que buscar el nombre impreso en el parte. */
-  trabajos: TrabajoOpcion[];
+type Props<T> = {
+  /** Convierte el texto crudo del OCR en los campos de la pantalla. */
+  extraer: (texto: string) => T;
   /** Se llama con lo que se pudo extraer (puede venir prácticamente vacío). */
-  onListo: (campos: CamposJornada) => void;
+  onListo: (campos: T) => void;
   onCerrar: () => void;
+  /** Cómo se nombra el documento en los mensajes ("el parte", "el ticket"). */
+  documento?: string;
 };
 
 type Estado = "iniciando" | "lista" | "leyendo" | "error";
@@ -58,7 +60,12 @@ function mensajeDeError(error: unknown): string {
   }
 }
 
-export function CamaraEscaner({ trabajos, onListo, onCerrar }: Props) {
+export function CamaraEscaner<T>({
+  extraer,
+  onListo,
+  onCerrar,
+  documento = "el documento",
+}: Props<T>) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [estado, setEstado] = useState<Estado>("iniciando");
@@ -115,12 +122,12 @@ export function CamaraEscaner({ trabajos, onListo, onCerrar }: Props) {
       const imagen = marcoDesdeVideo(video);
       soltarCamara();
       const { texto } = await reconocer(imagen.canvas);
-      onListo(extraerJornada(texto, trabajos));
+      onListo(extraer(texto));
     } catch {
-      setError("No se pudo leer el parte. Probá otra vez.");
+      setError(`No se pudo leer ${documento}. Probá otra vez.`);
       setEstado("error");
     }
-  }, [onListo, soltarCamara, trabajos]);
+  }, [documento, extraer, onListo, soltarCamara]);
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-black">
@@ -153,7 +160,9 @@ export function CamaraEscaner({ trabajos, onListo, onCerrar }: Props) {
 
       {(estado === "iniciando" || estado === "leyendo") && (
         <p className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-sm font-medium text-white">
-          {estado === "iniciando" ? "Abriendo la cámara…" : "Leyendo el parte…"}
+          {estado === "iniciando"
+            ? "Abriendo la cámara…"
+            : `Leyendo ${documento}…`}
         </p>
       )}
 

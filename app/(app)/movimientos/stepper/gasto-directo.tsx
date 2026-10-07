@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { Camera } from "lucide-react";
 import { useMovimientoStepper } from "./stepper-context";
 import {
   StepShellFintech,
@@ -27,6 +28,8 @@ import {
 } from "@/components/voz/dictado-pantalla";
 import { simboloMoneda, todayLocalISODate } from "@/lib/utils";
 import type { CampoDictable } from "@/lib/voz/tipos";
+import { CamaraEscaner } from "@/components/ocr/camara-escaner";
+import { extraerTicket, type CamposTicket } from "@/lib/ocr/parsear-ticket";
 
 /**
  * ¿El formulario **ya tiene** un valor en ese campo?
@@ -57,6 +60,8 @@ export function GastoDirecto() {
   const [nuevaCategoria, setNuevaCategoria] = useState<string | null>(null);
   // Overlay que BLOQUEA la pantalla mientras se trae el último gasto.
   const [buscandoUltimo, setBuscandoUltimo] = useState(false);
+  /** Escáner del ticket: se abre con el icono de la cabecera y se cierra al leer. */
+  const [escanerAbierto, setEscanerAbierto] = useState(false);
 
   /**
    * Al ELEGIR una sugerencia de descripción (no al tipear): completa Categoría y
@@ -106,6 +111,107 @@ export function GastoDirecto() {
       setBuscandoUltimo(false);
     }
   };
+
+  /**
+   * Aplica lo que salió del **ticket escaneado** (plan OCR §11) **sin pisar lo que
+   * el usuario ya cargó** —mismo criterio que el parte de Jornada—: la Descripción
+   * sólo si está vacía, la Fecha sólo si sigue siendo la de hoy y el Monto sólo si
+   * está en 0.
+   *
+   * La **Categoría** no está en el ticket: se busca en el historial por el comercio
+   * leído (`ultimoGastoPorDescripcionAction`) y, si no hay coincidencia, **queda en
+   * blanco** para que la elija el usuario. **Nunca guarda**: eso lo hace el botón
+   * del wizard.
+   */
+  const aplicarTicket = useCallback(
+    async (campos: CamposTicket) => {
+      setEscanerAbierto(false);
+
+      const patch: Partial<MovimientoData> = {};
+      const completados: string[] = [];
+      const respetados: string[] = [];
+
+      if (campos.descripcion) {
+        if (data.descripcion.trim()) {
+          respetados.push("Descripción");
+        } else {
+          patch.descripcion = campos.descripcion;
+          completados.push("Descripción");
+        }
+      }
+      if (campos.fecha) {
+        if (data.fecha === todayLocalISODate()) {
+          patch.fecha = campos.fecha;
+          completados.push("Fecha");
+        } else {
+          respetados.push("Fecha");
+        }
+      }
+      if (campos.monto !== undefined) {
+        if (data.montoOrigen > 0) {
+          respetados.push("Monto");
+        } else {
+          patch.montoOrigen = campos.monto;
+          completados.push("Monto");
+        }
+      }
+
+      // El comercio —el que leyó el OCR o el que el usuario ya había escrito— es la
+      // única pista para la categoría.
+      const comercio = patch.descripcion ?? data.descripcion.trim();
+      if (comercio && !data.idCategoriaGasto) {
+        setBuscandoUltimo(true);
+        try {
+          const ultimo = await ultimoGastoPorDescripcionAction({
+            descripcion: comercio,
+            idCuenta: data.cuentaOrigen || undefined,
+            // El ticket suele venir en mayúsculas: se compara igual, pero exacto.
+            sinMayusculas: true,
+          });
+          if (
+            ultimo?.categoriaId &&
+            options.categoriasGasto.some((c) => c.id === ultimo.categoriaId)
+          ) {
+            patch.idCategoriaGasto = ultimo.categoriaId;
+            completados.push("Categoría");
+          }
+          // El monto del historial sólo si el ticket no lo trajo ni lo cargó el usuario.
+          if (
+            patch.montoOrigen === undefined &&
+            data.montoOrigen === 0 &&
+            ultimo &&
+            ultimo.monto > 0
+          ) {
+            patch.montoOrigen = ultimo.monto;
+            completados.push("Monto");
+          }
+        } catch {
+          // Si la consulta falla, se aplica igual lo que trajo el ticket.
+        } finally {
+          setBuscandoUltimo(false);
+        }
+      }
+
+      if (Object.keys(patch).length > 0) handleSetData(patch);
+
+      if (completados.length === 0 && respetados.length === 0) {
+        toast.info("No pude leer datos del ticket. Cargalos a mano.");
+        return;
+      }
+      if (completados.length === 0) {
+        toast.info(`Ya tenías cargado: ${respetados.join(", ")}.`);
+        return;
+      }
+      toast.success(
+        `Se completó: ${completados.join(", ")}.` +
+          (respetados.length > 0
+            ? ` No se tocó ${respetados.join(", ")} (ya lo tenías).`
+            : "") +
+          " Revisá antes de guardar."
+      );
+    },
+    [data, handleSetData, options.categoriasGasto]
+  );
 
   const isValid =
     data.descripcion.trim().length > 0 &&
@@ -297,6 +403,19 @@ export function GastoDirecto() {
       titulo="Gasto"
       step={2}
       total={3}
+      accion={
+        // Escáner del ticket (plan OCR §11): sólo icono, al ras del título.
+        // Completa Descripción (comercio), Fecha y Monto, y la Categoría por historial.
+        <button
+          type="button"
+          onClick={() => setEscanerAbierto(true)}
+          aria-label="Escanear el ticket"
+          title="Escanear el ticket"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-subtitle transition-colors hover:bg-muted hover:text-header disabled:opacity-40"
+        >
+          <Camera className="h-5 w-5" />
+        </button>
+      }
       heroe={
         <HeroeFintech etiqueta={`Monto${isoCuenta ? ` · ${isoCuenta}` : ""}`}>
           <NumberField
@@ -389,6 +508,15 @@ export function GastoDirecto() {
         show={buscandoUltimo}
         message="Buscando el último gasto..."
       />
+
+      {escanerAbierto && (
+        <CamaraEscaner
+          documento="el ticket"
+          extraer={extraerTicket}
+          onListo={aplicarTicket}
+          onCerrar={() => setEscanerAbierto(false)}
+        />
+      )}
     </StepShellFintech>
   );
 }

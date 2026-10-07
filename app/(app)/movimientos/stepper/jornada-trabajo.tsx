@@ -24,7 +24,10 @@ import {
 } from "@/lib/utils";
 import { calcularMontoJornada } from "@/backend/src/lib/jornadas";
 import { CamaraEscaner } from "@/components/ocr/camara-escaner";
-import type { CamposJornada } from "@/lib/ocr/parsear-parte-trabajo";
+import {
+  extraerJornada,
+  type CamposJornada,
+} from "@/lib/ocr/parsear-parte-trabajo";
 import { useAliasDeCampo } from "@/components/voz/voz-provider";
 import {
   useRegistrarPantallaDictable,
@@ -347,7 +350,13 @@ export function JornadaTrabajo() {
 
       {escanerAbierto && (
         <CamaraEscaner
-          trabajos={trabajosHoras.map((t) => ({ id: t.id, nombre: t.nombre }))}
+          documento="el parte"
+          extraer={(texto) =>
+            extraerJornada(
+              texto,
+              trabajosHoras.map((t) => ({ id: t.id, nombre: t.nombre }))
+            )
+          }
           onListo={aplicarParte}
           onCerrar={() => setEscanerAbierto(false)}
         />
