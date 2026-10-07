@@ -163,11 +163,17 @@ body {
    soltar queda puesto **hasta el toque siguiente** — cubre los `mouse*` **emulados** de
    iOS que llegaban más tarde que la ventana de 900 ms anterior.
 
+   Se tapan las **tres** piezas que Recharts dibuja al activarse (medidas en el DOM, v3.10.1):
+   el tooltip, el **punto activo** y el **cursor** (la línea vertical gris ⇒
+   `path.recharts-curve.recharts-tooltip-cursor`; era lo único que seguía viéndose al
+   deslizar, §254).
+
    🔑 Se hace con un atributo y CSS **a propósito**, y no dejando de montar el
    `<Tooltip>`: apagarlo por render obliga a un re-render durante el gesto, eso atrasa
    los `touchmove` y el flick deja de detectarse (§234). Un atributo no re-renderiza
    nada y tapa igual lo que ya esté activo. */
 [data-sin-tooltip] .recharts-tooltip-wrapper,
+[data-sin-tooltip] .recharts-tooltip-cursor,
 [data-sin-tooltip] .recharts-active-dot {
   display: none !important;
 }
