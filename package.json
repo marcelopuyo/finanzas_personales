@@ -3,7 +3,9 @@
   "version": "1.7.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/preparar-ocr.mjs",
     "dev": "next dev -p 3001",
+    "prebuild": "node scripts/preparar-ocr.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -38,11 +40,14 @@
     "reflect-metadata": "^0.2.2",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
+    "tesseract.js": "^7.0.0",
     "typeorm": "^0.3.31",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@tesseract.js-data/eng": "^1.0.0",
+    "@tesseract.js-data/spa": "^1.0.0",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.1",
     "@types/pg": "^8.20.4",

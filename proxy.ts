@@ -172,7 +172,10 @@ export const config = {
   // muestra justamente cuando no hay red para validar la sesión. Y `api/ping`
   // es la SONDA del servidor (2026-09-17): tiene que contestar 204 siempre,
   // incluso sin sesión (se usa cuando la sesión no se puede validar).
+  // `/ocr/` (plan OCR · F0) son los assets del motor de OCR: pesos de 3,7 MB y
+  // el worker. También quedan fuera del guard — son estáticos y sin datos, y si
+  // el proxy los redirigiera, `importScripts` recibiría el HTML del login.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon\\.svg|icon\\.png|apple-icon\\.png|manifest\\.webmanifest|sw\\.js|icons/|offline(?:$|/)|version\\.json|api/ping(?:$|/)).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon\\.svg|icon\\.png|apple-icon\\.png|manifest\\.webmanifest|sw\\.js|icons/|ocr/|offline(?:$|/)|version\\.json|api/ping(?:$|/)).*)",
   ],
 };

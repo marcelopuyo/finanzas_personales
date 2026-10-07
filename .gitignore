@@ -43,5 +43,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# assets del OCR (plan OCR · F0): se regeneran con `scripts/preparar-ocr.mjs`
+# desde los paquetes instalados (~16 MB de binarios: worker, cores LSTM e idiomas)
+/public/ocr/
+
 deepseek/
 

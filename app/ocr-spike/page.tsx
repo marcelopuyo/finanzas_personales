@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { reconocer, liberarWorker, setProgresoOcr } from "@/lib/ocr/motor";
+import { reducirParaOcr } from "@/lib/ocr/preprocesar";
+import { extraerJornada, type CamposJornada } from "@/lib/ocr/parsear-parte-trabajo";
 
 /**
  * ⚠️ **PÁGINA TEMPORAL DE DIAGNÓSTICO (plan OCR · fase F1)** — ver
@@ -91,6 +94,18 @@ type ResultadoCalidad = {
   ms: number;
   ok: boolean;
   err?: string;
+};
+
+type EstadoOcr = {
+  estado: "inactivo" | "leyendo" | "listo" | "error";
+  /** Mensaje del motor mientras carga (pesos, core…). */
+  paso?: string;
+  texto?: string;
+  ms?: number;
+  campos?: CamposJornada;
+  err?: string;
+  /** Tamaño de la imagen que efectivamente vio el OCR. */
+  imagen?: { ancho: number; alto: number };
 };
 
 /**
@@ -220,12 +235,21 @@ export default function OcrSpikePage() {
   const [calidades, setCalidades] = useState<ResultadoCalidad[]>([]);
   const [probando, setProbando] = useState(false);
   const [capturando, setCapturando] = useState(false);
+  const [ocr, setOcr] = useState<EstadoOcr>({ estado: "inactivo" });
+  const [trabajosTexto, setTrabajosTexto] = useState("");
   const fotoRef = useRef<HTMLElement | null>(null);
+  /** Blob de la última captura: es lo que se le pasa al OCR. */
+  const fotoBlobRef = useRef<Blob | null>(null);
 
-  // Al capturar, la foto queda muy abajo: sin esto parece que el botón no hizo nada.
-  useEffect(() => {
-    if (foto) fotoRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
-  }, [foto]);
+  const trabajosOpciones = useMemo(
+    () =>
+      trabajosTexto
+        .split(",")
+        .map((nombre) => nombre.trim())
+        .filter(Boolean)
+        .map((nombre, i) => ({ id: i + 1, nombre })),
+    [trabajosTexto]
+  );
 
   const registrar = useCallback((msg: string) => {
     const t = new Date().toISOString().slice(11, 23);
@@ -255,6 +279,8 @@ export default function OcrSpikePage() {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
       if (fotoUrlRef.current) URL.revokeObjectURL(fotoUrlRef.current);
+      // En iOS el WASM es propenso a quedarse sin memoria: el worker se libera al salir.
+      void liberarWorker();
     };
   }, []);
 
@@ -434,6 +460,7 @@ export default function OcrSpikePage() {
       if (fotoUrlRef.current) URL.revokeObjectURL(fotoUrlRef.current);
       const url = URL.createObjectURL(blob);
       fotoUrlRef.current = url;
+      fotoBlobRef.current = blob;
       setFoto({ url, w: bmp.width, h: bmp.height, kb });
       registrar(
         `foto NÍTIDA (ImageCapture): ${bmp.width}×${bmp.height} · ${kb} KB`
@@ -477,6 +504,7 @@ export default function OcrSpikePage() {
         if (fotoUrlRef.current) URL.revokeObjectURL(fotoUrlRef.current);
         const url = URL.createObjectURL(blob);
         fotoUrlRef.current = url;
+        fotoBlobRef.current = blob;
         setFoto({ url, w: canvas.width, h: canvas.height, kb });
         registrar(
           `foto capturada: ${canvas.width}×${canvas.height} · ${kb} KB (${Math.round(performance.now() - t0)} ms)`
@@ -487,6 +515,48 @@ export default function OcrSpikePage() {
       0.8
     );
   }, [registrar]);
+
+  /** Corre el OCR sobre la última captura y aplica las reglas de extracción. */
+  const leerOcr = useCallback(async () => {
+    const blob = fotoBlobRef.current;
+    if (!blob) return;
+    setOcr({ estado: "leyendo" });
+    // El motor reporta la carga de pesos/core: se muestra para saber si tarda.
+    setProgresoOcr(({ estado, progreso }) =>
+      setOcr({ estado: "leyendo", paso: `${estado} ${Math.round(progreso * 100)}%` })
+    );
+    try {
+      const imagen = await reducirParaOcr(blob);
+      registrar(
+        `imagen para OCR: ${imagen.ancho}×${imagen.alto} (original ${Math.round(1 / imagen.escala)}× más grande)`
+      );
+      const { texto, ms } = await reconocer(imagen.canvas);
+      const campos = extraerJornada(texto, trabajosOpciones);
+      setOcr({
+        estado: "listo",
+        texto,
+        ms,
+        campos,
+        imagen: { ancho: imagen.ancho, alto: imagen.alto },
+      });
+      registrar(
+        `OCR listo en ${ms} ms · fecha=${campos.fecha ?? "-"} desde=${campos.horaDesde ?? "-"} hasta=${campos.horaHasta ?? "-"}`
+      );
+    } catch (e) {
+      const mensaje = e instanceof Error ? e.message : String(e);
+      setOcr({ estado: "error", err: mensaje });
+      registrar(`OCR ERROR: ${mensaje}`);
+    } finally {
+      setProgresoOcr(null);
+    }
+  }, [registrar, trabajosOpciones]);
+
+  // Al capturar: bajar hasta la foto y leerla con OCR (es lo que queremos validar).
+  useEffect(() => {
+    if (!foto) return;
+    fotoRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+    void leerOcr();
+  }, [foto, leerOcr]);
 
   const informe = useMemo(() => {
     const lineas: string[] = ["=== SPIKE CÁMARA (F1) ==="];
@@ -524,6 +594,26 @@ export default function OcrSpikePage() {
       );
     }
     if (error) lineas.push("[ERROR]", `  ${error.nombre}: ${error.mensaje}`);
+    if (ocr.estado !== "inactivo") {
+      lineas.push("[OCR]", `  estado: ${ocr.estado}`);
+      if (ocr.ms !== undefined) lineas.push(`  tardó: ${ocr.ms} ms`);
+      if (ocr.imagen) {
+        lineas.push(`  imagen: ${ocr.imagen.ancho}×${ocr.imagen.alto}`);
+      }
+      if (ocr.err) lineas.push(`  error: ${ocr.err}`);
+      if (ocr.campos) {
+        lineas.push(
+          `  fecha: ${ocr.campos.fecha ?? "—"}`,
+          `  horaDesde: ${ocr.campos.horaDesde ?? "—"}`,
+          `  horaHasta: ${ocr.campos.horaHasta ?? "—"}`,
+          `  trabajo: ${ocr.campos.trabajoDetectado ?? "—"}`,
+          ...ocr.campos.avisos.map((aviso) => `  aviso: ${aviso}`)
+        );
+      }
+      if (ocr.texto !== undefined) {
+        lineas.push("[TEXTO OCR]", ocr.texto.trim() || "(vacío)");
+      }
+    }
     if (log.length) lineas.push("[LOG]", ...log.map((l) => `  ${l}`));
     return lineas.join("\n");
   }, [
@@ -536,6 +626,7 @@ export default function OcrSpikePage() {
     calidades,
     foto,
     error,
+    ocr,
     log,
   ]);
 
@@ -716,6 +807,84 @@ export default function OcrSpikePage() {
           />
         </section>
       )}
+
+      <section className="mt-4">
+        <h2 className="mb-2 text-sm font-semibold text-foreground">
+          OCR (Tesseract.js · eng+spa)
+        </h2>
+        <label
+          htmlFor="trabajos-prueba"
+          className="mb-1 block text-xs text-muted-foreground"
+        >
+          Nombres de trabajos reales (separados por coma) para probar el reconocimiento:
+        </label>
+        <input
+          id="trabajos-prueba"
+          type="text"
+          value={trabajosTexto}
+          onChange={(e) => setTrabajosTexto(e.target.value)}
+          placeholder="Publix Market, Delivery Acme"
+          className="mb-3 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground"
+        />
+        <button
+          type="button"
+          onClick={() => void leerOcr()}
+          disabled={!foto || ocr.estado === "leyendo"}
+          className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium disabled:opacity-50"
+        >
+          {ocr.estado === "leyendo" ? "Leyendo…" : "Leer con OCR"}
+        </button>
+
+        {ocr.estado === "leyendo" && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            {ocr.paso ?? "iniciando motor…"}
+          </p>
+        )}
+
+        {ocr.estado === "error" && (
+          <p className="mt-2 text-sm text-danger">Error: {ocr.err}</p>
+        )}
+
+        {ocr.campos && (
+          <>
+            <Tabla
+              titulo="Campos detectados"
+              datos={[
+                { k: "Fecha", v: ocr.campos.fecha ?? "—" },
+                { k: "Hora desde", v: ocr.campos.horaDesde ?? "—" },
+                { k: "Hora hasta", v: ocr.campos.horaHasta ?? "—" },
+                { k: "Trabajo", v: ocr.campos.trabajoDetectado ?? "—" },
+                {
+                  k: "Imagen para OCR",
+                  v: ocr.imagen ? `${ocr.imagen.ancho}×${ocr.imagen.alto}` : "—",
+                },
+                {
+                  k: "Tiempo de OCR",
+                  v: ocr.ms !== undefined ? `${ocr.ms} ms` : "—",
+                },
+              ]}
+            />
+            {ocr.campos.avisos.length > 0 && (
+              <ul className="mt-2 list-disc pl-5 text-xs text-muted-foreground">
+                {ocr.campos.avisos.map((aviso) => (
+                  <li key={aviso}>{aviso}</li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+
+        {ocr.texto !== undefined && (
+          <>
+            <h3 className="mt-3 mb-1 text-xs font-semibold text-foreground">
+              Texto detectado ({ocr.texto.trim().length} caracteres)
+            </h3>
+            <pre className="max-h-64 overflow-auto rounded-lg border border-border bg-card p-3 text-[11px] leading-relaxed whitespace-pre-wrap text-muted-foreground">
+              {ocr.texto.trim() || "(sin texto)"}
+            </pre>
+          </>
+        )}
+      </section>
 
       {log.length > 0 && (
         <section className="mt-4">
