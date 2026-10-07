@@ -209,6 +209,13 @@ export default function OcrSpikePage() {
   } | null>(null);
   const [calidades, setCalidades] = useState<ResultadoCalidad[]>([]);
   const [probando, setProbando] = useState(false);
+  const [capturando, setCapturando] = useState(false);
+  const fotoRef = useRef<HTMLElement | null>(null);
+
+  // Al capturar, la foto queda muy abajo: sin esto parece que el botón no hizo nada.
+  useEffect(() => {
+    if (foto) fotoRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }, [foto]);
 
   const registrar = useCallback((msg: string) => {
     const t = new Date().toISOString().slice(11, 23);
@@ -410,6 +417,7 @@ export default function OcrSpikePage() {
       return;
     }
     try {
+      setCapturando(true);
       const blob = await new Ctor(track).takePhoto();
       const bmp = await createImageBitmap(blob);
       const kb = Math.round(blob.size / 1024);
@@ -423,6 +431,8 @@ export default function OcrSpikePage() {
     } catch (e) {
       const nombre = e instanceof DOMException ? e.name : "Error";
       registrar(`ImageCapture falló: ${nombre}`);
+    } finally {
+      setCapturando(false);
     }
   }, [registrar]);
 
@@ -433,25 +443,35 @@ export default function OcrSpikePage() {
       registrar("no puedo disparar: el video todavía no tiene tamaño");
       return;
     }
+    setCapturando(true);
+    const t0 = performance.now();
     const canvas = document.createElement("canvas");
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) {
+      setCapturando(false);
+      return;
+    }
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-    const cabecera = "data:image/jpeg;base64,";
-    const kb = Math.round(((dataUrl.length - cabecera.length) * 3) / 4 / 1024);
-
+    // ⛔ Sin `toDataURL`: encodear 12 MP dos veces (una para el peso y otra para
+    // el blob) tardaba segundos y **parecía que el botón no disparaba**.
     canvas.toBlob(
       (blob) => {
-        if (!blob) return;
+        if (!blob) {
+          setCapturando(false);
+          return;
+        }
+        const kb = Math.round(blob.size / 1024);
         if (fotoUrlRef.current) URL.revokeObjectURL(fotoUrlRef.current);
         const url = URL.createObjectURL(blob);
         fotoUrlRef.current = url;
         setFoto({ url, w: canvas.width, h: canvas.height, kb });
-        registrar(`foto capturada: ${canvas.width}×${canvas.height} · ~${kb} KB`);
+        registrar(
+          `foto capturada: ${canvas.width}×${canvas.height} · ${kb} KB (${Math.round(performance.now() - t0)} ms)`
+        );
+        setCapturando(false);
       },
       "image/jpeg",
       0.8
@@ -570,16 +590,16 @@ export default function OcrSpikePage() {
         <button
           type="button"
           onClick={disparar}
-          disabled={estado !== "abierta"}
+          disabled={estado !== "abierta" || capturando}
           className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
-          Disparar
+          {capturando ? "Capturando…" : "Disparar"}
         </button>
         {hayImageCapture && (
           <button
             type="button"
             onClick={() => void dispararNitido()}
-            disabled={estado !== "abierta"}
+            disabled={estado !== "abierta" || capturando}
             className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
             Foto nítida (ImageCapture)
@@ -601,6 +621,12 @@ export default function OcrSpikePage() {
           Copiar informe
         </button>
       </div>
+
+      {foto && (
+        <p className="mb-3 text-sm font-semibold text-success">
+          Última foto: {foto.w}×{foto.h} · ~{foto.kb} KB — está abajo ↓
+        </p>
+      )}
 
       <video
         ref={videoRef}
@@ -668,7 +694,7 @@ export default function OcrSpikePage() {
       )}
 
       {foto && (
-        <section className="mt-4">
+        <section ref={fotoRef} className="mt-4">
           <h2 className="mb-2 text-sm font-semibold text-foreground">
             Foto ({foto.w}×{foto.h} · ~{foto.kb} KB) — ¿se ve derecha?
           </h2>
