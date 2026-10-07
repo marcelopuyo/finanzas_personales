@@ -91,14 +91,16 @@ export function CuentaSlide({
   const prefetch = usePrefetchNav();
   /** Franja del gráfico: sirve para tapar su tooltip al hacer un flick. */
   const franjaRef = useRef<HTMLDivElement | null>(null);
-  /** Timers de apagado del gráfico y de la ventana tapada. */
+  /** Timers de apagado del punto activo del gráfico. */
   const timersRef = useRef<number[]>([]);
   /**
-   * Cuánto queda **tapado** el tooltip después de soltar: cubre el deslizamiento de la
-   * tarjeta y los `mouse*` **emulados** de iOS.
+   * Red de seguridad **sólo para equipos con mouse** (híbridos): tras soltar, la franja
+   * queda tapada hasta el **toque siguiente**, así que si no llega ninguno se destapa
+   * sola pasado un rato largo — bien después de los `mouse*` **emulados** de iOS, que
+   * es lo que hay que cubrir (§237).
    */
-  const VENTANA_TAPADO_MS = 900;
-  /** Timer de la ventana tapada. */
+  const DESTAPADO_SEGURIDAD_MS = 4000;
+  /** Timer de esa red de seguridad. */
   const finTapadoRef = useRef<number | undefined>(undefined);
 
   useEffect(
@@ -144,9 +146,32 @@ export function CuentaSlide({
   };
 
   /**
-   * Gesto **ya rápido** (va a terminar en flick): se silencia la banda y se **tapa** el
-   * tooltip del gráfico. Todo es DOM (`ref` + atributo): **ni un re-render**, que es la
-   * condición para que el flick siga detectándose (§234).
+   * Dedo **recién apoyado**: se tapa el tooltip **de entrada**, antes de que Recharts
+   * alcance a pintarlo (§237: en iOS los primeros `touchmove` se veían con el tooltip
+   * a la vista, porque el tapado recién empezaba cuando la velocidad ya había cruzado
+   * el umbral). Si el gesto resulta lento, `alGestoLento` lo vuelve a destapar.
+   */
+  const alEmpezarLaFranja = () => {
+    if (finTapadoRef.current !== undefined) {
+      window.clearTimeout(finTapadoRef.current);
+      finTapadoRef.current = undefined;
+    }
+    taparTooltip();
+  };
+
+  /**
+   * El gesto **no** fue un flick ⇒ es un *scrub* lento: el tooltip vuelve a mostrarse
+   * con el dedo apoyado, como siempre.
+   */
+  const alGestoLento = () => {
+    destaparTooltip();
+  };
+
+  /**
+   * Gesto **ya rápido** (va a terminar en flick): viene de un gesto que hasta acá
+   * parecía lento ⇒ se silencia la banda y se **vuelve a tapar** el tooltip. Todo es
+   * DOM (`ref` + atributo): **ni un re-render**, que es la condición para que el flick
+   * siga detectándose (§234).
    */
   const alGestoRapido = () => {
     alSilenciar?.();
@@ -154,10 +179,14 @@ export function CuentaSlide({
   };
 
   /**
-   * Se soltó el dedo ⇒ esta franja queda tapada un rato (cubre el deslizamiento de la
-   * tarjeta y los `mouse*` **emulados** de iOS) y se apaga el estado de Recharts, así
-   * al destapar no reaparece nada. La banda queda silenciada hasta el **toque
-   * siguiente** (ver `inicio-panel.tsx`).
+   * Se soltó el dedo ⇒ la franja **queda tapada hasta el toque siguiente** (no por un
+   * timer corto) y se apaga el estado de Recharts, así al destapar no reaparece nada.
+   * La banda queda silenciada hasta el `touchstart` siguiente (ver `inicio-panel.tsx`).
+   *
+   * 🔑 Por qué **no** una ventana corta (los 900 ms que se usaban antes): en iOS los
+   * `mouse*` **emulados** podían llegar más tarde que esa ventana y volvían a encender
+   * el tooltip justo mientras la tarjeta se deslizaba (§237). El toque siguiente es la
+   * señal inequívoca de que el usuario vuelve a interactuar.
    */
   const alSoltarLaFranja = () => {
     alSilenciar?.();
@@ -168,7 +197,7 @@ export function CuentaSlide({
     }
     finTapadoRef.current = window.setTimeout(
       () => destaparTooltip(),
-      VENTANA_TAPADO_MS
+      DESTAPADO_SEGURIDAD_MS
     );
   };
 
@@ -188,6 +217,8 @@ export function CuentaSlide({
 
   const flick = useFlickLateral({
     alFlick: alFlickDeLaFranja,
+    alEmpezar: alEmpezarLaFranja,
+    alLento: alGestoLento,
     alRapido: alGestoRapido,
     alSoltar: alSoltarLaFranja,
   });

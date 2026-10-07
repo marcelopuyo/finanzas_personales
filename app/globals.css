@@ -155,8 +155,13 @@ body {
 }
 
 /* Recharts: **tapar** el tooltip de la franja del gráfico del carrusel de Inicio
-   (`app/(app)/dashboard/components/cuenta-slide.tsx`) mientras el gesto es un flick o
-   acaba de soltarse (2026-10-05).
+   (`app/(app)/dashboard/components/cuenta-slide.tsx`).
+
+   El fix del pendiente de §237 (2026-10-07) puso el atributo **al apoyar el dedo** (no
+   recién cuando la velocidad ya cruzó el umbral, que dejaba ver los primeros cuadros del
+   arrastre): se quita si el gesto se confirma lento (scrub, el tooltip vuelve solo) y tras
+   soltar queda puesto **hasta el toque siguiente** — cubre los `mouse*` **emulados** de
+   iOS que llegaban más tarde que la ventana de 900 ms anterior.
 
    🔑 Se hace con un atributo y CSS **a propósito**, y no dejando de montar el
    `<Tooltip>`: apagarlo por render obliga a un re-render durante el gesto, eso atrasa

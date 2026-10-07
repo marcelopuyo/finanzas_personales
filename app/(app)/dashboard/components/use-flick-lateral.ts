@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { TouchEvent } from "react";
 
 /** Ventana (ms) sobre la que se mide la velocidad **final** del gesto. */
@@ -13,6 +13,12 @@ const VENTANA_MS = 110;
 const VELOCIDAD_MINIMA = 0.5;
 /** Recorrido mínimo (px): por debajo de esto el gesto es un toque, no un desliz. */
 const RECORRIDO_MINIMO = 24;
+/**
+ * Ventana (ms) para **decidir** qué es el gesto, medida desde el `touchstart`. Si al
+ * cumplirse todavía no se reconoció un flick, el gesto es un *scrub* lento ⇒ el tooltip
+ * **vuelve a mostrarse** con el dedo apoyado (fix del pendiente de §237).
+ */
+const DECISION_MS = 250;
 
 /** Una posición del dedo con su momento. */
 interface Muestra {
@@ -25,10 +31,28 @@ interface OpcionesFlick {
   /** Se llama cuando el gesto **resulta** un flick (al soltar). */
   alFlick?: (dir: 1 | -1) => void;
   /**
+   * Se llama **al apoyar el dedo** en la franja, antes de cualquier `touchmove`.
+   *
+   * 🔑 Es el fix del pendiente de §237: antes el tapado recién empezaba cuando la
+   * velocidad **ya había cruzado** el umbral, así que en iOS los primeros cuadros del
+   * arrastre se veían con el tooltip a la vista. Tapa de entrada y lo destapa
+   * `alLento` si el gesto resulta un *scrub*.
+   *
+   * ⚠️ Barato y **sin estado de React** (un atributo de DOM alcanza): ver la nota de
+   * abajo.
+   */
+  alEmpezar?: () => void;
+  /**
+   * Se llama **una vez por gesto**, `DECISION_MS` después del `touchstart`, **sólo si
+   * todavía no se reconoció un flick** ⇒ el gesto es un *scrub* lento y el tooltip
+   * debe volver a mostrarse con el dedo apoyado (es el comportamiento que el usuario
+   * pidió conservar).
+   */
+  alLento?: () => void;
+  /**
    * Se llama **una vez por gesto**, en cuanto el movimiento ya viene rápido y
-   * horizontal (todavía con el dedo apoyado). Sirve para **tapar el tooltip** del
-   * gráfico: si el gesto va a terminar en flick, no tiene sentido ver el tooltip
-   * durante el arrastre (pedido del usuario, 2026-10-05).
+   * horizontal (todavía con el dedo apoyado). Sirve para **volver a tapar** el tooltip
+   * del gráfico si el gesto empezó lento y terminó en latigazo.
    *
    * ⚠️ Lo que se llame acá tiene que ser **barato y sin estado de React** (ver
    * `CuentaSlide` y la nota de arriba): un atributo de DOM alcanza.
@@ -38,10 +62,11 @@ interface OpcionesFlick {
    * Se llama **siempre** al soltar (o cancelar) un gesto que empezó en la franja,
    * sea flick o no.
    *
-   * 🔑 Es la parte que faltaba (2026-10-05): iOS emite eventos de mouse **emulados**
-   * después del `touchend` y cualquiera de ellos vuelve a encender el tooltip, que
-   * queda **pegado hasta el toque siguiente**. Con esto, la banda queda sin tooltips
-   * apenas se levanta el dedo (y el segundo toque la despierta: ver
+   * 🔑 Es lo que deja la franja **tapada hasta el toque siguiente** (no por un timer
+   * corto): en iOS los `mouse*` **emulados** que llegan después del `touchend` volvían
+   * a encender el tooltip justo mientras la tarjeta se deslizaba, y podían llegar más
+   * tarde que la ventana de 900 ms que se usaba antes (§237). La banda queda sin
+   * tooltips apenas se levanta el dedo y el toque siguiente la despierta (ver
    * `inicio-panel.tsx`), así que tampoco queda pegado un **arrastre lento**.
    */
   alSoltar?: () => void;
@@ -73,18 +98,54 @@ interface OpcionesFlick {
  * el 2026-10-05 y se revirtió en §234: ahora todo se resuelve con **DOM** (atributo
  * + `mouseout`) y el silencio de la banda es un `ref`.
  */
-export function useFlickLateral({ alFlick, alRapido, alSoltar }: OpcionesFlick = {}) {
+export function useFlickLateral({
+  alFlick,
+  alEmpezar,
+  alLento,
+  alRapido,
+  alSoltar,
+}: OpcionesFlick = {}) {
   const muestrasRef = useRef<Muestra[]>([]);
   /** ¿Ya se avisó `alRapido` en este gesto? (se llama una sola vez) */
   const avisadoRef = useRef(false);
+  /** Timer de la decisión lento/flick (`DECISION_MS`). */
+  const decisionRef = useRef<number | undefined>(undefined);
 
-  const onTouchStart = useCallback((e: TouchEvent<HTMLElement>) => {
-    const t = e.touches[0];
-    muestrasRef.current = t
-      ? [{ x: t.clientX, y: t.clientY, t: performance.now() }]
-      : [];
-    avisadoRef.current = false;
-  }, []);
+  const limpiarDecision = () => {
+    if (decisionRef.current !== undefined) {
+      window.clearTimeout(decisionRef.current);
+      decisionRef.current = undefined;
+    }
+  };
+
+  useEffect(
+    () => () => {
+      if (decisionRef.current !== undefined) {
+        window.clearTimeout(decisionRef.current);
+      }
+    },
+    []
+  );
+
+  const onTouchStart = useCallback(
+    (e: TouchEvent<HTMLElement>) => {
+      const t = e.touches[0];
+      muestrasRef.current = t
+        ? [{ x: t.clientX, y: t.clientY, t: performance.now() }]
+        : [];
+      avisadoRef.current = false;
+      limpiarDecision();
+      // Tapa **de entrada**: así no se ve ni el primer cuadro del arrastre, que era
+      // justo lo que se filtraba en iOS.
+      alEmpezar?.();
+      decisionRef.current = window.setTimeout(() => {
+        decisionRef.current = undefined;
+        // Si en `DECISION_MS` no hubo flick, el gesto es un scrub lento.
+        if (!avisadoRef.current) alLento?.();
+      }, DECISION_MS);
+    },
+    [alEmpezar, alLento]
+  );
 
   const onTouchMove = useCallback(
     (e: TouchEvent<HTMLElement>) => {
@@ -107,6 +168,7 @@ export function useFlickLateral({ alFlick, alRapido, alSoltar }: OpcionesFlick =
 
   const onTouchEnd = useCallback(
     (e: TouchEvent<HTMLElement>) => {
+      limpiarDecision();
       const muestras = muestrasRef.current;
       muestrasRef.current = [];
       // Se soltó el dedo: la banda queda sin tooltips (ver `alSoltar`), incluso si el
@@ -134,6 +196,7 @@ export function useFlickLateral({ alFlick, alRapido, alSoltar }: OpcionesFlick =
 
   /** Cancelado (el navegador se quedó con el gesto): no cuenta como flick. */
   const onTouchCancel = useCallback(() => {
+    limpiarDecision();
     muestrasRef.current = [];
     avisadoRef.current = false;
     // También acá: el gesto terminó ⇒ la banda queda sin tooltips.
