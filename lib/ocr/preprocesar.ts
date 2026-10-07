@@ -3,11 +3,11 @@
  *
  * Por ahora sólo el **primer** paso del pipeline (el que ya está medido):
  * reducir la captura al lado largo útil. Los siguientes (binarizado, contraste,
- * recorte del papel) se agregan en la fase F4 con evidencia de F7.
+ * recorte del papel) se agregan cuando F7 diga que hacen falta.
  *
- * ⚠️ En el flujo definitivo la reducción va **dentro del mismo `drawImage`** desde
- * el video (nunca se materializa un buffer de 12 MP). Acá se acepta un `Blob` ya
- * capturado porque es lo que produce el disparo del escáner.
+ * ⚠️ La reducción va **dentro del mismo `drawImage`** (nunca se materializa un
+ * buffer de 12 MP): `marcoDesdeVideo` es el camino del escáner;
+ * `reducirParaOcr` existe para una imagen ya capturada como `Blob`.
  */
 import { LADO_LARGO_OCR } from "./constantes";
 
@@ -21,11 +21,34 @@ export type ImagenOcr = {
 };
 
 /**
- * Reduce la imagen al lado largo indicado (~2000 px por defecto).
+ * Captura un cuadro del video **ya reducido**.
  *
- * 4032×3024 (12 MP) en Tesseract es lento y arriesga OOM en iOS; ~2000 px del
- * lado largo sigue dando de sobra para el texto de un documento que llena el
- * cuadro.
+ * Es el camino del escáner definitivo: se dibuja una sola vez, del video al
+ * canvas final, así nunca se materializa un buffer de 12 MP (memoria en iOS).
+ */
+export function marcoDesdeVideo(
+  video: HTMLVideoElement,
+  ladoLargo: number = LADO_LARGO_OCR
+): ImagenOcr {
+  const escala = Math.min(
+    1,
+    ladoLargo / Math.max(video.videoWidth, video.videoHeight)
+  );
+  const lienzo = document.createElement("canvas");
+  lienzo.width = Math.max(1, Math.round(video.videoWidth * escala));
+  lienzo.height = Math.max(1, Math.round(video.videoHeight * escala));
+
+  const ctx = lienzo.getContext("2d");
+  if (!ctx) throw new Error("No se pudo crear el contexto 2D del canvas");
+  ctx.drawImage(video, 0, 0, lienzo.width, lienzo.height);
+
+  return { canvas: lienzo, ancho: lienzo.width, alto: lienzo.height, escala };
+}
+
+/**
+ * Reduce al lado largo indicado una imagen ya capturada como `Blob`.
+ *
+ * Para el escáner conviene `marcoDesdeVideo` (evita decodificar los 12 MP).
  */
 export async function reducirParaOcr(
   fuente: Blob,

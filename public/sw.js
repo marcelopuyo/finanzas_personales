@@ -140,6 +140,10 @@ async function sincronizarBuild(buildId) {
   if (anterior === buildId) return;
 
   await Promise.all([caches.delete(DATA_CACHE), caches.delete(META_CACHE)]);
+  // Los assets del OCR no llevan hash en el nombre: si no se borran, tras un
+  // deploy el SW seguiría sirviendo el core/idioma de la versión anterior
+  // (plan OCR §3.4). Los estáticos con hash, en cambio, se conservan.
+  await borrarOcrDelCache();
   const metaNueva = await caches.open(META_CACHE);
   await metaNueva.put(BUILD_KEY, new Response(buildId));
 
@@ -241,9 +245,14 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname === "/sw.js") return; // el propio SW no se cachea
 
   // Estáticos con hash / iconos → cache-first.
+  // Los assets del OCR entran acá aunque NO lleven hash en el nombre: se
+  // guardan la primera vez que se escanea (no en la instalación, que bajaría
+  // ~16 MB de una) y así el escáner funciona sin conexión. Su invalidación por
+  // deploy la hace `borrarOcrDelCache()` (ver `sincronizarBuild`).
   if (
     url.pathname.startsWith("/_next/static/") ||
-    url.pathname.startsWith("/icons/")
+    url.pathname.startsWith("/icons/") ||
+    url.pathname.startsWith("/ocr/")
   ) {
     event.respondWith(cacheFirst(event, request));
     return;
@@ -259,6 +268,28 @@ self.addEventListener("fetch", (event) => {
   // Sin caché de RSC, offline Next cae a una navegación completa (MPA) y esa sí
   // la resuelve este SW desde la caché de documentos.
 });
+
+/**
+ * Borra de `fp-assets` los assets del OCR (`/ocr/**`).
+ *
+ * Se llaman desde `sincronizarBuild()` cuando cambia el build: a diferencia de
+ * `/_next/static/**`, estos archivos **no llevan hash** en el nombre, así que sin
+ * este borrado el SW seguiría sirviendo el core o el idioma de la versión
+ * anterior (plan OCR §3.4).
+ */
+async function borrarOcrDelCache() {
+  try {
+    const cache = await caches.open(ASSET_CACHE);
+    const claves = await cache.keys();
+    await Promise.all(
+      claves
+        .filter((peticion) => new URL(peticion.url).pathname.startsWith("/ocr/"))
+        .map((peticion) => cache.delete(peticion))
+    );
+  } catch {
+    /* si falla, el próximo fetch los volverá a pedir igual */
+  }
+}
 
 /** Cache-first para estáticos: si está cacheado se sirve al instante. */
 async function cacheFirst(event, request) {

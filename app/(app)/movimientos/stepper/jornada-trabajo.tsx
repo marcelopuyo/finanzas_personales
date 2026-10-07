@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Camera } from "lucide-react";
+import { toast } from "sonner";
 import { useMovimientoStepper } from "./stepper-context";
 import {
   StepShellFintech,
@@ -14,8 +16,15 @@ import {
   formatFecha,
 } from "./ui";
 import { STEP_CONFIRMACION, type MovimientoData } from "./types";
-import { decimalToTime, numberToCurrency, timeToDecimal } from "@/lib/utils";
+import {
+  decimalToTime,
+  numberToCurrency,
+  timeToDecimal,
+  todayLocalISODate,
+} from "@/lib/utils";
 import { calcularMontoJornada } from "@/backend/src/lib/jornadas";
+import { CamaraEscaner } from "@/components/ocr/camara-escaner";
+import type { CamposJornada } from "@/lib/ocr/parsear-parte-trabajo";
 import { useAliasDeCampo } from "@/components/voz/voz-provider";
 import {
   useRegistrarPantallaDictable,
@@ -33,6 +42,8 @@ import { crearDictadoJornada } from "./dictado-trabajo";
  */
 export function JornadaTrabajo() {
   const { data, handleSetData, navigateTo, options } = useMovimientoStepper();
+  /** Escáner de partes: se abre con el botón y se cierra al leer o al cancelar. */
+  const [escanerAbierto, setEscanerAbierto] = useState(false);
 
   /**
    * Solo trabajos de modalidad `horas_variables` admiten jornadas.
@@ -156,6 +167,74 @@ export function JornadaTrabajo() {
       : ""
   }`;
 
+  /**
+   * Aplica lo que salió del parte **sin pisar lo que el usuario ya cargó** (mismo
+   * criterio que el campo Descripción de Gasto): la Fecha sólo si sigue siendo la
+   * de hoy, las horas sólo si están vacías y el Trabajo sólo si no hay uno
+   * elegido. **Nunca guarda**: eso lo sigue haciendo el botón del wizard.
+   */
+  const aplicarParte = useCallback(
+    (campos: CamposJornada) => {
+      setEscanerAbierto(false);
+
+      const patch: Partial<MovimientoData> = {};
+      const completados: string[] = [];
+      const respetados: string[] = [];
+
+      if (campos.fecha) {
+        if (data.fecha === todayLocalISODate()) {
+          patch.fecha = campos.fecha;
+          completados.push("Fecha");
+        } else {
+          respetados.push("Fecha");
+        }
+      }
+      if (campos.horaDesde) {
+        if (data.horaDesde) {
+          respetados.push("Hora desde");
+        } else {
+          patch.horaDesde = campos.horaDesde;
+          completados.push("Hora desde");
+        }
+      }
+      if (campos.horaHasta) {
+        if (data.horaHasta) {
+          respetados.push("Hora hasta");
+        } else {
+          patch.horaHasta = campos.horaHasta;
+          completados.push("Hora hasta");
+        }
+      }
+      if (campos.idTrabajo) {
+        if (data.idTrabajo) {
+          respetados.push("Trabajo");
+        } else {
+          patch.idTrabajo = campos.idTrabajo;
+          completados.push("Trabajo");
+        }
+      }
+
+      if (completados.length > 0) handleSetData(patch);
+
+      if (completados.length === 0 && respetados.length === 0) {
+        toast.info("No pude leer datos del parte. Cargalos a mano.");
+        return;
+      }
+      if (completados.length === 0) {
+        toast.info(`Ya tenías cargado: ${respetados.join(", ")}.`);
+        return;
+      }
+      toast.success(
+        `Se completó: ${completados.join(", ")}.` +
+          (respetados.length > 0
+            ? ` No se tocó ${respetados.join(", ")} (ya lo tenías).`
+            : "") +
+          " Revisá antes de guardar."
+      );
+    },
+    [data.fecha, data.horaDesde, data.horaHasta, data.idTrabajo, handleSetData]
+  );
+
   return (
     <StepShellFintech
       titulo="Jornada"
@@ -187,6 +266,19 @@ export function JornadaTrabajo() {
       )}
 
       <div className="space-y-4 rounded-xl border border-border bg-card p-4">
+        {/* Escáner (plan OCR): el usuario apunta al parte y los campos se
+            completan solos. Va arriba de todo porque es la entrada rápida; quien
+            prefiera tipear simplemente lo ignora. */}
+        <button
+          type="button"
+          onClick={() => setEscanerAbierto(true)}
+          disabled={!trabajosHoras.length}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-primary/40 bg-primary/5 px-3 py-2.5 text-[13px] font-medium text-primary disabled:opacity-50"
+        >
+          <Camera className="h-4 w-4" />
+          Escanear el parte de trabajo
+        </button>
+
         {/* El **trabajo** es el único vínculo de la jornada: no hay período que
             elegir (la liquidación nace al cobrar). Va primero porque de él sale
             el precio de la hora del monto estimado. */}
@@ -250,6 +342,14 @@ export function JornadaTrabajo() {
           {decimalToTime(jornadaSolapada.horaHasta)}. No se pueden superponer
           horas del mismo trabajo.
         </div>
+      )}
+
+      {escanerAbierto && (
+        <CamaraEscaner
+          trabajos={trabajosHoras.map((t) => ({ id: t.id, nombre: t.nombre }))}
+          onListo={aplicarParte}
+          onCerrar={() => setEscanerAbierto(false)}
+        />
       )}
     </StepShellFintech>
   );
