@@ -73,6 +73,16 @@ const CANDIDATAS: { etiqueta: string; size?: MediaTrackConstraints }[] = [
   { etiqueta: "solo alto 3024 (ideal)", size: { height: { ideal: 3024 } } },
 ];
 
+/**
+ * Resolución medida como la **máxima que concede iOS** en el dispositivo del
+ * usuario (4032×3024 @30 fps en 862 ms — ver §1.6 del plan). Es la que usará el
+ * escáner real: sin `ideal` de tamaño, iOS abre a 480×640 y no sirve para OCR.
+ */
+const CALIDAD_MAX: MediaTrackConstraints = {
+  width: { ideal: 4032 },
+  height: { ideal: 3024 },
+};
+
 type ResultadoCalidad = {
   etiqueta: string;
   size?: MediaTrackConstraints;
@@ -573,7 +583,7 @@ export default function OcrSpikePage() {
       <div className="mb-4 flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={() => void abrirCamara()}
+          onClick={() => void abrirCamara(CALIDAD_MAX)}
           disabled={estado !== "inicial"}
           className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
         >
