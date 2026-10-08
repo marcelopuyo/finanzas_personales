@@ -106,14 +106,20 @@ export default function TopBar({
             href="/perfil"
             aria-label={userLabel}
             title={userLabel}
-            className="ml-1 rounded-full transition-opacity hover:opacity-90"
+            // Área táctil de **44×44** (mínimo de Apple HIG; Material pide 48): el
+            // círculo sigue midiendo 32 px —los 6 px de padding de cada lado son
+            // los que se tocan— y `-mr-1.5` compensa el padding de la derecha para
+            // que el círculo quede **exactamente** donde estaba (alineado con el
+            // margen del logo). El gesto de tocar "un poco al lado" del avatar
+            // entraba en el borde del `<header>` y no abría nada (2026-10-07).
+            className="-mr-1.5 ml-1 inline-flex items-center justify-center rounded-full p-1.5 transition-opacity hover:opacity-90"
           >
-          <span
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#414346] text-[15px] text-[#f0f1f2]"
-            style={{ width: 32, height: 32 }}
-          >
-            {initial}
-          </span>
+            <span
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#414346] text-[15px] text-[#f0f1f2]"
+              style={{ width: 32, height: 32 }}
+            >
+              {initial}
+            </span>
           </Link>
         </div>
       </div>
