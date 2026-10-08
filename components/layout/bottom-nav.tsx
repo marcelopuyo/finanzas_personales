@@ -184,8 +184,8 @@ export default function BottomNav() {
               activo ? "text-header" : "text-subtitle hover:text-label"
             )}
           >
-            <Icono size={21} />
-            <span className="text-[10px] leading-none">{t.label}</span>
+            <Icono size={22} />
+            <span className="text-[11px] font-medium leading-none">{t.label}</span>
           </Link>
         );
       })}
@@ -208,8 +208,8 @@ export default function BottomNav() {
           masActivo ? "text-header" : "text-subtitle hover:text-label"
         )}
       >
-        {masActivo ? <HamburgerMenuDuotone size={21} /> : <HamburgerMenuLinear size={21} />}
-        <span className="text-[10px] leading-none">Más</span>
+        {masActivo ? <HamburgerMenuDuotone size={22} /> : <HamburgerMenuLinear size={22} />}
+        <span className="text-[11px] font-medium leading-none">Más</span>
       </button>
     </nav>
 
