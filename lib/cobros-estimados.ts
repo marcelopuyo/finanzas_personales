@@ -29,12 +29,19 @@
 //     `cadencia = null`: el trabajo se muestra **sin separar**, como antes.
 //     ⛔ Nunca inventar un estimado con 1–2 datos.
 //  8. **"Día de pago"** (`pagoDias`, 2026-10-07): días que el trabajo tarda en
-//     pagar desde el **fin del período** hasta el cobro real (moda de los últimos
-//     `N_HISTORIAL`, ignorando las `fechaDeCobro` centinela < 1901). Con eso cada
-//     ventana expone su **fecha estimada de pago** = `cierre + pagoDias`: el chip
-//     dice cuándo cierra el período y **cuándo llega la plata**. Sin cobros usables
-//     ⇒ `pagoDias = null` y no se muestra fecha de pago (medido en Duffys: 8 días
-//     en los primeros 9 cobros, 13 en los últimos 7 ⇒ la moda manda).
+//     pagar desde el **fin del período** hasta el cobro real, como **moda de TODO el
+//     historial** del trabajo (ignorando las `fechaDeCobro` centinela < 1901). A
+//     diferencia de la cadencia, acá **no** se recorta a las últimas `N_HISTORIAL`:
+//     es "la cantidad de días con la que paga este trabajo" y tiene que ser un número
+//     estable. Con eso cada ventana expone su **fecha estimada de pago** =
+//     `cierre + pagoDias`. Sin cobros usables ⇒ `pagoDias = null` y no se muestra
+//     fecha de pago.
+//     📊 Medición que fijó el criterio (Duffys, 18 cobros): 9 seguidos a **+8**
+//     (nov-25 → mar-26) y después 8 de 9 a **+13/+14/+15** (abr → jul-26) ⇒ la moda
+//     de todo el historial da **+8** (10 de 18) y la de los últimos 8 daba **+13**.
+//     El usuario pidió expresamente el criterio de **días fijos**: su período
+//     siempre dura 14 días y el pago siempre la misma cantidad de días después,
+//     independientemente de las jornadas trabajadas.
 
 /** Cuántas liquidaciones cerradas se miran para inferir la cadencia. */
 export const N_HISTORIAL = 8;
@@ -235,10 +242,14 @@ function moda(valores: number[]): number | null {
 // ---------------------------------------------------------------------------
 
 /**
- * Infiere la cadencia de un trabajo a partir de sus liquidaciones **cerradas**
- * (todas las que se le pasen; el módulo se queda con las últimas `N_HISTORIAL`).
- * Devuelve `null` cuando no hay historia suficiente o la cadencia no es
- * consistente (ver regla 7 del encabezado).
+ * Infiere la cadencia de un trabajo a partir de sus liquidaciones **cerradas**.
+ * ⚠️ Los dos datos **no** miran la misma ventana (2026-10-07): la **duración** y el
+ * **paso** salen de las últimas `N_HISTORIAL` (un cambio de horario hay que
+ * detectarlo rápido), mientras que el **"día de pago"** (`pagoDias`) se cuenta sobre
+ * **todo** el historial, porque es "la cantidad de días con la que paga este trabajo"
+ * y tiene que ser un número estable (ver reglas 1 y 8 del encabezado).
+ * Devuelve `null` cuando no hay historia suficiente o la cadencia no es consistente
+ * (ver regla 7 del encabezado).
  */
 export function inferirCadencia(
   liquidaciones: LiquidacionCerradaFuente[]
@@ -270,9 +281,16 @@ export function inferirCadencia(
     const dentro = diffs.filter((d) => Math.abs(d - base) <= TOLERANCIA_PASO).length;
     if (dentro / diffs.length < MIN_CONSISTENCIA) return null;
   }
-  // **Día de pago**: cuántos días pasan del fin del período al cobro real (moda,
-  // en empate el más reciente — mismo criterio que `duracion`).
-  const retrasos = ult
+  // **Día de pago**: cuántos días pasan del fin del período al cobro real. A
+  // diferencia de la cadencia (que mira sólo las últimas `N_HISTORIAL`, porque un
+  // cambio de horario hay que detectarlo rápido), acá se usa **todo** el historial
+  // del trabajo (2026-10-07): es "la cantidad de días con la que paga este trabajo"
+  // y tiene que ser **un número estable**, no lo que pasó en los últimos cobros.
+  // Medido en Duffys: 10 de 18 cobros a +8 y 6 a +13 ⇒ la moda de todo el historial
+  // es 8 (con la ventana reciente daba 13). Se autocorrige solo: si el trabajo pasa
+  // a pagar sistemáticamente a 13, la moda se da vuelta cuando esos cobros superan
+  // a los viejos.
+  const retrasos = usables
     .filter((x) => x.c)
     .map((x) => diasEntre(x.h, x.c))
     .filter((d) => d >= 0 && d <= MAX_PAGO_DIAS);
