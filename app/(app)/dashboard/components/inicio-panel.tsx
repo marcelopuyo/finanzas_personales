@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { CuentaSlide } from "./cuenta-slide";
 import { AporteCuentasLista } from "./aporte-cuentas-lista";
 import { MovimientosCuentaClient } from "@/app/(app)/cuentas/[id]/movimientos-client";
@@ -113,6 +114,40 @@ function guardarFoco(indice: number) {
   } catch {
     /* sin sessionStorage simplemente no se restaura */
   }
+}
+
+/**
+ * **Chevron del carrusel de Inicio** (2026-10-07): navega una tarjeta a la vez.
+ *
+ * 🔑 **Sólo se monta en desktop** (`hidden lg:flex` en su contenedor): en el celular
+ * el carrusel se maneja con el dedo (swipe/flick), que es más natural que un botón
+ * de 36 px. El que no tiene a dónde ir queda **apagado** (`disabled` + `opacity`),
+ * nunca como un botón "muerto" que no hace nada.
+ */
+function ChevronTarjeta({
+  dir,
+  disabled,
+  onClick,
+}: {
+  dir: 1 | -1;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const Icono = dir === -1 ? ChevronLeft : ChevronRight;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={dir === -1 ? "Cuenta anterior" : "Cuenta siguiente"}
+      className={cn(
+        "pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/70 text-value backdrop-blur transition-colors",
+        disabled ? "cursor-default opacity-30" : "hover:bg-card"
+      )}
+    >
+      <Icono className="h-5 w-5" />
+    </button>
+  );
 }
 
 interface InicioPanelProps {
@@ -655,6 +690,28 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
               />
             );
           })}
+        </div>
+
+        {/* Chevrones del carrusel: **sólo desktop** (`hidden lg:flex`). En pantalla
+            grande no hay swipe, así que se pasa de cuenta con estos dos botones,
+            uno a cada lado y **centrados verticalmente** en la banda. El contenedor
+            es `pointer-events-none` (no tapa el gráfico) y cada botón lo reactiva
+            (`pointer-events-auto`); arranca **debajo de la top bar** para que el
+            centro caiga sobre el gráfico y no sobre la barra. */}
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 hidden items-center justify-between px-2 lg:flex lg:px-4"
+          style={{ top: "calc(var(--app-top) / var(--fp-zoom, 1))" }}
+        >
+          <ChevronTarjeta
+            dir={-1}
+            disabled={indice === 0}
+            onClick={() => desplazarTarjeta(-1)}
+          />
+          <ChevronTarjeta
+            dir={1}
+            disabled={indice >= totalTarjetas - 1}
+            onClick={() => desplazarTarjeta(1)}
+          />
         </div>
 
         {/* Dots: dentro de la banda, abajo de las acciones. En **monocromo** desde

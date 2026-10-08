@@ -28,6 +28,13 @@
 //     típico de `por_tarea` y de los trabajos legacy— o paso inconsistente) ⇒
 //     `cadencia = null`: el trabajo se muestra **sin separar**, como antes.
 //     ⛔ Nunca inventar un estimado con 1–2 datos.
+//  8. **"Día de pago"** (`pagoDias`, 2026-10-07): días que el trabajo tarda en
+//     pagar desde el **fin del período** hasta el cobro real (moda de los últimos
+//     `N_HISTORIAL`, ignorando las `fechaDeCobro` centinela < 1901). Con eso cada
+//     ventana expone su **fecha estimada de pago** = `cierre + pagoDias`: el chip
+//     dice cuándo cierra el período y **cuándo llega la plata**. Sin cobros usables
+//     ⇒ `pagoDias = null` y no se muestra fecha de pago (medido en Duffys: 8 días
+//     en los primeros 9 cobros, 13 en los últimos 7 ⇒ la moda manda).
 
 /** Cuántas liquidaciones cerradas se miran para inferir la cadencia. */
 export const N_HISTORIAL = 8;
@@ -44,6 +51,12 @@ const MAX_DURACION = 60;
 
 /** Ventanas máximas a generar por trabajo (guarda). */
 const MAX_VENTANAS = 80;
+
+/** Retraso de pago máximo aceptado (días): más que esto es un dato raro. */
+const MAX_PAGO_DIAS = 90;
+
+/** Año a partir del cual una `fechaDeCobro` es **real** (las centinela son < 1901). */
+const ANIO_MIN_COBRO = 1901;
 
 // ---------------------------------------------------------------------------
 // Tipos de entrada (estructurales: los cumplen los DTO y las entidades)
@@ -65,6 +78,11 @@ export interface LiquidacionCerradaFuente {
   trabajo?: { nombre: string } | null;
   fechaDesde: string | Date;
   fechaHasta: string | Date;
+  /**
+   * Fecha del **cobro real**, para inferir el **"día de pago"** del trabajo (ver
+   * regla 8 del encabezado). Las centinela (< 1901) y las nulas se ignoran.
+   */
+  fechaDeCobro?: string | Date | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -79,6 +97,13 @@ export interface CadenciaTrabajo {
   paso: number;
   /** `fechaDesde` de la última liquidación cerrada ("YYYY-MM-DD"). */
   ancla: string;
+  /**
+   * **"Día de pago"**: días que este trabajo tarda en pagar desde el **fin del
+   * período** hasta el cobro real (moda de los últimos `N_HISTORIAL`; en empate
+   * gana el más reciente). `null` = no hay cobros usables ⇒ no se estima la fecha
+   * de pago (nunca se inventa).
+   */
+  pagoDias: number | null;
 }
 
 /** Agregado de los ítems de un trabajo que caen en una misma sección. */
@@ -89,6 +114,11 @@ export interface BloqueCobro {
   hasta: string;
   /** Fin de la ventana estimada que los agrupa ("" si no hay cadencia). */
   cierre: string;
+  /**
+   * **Fecha estimada de pago** (`cierre` + el "día de pago" del trabajo; "" si no
+   * se pudo inferir el retraso). Ver regla 8 del encabezado.
+   */
+  pago: string;
   jornadas: number;
   tareas: number;
   /** Σ de los montos de los ítems (sin propina). */
@@ -120,6 +150,12 @@ export interface SeccionPendiente<T extends ItemPendienteFuente> {
   items: T[];
   /** Fin de la ventana estimada que los agrupa ("YYYY-MM-DD"). */
   cierre: string;
+  /**
+   * **Fecha estimada de pago** (`cierre` + el "día de pago" del trabajo; "" si no se
+   * pudo inferir el retraso). Es la fecha que le interesa al usuario: cuándo **llega
+   * la plata**, no cuándo cierra el período.
+   */
+  pago: string;
 }
 
 /** Reparto de los ítems de **un trabajo** en las tres secciones. */
@@ -144,6 +180,13 @@ function ymd(v: string | Date | null | undefined): string {
   if (!v) return "";
   if (v instanceof Date) return v.toISOString().slice(0, 10);
   return String(v).slice(0, 10);
+}
+
+/** Año de una fecha (`0` si no se puede leer): descarta las centinela viejas. */
+function anioDe(v: string | Date | null | undefined): number {
+  const iso = ymd(v);
+  const anio = Number(iso.slice(0, 4));
+  return Number.isFinite(anio) ? anio : 0;
 }
 
 /** Días entre dos "YYYY-MM-DD" (b − a). */
@@ -201,7 +244,12 @@ export function inferirCadencia(
   liquidaciones: LiquidacionCerradaFuente[]
 ): CadenciaTrabajo | null {
   const usables = liquidaciones
-    .map((l) => ({ d: ymd(l.fechaDesde), h: ymd(l.fechaHasta) }))
+    .map((l) => ({
+      d: ymd(l.fechaDesde),
+      h: ymd(l.fechaHasta),
+      // Cobro REAL: se descartan las centinela del modelo viejo (< 1901).
+      c: anioDe(l.fechaDeCobro) >= ANIO_MIN_COBRO ? ymd(l.fechaDeCobro) : "",
+    }))
     .filter((x) => x.d && x.h && x.d <= x.h)
     .sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
   if (usables.length < 3) return null;
@@ -222,11 +270,18 @@ export function inferirCadencia(
     const dentro = diffs.filter((d) => Math.abs(d - base) <= TOLERANCIA_PASO).length;
     if (dentro / diffs.length < MIN_CONSISTENCIA) return null;
   }
+  // **Día de pago**: cuántos días pasan del fin del período al cobro real (moda,
+  // en empate el más reciente — mismo criterio que `duracion`).
+  const retrasos = ult
+    .filter((x) => x.c)
+    .map((x) => diasEntre(x.h, x.c))
+    .filter((d) => d >= 0 && d <= MAX_PAGO_DIAS);
   return {
     duracion,
     // El paso nunca puede ser menor que la duración (las ventanas se pisarían).
     paso: Math.max(base, duracion),
     ancla: ult[ult.length - 1].d,
+    pagoDias: moda(retrasos),
   };
 }
 
@@ -272,7 +327,8 @@ export function ventanasDe(
 function bloque(
   trabajo: string,
   items: ItemPendienteFuente[],
-  cierre: string
+  cierre: string,
+  pago: string
 ): BloqueCobro {
   const fechas = items.map((i) => ymd(i.fecha)).sort();
   return {
@@ -280,6 +336,7 @@ function bloque(
     desde: fechas[0] ?? "",
     hasta: fechas[fechas.length - 1] ?? "",
     cierre,
+    pago,
     jornadas: items.filter((i) => i.tipo === "jornada").length,
     tareas: items.filter((i) => i.tipo === "tarea").length,
     monto: Number(
@@ -289,6 +346,15 @@ function bloque(
       items.reduce((acc, i) => acc + (i.montoPropina ?? 0), 0).toFixed(2)
     ),
   };
+}
+
+/**
+ * **Fecha estimada de pago** de una ventana: su cierre + el "día de pago" del
+ * trabajo. `""` cuando no hay retraso inferido ⇒ la UI **no** inventa una fecha.
+ */
+function pagoDe(cad: CadenciaTrabajo, cierre: string): string {
+  if (cad.pagoDias == null || !cierre) return "";
+  return sumarDias(cierre, cad.pagoDias);
 }
 
 /** Fecha del ítem **más nuevo** de un grupo ("" si está vacío). */
@@ -395,10 +461,18 @@ export function repartirPendientes<T extends ItemPendienteFuente>(
       trabajo,
       cadencia,
       porCobrar: cerradas.length
-        ? { items: cerradas, cierre: cierreCerradas }
+        ? {
+            items: cerradas,
+            cierre: cierreCerradas,
+            pago: pagoDe(cadencia, cierreCerradas),
+          }
         : null,
       enCurso: abiertas.length
-        ? { items: abiertas, cierre: cierreAbiertas }
+        ? {
+            items: abiertas,
+            cierre: cierreAbiertas,
+            pago: pagoDe(cadencia, cierreAbiertas),
+          }
         : null,
       sinPeriodo: sueltos,
     });
@@ -434,13 +508,13 @@ export function estimarCobros(
       trabajo: r.trabajo,
       cadencia: r.cadencia,
       porCobrar: r.porCobrar
-        ? bloque(r.trabajo, r.porCobrar.items, r.porCobrar.cierre)
+        ? bloque(r.trabajo, r.porCobrar.items, r.porCobrar.cierre, r.porCobrar.pago)
         : null,
       enCurso: r.enCurso
-        ? bloque(r.trabajo, r.enCurso.items, r.enCurso.cierre)
+        ? bloque(r.trabajo, r.enCurso.items, r.enCurso.cierre, r.enCurso.pago)
         : null,
       sinPeriodo: r.sinPeriodo.length
-        ? bloque(r.trabajo, r.sinPeriodo, "")
+        ? bloque(r.trabajo, r.sinPeriodo, "", "")
         : null,
     })
   );

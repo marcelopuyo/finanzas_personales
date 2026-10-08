@@ -8,7 +8,7 @@ import type {
   ItemPendienteOut,
   LiquidacionOut,
 } from "@/backend/src/queries/trabajos";
-import { cn, decimalToTime, isoADdMmAa, numberToCurrency } from "@/lib/utils";
+import { cn, decimalToTime, numberToCurrency } from "@/lib/utils";
 import type { RepartoPendientes } from "@/lib/cobros-estimados";
 import { SIN_TRABAJO } from "@/lib/filtros-dashboard";
 import { etiquetaConteoItems } from "@/lib/trabajo-texto";
@@ -111,25 +111,32 @@ function detalleItem(i: ItemPendienteOut): string {
  *   respaldo. No hay paginador.
  */
 /**
- * **Fecha de la ventana estimada** de una sección de pendientes (2026-10-02).
- * Reemplaza al chip de ventana ("Por cobrar / En curso / Sin período"): la
- * clasificación sigue deduciéndose de la fecha, pero mostrando **cuándo** cierra o
- * venció la ventana.
+ * **Ventana estimada** de una sección de pendientes (2026-10-02, ampliada el
+ * 2026-10-07 con el "día de pago"). Reemplaza al chip de ventana ("Por cobrar / En
+ * curso / Sin período"): la clasificación sigue deduciéndose de la fecha, pero
+ * mostrando **cuándo** cierra o venció la ventana **y cuándo se cobra**.
  *
- * - `enCurso` ⇒ la ventana todavía está abierta ⇒ `"cobro estimado dd-mm-aa"`
- *   (**ámbar**, mismo lenguaje del antiguo chip "En curso"). El **monto** de la
- *   fila va ámbar: es plata que todavía **no** se puede cobrar.
- * - `porCobrar` ⇒ la ventana ya cerró (cobrable ahora) ⇒ `"venció el dd-mm-aa"`
+ * - `enCurso` ⇒ la ventana todavía está abierta ⇒ `cierra el dd-mm-aa` (**ámbar**,
+ *   mismo lenguaje del antiguo chip "En curso"). El **monto** de la fila va ámbar:
+ *   es plata que todavía **no** se puede cobrar.
+ * - `porCobrar` ⇒ la ventana ya cerró (cobrable ahora) ⇒ `venció el dd-mm-aa`
  *   (**verde**, y la fila también en verde).
  *
+ * En los dos casos, si se pudo inferir el **"día de pago"** del trabajo
+ * (`CadenciaTrabajo.pagoDias`, de sus cobros reales) se agrega un segundo chip
+ * `pago ~dd-mm-aa` con la fecha estimada en la que **llega la plata** — que es
+ * distinta del cierre del período (en Duffys, ~8 días después).
+ *
  * La calcula `useVentanasCobro` (con la fecha **local** del navegador) a partir de
- * `lib/cobros-estimados.ts`. Los trabajos **sin cadencia** no tienen ventana ⇒ no
- * se muestra nada.
+ * `lib/cobros-estimados.ts`. Los trabajos **sin cadencia** no tienen ventana ⇒ no se
+ * muestra nada.
  */
 export interface FechaCobroEstimada {
   tipo: "enCurso" | "porCobrar";
   /** Fin de la ventana estimada ("YYYY-MM-DD"). */
   cierre: string;
+  /** Fecha estimada de **pago** ("" si no se pudo inferir el retraso). */
+  pago: string;
 }
 
 /** Orden de las secciones dentro de un mismo trabajo (la cerrada va primero). */
@@ -317,14 +324,22 @@ export function PeriodosGrid({
       partes.push({
         items: r.porCobrar.items,
         orden: 0,
-        fecha: { tipo: "porCobrar", cierre: r.porCobrar.cierre },
+        fecha: {
+          tipo: "porCobrar",
+          cierre: r.porCobrar.cierre,
+          pago: r.porCobrar.pago,
+        },
       });
     }
     if (r.enCurso) {
       partes.push({
         items: r.enCurso.items,
         orden: 1,
-        fecha: { tipo: "enCurso", cierre: r.enCurso.cierre },
+        fecha: {
+          tipo: "enCurso",
+          cierre: r.enCurso.cierre,
+          pago: r.enCurso.pago,
+        },
       });
     }
     if (r.sinPeriodo.length) {
@@ -429,19 +444,38 @@ export function PeriodosGrid({
                       {f.titulo}
                     </span>
                     {f.tipo === "pendiente" && f.fecha && (
-                      <span
-                        className={cn(
-                          "shrink-0 text-[10.5px] font-medium whitespace-nowrap",
-                          f.fecha.tipo === "enCurso"
-                            ? "text-warning"
-                            : "text-success"
+                      <>
+                        {/* Cuándo cierra (o venció) el período. Va **sin año**
+                            (`dd-mm`, como el resto de las fechas de la grilla) para
+                            que entre con el chip de pago en el ancho de un celular. */}
+                        <span
+                          className={cn(
+                            "shrink-0 text-[10.5px] font-medium whitespace-nowrap",
+                            f.fecha.tipo === "enCurso"
+                              ? "text-warning"
+                              : "text-success"
+                          )}
+                        >
+                          {f.fecha.tipo === "enCurso"
+                            ? "cierra el "
+                            : "venció el "}
+                          {diaMes(f.fecha.cierre)}
+                        </span>
+                        {/* Cuándo **llega la plata**: el cierre + el "día de pago" del
+                            trabajo (2026-10-07). Sólo si el retraso se pudo inferir. */}
+                        {f.fecha.pago && (
+                          <span
+                            className={cn(
+                              "shrink-0 text-[10.5px] font-medium whitespace-nowrap",
+                              f.fecha.tipo === "enCurso"
+                                ? "text-warning"
+                                : "text-success"
+                            )}
+                          >
+                            pago ~{diaMes(f.fecha.pago)}
+                          </span>
                         )}
-                      >
-                        {f.fecha.tipo === "enCurso"
-                          ? "cobro estimado "
-                          : "venció el "}
-                        {isoADdMmAa(f.fecha.cierre)}
-                      </span>
+                      </>
                     )}
                   </span>
                   <span className="mt-0.5 block text-[11px] leading-[15px] text-subtitle">
