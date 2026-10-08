@@ -9,6 +9,7 @@ import type {
   LiquidacionOut,
 } from "@/backend/src/queries/trabajos";
 import { cn, decimalToTime, isoADdMmAa, numberToCurrency } from "@/lib/utils";
+import type { RepartoPendientes } from "@/lib/cobros-estimados";
 import { SIN_TRABAJO } from "@/lib/filtros-dashboard";
 import { etiquetaConteoItems } from "@/lib/trabajo-texto";
 import { getLiquidacionesCobradasPaginaAction } from "../actions";
@@ -110,24 +111,29 @@ function detalleItem(i: ItemPendienteOut): string {
  *   respaldo. No hay paginador.
  */
 /**
- * **Fecha estimada de cobro** de un trabajo (2026-10-02). Reemplaza al chip de
- * ventana ("Por cobrar / En curso / Sin período"): la clasificación sigue
- * deduciéndose de la fecha, pero mostrando **cuándo** cierra o venció la ventana.
+ * **Fecha de la ventana estimada** de una sección de pendientes (2026-10-02).
+ * Reemplaza al chip de ventana ("Por cobrar / En curso / Sin período"): la
+ * clasificación sigue deduciéndose de la fecha, pero mostrando **cuándo** cierra o
+ * venció la ventana.
  *
  * - `enCurso` ⇒ la ventana todavía está abierta ⇒ `"cobro estimado dd-mm-aa"`
- *   (**ámbar**, mismo lenguaje del antiguo chip "En curso").
+ *   (**ámbar**, mismo lenguaje del antiguo chip "En curso"). El **monto** de la
+ *   fila va ámbar: es plata que todavía **no** se puede cobrar.
  * - `porCobrar` ⇒ la ventana ya cerró (cobrable ahora) ⇒ `"venció el dd-mm-aa"`
- *   (**verde**).
+ *   (**verde**, y la fila también en verde).
  *
  * La calcula `useVentanasCobro` (con la fecha **local** del navegador) a partir de
- * `lib/cobros-estimados.ts`. Los trabajos **sin cadencia** no tienen fecha ⇒ no se
- * muestra nada (opción A, decisión del usuario).
+ * `lib/cobros-estimados.ts`. Los trabajos **sin cadencia** no tienen ventana ⇒ no
+ * se muestra nada.
  */
 export interface FechaCobroEstimada {
   tipo: "enCurso" | "porCobrar";
   /** Fin de la ventana estimada ("YYYY-MM-DD"). */
   cierre: string;
 }
+
+/** Orden de las secciones dentro de un mismo trabajo (la cerrada va primero). */
+type OrdenSeccion = 0 | 1 | 2;
 
 type Fila =
   | {
@@ -138,8 +144,10 @@ type Fila =
       monto: number;
       refFecha: string;
       lista: ItemPendienteOut[];
-      /** Fecha estimada de cobro (reemplaza al chip de ventana). */
+      /** Ventana de la sección (sin ventana cuando el trabajo no tiene cadencia). */
       fecha?: FechaCobroEstimada;
+      /** Sección de la fila: desempata el orden dentro del mismo trabajo. */
+      orden: OrdenSeccion;
     }
   | {
       tipo: "cobrado";
@@ -151,27 +159,37 @@ type Fila =
       liquidacion: LiquidacionOut;
     };
 
+/** Fila de un **pendiente**: el orden por sección sólo aplica a estas. */
+type FilaPendiente = Extract<Fila, { tipo: "pendiente" }>;
+
 export function PeriodosGrid({
-  pendientes,
+  secciones,
   cobradosIniciales,
   hayMasCobrados,
   currency,
-  fechasCobro,
   onEditar,
   onEliminar,
   encabezado,
   filtroTrabajos,
   onTotalCobrados,
 }: {
-  pendientes: ItemPendienteOut[];
+  /**
+   * **Pendientes repartidos en ventanas por trabajo** (lo calcula `useVentanasCobro`
+   * sobre `lib/cobros-estimados.ts`): cada trabajo trae hasta **dos secciones**
+   * —"por cobrar" (ventana cerrada) y "en curso" (abierta/futura)— y la lista pinta
+   * **una fila por sección** (2026-10-07).
+   *
+   * ⚠️ Antes llegaba la lista **cruda** de ítems + **una sola** fecha por trabajo:
+   * las dos ventanas de Duffys caían en la misma fila, con el rango de las dos
+   * (`19-09 → 06-10`) y la fecha de la última (`16-10`) ⇒ no coincidía nada.
+   */
+  secciones: RepartoPendientes<ItemPendienteOut>[];
   /** Primera tanda de cobradas, ya resuelta en el server (la pantalla abre con datos). */
   cobradosIniciales: LiquidacionOut[];
   /** ¿Quedan más tandas de cobradas? (lo resuelve el server). */
   hayMasCobrados: boolean;
   /** ISO 4217 de la moneda predeterminada del usuario. */
   currency: string;
-  /** **Fecha estimada de cobro por trabajo** (clave = nombre del trabajo). */
-  fechasCobro?: Record<string, FechaCobroEstimada>;
   /** Abre el formulario de edición de un ítem pendiente. */
   onEditar?: (item: ItemPendienteOut) => void;
   /** Pide confirmación para eliminar un ítem pendiente. */
@@ -282,34 +300,73 @@ export function PeriodosGrid({
     return () => obs.disconnect();
   }, [cargarMas, hayMas]);
 
-  // ── Filas: PRIMERO los pendientes (por trabajo), después las cobradas ──
-  const filasPendientes: Fila[] = [];
-  const grupos = new Map<string, ItemPendienteOut[]>();
-  for (const i of pendientes) {
-    const nombre = i.trabajoNombre || "Sin trabajo";
-    const lista = grupos.get(nombre);
-    if (lista) lista.push(i);
-    else grupos.set(nombre, [i]);
+  // ── Filas: PRIMERO los pendientes (**una por ventana** de cada trabajo),
+  //    después las cobradas ──
+  const filasPendientes: FilaPendiente[] = [];
+  for (const r of secciones) {
+    // Hasta **dos filas** por trabajo: la ventana **cerrada** ("venció el", verde) y
+    // la **abierta/futura** ("cobro estimado", ámbar). Los ítems sin ventana (trabajo
+    // sin cadencia, o fechas que caen entre ventanas) van en una tercera fila **sin
+    // chip**.
+    const partes: {
+      items: ItemPendienteOut[];
+      orden: OrdenSeccion;
+      fecha?: FechaCobroEstimada;
+    }[] = [];
+    if (r.porCobrar) {
+      partes.push({
+        items: r.porCobrar.items,
+        orden: 0,
+        fecha: { tipo: "porCobrar", cierre: r.porCobrar.cierre },
+      });
+    }
+    if (r.enCurso) {
+      partes.push({
+        items: r.enCurso.items,
+        orden: 1,
+        fecha: { tipo: "enCurso", cierre: r.enCurso.cierre },
+      });
+    }
+    if (r.sinPeriodo.length) {
+      partes.push({ items: r.sinPeriodo, orden: 2 });
+    }
+    for (const p of partes) {
+      const fechas = p.items.map((i) => i.fecha).sort();
+      filasPendientes.push({
+        tipo: "pendiente",
+        key: `p:${r.trabajo}:${p.orden}`,
+        titulo: r.trabajo,
+        fecha: p.fecha,
+        orden: p.orden,
+        subtitulo: `${conteo(p.items)} · ${rangoPendiente(fechas)}`,
+        monto: p.items.reduce((acc, i) => acc + (i.monto || 0), 0),
+        // La fecha más reciente del grupo ordena a los pendientes entre sí.
+        refFecha: fechas[fechas.length - 1],
+        lista: p.items,
+      });
+    }
   }
-  for (const [trabajo, lista] of grupos.entries()) {
-    const fechas = lista.map((i) => i.fecha).sort();
-    filasPendientes.push({
-      tipo: "pendiente",
-      key: `p:${trabajo}`,
-      titulo: trabajo,
-      fecha: fechasCobro?.[trabajo],
-      subtitulo: `${conteo(lista)} · ${rangoPendiente(fechas)}`,
-      monto: lista.reduce((acc, i) => acc + (i.monto || 0), 0),
-      // La fecha más reciente del grupo ordena a los pendientes entre sí.
-      refFecha: fechas[fechas.length - 1],
-      lista,
-    });
+  /**
+   * Lo más reciente arriba DENTRO de los pendientes (los cobrados ya vienen
+   * ordenados por fecha de cobro DESC desde la consulta). El orden se resuelve **por
+   * trabajo** (con su ítem más nuevo) y, adentro de un trabajo, por sección —la
+   * ventana cerrada, que es la plata que ya se puede cobrar, arriba de la en curso—:
+   * así las dos filas de un mismo trabajo quedan **juntas**.
+   */
+  const masNuevo = new Map<string, string>();
+  for (const f of filasPendientes) {
+    const prev = masNuevo.get(f.titulo);
+    if (prev === undefined || f.refFecha > prev) {
+      masNuevo.set(f.titulo, f.refFecha);
+    }
   }
-  // Lo más reciente arriba DENTRO de los pendientes (los cobrados ya vienen
-  // ordenados por fecha de cobro DESC desde la consulta).
-  filasPendientes.sort((a, b) =>
-    a.refFecha < b.refFecha ? 1 : a.refFecha > b.refFecha ? -1 : 0
-  );
+  filasPendientes.sort((a, b) => {
+    const pa = masNuevo.get(a.titulo) ?? "";
+    const pb = masNuevo.get(b.titulo) ?? "";
+    if (pa !== pb) return pa < pb ? 1 : -1;
+    if (a.titulo !== b.titulo) return a.titulo < b.titulo ? -1 : 1;
+    return a.orden - b.orden;
+  });
   /**
    * Cobradas a mostrar: si la lista quedó de un **filtro anterior** (mientras llega
    * la primera tanda filtrada) se acota en memoria, así no se ven filas que el
@@ -322,6 +379,12 @@ export function PeriodosGrid({
           filtroTrabajos.includes(p.trabajo?.nombre ?? SIN_TRABAJO)
       )
     : cobrados;
+  /**
+   * ¿La fila es un pendiente de la ventana **en curso** (todavía no cobrable)?
+   * ⇒ el monto va **ámbar** en vez de verde, en la fila y en cada ítem desplegado.
+   */
+  const esEnCurso = (f: Fila) =>
+    f.tipo === "pendiente" && f.fecha?.tipo === "enCurso";
   const filas: Fila[] = [
     ...filasPendientes,
     ...cobradosVisibles.map((p): Fila => {
@@ -386,12 +449,17 @@ export function PeriodosGrid({
                   </span>
                 </span>
                 <span className="shrink-0 text-right">
-                  {/* Verde = falta cobrar · blanco = ya cobrado. Es la ÚNICA
-                      diferencia estética entre las dos clases de fila. */}
+                  {/* Verde = pendiente de una ventana **cerrada** (se cobra ya) ·
+                      **ámbar** = pendiente **en curso** (todavía no) · blanco = ya
+                      cobrado. */}
                   <span
                     className={cn(
                       "block text-[14.5px] tabular-nums",
-                      f.tipo === "pendiente" ? "text-success" : "text-value"
+                      f.tipo === "cobrado"
+                        ? "text-value"
+                        : esEnCurso(f)
+                          ? "text-warning"
+                          : "text-success"
                     )}
                   >
                     {numberToCurrency(f.monto, currency)}
@@ -422,7 +490,12 @@ export function PeriodosGrid({
                             </span>
                           )}
                         </p>
-                        <span className="shrink-0 text-[12.5px] tabular-nums text-success">
+                        <span
+                          className={cn(
+                            "shrink-0 text-[12.5px] tabular-nums",
+                            esEnCurso(f) ? "text-warning" : "text-success"
+                          )}
+                        >
                           {numberToCurrency(i.monto || 0, currency)}
                         </span>
                         <div className="flex shrink-0 items-center gap-0.5">

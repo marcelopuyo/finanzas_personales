@@ -2,15 +2,13 @@
 
 import { useMemo } from "react";
 import {
-  estimarCobros,
-  type BloqueCobro,
-  type EstimacionTrabajo,
+  repartirPendientes,
   type ItemPendienteFuente,
   type LiquidacionCerradaFuente,
+  type RepartoPendientes,
 } from "@/lib/cobros-estimados";
 import { useMontado } from "@/lib/use-cliente";
 import { todayLocalISODate } from "@/lib/utils";
-import type { FechaCobroEstimada } from "./periodos-grid";
 
 /** Monto y **cantidad de ítems** (jornadas + tareas) de una sección del resumen. */
 export interface ResumenVentana {
@@ -18,11 +16,17 @@ export interface ResumenVentana {
   items: number;
 }
 
-/** Suma un bloque al resumen de su sección (los bloques nulos no existen). */
-function sumarBloque(acc: ResumenVentana, b: BloqueCobro | null): void {
-  if (!b) return;
-  acc.monto += b.monto;
-  acc.items += b.jornadas + b.tareas;
+/** Suma una sección al resumen de su ventana (las secciones nulas no existen). */
+function sumarSeccion<T extends ItemPendienteFuente>(
+  acc: ResumenVentana,
+  items: T[] | undefined
+): void {
+  if (!items?.length) return;
+  acc.items += items.length;
+  // Redondeo a 2 decimales en cada paso: mismo criterio que `BloqueCobro.monto`.
+  acc.monto = Number(
+    (acc.monto + items.reduce((a, i) => a + (i.monto ?? 0), 0)).toFixed(2)
+  );
 }
 
 /**
@@ -30,73 +34,69 @@ function sumarBloque(acc: ResumenVentana, b: BloqueCobro | null): void {
  * navegador (2026-10-01, rama `rediseno-ui`).
  *
  * 🔑 Es el fix de **§211** movido a su propio hook: el server (Vercel, **UTC**)
- * reparte los pendientes con SU fecha, que en la tarde-noche ya es la del día
+ * repartía los pendientes con SU fecha, que en la tarde-noche ya es la del día
  * siguiente respecto al usuario (21:00 en GMT-4 ⇒ el server está en el día
  * siguiente) ⇒ una ventana que cierra mañana aparecía HOY como cobrable.
  *
  * Con `useMontado()` el recálculo ocurre **después de montar** (en SSR/hidratación
- * se usa el valor del server ⇒ sin desajuste) y solo si la fecha local difiere de
- * la del server.
+ * se reparte con la fecha del server ⇒ sin desajuste, porque el reparto es
+ * **puro**: los mismos ítems + las mismas liquidaciones + la misma fecha dan el
+ * mismo corte en los dos lados) y solo si la fecha local difiere de la del server.
  *
- * Devuelve, por trabajo, la **fecha estimada de cobro** (opción A, 2026-10-02) más
- * el **resumen de las dos ventanas** (`porCobrar` / `enCurso`: monto + cantidad de
- * ítems) que pinta `TrabajoClient` arriba de la grilla.
+ * Devuelve el **reparto de los pendientes por trabajo** (`secciones`, con los ítems
+ * adentro: la lista pinta **una fila por ventana**, 2026-10-07) más el **resumen de
+ * las dos ventanas** (`porCobrar` / `enCurso`: monto + cantidad de ítems) que pinta
+ * `TrabajoClient` arriba de la grilla.
  */
-export function useVentanasCobro({
-  estimacionesSSR,
+export function useVentanasCobro<T extends ItemPendienteFuente>({
   hoyServidor,
   items,
   liquidaciones,
   forzar = false,
 }: {
-  /** Reparto calculado en el server (`dashboard-data.ts`). */
-  estimacionesSSR?: EstimacionTrabajo[];
-  /** "Hoy" del server (`YYYY-MM-DD`) para saber si hace falta recalcular. */
+  /** "Hoy" del **server** (`YYYY-MM-DD`): es el de la primera pintada. */
   hoyServidor?: string;
   /** Ítems pendientes de cobro (jornadas/tareas sin liquidar). */
-  items: ItemPendienteFuente[];
+  items: T[];
   /** Liquidaciones con COBRO REAL (las "cerradas" que usa la inferencia). */
   liquidaciones: LiquidacionCerradaFuente[];
   /**
-   * **Fuerza el recálculo en el cliente** (2026-10-03): con el **filtro por
-   * trabajo** del panel de Ingresos, las estimaciones del server —que son de
-   * **todos** los pendientes— no sirven y hay que repartir solo los filtrados.
+   * **Fuerza el cálculo con la fecha local** (2026-10-03): con el **filtro por
+   * trabajo** del panel de Ingresos los pendientes ya vienen acotados y tanto el
+   * reparto como el resumen tienen que salir de ahí.
    */
   forzar?: boolean;
 }): {
-  fechas: Record<string, FechaCobroEstimada>;
+  secciones: RepartoPendientes<T>[];
   porCobrar: ResumenVentana;
   enCurso: ResumenVentana;
 } {
   const montado = useMontado();
 
-  const estimaciones = useMemo(() => {
-    if (!montado || !hoyServidor || !estimacionesSSR) return estimacionesSSR ?? [];
+  /**
+   * Fecha con la que se reparten las ventanas: antes de montar manda la del
+   * **server** (SSR e hidratación pintan lo mismo); después, si la local ya cambió
+   * (de noche el UTC ya está en el día siguiente), la local.
+   */
+  const hoy = useMemo(() => {
+    if (!montado || !hoyServidor) return hoyServidor || todayLocalISODate();
+    if (forzar) return todayLocalISODate() || hoyServidor;
     const hoyLocal = todayLocalISODate();
-    if (!forzar && hoyLocal === hoyServidor) return estimacionesSSR;
-    return estimarCobros(items, liquidaciones, hoyLocal || hoyServidor);
-  }, [montado, hoyServidor, estimacionesSSR, items, liquidaciones, forzar]);
+    return hoyLocal === hoyServidor ? hoyServidor : hoyLocal || hoyServidor;
+  }, [montado, hoyServidor, forzar]);
 
   return useMemo(() => {
-    const fechas: Record<string, FechaCobroEstimada> = {};
+    const secciones = repartirPendientes(items, liquidaciones, hoy);
     // Resumen de las dos ventanas: los bloques vienen **partidos por sección** ⇒
     // cada monto es exacto aunque el trabajo tenga ítems en las dos (el caso
-    // Atlas). ⚠️ Los ítems **sin cadencia** (`sinPeriodo`) no entran: sin
-    // estimación no hay sección que mostrar.
+    // Duffys). ⚠️ Los ítems **sin período** (`sinPeriodo`) no entran: sin
+    // estimación no hay línea que mostrar.
     const porCobrar: ResumenVentana = { monto: 0, items: 0 };
     const enCurso: ResumenVentana = { monto: 0, items: 0 };
-    for (const e of estimaciones) {
-      sumarBloque(porCobrar, e.porCobrar);
-      sumarBloque(enCurso, e.enCurso);
-      // Opción A (2026-10-02): manda la ventana **en curso/futura** ("cobro
-      // estimado"); si no hay, se muestra la ya cerrada ("venció el"). Sin
-      // cadencia (`sinPeriodo`) no hay fecha ⇒ no se muestra nada.
-      if (e.enCurso?.cierre) {
-        fechas[e.trabajo] = { tipo: "enCurso", cierre: e.enCurso.cierre };
-      } else if (e.porCobrar?.cierre) {
-        fechas[e.trabajo] = { tipo: "porCobrar", cierre: e.porCobrar.cierre };
-      }
+    for (const r of secciones) {
+      sumarSeccion(porCobrar, r.porCobrar?.items);
+      sumarSeccion(enCurso, r.enCurso?.items);
     }
-    return { fechas, porCobrar, enCurso };
-  }, [estimaciones]);
+    return { secciones, porCobrar, enCurso };
+  }, [items, liquidaciones, hoy]);
 }

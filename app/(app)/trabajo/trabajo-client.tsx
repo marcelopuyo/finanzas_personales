@@ -2,10 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
-import type {
-  EstimacionTrabajo,
-  LiquidacionCerradaFuente,
-} from "@/lib/cobros-estimados";
+import type { LiquidacionCerradaFuente } from "@/lib/cobros-estimados";
 import { toast } from "sonner";
 import { usePendingNav } from "@/components/ui/nav-progress";
 import { Modal } from "@/components/ui/modal";
@@ -54,7 +51,6 @@ export function TrabajoClient({
   cuentas,
   monedaISO,
   embebido = false,
-  estimacionesSSR,
   hoyServidor,
   ingresosDetalle,
   filtroTrabajos,
@@ -82,13 +78,11 @@ export function TrabajoClient({
    */
   embebido?: boolean;
   /**
-   * **Reparto de los pendientes en ventanas** (por cobrar · en curso · sin período).
-   * ⚠️ Igual que los badges (§211): el server (Vercel, **UTC**) lo calcula con SU
-   * fecha, así que se **recalcula en el cliente** con la fecha local del navegador
-   * (`useVentanasCobro`) para no adelantar el cambio de ventana.
+   * **"Hoy" del server** (`YYYY-MM-DD`): es la fecha de la **primera pintada** del
+   * reparto de ventanas. Después del montaje, si la fecha local del navegador ya
+   * cambió (el server está en **UTC**: de noche ya es el día siguiente), se
+   * recalcula con la local — ver `useVentanasCobro` (§211).
    */
-  estimacionesSSR?: EstimacionTrabajo[];
-  /** "Hoy" del server (`YYYY-MM-DD`), para saber si hace falta recalcular. */
   hoyServidor?: string;
   /** Liquidaciones con cobro real (las "cerradas" que usa la inferencia). */
   ingresosDetalle?: LiquidacionCerradaFuente[];
@@ -110,13 +104,12 @@ export function TrabajoClient({
     [pendientes, filtroTrabajos]
   );
 
-  /** Fecha estimada de cobro por trabajo + resumen de las dos ventanas: se
-      recalculan con la fecha **local** del navegador (§211). */
-  const { fechas: fechasCobro, porCobrar, enCurso } = useVentanasCobro({
-    estimacionesSSR,
+  /** Reparto de los pendientes en ventanas + resumen de las dos ventanas: se
+      calculan con la fecha **local** del navegador (§211). */
+  const { secciones, porCobrar, enCurso } = useVentanasCobro({
     hoyServidor,
-    // Con el **filtro por trabajo** los pendientes se acotan antes de calcular las
-    // ventanas (y se **fuerza** el recálculo: las del server son de todos).
+    // Con el **filtro por trabajo** los pendientes ya llegan acotados: el reparto (y
+    // el resumen) salen de ahí.
     items: pendientesFiltrados,
     liquidaciones: ingresosDetalle ?? [],
     // ⚠️ Un array **nuevo** en cada render dispararía el memo ⇒ se pasa un booleano.
@@ -262,11 +255,10 @@ export function TrabajoClient({
         </div>
       ) : (
         <PeriodosGrid
-          pendientes={pendientesFiltrados}
+          secciones={secciones}
           cobradosIniciales={cobradosIniciales}
           hayMasCobrados={hayMasCobrados}
           currency={monedaISO}
-          fechasCobro={fechasCobro}
           onEditar={(i) => void abrirEdicion(i)}
           onEliminar={setAEliminar}
           encabezado={embebido ? encabezadoSeccion : undefined}

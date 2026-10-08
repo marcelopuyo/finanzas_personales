@@ -110,6 +110,31 @@ export interface EstimacionTrabajo {
   sinPeriodo: BloqueCobro | null;
 }
 
+/**
+ * **Una sección del reparto con sus ítems adentro** (2026-10-07): el mismo corte
+ * que `BloqueCobro` pero conservando los ítems, porque la lista del panel de
+ * Ingresos pinta **una fila por ventana** (no una por trabajo) y necesita saber a
+ * cuál pertenece cada ítem.
+ */
+export interface SeccionPendiente<T extends ItemPendienteFuente> {
+  items: T[];
+  /** Fin de la ventana estimada que los agrupa ("YYYY-MM-DD"). */
+  cierre: string;
+}
+
+/** Reparto de los ítems de **un trabajo** en las tres secciones. */
+export interface RepartoPendientes<T extends ItemPendienteFuente> {
+  trabajo: string;
+  /** `null` = no se pudo inferir la cadencia (el trabajo va entero a `sinPeriodo`). */
+  cadencia: CadenciaTrabajo | null;
+  /** Ventana ya cerrada (cobrable ahora). */
+  porCobrar: SeccionPendiente<T> | null;
+  /** Ventana en curso o futura (todavía no). */
+  enCurso: SeccionPendiente<T> | null;
+  /** Ítems fuera de toda ventana + **todos** los de un trabajo sin cadencia. */
+  sinPeriodo: T[];
+}
+
 // ---------------------------------------------------------------------------
 // Utilidades de fecha (siempre en UTC: las fechas son días, no instantes)
 // ---------------------------------------------------------------------------
@@ -266,22 +291,48 @@ function bloque(
   };
 }
 
+/** Fecha del ítem **más nuevo** de un grupo ("" si está vacío). */
+function hastaDe<T extends ItemPendienteFuente>(items: T[]): string {
+  let max = "";
+  for (const i of items) {
+    const f = ymd(i.fecha);
+    if (f > max) max = f;
+  }
+  return max;
+}
+
+/**
+ * Clave de orden del reparto: manda la sección **en curso** y, si no hay, la de
+ * "por cobrar"; un trabajo sin ventanas se ordena por su ítem más nuevo.
+ */
+function claveOrden<T extends ItemPendienteFuente>(
+  r: RepartoPendientes<T>
+): string {
+  if (r.enCurso) return hastaDe(r.enCurso.items);
+  if (r.porCobrar) return hastaDe(r.porCobrar.items);
+  return hastaDe(r.sinPeriodo);
+}
+
 /**
  * Reparte los ítems pendientes de cada trabajo en las tres secciones del panel:
  * **por cobrar** (ventana cerrada) · **en curso** (ventana abierta/futura) ·
  * **sin período estimado** (sin cadencia o fuera de toda ventana).
+ *
+ * 🔑 Es la **única** implementación del corte por ventanas: `estimarCobros` la
+ * envuelve para el resumen agregado y la lista del panel de Ingresos la usa
+ * directo (necesita los ítems para pintar **una fila por ventana**, 2026-10-07).
  */
-export function estimarCobros(
-  items: ItemPendienteFuente[],
+export function repartirPendientes<T extends ItemPendienteFuente>(
+  items: T[],
   liquidaciones: LiquidacionCerradaFuente[],
   hoyISO: string,
   trabajoSinAsignar = "Sin trabajo"
-): EstimacionTrabajo[] {
+): RepartoPendientes<T>[] {
   const pendientes = items.filter((i) => !i.eliminado);
   if (!pendientes.length) return [];
 
   // Ítems agrupados por trabajo (mismo criterio que el panel: `trabajoNombre`).
-  const porTrabajo = new Map<string, ItemPendienteFuente[]>();
+  const porTrabajo = new Map<string, T[]>();
   for (const i of pendientes) {
     const nombre = i.trabajoNombre || trabajoSinAsignar;
     const lista = porTrabajo.get(nombre);
@@ -298,7 +349,7 @@ export function estimarCobros(
     else liqsPorTrabajo.set(nombre, [l]);
   }
 
-  const out: EstimacionTrabajo[] = [];
+  const out: RepartoPendientes<T>[] = [];
   for (const [trabajo, lista] of porTrabajo.entries()) {
     const cadencia = inferirCadencia(liqsPorTrabajo.get(trabajo) ?? []);
     if (!cadencia) {
@@ -307,7 +358,7 @@ export function estimarCobros(
         cadencia: null,
         porCobrar: null,
         enCurso: null,
-        sinPeriodo: bloque(trabajo, lista, ""),
+        sinPeriodo: lista,
       });
       continue;
     }
@@ -315,9 +366,9 @@ export function estimarCobros(
     const fechas = lista.map((i) => ymd(i.fecha)).sort();
     const ventanas = ventanasDe(cadencia, fechas[0], fechas[fechas.length - 1]);
 
-    const cerradas: ItemPendienteFuente[] = [];
-    const abiertas: ItemPendienteFuente[] = [];
-    const sueltos: ItemPendienteFuente[] = [];
+    const cerradas: T[] = [];
+    const abiertas: T[] = [];
+    const sueltos: T[] = [];
     let cierreCerradas = "";
     let cierreAbiertas = "";
     for (const i of lista) {
@@ -343,16 +394,54 @@ export function estimarCobros(
     out.push({
       trabajo,
       cadencia,
-      porCobrar: cerradas.length ? bloque(trabajo, cerradas, cierreCerradas) : null,
-      enCurso: abiertas.length ? bloque(trabajo, abiertas, cierreAbiertas) : null,
-      sinPeriodo: sueltos.length ? bloque(trabajo, sueltos, "") : null,
+      porCobrar: cerradas.length
+        ? { items: cerradas, cierre: cierreCerradas }
+        : null,
+      enCurso: abiertas.length
+        ? { items: abiertas, cierre: cierreAbiertas }
+        : null,
+      sinPeriodo: sueltos,
     });
   }
 
-  // Más reciente primero dentro de cada sección (mismo criterio que antes).
+  // Más reciente primero (mismo criterio que antes).
   return out.sort((a, b) => {
-    const fa = a.enCurso?.hasta ?? a.porCobrar?.hasta ?? a.sinPeriodo?.hasta ?? "";
-    const fb = b.enCurso?.hasta ?? b.porCobrar?.hasta ?? b.sinPeriodo?.hasta ?? "";
+    const fa = claveOrden(a);
+    const fb = claveOrden(b);
     return fa < fb ? 1 : fa > fb ? -1 : 0;
   });
+}
+
+/**
+ * **Agregado** del reparto: por trabajo, un bloque por sección con el **monto**, las
+ * **cantidades** y el **rango de fechas** de sus ítems (sin los ítems). Es la forma
+ * que necesitan quien sólo muestra totales; el panel de Ingresos usa
+ * `repartirPendientes` porque además pinta **una fila por ventana** con sus ítems.
+ *
+ * ⚠️ Desde el 2026-10-07 el panel **no** pasa por acá (el resumen sale de las mismas
+ * `secciones` que las filas, para que no puedan discrepar). Se conserva como API
+ * agregada del módulo, envuelta sobre `repartirPendientes` para que el corte por
+ * ventanas viva en un solo lugar.
+ */
+export function estimarCobros(
+  items: ItemPendienteFuente[],
+  liquidaciones: LiquidacionCerradaFuente[],
+  hoyISO: string,
+  trabajoSinAsignar = "Sin trabajo"
+): EstimacionTrabajo[] {
+  return repartirPendientes(items, liquidaciones, hoyISO, trabajoSinAsignar).map(
+    (r) => ({
+      trabajo: r.trabajo,
+      cadencia: r.cadencia,
+      porCobrar: r.porCobrar
+        ? bloque(r.trabajo, r.porCobrar.items, r.porCobrar.cierre)
+        : null,
+      enCurso: r.enCurso
+        ? bloque(r.trabajo, r.enCurso.items, r.enCurso.cierre)
+        : null,
+      sinPeriodo: r.sinPeriodo.length
+        ? bloque(r.trabajo, r.sinPeriodo, "")
+        : null,
+    })
+  );
 }

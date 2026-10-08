@@ -228,9 +228,10 @@ export function DashboardClient({
   ]);
 
   // ⚠️ El reparto de los pendientes en "Por cobrar / En curso / Sin período" se
-  // movió a `TrabajoClient` (`useVentanasCobro`, 2026-10-01): ahora viaja como
-  // **ficha dentro de cada fila de la grilla** de Ingresos, y allí se recalcula con
-  // la fecha **LOCAL** del navegador (fix de §211).
+  // movió a `TrabajoClient` (`useVentanasCobro`, 2026-10-01): desde el 2026-10-07
+  // **no** viaja como prop — el hook lo calcula con la fecha **local** del navegador
+  // (fix de §211) y de ahí salen tanto la lista (**una fila por ventana**, `19-09 →`
+  // `02-10` en verde y `03-10 → 06-10` en ámbar) como su resumen de arriba.
 
   // filteredGastos pero SIN el filtro de categoría (para el panel Resumen)
   const filteredSinCat = useMemo(() => {
@@ -747,7 +748,6 @@ export function DashboardClient({
       {trabajo && (
         <TrabajoClient
           embebido
-          estimacionesSSR={data.cobrosEstimados}
           hoyServidor={data.hoyServidor}
           ingresosDetalle={data.ingresosDetalle}
           pendientes={trabajo.pendientes}
