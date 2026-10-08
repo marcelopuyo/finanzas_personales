@@ -610,10 +610,13 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
     // banda dejaba 3.5rem de aire de más arriba.
     <div className="-mx-4 -mt-[calc(var(--app-top)/var(--fp-zoom,1))] lg:-mx-6">
       {/* ───────── BANDA (hero) ───────── */}
+      {/* Sin `border-b`: el usuario pidió sacar la línea clara que se veía entre la
+          banda y los datos de abajo. El corte lo marca el **tono** de la banda
+          (`bg-muted`) contra el fondo de la página, no una línea. */}
       <div
         ref={bandaRef}
         data-inicio-hero=""
-        className="relative border-b border-border bg-muted"
+        className="relative bg-muted"
         style={{ paddingTop: "calc(var(--app-top) / var(--fp-zoom, 1))" }}
       >
         {/* Carrusel: full-width, una tarjeta por vista, snap sin peek ni gap. */}
@@ -657,8 +660,10 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
         {/* Dots: dentro de la banda, abajo de las acciones. En **monocromo** desde
             el 2026-10-03 (el activo era azul `--primary`: el usuario pidió sacar el
             azul de la barra y de este carrusel; el activo ahora es un blanco más
-            ancho, igual que el tab activo de la barra inferior). */}
-        <div className="mt-1.5 flex items-center justify-center gap-1.5 pb-1.5">
+            ancho, igual que el tab activo de la barra inferior).
+            `mt-3` (`12 px`, el doble de los 6 px que tenía) para despegarlos de los
+            rótulos de las acciones — pedido del 2026-10-07. */}
+        <div className="mt-3 flex items-center justify-center gap-1.5 pb-1.5">
           {Array.from({ length: totalTarjetas }).map((_, i) => (
             <i
               key={i}
