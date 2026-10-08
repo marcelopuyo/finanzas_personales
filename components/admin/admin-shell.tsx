@@ -86,10 +86,16 @@ export default function AdminShell({
         // contenido de abajo ya fluye después, no hace falta compensar el scroll.
         style={{ paddingTop: "env(safe-area-inset-top)" }}
       >
-        <div className="flex h-14 items-center gap-3 px-4 lg:px-6">
+        {/* Una sola fila en `lg+` (como siempre) y **dos** cuando no entran:
+            las tabs son `order-last w-full` hasta `lg`, así que caen a una fila
+            propia a todo el ancho (con `wrap`) y **las 5 quedan visibles**, sin
+            scroll horizontal. Antes vivían al lado de la marca y el avatar, donde
+            a 390 px sólo quedaban 188 px de 454 ⇒ "Tipos de Cuenta" y
+            "Cotizaciones" eran inalcanzables (2026-10-07). */}
+        <div className="flex flex-wrap items-center gap-x-3 px-4 lg:px-6">
           {/* Marca */}
-          <Link href="/admin" className="flex shrink-0 items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-primary" />
+          <Link href="/admin" className="flex h-14 min-w-0 items-center gap-2">
+            <ShieldCheck className="h-5 w-5 shrink-0 text-primary" />
             <span className="hidden text-[14px] text-sidebar-foreground sm:inline">
               Finanzas
             </span>
@@ -99,7 +105,7 @@ export default function AdminShell({
           </Link>
 
           {/* Tabs de acceso a los CRUDs */}
-          <nav className="ml-1 flex flex-1 items-center gap-1 overflow-x-auto">
+          <nav className="order-last flex w-full flex-wrap items-center gap-1 pb-2 lg:order-none lg:w-auto lg:flex-1 lg:pb-0">
             {TABS.map((tab) => {
               const active = pathname.startsWith(tab.href);
               return (
@@ -120,7 +126,7 @@ export default function AdminShell({
           </nav>
 
           {/* Avatar + opciones del usuario */}
-          <div className="relative shrink-0" ref={dropdownRef}>
+          <div className="relative ml-auto flex h-14 shrink-0 items-center" ref={dropdownRef}>
             <button
               type="button"
               onClick={() => setOpen((o) => !o)}
