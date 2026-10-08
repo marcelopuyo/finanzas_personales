@@ -693,13 +693,18 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
         </div>
 
         {/* Chevrones del carrusel: **sólo desktop** (`hidden lg:flex`). En pantalla
-            grande no hay swipe, así que se pasa de cuenta con estos dos botones,
-            uno a cada lado y **centrados verticalmente** en la banda. El contenedor
-            es `pointer-events-none` (no tapa el gráfico) y cada botón lo reactiva
-            (`pointer-events-auto`); arranca **debajo de la top bar** para que el
-            centro caiga sobre el gráfico y no sobre la barra. */}
+            grande no hay swipe, así que se pasa de cuenta con estos dos botones, uno
+            a cada lado, **alineados con los botones de acciones rápidas** del slide
+            (2026-10-07). El contenedor es `pointer-events-none` (no tapa el gráfico ni
+            los botones) y cada botón lo reactiva (`pointer-events-auto`).
+            📏 `pb-[39.4px]`: medio botón (18 px) por debajo del centro de los
+            círculos de acción, que están a 57,4 px del borde inferior de la banda
+            (dots 24 px + rótulo 16,4 px + medio círculo 17 px). Se mide desde abajo
+            —y no desde arriba— porque **todo lo que está arriba de las acciones es
+            fijo** (título + monto + gráfico de 96 px); si cambia el alto del gráfico o
+            el `leading` del rótulo de `AccionCirculo`, se re-mide acá. */}
         <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 hidden items-center justify-between px-2 lg:flex lg:px-4"
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 hidden items-end justify-between px-2 pb-[39.4px] lg:flex lg:px-4"
           style={{ top: "calc(var(--app-top) / var(--fp-zoom, 1))" }}
         >
           <ChevronTarjeta
