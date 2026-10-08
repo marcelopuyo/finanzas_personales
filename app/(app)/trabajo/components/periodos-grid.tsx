@@ -114,12 +114,12 @@ function detalleItem(i: ItemPendienteOut): string {
  * **Ventana estimada** de una sección de pendientes (2026-10-02, ampliada el
  * 2026-10-07 con el "día de pago"). Reemplaza al chip de ventana ("Por cobrar / En
  * curso / Sin período"): la clasificación sigue deduciéndose de la fecha, pero
- * mostrando **cuándo** cierra o venció la ventana **y cuándo se cobra**.
+ * mostrando **cuándo** cerró o cierra la ventana **y cuándo se cobra**.
  *
  * - `enCurso` ⇒ la ventana todavía está abierta ⇒ `cierra el dd-mm-aa` (**ámbar**,
  *   mismo lenguaje del antiguo chip "En curso"). El **monto** de la fila va ámbar:
  *   es plata que todavía **no** se puede cobrar.
- * - `porCobrar` ⇒ la ventana ya cerró (cobrable ahora) ⇒ `venció el dd-mm-aa`
+ * - `porCobrar` ⇒ la ventana ya cerró (cobrable ahora) ⇒ `cerró el dd-mm`
  *   (**verde**, y la fila también en verde).
  *
  * En los dos casos, si se pudo inferir el **"día de pago"** del trabajo
@@ -311,7 +311,7 @@ export function PeriodosGrid({
   //    después las cobradas ──
   const filasPendientes: FilaPendiente[] = [];
   for (const r of secciones) {
-    // Hasta **dos filas** por trabajo: la ventana **cerrada** ("venció el", verde) y
+    // Hasta **dos filas** por trabajo: la ventana **cerrada** ("cerró el", verde) y
     // la **abierta/futura** ("cobro estimado", ámbar). Los ítems sin ventana (trabajo
     // sin cadencia, o fechas que caen entre ventanas) van en una tercera fila **sin
     // chip**.
@@ -437,7 +437,7 @@ export function PeriodosGrid({
               >
                 <span className="min-w-0 flex-1">
                   {/* Título + la **fecha estimada de cobro**: dice cuándo cierra
-                      la ventana (ámbar) o cuándo venció (verde). Reemplaza al
+                      la ventana (ámbar) o cuándo cerró (verde). Reemplaza al
                       chip de ventana (2026-10-02). */}
                   <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
                     <span className="text-[13.5px] break-words text-header">
@@ -445,9 +445,11 @@ export function PeriodosGrid({
                     </span>
                     {f.tipo === "pendiente" && f.fecha && (
                       <>
-                        {/* Cuándo cierra (o venció) el período. Va **sin año**
+                        {/* Cuándo cerró (o cierra) el período. Va **sin año**
                             (`dd-mm`, como el resto de las fechas de la grilla) para
-                            que entre con el chip de pago en el ancho de un celular. */}
+                            que entre con el chip de pago en el ancho de un celular.
+                            El verbo es **"cerró"** y no "venció" (pedido del usuario,
+                            2026-10-07): un período no vence, cierra. */}
                         <span
                           className={cn(
                             "shrink-0 text-[10.5px] font-medium whitespace-nowrap",
@@ -456,9 +458,7 @@ export function PeriodosGrid({
                               : "text-success"
                           )}
                         >
-                          {f.fecha.tipo === "enCurso"
-                            ? "cierra el "
-                            : "venció el "}
+                          {f.fecha.tipo === "enCurso" ? "cierra el " : "cerró el "}
                           {diaMes(f.fecha.cierre)}
                         </span>
                         {/* Cuándo **llega la plata**: el cierre + el "día de pago" del
