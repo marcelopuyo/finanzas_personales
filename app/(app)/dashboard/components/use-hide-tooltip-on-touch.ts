@@ -70,16 +70,32 @@ export function useHideTooltipOnTouch<T extends HTMLElement = HTMLDivElement>() 
   }, []);
 
   /**
-   * Apaga el tooltip: `mouseLeaveChart()` —el único que limpia `hover.active`—
-   * lo despacha Recharts desde el `onMouseLeave` del `.recharts-wrapper`, y React
-   * deriva ese evento de un `mouseout` nativo ⇒ se le dispara uno sintético.
+   * Apaga los tooltips del gráfico: `mouseLeaveChart()` —el único que limpia
+   * `hover.active`— lo despacha Recharts desde el `onMouseLeave` del
+   * `.recharts-wrapper`, y React deriva ese evento de un `mouseout` nativo ⇒ se le
+   * dispara uno sintético.
+   *
+   * ⚠️ `querySelectorAll`, no `querySelector` (2026-10-09): un panel puede tener
+   * **más de un gráfico** —el del **eje Y fijo** y el que **scrollea**
+   * (`scrollDesde`, §265)— y el "regla" del eje va **primero en el DOM** ⇒ con
+   * `querySelector` el `mouseout` llegaba **sólo al carril del eje** y el tooltip
+   * del gráfico que se toca **quedaba pegado** después de levantar el dedo
+   * (medido: con 1 `mouseout` al 1º, el tooltip del que scrollea seguía
+   * `visible`; apagando los dos, pasa a `hidden`).
    */
-  const apagar = useCallback((raiz: HTMLElement) => {
-    const wrapper =
-      raiz.querySelector<HTMLElement>(".recharts-wrapper") ??
-      (raiz.classList.contains("recharts-wrapper") ? raiz : null);
-    wrapper?.dispatchEvent(new MouseEvent("mouseout", { bubbles: true }));
-  }, []);
+  const apagar = useCallback(
+    (raiz: HTMLElement) => {
+      const wrappers = [
+        ...raiz.querySelectorAll<HTMLElement>(".recharts-wrapper"),
+      ];
+      // El propio contenedor también puede ser el wrapper (uso documentado abajo).
+      if (raiz.classList.contains("recharts-wrapper")) wrappers.push(raiz);
+      for (const wrapper of wrappers) {
+        wrapper.dispatchEvent(new MouseEvent("mouseout", { bubbles: true }));
+      }
+    },
+    []
+  );
 
   const onTouchStart = useCallback(
     (e: TouchEvent<T>) => {

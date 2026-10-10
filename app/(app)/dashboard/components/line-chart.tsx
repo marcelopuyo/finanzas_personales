@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { ChartTooltip, type SerieTooltip } from "./chart-tooltip";
 import { useHideTooltipOnTouch } from "./use-hide-tooltip-on-touch";
+import { mesAnioCorto } from "@/lib/mes-etiqueta";
 import { cn } from "@/lib/utils";
 
 /** Una **serie secundaria** de `EvolutionChart` (comparación). */
@@ -204,6 +205,11 @@ export function EvolutionChart({
         // En el scroll el alto del eje X se FIJA igual en los dos gráficos: si no,
         // las áreas de dibujo no coinciden y las líneas no caen sobre la grilla.
         height={conScroll ? ALTO_EJE_X : undefined}
+        // 📆 Año a **2 dígitos** en los rótulos (`sep-2026` ⇒ `sep-26`, 2026-10-10):
+        // con 15 meses el año completo se come el ancho de las columnas. Las
+        // etiquetas que no son `mes-aaaa` (fechas ISO de las series diarias) pasan
+        // igual. El **tooltip** y el listado conservan el año completo.
+        tickFormatter={mesAnioCorto}
         tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
         axisLine={false}
         tickLine={false}

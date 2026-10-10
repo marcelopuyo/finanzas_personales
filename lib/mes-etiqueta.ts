@@ -41,3 +41,17 @@ export function claveMesDesdeEtiqueta(etiqueta: string): number {
   const y = Number(anio);
   return Number.isFinite(y) ? y * 100 + n : 0;
 }
+
+/**
+ * **Abrevia el año a 2 dígitos** en una etiqueta `"mes-aaaa"` (`"sep-2026"` →
+ * `"sep-26"`): la usan los **rótulos del eje X** de los gráficos, donde el año
+ * completo se come el ancho de los meses (2026-10-10).
+ *
+ * ⚠️ Lo que **no** sea `mes-aaaa` se devuelve **tal cual**: en los mismos gráficos
+ * hay series **diarias** con etiquetas ISO (`"2026-09-10"`, sparklines de las
+ * cuentas) que no se tocan.
+ */
+export function mesAnioCorto(etiqueta: string): string {
+  const m = /^(\p{L}{3,4})-(\d{4})$/iu.exec(etiqueta);
+  return m ? `${m[1]}-${m[2].slice(2)}` : etiqueta;
+}
