@@ -77,24 +77,30 @@ export function AporteCuentasLista({
     },
   ];
 
-  /**
-   * ⚠️ **Sin título** (decisión del usuario, 2026-10-04): el listado va pelado — la
-   * **barra de aporte** de la tarjeta de arriba ya dice de qué se trata. Si en algún
-   * momento se quiere volver a rotular, el `h2` de los otros paneles es
-   * `text-[15.5px] text-header`.
-   */
-
   return (
     <>
       {data.length === 0 ? (
-        <div className="flex h-32 items-center justify-center rounded-lg border border-border bg-card text-[13px] text-subtitle">
-          Sin datos disponibles
-        </div>
+        <>
+          <div className="overflow-hidden rounded-lg border border-border bg-card text-[13px] text-subtitle sm:hidden">
+            <div className="border-b border-border px-3 py-2.5">
+              <h2 className="text-[15.5px] text-header">Saldos</h2>
+            </div>
+            <div className="flex h-32 items-center justify-center">
+              Sin datos disponibles
+            </div>
+          </div>
+          <div className="hidden h-32 items-center justify-center rounded-lg border border-border bg-card text-[13px] text-subtitle sm:flex">
+            Sin datos disponibles
+          </div>
+        </>
       ) : (
         <>
           {/* ── MOBILE (<sm): mismas filas que los movimientos ── */}
           <div className="sm:hidden">
             <div className="overflow-hidden rounded-lg border border-border bg-card">
+              <div className="border-b border-border px-3 py-2.5">
+                <h2 className="text-[15.5px] text-header">Saldos</h2>
+              </div>
               <ul>
                 {data.map((c) => {
                   const id = c.id;
