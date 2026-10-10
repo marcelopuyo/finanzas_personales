@@ -71,10 +71,12 @@ interface EvolutionChartProps {
   sinScrollLateral?: boolean;
   /**
    * **Series secundarias** (2026-10-09, panel Resultados): se dibujan con **menos
-   * jerarquía** que la principal — trazo fino (`1.5`), **sin relleno** y **sin
-   * puntos** — para compararlas contra ella sin competir; además van **debajo**
-   * (la principal se pinta última y queda arriba). Con al menos una se pinta la
-   * **leyenda** y el tooltip pasa a listar **una fila por serie**.
+   * jerarquía** que la principal — trazo fino y semitransparente, **sin relleno** y
+   * **sin puntos** — para compararlas contra ella sin competir; además van
+   * **debajo** (la principal se pinta última y queda arriba). Si el dato de la
+   * serie viene **en negativo** (gastos), la línea se dibuja **bajo el eje**.
+   * Con al menos una se pinta la **leyenda** y el tooltip pasa a listar **una fila
+   * por serie**.
    */
   seriesSecundarias?: SerieSecundaria[];
   /**
@@ -82,7 +84,44 @@ interface EvolutionChartProps {
    * `"Total"`). Sólo se usa cuando hay `seriesSecundarias`.
    */
   etiquetaPrincipal?: string;
+  /**
+   * **Scroll horizontal a partir de N puntos** (2026-10-09): con **más puntos que
+   * este umbral** el gráfico deja de comprimirse — se dibuja a `n × 56 px` dentro
+   * de un contenedor que scrollea — y el **eje Y queda FIJO** a la izquierda (un
+   * gráfico "regla" del ancho justo del eje, alineado con el que scrollea: mismo
+   * alto de eje X y mismo **dominio**, que se calcula una vez para los dos).
+   * Sin la prop el gráfico **no scrollea nunca** (sparklines de las tarjetas,
+   * banda de Inicio).
+   * ⚠️ Con scroll, el dedo **arrastra el gráfico** en horizontal (es lo que
+   * permite moverse): el tooltip se sigue viendo con un tap, pero ya no se
+   * "scrubea" arrastrando.
+   */
+  scrollDesde?: number;
 }
+
+/**
+ * Ancho en px **por punto** cuando el gráfico scrollea (56: los rótulos
+ * `"sep-2026"` entran sin pisarse).
+ */
+const ANCHO_POR_PUNTO = 56;
+
+/** Ancho del carril del **eje Y fijo** (los rótulos tipo `-250000` entran justos). */
+const ANCHO_EJE_Y = 56;
+
+/**
+ * Alto reservado por el **eje X**, igual en los DOS gráficos del scroll: si
+ * difiriera, las áreas de dibujo no coincidirían y las líneas no caerían sobre
+ * las líneas de la grilla. Es el default de recharts (30), declarado para que se
+ * vea de dónde sale la alineación.
+ */
+const ALTO_EJE_X = 30;
+
+/**
+ * **Umbral que usan los paneles del dashboard** para pasar `scrollDesde`: desde
+ * **13 meses** el gráfico ya no entra cómodo en un celular (12 columnas de ~56 px
+ * dan ~670 px, más de lo que hay de ancho útil).
+ */
+export const MESES_SCROLL = 12;
 
 export function EvolutionChart({
   title,
@@ -100,6 +139,7 @@ export function EvolutionChart({
   sinScrollLateral = false,
   seriesSecundarias,
   etiquetaPrincipal = "Total",
+  scrollDesde,
 }: EvolutionChartProps) {
   /** Wrapper: con `sinRecuadro` queda transparente (banda de Inicio). */
   const caja = sinRecuadro
@@ -133,9 +173,119 @@ export function EvolutionChart({
    */
   const mostrarPuntos = minimo && data.length <= 3;
 
+  /**
+   * **Scroll horizontal** activo: más puntos que el umbral y no es el modo mínimo.
+   */
+  const conScroll =
+    !minimo && scrollDesde !== undefined && data.length > scrollDesde;
+
+  /** Series que hay que declarar en cada gráfico para que **compartan escala**. */
+  const clavesDeSeries = ["value", ...(seriesSecundarias ?? []).map((s) => s.key)];
+
+  /**
+   * **Cuerpo del gráfico**: grilla, ejes, tooltip y series. Se usa en los DOS
+   * gráficos del scroll (`ejeY: "oculto"` = el que scrollea, donde el eje va fijo
+   * aparte) y en el de siempre. En el que scrollea el eje Y va **oculto** (`hide`):
+   * no ocupa lugar, pero **fija la escala** — sin él recharts crearía su propio eje
+   * por defecto y las escalas divergirían.
+   */
+  const cuerpo = (ejeY: "visible" | "oculto") => (
+    <>
+      {!minimo && (
+        <CartesianGrid
+          strokeDasharray="3 3"
+          vertical={false}
+          stroke="var(--border)"
+        />
+      )}
+      <XAxis
+        dataKey="name"
+        hide={minimo}
+        // En el scroll el alto del eje X se FIJA igual en los dos gráficos: si no,
+        // las áreas de dibujo no coinciden y las líneas no caen sobre la grilla.
+        height={conScroll ? ALTO_EJE_X : undefined}
+        tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+        axisLine={false}
+        tickLine={false}
+      />
+      {ejeY === "visible" ? (
+        <YAxis
+          hide={minimo}
+          // Con los ejes ocultos la serie toca los bordes: se le deja aire.
+          padding={minimo ? { top: 12, bottom: 12 } : undefined}
+          domain={dominio}
+          tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+          axisLine={false}
+          tickLine={false}
+        />
+      ) : (
+        <YAxis hide />
+      )}
+      <Tooltip content={<ChartTooltip currency={currency} series={series} />} />
+      {/* Secundarias PRIMERO: en recharts el orden de los hijos es el orden de
+          pintado ⇒ la principal (área o línea) queda por encima. Trazo fino y
+          sin relleno: la jerarquía la marca el trazo, no el sombreado. */}
+      {seriesSecundarias?.map((s) => (
+        <Line
+          key={s.key}
+          type="monotone"
+          dataKey={s.key}
+          name={s.label}
+          stroke={colorSecundaria(s)}
+          strokeWidth={GROSOR_SECUNDARIA}
+          strokeOpacity={OPACIDAD_SECUNDARIA}
+          dot={false}
+          activeDot={{
+            r: 2.5,
+            fill: colorSecundaria(s),
+            stroke: "none",
+            fillOpacity: 0.8,
+          }}
+        />
+      ))}
+      {area ? (
+        <>
+          <defs>
+            <linearGradient id="evolutionArea" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+              <stop offset="100%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <Area
+            type="monotone"
+            dataKey="value"
+            stroke={color}
+            strokeWidth={2}
+            fill="url(#evolutionArea)"
+            dot={mostrarPuntos ? { r: 2.5, fill: color } : false}
+            activeDot={{ r: 4, fill: color }}
+          />
+        </>
+      ) : (
+        <Line
+          type="monotone"
+          dataKey="value"
+          stroke={color}
+          strokeWidth={2}
+          dot={mostrarPuntos ? { r: 2.5, fill: color } : false}
+          activeDot={{ r: 4, fill: color }}
+        />
+      )}
+    </>
+  );
+
   /** Color de una serie secundaria (gris atenuado si no se indica). */
   const colorSecundaria = (s: SerieSecundaria) =>
     s.color ?? "var(--muted-foreground)";
+
+  /**
+   * Trazo de las **secundarias**: fino y **semitransparente** (2026-10-09, pedido
+   * del usuario) para que **destaquen menos** que la principal (`2 px`, opacidad
+   * plena y con sombreado). Son los dos números que hay que tocar para subir o
+   * bajarles el protagonismo.
+   */
+  const GROSOR_SECUNDARIA = 1.2;
+  const OPACIDAD_SECUNDARIA = 0.55;
 
   /**
    * Series para la **leyenda** y el **tooltip**: la principal (`value`) primero y
@@ -221,78 +371,72 @@ export function EvolutionChart({
           ))}
         </div>
       )}
-      <ResponsiveContainer width="100%" height={height}>
-        <ComposedChart data={data}>
-          {!minimo && (
-            <CartesianGrid
-              strokeDasharray="3 3"
-              vertical={false}
-              stroke="var(--border)"
-            />
-          )}
-          <XAxis
-            dataKey="name"
-            hide={minimo}
-            tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis
-            hide={minimo}
-            // Con los ejes ocultos la serie toca los bordes: se le deja aire.
-            padding={minimo ? { top: 12, bottom: 12 } : undefined}
-            domain={dominio}
-            tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <Tooltip content={<ChartTooltip currency={currency} series={series} />} />
-          {/* Secundarias PRIMERO: en recharts el orden de los hijos es el orden de
-              pintado ⇒ la principal (área o línea) queda por encima. Trazo fino y
-              sin relleno: la jerarquía la marca el trazo, no el sombreado. */}
-          {seriesSecundarias?.map((s) => (
-            <Line
-              key={s.key}
-              type="monotone"
-              dataKey={s.key}
-              name={s.label}
-              stroke={colorSecundaria(s)}
-              strokeWidth={1.5}
-              strokeOpacity={0.8}
-              dot={false}
-              activeDot={{ r: 3, fill: colorSecundaria(s), stroke: "none" }}
-            />
-          ))}
-          {area ? (
-            <>
-              <defs>
-                <linearGradient id="evolutionArea" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={color} stopOpacity={0.35} />
-                  <stop offset="100%" stopColor={color} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke={color}
-                strokeWidth={2}
-                fill="url(#evolutionArea)"
-                dot={mostrarPuntos ? { r: 2.5, fill: color } : false}
-                activeDot={{ r: 4, fill: color }}
-              />
-            </>
-          ) : (
-            <Line
-              type="monotone"
-              dataKey="value"
-              stroke={color}
-              strokeWidth={2}
-              dot={mostrarPuntos ? { r: 2.5, fill: color } : false}
-              activeDot={{ r: 4, fill: color }}
-            />
-          )}
-        </ComposedChart>
-      </ResponsiveContainer>
+      {conScroll ? (
+        <div className="flex">
+          {/* ── Eje Y FIJO: sólo el eje, del ancho justo de sus rótulos ── */}
+          <div className="shrink-0" style={{ width: ANCHO_EJE_Y }}>
+            <ResponsiveContainer width="100%" height={height}>
+              <ComposedChart data={data}>
+                {/* Reserva el MISMO alto de eje X que el gráfico que scrollea. */}
+                <XAxis
+                  dataKey="name"
+                  height={ALTO_EJE_X}
+                  tick={false}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  width={ANCHO_EJE_Y - 6}
+                  tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                {/*
+                  ⚠️ Las MISMAS series que el gráfico que scrollea, pero
+                  **invisibles**, por dos motivos medidos en el navegador:
+                  1. recharts **no pinta un eje** que no tenga ninguna serie
+                     asociada ⇒ sin esto el carril queda vacío;
+                  2. el **dominio** de un eje se calcula con las series que declara
+                     *ese* chart ⇒ declarando las mismas, los dos calculan la MISMA
+                     escala y los rótulos caen justo sobre la grilla (sin fijar un
+                     `domain` a mano, que dejaba rótulos impares tipo `-241500`).
+                */}
+                {clavesDeSeries.map((key) => (
+                  <Line
+                    key={key}
+                    type="monotone"
+                    dataKey={key}
+                    stroke="transparent"
+                    dot={false}
+                    activeDot={false}
+                    isAnimationActive={false}
+                  />
+                ))}
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+          {/* ── El gráfico: ancho por punto ⇒ el contenedor scrollea solo ── */}
+          <div
+            className="min-w-0 flex-1 overflow-x-auto"
+            // `pan-x pan-y`: el gráfico se mueve en horizontal y la página sigue
+            // scrolleando en vertical. El dedo ya no "scrubea" el tooltip (ahora
+            // arrastra el gráfico): el tap sigue mostrándolo.
+            style={{ touchAction: "pan-x pan-y" }}
+          >
+            <div
+              style={{ width: `max(100%, ${data.length * ANCHO_POR_PUNTO}px)` }}
+            >
+              <ResponsiveContainer width="100%" height={height}>
+                <ComposedChart data={data}>{cuerpo("oculto")}</ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={height}>
+          <ComposedChart data={data}>{cuerpo("visible")}</ComposedChart>
+        </ResponsiveContainer>
+      )}
     </div>
   );
 }

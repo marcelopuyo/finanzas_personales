@@ -12,7 +12,7 @@ import { AccountCard } from "./components/account-card";
 import { CuentasActionsMenu } from "./components/cuentas-actions-menu";
 import { TrabajosActionsMenu } from "./components/trabajos-actions-menu";
 import { DonutChart } from "./components/donut-chart";
-import { EvolutionChart } from "./components/line-chart";
+import { EvolutionChart, MESES_SCROLL } from "./components/line-chart";
 import { PrestamosChart } from "./components/prestamos-chart";
 import { ResultadosMensuales } from "./components/resultados-mensuales";
 import { PrestamosActionsMenu } from "./components/prestamos-actions-menu";
@@ -693,6 +693,9 @@ export function DashboardClient({
           // gráfico de las tarjetas de Inicio (pedido del usuario, 2026-10-03).
           color="var(--success)"
           area
+          // 📜 Con muchos meses el gráfico scrollea y el eje Y queda fijo
+          // (2026-10-09): si no, en el celular los meses se comprimen.
+          scrollDesde={MESES_SCROLL}
         />
       )}
       </div>
@@ -738,6 +741,8 @@ export function DashboardClient({
           color="var(--success)"
           area
           currency={data.monedaPredeterminadaISO}
+          // 📜 Mismo scroll horizontal que el histórico de Gastos.
+          scrollDesde={MESES_SCROLL}
         />
       )}
       </div>
@@ -787,6 +792,9 @@ export function DashboardClient({
           { key: "gastos", label: "Gastos", color: "var(--danger)" },
         ]}
         currency={data.monedaPredeterminadaISO}
+        // 📜 Con muchos meses el gráfico scrollea y el **eje Y queda fijo**
+        // (2026-10-09): el panel ya tiene 15 meses de histórico.
+        scrollDesde={MESES_SCROLL}
       />
       </div>
       {/* Listado mes a mes (mismo dato que el gráfico), movido acá desde la

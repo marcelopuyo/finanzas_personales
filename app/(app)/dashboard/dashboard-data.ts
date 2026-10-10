@@ -97,6 +97,9 @@ export interface DashboardData {
    * `ingresos`/`gastos` son las **secundarias** — las tres vienen alineadas del
    * backend (`getEvolucionResultados`), que es el mismo dato que lista
    * `ResultadosMensuales` (que sólo muestra `value`).
+   * ⚠️ `gastos` va **en negativo** (el backend lo da como magnitud): así la línea
+   * se dibuja **debajo del eje** y el gráfico queda espejado (ingresos arriba,
+   * gastos abajo) — pedido del usuario, 2026-10-09.
    * ⚠️ Acá se ordenan **cronológicamente** (ver más abajo).
    */
   evolucionResultados: {
@@ -348,13 +351,16 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   // devuelve en orden de inserción (todos los meses con ingresos y, al final, los
   // que sólo tienen gastos) ⇒ el eje X quedaba fuera de orden. Los rótulos
   // (`"sep-2026"`) no son fechas parseables; ver `lib/mes-etiqueta.ts`.
+  // 🔻 Los gastos se **invierten** acá (el backend los da como magnitud positiva):
+  // la línea se dibuja **debajo del eje** y el gráfico queda espejado. El neto
+  // (`value`) no cambia: el backend ya lo calcula como ingresos − gastos.
   const evolucionResultados = [...evolResultados]
     .sort((a, b) => claveMesDesdeEtiqueta(a.id) - claveMesDesdeEtiqueta(b.id))
     .map((e) => ({
       name: e.id,
       value: e.valor || 0,
       ingresos: e.ingresos || 0,
-      gastos: e.gastos || 0,
+      gastos: -(e.gastos || 0),
     }));
 
   return {
