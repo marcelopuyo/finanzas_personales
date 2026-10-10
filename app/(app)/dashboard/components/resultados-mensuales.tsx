@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
+import { claveMesDesdeEtiqueta } from "@/lib/mes-etiqueta";
 import { cn, numberToCurrency } from "@/lib/utils";
 
 /**
@@ -29,39 +30,13 @@ export interface ResultadoMes {
   value: number;
 }
 
-/** Meses abreviados de `etiquetaDesdeYM` (es-ES corto) → número. */
-const MESES: Record<string, number> = {
-  ene: 1,
-  feb: 2,
-  mar: 3,
-  abr: 4,
-  may: 5,
-  jun: 6,
-  jul: 7,
-  ago: 8,
-  sep: 9,
-  oct: 10,
-  nov: 11,
-  dic: 12,
-};
-
 /**
  * Clave numérica `AAAAMM` a partir de la etiqueta `"mes-aaaa"`.
  *
- * ⚠️ Se **ordena explícitamente** (no se confía en el orden que devuelve el
- * backend, que sale del orden de inserción de un `Record`).
- *
- * ⚠️ **Ojo con septiembre**: `toLocaleDateString("es-ES", { month: "short" })`
- * devuelve **`"sept"`** (4 letras, el único mes que no entra en 3) ⇒ se compara
- * por los **3 primeros caracteres**, que alcanzan para distinguir los 12 meses en
- * español. Una etiqueta que no matchee queda en `0` (se va al final).
+ * ⚠️ Vive en **`lib/mes-etiqueta.ts`** junto con el orden **cronológico** del
+ * gráfico (`dashboard-data.ts`): el listado y el gráfico tienen que ordenar con
+ * el MISMO criterio.
  */
-function claveMes(etiqueta: string): number {
-  const [mes = "", anio = ""] = etiqueta.split("-");
-  const n = MESES[mes.slice(0, 3).toLowerCase()] ?? 0;
-  const y = Number(anio);
-  return Number.isFinite(y) ? y * 100 + n : 0;
-}
 
 export function ResultadosMensuales({
   data,
@@ -71,9 +46,13 @@ export function ResultadosMensuales({
   /** ISO 4217 de la moneda (los resultados vienen en la predeterminada). */
   monedaISO: string;
 }) {
-  // **Del más actual al más antiguo** (pedido del usuario).
+  // **Del más actual al más antiguo** (pedido del usuario). El gráfico ordena al
+  // revés (cronológico): el helper es el mismo para los dos.
   const filas = useMemo(
-    () => [...data].sort((a, b) => claveMes(b.name) - claveMes(a.name)),
+    () =>
+      [...data].sort(
+        (a, b) => claveMesDesdeEtiqueta(b.name) - claveMesDesdeEtiqueta(a.name)
+      ),
     [data]
   );
 

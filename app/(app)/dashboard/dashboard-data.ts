@@ -21,6 +21,7 @@ import {
 import type { GastoOut } from "@/backend/src/queries/gastos";
 import { getAllGastos } from "@/backend/src/queries/gastos";
 import { getSessionUser } from "@/backend/src/lib/auth";
+import { claveMesDesdeEtiqueta } from "@/lib/mes-etiqueta";
 import { numberToCurrency } from "@/lib/utils";
 
 export interface DashboardData {
@@ -90,7 +91,20 @@ export interface DashboardData {
     data: Record<string, string | number>[];
     series: { key: string; detalle: string; currency: string; sentido: string }[];
   };
-  evolucionResultados: { name: string; value: number }[];
+  /**
+   * Serie del gráfico de **Resultados**: una fila por mes con las 3 cifras
+   * (2026-10-09). `value` es el resultado neto (la serie principal) y
+   * `ingresos`/`gastos` son las **secundarias** — las tres vienen alineadas del
+   * backend (`getEvolucionResultados`), que es el mismo dato que lista
+   * `ResultadosMensuales` (que sólo muestra `value`).
+   * ⚠️ Acá se ordenan **cronológicamente** (ver más abajo).
+   */
+  evolucionResultados: {
+    name: string;
+    value: number;
+    ingresos: number;
+    gastos: number;
+  }[];
 }
 
 export async function fetchDashboardData(): Promise<DashboardData> {
@@ -329,11 +343,19 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   // "Resultados", que es una serie del backend.
 
   // Evolución de resultados: usa el endpoint del backend getEvolucionResultados
-  // (misma lógica que el frontend original: una sola serie con el resultado neto por mes)
-  const evolucionResultados = evolResultados.map((e) => ({
-    name: e.id,
-    value: e.valor || 0,
-  }));
+  // (una fila por mes con ingresos, gastos y el neto ya alineados).
+  // ⚠️ Se ordena **cronológicamente** con `claveMesDesdeEtiqueta`: el backend las
+  // devuelve en orden de inserción (todos los meses con ingresos y, al final, los
+  // que sólo tienen gastos) ⇒ el eje X quedaba fuera de orden. Los rótulos
+  // (`"sep-2026"`) no son fechas parseables; ver `lib/mes-etiqueta.ts`.
+  const evolucionResultados = [...evolResultados]
+    .sort((a, b) => claveMesDesdeEtiqueta(a.id) - claveMesDesdeEtiqueta(b.id))
+    .map((e) => ({
+      name: e.id,
+      value: e.valor || 0,
+      ingresos: e.ingresos || 0,
+      gastos: e.gastos || 0,
+    }));
 
   return {
     balance,

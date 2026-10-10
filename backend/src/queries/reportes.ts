@@ -23,8 +23,18 @@ export interface EvolucionItem {
 }
 
 export interface EvolucionResultado {
+  /** Etiqueta del mes (`"sep-2026"`). */
   id: string;
+  /** Resultado neto del mes: `ingresos − gastos`. */
   valor: number;
+  /**
+   * Ingresos del mes (positivo). Son las series **secundarias** del gráfico de
+   * Resultados (2026-10-09): salen del MISMO armado que `valor` ⇒ no pueden
+   * desalinearse con él.
+   */
+  ingresos: number;
+  /** Gastos del mes (positivo). Ver `ingresos`. */
+  gastos: number;
 }
 
 export interface CuentaConEvolucion {
@@ -220,14 +230,20 @@ export async function getEvolucionResultados(): Promise<EvolucionResultado[]> {
   ]);
 
   // Ingresos (jornadas, en la moneda predeterminada) y gastos (por fecha de
-  // pago, `gasto.monto` ya está en esa moneda): se restan por mes.
-  const resultado: Record<string, number> = {};
-
+  // pago, `gasto.monto` ya está en esa moneda): se agrupan **por mes** y el
+  // resultado del mes es la resta. Las TRES cifras del mes salen de este mismo
+  // armado ⇒ no pueden desalinearse (el gráfico de 3 series viejo armaba cada
+  // serie por su lado y las unía por clave: `getEvolucionGastos` usaba el nombre
+  // del período y `getEvolucionIngresos` el mes ⇒ series desfasadas).
+  const ingresosPorMes: Record<string, number> = {};
   for (const item of ingresos) {
-    resultado[item.periodo] = (resultado[item.periodo] || 0) + item.monto;
+    ingresosPorMes[item.periodo] =
+      (ingresosPorMes[item.periodo] || 0) + item.monto;
   }
+
+  const gastosPorMes: Record<string, number> = {};
   for (const item of gastos) {
-    resultado[item.periodo] = (resultado[item.periodo] || 0) - item.monto;
+    gastosPorMes[item.periodo] = (gastosPorMes[item.periodo] || 0) + item.monto;
   }
 
   // Se muestran TODOS los meses con datos (ingresos y/o gastos): un mes puede
@@ -235,11 +251,16 @@ export async function getEvolucionResultados(): Promise<EvolucionResultado[]> {
   // (ingresos − gastos) igual debe verse. Antes solo se mostraban los meses con
   // gastos y se descartaban los que solo reflejaban ingresos (fix 2026-09-06:
   // se mostró el mes en curso sin gastos y el usuario pidió aplicar a todos).
-  return Object.keys(resultado)
-    .map((key) => ({
-      id: key,
-      valor: resultado[key],
-    }));
+  // ⚠️ El ORDEN es el de inserción (ingresos primero y después los meses que
+  // solo tienen gastos): el orden **cronológico** lo fija `dashboard-data.ts`,
+  // que es el único consumidor de esta query.
+  return Array.from(
+    new Set([...Object.keys(ingresosPorMes), ...Object.keys(gastosPorMes)])
+  ).map((key) => {
+    const ing = ingresosPorMes[key] || 0;
+    const gas = gastosPorMes[key] || 0;
+    return { id: key, valor: ing - gas, ingresos: ing, gastos: gas };
+  });
 }
 
 // ============================================================

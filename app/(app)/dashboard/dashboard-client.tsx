@@ -775,6 +775,17 @@ export function DashboardClient({
         // en Inicio ⇒ mismo color (pedido del usuario, 2026-10-03).
         color="var(--success)"
         area
+        etiquetaPrincipal="Resultado"
+        // 📈 Ingresos y Gastos del MISMO mes por detrás del resultado, en **menor
+        // jerarquía** (trazo fino y **sin sombreado**) — pedido del usuario,
+        // 2026-10-09. Azul `--primary` para ingresos y rojo `--danger` para
+        // gastos: la línea verde (resultado) ya está tomada. Las 3 cifras vienen
+        // alineadas del backend (`getEvolucionResultados`), así que no pueden
+        // desfasarse entre sí.
+        seriesSecundarias={[
+          { key: "ingresos", label: "Ingresos", color: "var(--primary)" },
+          { key: "gastos", label: "Gastos", color: "var(--danger)" },
+        ]}
         currency={data.monedaPredeterminadaISO}
       />
       </div>

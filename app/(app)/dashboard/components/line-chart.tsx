@@ -14,12 +14,28 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { ChartTooltip } from "./chart-tooltip";
+import { ChartTooltip, type SerieTooltip } from "./chart-tooltip";
 import { useHideTooltipOnTouch } from "./use-hide-tooltip-on-touch";
+import { cn } from "@/lib/utils";
+
+/** Una **serie secundaria** de `EvolutionChart` (comparación). */
+export interface SerieSecundaria {
+  /**
+   * `dataKey` del dato extra de cada fila de `data` (además de `name` y
+   * `value`), ej. `"ingresos"`. Recharts lo lee del objeto, por eso `data` no
+   * necesita declararlo.
+   */
+  key: string;
+  /** Rótulo de la serie en la leyenda y el tooltip. */
+  label: string;
+  /** Color del trazo (default `var(--muted-foreground)`). */
+  color?: string;
+}
 
 interface EvolutionChartProps {
   /** Título del panel. Opcional si se pasa `encabezado`. */
   title?: string;
+  /** Filas del gráfico: `name` (eje X) + `value` (serie principal). */
   data: { name: string; value: number }[];
   color?: string;
   /** Px del área del gráfico (o `"100%"` para llenar un contenedor con alto). */
@@ -53,6 +69,19 @@ interface EvolutionChartProps {
    * tooltip en vez de mover el carrusel**. El scroll vertical sigue normal.
    */
   sinScrollLateral?: boolean;
+  /**
+   * **Series secundarias** (2026-10-09, panel Resultados): se dibujan con **menos
+   * jerarquía** que la principal — trazo fino (`1.5`), **sin relleno** y **sin
+   * puntos** — para compararlas contra ella sin competir; además van **debajo**
+   * (la principal se pinta última y queda arriba). Con al menos una se pinta la
+   * **leyenda** y el tooltip pasa a listar **una fila por serie**.
+   */
+  seriesSecundarias?: SerieSecundaria[];
+  /**
+   * Rótulo de la serie **principal** en la leyenda y el tooltip (default
+   * `"Total"`). Sólo se usa cuando hay `seriesSecundarias`.
+   */
+  etiquetaPrincipal?: string;
 }
 
 export function EvolutionChart({
@@ -69,6 +98,8 @@ export function EvolutionChart({
   sinRecuadro = false,
   minimo = false,
   sinScrollLateral = false,
+  seriesSecundarias,
+  etiquetaPrincipal = "Total",
 }: EvolutionChartProps) {
   /** Wrapper: con `sinRecuadro` queda transparente (banda de Inicio). */
   const caja = sinRecuadro
@@ -101,6 +132,26 @@ export function EvolutionChart({
    * distingue del fondo): se dibujan los puntos para que la serie sea visible.
    */
   const mostrarPuntos = minimo && data.length <= 3;
+
+  /** Color de una serie secundaria (gris atenuado si no se indica). */
+  const colorSecundaria = (s: SerieSecundaria) =>
+    s.color ?? "var(--muted-foreground)";
+
+  /**
+   * Series para la **leyenda** y el **tooltip**: la principal (`value`) primero y
+   * las secundarias después. `undefined` sin secundarias ⇒ el tooltip sigue
+   * mostrando el total (comportamiento de siempre en Gastos/Ingresos).
+   */
+  const series: SerieTooltip[] | undefined = seriesSecundarias?.length
+    ? [
+        { dataKey: "value", label: etiquetaPrincipal, color, principal: true },
+        ...seriesSecundarias.map((s) => ({
+          dataKey: s.key,
+          label: s.label,
+          color: colorSecundaria(s),
+        })),
+      ]
+    : undefined;
   const header =
     encabezado !== undefined ? (
       encabezado
@@ -148,6 +199,28 @@ export function EvolutionChart({
       className={caja}
     >
       {header}
+      {/* Leyenda: sólo con series secundarias (una sola serie no necesita
+          rótulo: el nombre lo da el panel). Los puntos son el mismo color del
+          trazo y la serie principal va con más peso. */}
+      {series && (
+        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+          {series.map((s) => (
+            <span
+              key={s.dataKey}
+              className={cn(
+                "flex items-center gap-1.5 text-[11px]",
+                s.principal ? "text-card-foreground" : "text-subtitle"
+              )}
+            >
+              <span
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ background: s.color }}
+              />
+              {s.label}
+            </span>
+          ))}
+        </div>
+      )}
       <ResponsiveContainer width="100%" height={height}>
         <ComposedChart data={data}>
           {!minimo && (
@@ -173,7 +246,23 @@ export function EvolutionChart({
             axisLine={false}
             tickLine={false}
           />
-          <Tooltip content={<ChartTooltip currency={currency} />} />
+          <Tooltip content={<ChartTooltip currency={currency} series={series} />} />
+          {/* Secundarias PRIMERO: en recharts el orden de los hijos es el orden de
+              pintado ⇒ la principal (área o línea) queda por encima. Trazo fino y
+              sin relleno: la jerarquía la marca el trazo, no el sombreado. */}
+          {seriesSecundarias?.map((s) => (
+            <Line
+              key={s.key}
+              type="monotone"
+              dataKey={s.key}
+              name={s.label}
+              stroke={colorSecundaria(s)}
+              strokeWidth={1.5}
+              strokeOpacity={0.8}
+              dot={false}
+              activeDot={{ r: 3, fill: colorSecundaria(s), stroke: "none" }}
+            />
+          ))}
           {area ? (
             <>
               <defs>
