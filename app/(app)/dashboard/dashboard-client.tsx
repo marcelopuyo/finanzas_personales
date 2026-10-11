@@ -674,6 +674,7 @@ export function DashboardClient({
       {tabGastos === "resumen" ? (
         <DonutChart
           encabezado={gastosPanelTabs}
+          tooltipPersistenteEnTap
           currency={data.monedaPredeterminadaISO}
           data={filteredResumen.map((g) => ({
             name: g.name,
@@ -687,6 +688,7 @@ export function DashboardClient({
       ) : (
         <EvolutionChart
           encabezado={gastosPanelTabs}
+          tooltipPersistenteEnTap
           currency={data.monedaPredeterminadaISO}
           data={filteredEvolucion}
           // 📟 Verde (no `--primary`): el histórico usa el MISMO color que el
@@ -725,6 +727,7 @@ export function DashboardClient({
       {tabIngresos === "resumen" ? (
         <DonutChart
           encabezado={ingresosPanelTabs}
+          tooltipPersistenteEnTap
           currency={data.monedaPredeterminadaISO}
           data={filteredIngresosResumen.map((i) => ({ name: i.name, value: i.value }))}
           invertTrend
@@ -736,6 +739,7 @@ export function DashboardClient({
       ) : (
         <EvolutionChart
           encabezado={ingresosPanelTabs}
+          tooltipPersistenteEnTap
           data={filteredIngresosEvolucion}
           // 📟 Verde, igual que el histórico de Gastos y que las tarjetas.
           color="var(--success)"
@@ -803,6 +807,7 @@ export function DashboardClient({
       <div data-panel="prestamos">
       <PrestamosChart
         encabezado={prestamosPanelHeader}
+        tooltipPersistenteEnTap
         data={data.prestamosChart.data}
         series={data.prestamosChart.series}
       />

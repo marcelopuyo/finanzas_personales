@@ -44,6 +44,8 @@ interface PrestamosChartProps {
    * ningún encabezado.
    */
   encabezado?: ReactNode;
+  /** Mantiene visible el tooltip tras tocar una barra en mobile. */
+  tooltipPersistenteEnTap?: boolean;
 }
 
 /**
@@ -117,9 +119,11 @@ export function PrestamosChart({
   badge,
   action,
   encabezado,
+  tooltipPersistenteEnTap = false,
 }: PrestamosChartProps) {
-  // El tooltip se oculta al levantar el dedo en mobile (ver el hook).
-  const touchReset = useHideTooltipOnTouch();
+  const touchReset = useHideTooltipOnTouch({
+    mantenerTooltipEnTap: tooltipPersistenteEnTap,
+  });
   const header =
     encabezado !== undefined ? (
       encabezado
@@ -198,6 +202,7 @@ export function PrestamosChart({
   return (
     <div
       onTouchStart={touchReset.onTouchStart}
+      onTouchMoveCapture={touchReset.onTouchMoveCapture}
       onTouchEnd={touchReset.onTouchEnd}
       onTouchCancel={touchReset.onTouchCancel}
       className={`rounded-lg border border-border bg-card p-5 ${className}`}

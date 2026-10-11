@@ -115,6 +115,13 @@ export function useHideTooltipOnTouch<
     [apagar, limpiarTimers, mantenerTooltipEnTap]
   );
 
+  const onTouchMoveCapture = useCallback(
+    (e: TouchEvent<T>) => {
+      if (mantenerTooltipEnTap) e.stopPropagation();
+    },
+    [mantenerTooltipEnTap]
+  );
+
   const onTouchEnd = useCallback(
     (e: TouchEvent<T>) => {
       const raiz = e.currentTarget;
@@ -171,5 +178,10 @@ export function useHideTooltipOnTouch<
     [apagar, limpiarTimers, mantenerTooltipEnTap]
   );
 
-  return { onTouchStart, onTouchEnd, onTouchCancel: onTouchEnd };
+  return {
+    onTouchStart,
+    onTouchMoveCapture,
+    onTouchEnd,
+    onTouchCancel: onTouchEnd,
+  };
 }

@@ -422,6 +422,7 @@ export function EvolutionChart({
   return (
     <div
       onTouchStart={touchReset.onTouchStart}
+      onTouchMoveCapture={touchReset.onTouchMoveCapture}
       onTouchEnd={touchReset.onTouchEnd}
       onTouchCancel={touchReset.onTouchCancel}
       // Con `pan-y` el navegador no se queda con el gesto horizontal: el dedo
@@ -503,11 +504,6 @@ export function EvolutionChart({
             // `pan-x pan-y`: el gráfico se mueve en horizontal y la página sigue
             // scrolleando en vertical. Con tooltip persistente el tap lo fija y
             // el swipe queda libre para desplazar el historial.
-            onTouchMoveCapture={
-              tooltipPersistenteEnTap
-                ? (e) => e.stopPropagation()
-                : undefined
-            }
             style={{ touchAction: "pan-x pan-y" }}
           >
             <div

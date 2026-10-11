@@ -47,6 +47,8 @@ interface DonutChartProps {
   /** Invierte el color de las flechas de tendencia (verde si sube, rojo si baja).
    * Se usa en Ingresos, donde subir es bueno. Default: rojo sube / verde baja (Gastos). */
   invertTrend?: boolean;
+  /** Mantiene visible el tooltip tras tocar un segmento en mobile. */
+  tooltipPersistenteEnTap?: boolean;
 }
 
 /**
@@ -155,9 +157,11 @@ export function DonutChart({
   encabezado,
   compare,
   invertTrend = false,
+  tooltipPersistenteEnTap = false,
 }: DonutChartProps) {
-  // El tooltip se oculta al levantar el dedo en mobile (ver el hook).
-  const touchReset = useHideTooltipOnTouch();
+  const touchReset = useHideTooltipOnTouch({
+    mantenerTooltipEnTap: tooltipPersistenteEnTap,
+  });
   const header =
     encabezado !== undefined ? (
       encabezado
@@ -185,6 +189,7 @@ export function DonutChart({
   return (
     <div
       onTouchStart={touchReset.onTouchStart}
+      onTouchMoveCapture={touchReset.onTouchMoveCapture}
       onTouchEnd={touchReset.onTouchEnd}
       onTouchCancel={touchReset.onTouchCancel}
       className={`rounded-2xl border border-border bg-card p-5 ${className}`}
