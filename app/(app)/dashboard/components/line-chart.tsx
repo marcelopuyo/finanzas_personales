@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   LineChart,
   Line,
@@ -100,27 +100,67 @@ interface EvolutionChartProps {
   scrollDesde?: number;
 }
 
-/**
- * Ancho en px **por punto** cuando el gráfico scrollea (56: los rótulos
- * `"sep-2026"` entran sin pisarse).
- */
-const ANCHO_POR_PUNTO = 56;
-
 /** Ancho del carril del **eje Y fijo** (los rótulos tipo `-250000` entran justos). */
 const ANCHO_EJE_Y = 56;
 
 /**
+ * **Meses que entran en pantalla** cuando el gráfico scrollea (2026-10-10): el
+ * ancho del gráfico se calcula como `n / 8` del ancho del contenedor ⇒ la columna
+ * de cada mes mide **1/8 del viewport** y siempre se ven 8 (independiente del
+ * tamaño del celular, y sin medir nada con JS).
+ */
+const MESES_VISIBLES = 8;
+
+/**
  * Alto reservado por el **eje X**, igual en los DOS gráficos del scroll: si
  * difiriera, las áreas de dibujo no coincidirían y las líneas no caerían sobre
- * las líneas de la grilla. Es el default de recharts (30), declarado para que se
- * vea de dónde sale la alineación.
+ * las líneas de la grilla. Son los 30 px de recharts + 4 para que la **segunda
+ * línea** del rótulo en dos líneas (`TickMesAnio`) no se corte.
  */
-const ALTO_EJE_X = 30;
+const ALTO_EJE_X = 34;
+
+/**
+ * Rótulo del eje X **en dos líneas** (`mes` arriba, `año` abajo) para los gráficos
+ * que **scrollean** (2026-10-10): con **8 columnas** visibles la banda mide ~34 px
+ * en un celular y `"oct-26"` mide ~35 px ⇒ **no entra** y recharts escondía uno de
+ * cada dos meses (se veían 4 rótulos para 8 meses). En dos líneas cada rótulo mide
+ * ~21 px: entran los **8** (se fuerza con `interval={0}`) y el año sigue a la
+ * vista. Cualquier etiqueta que no sea `mes-aaaa` se muestra en una línea.
+ */
+function TickMesAnio({
+  x,
+  y,
+  payload,
+}: {
+  x?: number;
+  y?: number;
+  payload?: { value?: string | number };
+}) {
+  const valor = String(payload?.value ?? "");
+  const partes = /^(\p{L}{3,4})-(\d{4})$/u.exec(valor);
+  if (!partes) {
+    return (
+      <text x={x} y={y} dy={14} textAnchor="middle" fontSize={12} fill="var(--muted-foreground)">
+        {valor}
+      </text>
+    );
+  }
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text x={0} dy={12} textAnchor="middle" fontSize={11} fill="var(--muted-foreground)">
+        {partes[1]}
+      </text>
+      <text x={0} dy={23} textAnchor="middle" fontSize={9} fill="var(--muted-foreground)">
+        {partes[2].slice(2)}
+      </text>
+    </g>
+  );
+}
 
 /**
  * **Umbral que usan los paneles del dashboard** para pasar `scrollDesde`: desde
- * **13 meses** el gráfico ya no entra cómodo en un celular (12 columnas de ~56 px
- * dan ~670 px, más de lo que hay de ancho útil).
+ * **13 meses** el gráfico ya no entra cómodo en un celular (8 columnas visibles ⇒
+ * con 8 meses o menos el gráfico entra entero y **no** hay scroll).
  */
 export const MESES_SCROLL = 12;
 
@@ -146,8 +186,37 @@ export function EvolutionChart({
   const caja = sinRecuadro
     ? className
     : `rounded-lg border border-border bg-card p-5 ${className}`;
-  // El tooltip se oculta al levantar el dedo en mobile (ver el hook).
+
+  /** **Scroll horizontal** activo: más puntos que el umbral y no es el modo mínimo. */
+  const conScroll =
+    !minimo && scrollDesde !== undefined && data.length > scrollDesde;
+
+  /**
+   * Tooltip al levantar el dedo en mobile (ver el hook). Va en toda la tarjeta
+   * porque el encabezado (pestañas + ⋯) viaja dentro de ella.
+   */
   const touchReset = useHideTooltipOnTouch();
+
+  /**
+   * 📌 **El gráfico abre por el final** (el mes actual a la derecha) cuando
+   * scrollea (2026-10-10): si no, con 15 meses se veía primero **ago-2025** y el
+   * mes en curso quedaba fuera de pantalla. Se re-ancla cuando cambia la cantidad
+   * de puntos (filtros), **no** en cada render, para no pelear con el dedo del
+   * usuario; el `requestAnimationFrame` cubre el primer pintado (donde el ancho
+   * del contenedor todavía se está asentando).
+   */
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!conScroll) return;
+    const el = scrollerRef.current;
+    if (!el) return;
+    const alFinal = () => {
+      el.scrollLeft = el.scrollWidth;
+    };
+    alFinal();
+    const raf = requestAnimationFrame(alFinal);
+    return () => cancelAnimationFrame(raf);
+  }, [conScroll, data.length]);
 
   /**
    * 📈 **Dominio ajustado a los datos** (2026-10-03, bug reportado en prod): con el
@@ -173,12 +242,6 @@ export function EvolutionChart({
    * distingue del fondo): se dibujan los puntos para que la serie sea visible.
    */
   const mostrarPuntos = minimo && data.length <= 3;
-
-  /**
-   * **Scroll horizontal** activo: más puntos que el umbral y no es el modo mínimo.
-   */
-  const conScroll =
-    !minimo && scrollDesde !== undefined && data.length > scrollDesde;
 
   /** Series que hay que declarar en cada gráfico para que **compartan escala**. */
   const clavesDeSeries = ["value", ...(seriesSecundarias ?? []).map((s) => s.key)];
@@ -210,7 +273,14 @@ export function EvolutionChart({
         // etiquetas que no son `mes-aaaa` (fechas ISO de las series diarias) pasan
         // igual. El **tooltip** y el listado conservan el año completo.
         tickFormatter={mesAnioCorto}
-        tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+        // Con scroll, el rótulo va **en dos líneas** y se fuerzan TODOS los meses
+        // (entran: ~21 px de ancho contra ~34 px de banda). Ver `TickMesAnio`.
+        tick={
+          conScroll
+            ? <TickMesAnio />
+            : { fontSize: 12, fill: "var(--muted-foreground)" }
+        }
+        interval={conScroll ? 0 : undefined}
         axisLine={false}
         tickLine={false}
       />
@@ -421,8 +491,9 @@ export function EvolutionChart({
               </ComposedChart>
             </ResponsiveContainer>
           </div>
-          {/* ── El gráfico: ancho por punto ⇒ el contenedor scrollea solo ── */}
+          {/* ── El gráfico: `n / 8` del ancho ⇒ 8 columnas visibles y scroll ── */}
           <div
+            ref={scrollerRef}
             className="min-w-0 flex-1 overflow-x-auto"
             // `pan-x pan-y`: el gráfico se mueve en horizontal y la página sigue
             // scrolleando en vertical. El dedo ya no "scrubea" el tooltip (ahora
@@ -430,7 +501,9 @@ export function EvolutionChart({
             style={{ touchAction: "pan-x pan-y" }}
           >
             <div
-              style={{ width: `max(100%, ${data.length * ANCHO_POR_PUNTO}px)` }}
+              // Cada mes mide **1/8 del contenedor** (`MESES_VISIBLES`), así el
+              // ancho visible es el mismo en cualquier pantalla y sin medir con JS.
+              style={{ width: `${(data.length / MESES_VISIBLES) * 100}%` }}
             >
               <ResponsiveContainer width="100%" height={height}>
                 <ComposedChart data={data}>{cuerpo("oculto")}</ComposedChart>
