@@ -13,12 +13,11 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
-  type DotItemDotProps,
 } from "recharts";
 import { ChartTooltip, type SerieTooltip } from "./chart-tooltip";
 import { useHideTooltipOnTouch } from "./use-hide-tooltip-on-touch";
 import { mesAnioCorto } from "@/lib/mes-etiqueta";
-import { cn, simboloMoneda } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 /** Una **serie secundaria** de `EvolutionChart` (comparación). */
 export interface SerieSecundaria {
@@ -48,11 +47,8 @@ interface EvolutionChartProps {
   area?: boolean;
   /** Código ISO para formatear el tooltip (default ARS). */
   currency?: string;
-  /**
-   * Muestra el valor de cada punto en una etiqueta compacta y oculta el tooltip.
-   * Está pensado para gráficos donde los valores deben quedar visibles.
-   */
-  mostrarValores?: boolean;
+  /** Mantiene visible el tooltip después de tocar un punto en mobile. */
+  tooltipPersistenteEnTap?: boolean;
   /**
    * **Reemplaza TODO el encabezado del panel** (2026-10-01, `rediseno-ui`): el
    * rediseño deja dentro del panel solo su **selector de pestañas**, y el título,
@@ -100,8 +96,8 @@ interface EvolutionChartProps {
    * Sin la prop el gráfico **no scrollea nunca** (sparklines de las tarjetas,
    * banda de Inicio).
    * ⚠️ Con scroll, el dedo **arrastra el gráfico** en horizontal (es lo que
-   * permite moverse): el tooltip se sigue viendo con un tap, pero ya no se
-   * "scrubea" arrastrando.
+   * permite moverse). `tooltipPersistenteEnTap` fija el tooltip con un toque;
+   * el arrastre sigue reservado para navegar el historial.
    */
   scrollDesde?: number;
 }
@@ -180,7 +176,7 @@ export function EvolutionChart({
   badge,
   area = false,
   currency,
-  mostrarValores = false,
+  tooltipPersistenteEnTap = false,
   encabezado,
   sinRecuadro = false,
   minimo = false,
@@ -202,7 +198,9 @@ export function EvolutionChart({
    * Tooltip al levantar el dedo en mobile (ver el hook). Va en toda la tarjeta
    * porque el encabezado (pestañas + ⋯) viaja dentro de ella.
    */
-  const touchReset = useHideTooltipOnTouch();
+  const touchReset = useHideTooltipOnTouch({
+    mantenerTooltipEnTap: tooltipPersistenteEnTap,
+  });
 
   /**
    * 📌 **El gráfico abre por el final** (el mes actual a la derecha) cuando
@@ -249,137 +247,6 @@ export function EvolutionChart({
    * distingue del fondo): se dibujan los puntos para que la serie sea visible.
    */
   const mostrarPuntos = minimo && data.length <= 3;
-
-  const etiquetaResultado = ({
-    cx,
-    cy,
-    index,
-    points,
-    value,
-  }: DotItemDotProps) => {
-    const xPunto = Number(cx);
-    const yPunto = Number(cy);
-    const monto = Number(Array.isArray(value) ? value[1] : value);
-    if (!Number.isFinite(xPunto) || !Number.isFinite(yPunto) || !Number.isFinite(monto)) {
-      return <g />;
-    }
-
-    const formatearEtiqueta = (valorPunto: unknown) => {
-      const numero = Number(
-        Array.isArray(valorPunto) ? valorPunto[1] : valorPunto
-      );
-      const sufijo = Math.abs(numero) >= 1_000_000
-        ? "M"
-        : Math.abs(numero) >= 1_000
-          ? "k"
-          : "";
-      const divisor = sufijo === "M" ? 1_000_000 : sufijo === "k" ? 1_000 : 1;
-      const cifra = new Intl.NumberFormat("es-AR", {
-        maximumFractionDigits: sufijo ? 1 : 0,
-      }).format(Math.abs(numero) / divisor);
-      const simbolo = simboloMoneda(currency ?? "ARS");
-      const texto = `${numero < 0 ? "−" : ""}${simbolo}${cifra}${sufijo}`;
-      return { texto, ancho: Math.max(26, texto.length * 5 + 10) };
-    };
-
-    const altoGrafico = typeof height === "number" ? height : 300;
-    const altoEjeX = conScroll ? ALTO_EJE_X : 30;
-    const yMin = 60;
-    const yMax = Math.max(yMin, altoGrafico - altoEjeX - 22);
-    const filasDisponibles = Math.floor((yMax - yMin) / 22) + 1;
-    const offsetsY = [-28, 12, -50, 34, -72, 56];
-    const ubicaciones: {
-      x: number;
-      y: number;
-      ancho: number;
-    }[] = [];
-
-    for (let i = 0; i <= index; i += 1) {
-      const punto = points[i];
-      const puntoX = Number(punto?.x);
-      const puntoY = Number(punto?.y);
-      const puntoMonto = Number(
-        Array.isArray(punto?.value) ? punto.value[1] : punto?.value
-      );
-      if (
-        !Number.isFinite(puntoX) ||
-        !Number.isFinite(puntoY) ||
-        !Number.isFinite(puntoMonto)
-      ) {
-        ubicaciones.push({ x: Number.NaN, y: Number.NaN, ancho: 0 });
-        continue;
-      }
-
-      const { ancho } = formatearEtiqueta(punto?.value);
-      const posicionesY = [
-        ...offsetsY.map((offset) => puntoY + offset),
-        ...Array.from(
-          { length: filasDisponibles },
-          (_, fila) => yMin + fila * 22
-        ),
-      ];
-      const ubicacion = posicionesY
-        .map((y) => ({
-          x: puntoX,
-          y: Math.max(yMin, Math.min(yMax, y)),
-          ancho,
-        }))
-        .find((candidata) =>
-          ubicaciones.every((anterior) => {
-            if (!Number.isFinite(anterior.x) || !Number.isFinite(anterior.y)) {
-              return true;
-            }
-            const separacionHorizontal =
-              Math.abs(candidata.x - anterior.x) >=
-              (candidata.ancho + anterior.ancho) / 2 + 4;
-            const separacionVertical =
-              candidata.y + 18 <= anterior.y - 3 ||
-              anterior.y + 18 <= candidata.y - 3;
-            return separacionHorizontal || separacionVertical;
-          })
-        );
-
-      ubicaciones.push(
-        ubicacion ?? {
-          x: puntoX,
-          y: yMin,
-          ancho,
-        }
-      );
-    }
-
-    const etiqueta = formatearEtiqueta(value);
-    const { texto, ancho } = etiqueta;
-    const yEtiqueta = ubicaciones[index]?.y ?? yPunto - 28;
-    const colorEtiqueta = monto < 0 ? "var(--danger)" : "var(--success)";
-
-    return (
-      <g className="pointer-events-none" aria-hidden="true">
-        <rect
-          x={xPunto - ancho / 2}
-          y={yEtiqueta}
-          width={ancho}
-          height={18}
-          rx={6}
-          fill={colorEtiqueta}
-          fillOpacity={0.12}
-          stroke={colorEtiqueta}
-          strokeOpacity={0.35}
-        />
-        <text
-          x={xPunto}
-          y={yEtiqueta + 12}
-          textAnchor="middle"
-          fontSize={9}
-          fontWeight={600}
-          fill={colorEtiqueta}
-        >
-          {texto}
-        </text>
-        <circle cx={xPunto} cy={yPunto} r={2.5} fill={color} />
-      </g>
-    );
-  };
 
   /** Series que hay que declarar en cada gráfico para que **compartan escala**. */
   const clavesDeSeries = ["value", ...(seriesSecundarias ?? []).map((s) => s.key)];
@@ -435,9 +302,7 @@ export function EvolutionChart({
       ) : (
         <YAxis hide />
       )}
-      {!mostrarValores && (
-        <Tooltip content={<ChartTooltip currency={currency} series={series} />} />
-      )}
+      <Tooltip content={<ChartTooltip currency={currency} series={series} />} />
       {/* Secundarias PRIMERO: en recharts el orden de los hijos es el orden de
           pintado ⇒ la principal (área o línea) queda por encima. Trazo fino y
           sin relleno: la jerarquía la marca el trazo, no el sombreado. */}
@@ -473,13 +338,7 @@ export function EvolutionChart({
             stroke={color}
             strokeWidth={2}
             fill="url(#evolutionArea)"
-            dot={
-              mostrarValores
-                ? etiquetaResultado
-                : mostrarPuntos
-                  ? { r: 2.5, fill: color }
-                  : false
-            }
+            dot={mostrarPuntos ? { r: 2.5, fill: color } : false}
             activeDot={{ r: 4, fill: color }}
           />
         </>
@@ -598,10 +457,7 @@ export function EvolutionChart({
           {/* ── Eje Y FIJO: sólo el eje, del ancho justo de sus rótulos ── */}
           <div className="shrink-0" style={{ width: ANCHO_EJE_Y }}>
             <ResponsiveContainer width="100%" height={height}>
-              <ComposedChart
-                data={data}
-                margin={mostrarValores ? { top: 58 } : undefined}
-              >
+              <ComposedChart data={data}>
                 {/* Reserva el MISMO alto de eje X que el gráfico que scrollea. */}
                 <XAxis
                   dataKey="name"
@@ -645,8 +501,13 @@ export function EvolutionChart({
             ref={scrollerRef}
             className="min-w-0 flex-1 overflow-x-auto"
             // `pan-x pan-y`: el gráfico se mueve en horizontal y la página sigue
-            // scrolleando en vertical. El dedo ya no "scrubea" el tooltip (ahora
-            // arrastra el gráfico): el tap sigue mostrándolo.
+            // scrolleando en vertical. Con tooltip persistente el tap lo fija y
+            // el swipe queda libre para desplazar el historial.
+            onTouchMoveCapture={
+              tooltipPersistenteEnTap
+                ? (e) => e.stopPropagation()
+                : undefined
+            }
             style={{ touchAction: "pan-x pan-y" }}
           >
             <div
@@ -655,10 +516,7 @@ export function EvolutionChart({
               style={{ width: `${(data.length / MESES_VISIBLES) * 100}%` }}
             >
               <ResponsiveContainer width="100%" height={height}>
-                <ComposedChart
-                  data={data}
-                  margin={mostrarValores ? { top: 58 } : undefined}
-                >
+                <ComposedChart data={data}>
                   {cuerpo("oculto")}
                 </ComposedChart>
               </ResponsiveContainer>
@@ -667,10 +525,7 @@ export function EvolutionChart({
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={height}>
-          <ComposedChart
-            data={data}
-            margin={mostrarValores ? { top: 58 } : undefined}
-          >
+          <ComposedChart data={data}>
             {cuerpo("visible")}
           </ComposedChart>
         </ResponsiveContainer>

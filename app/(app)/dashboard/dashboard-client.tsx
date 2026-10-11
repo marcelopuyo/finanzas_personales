@@ -780,7 +780,7 @@ export function DashboardClient({
         // en Inicio ⇒ mismo color (pedido del usuario, 2026-10-03).
         color="var(--success)"
         area
-        mostrarValores
+        tooltipPersistenteEnTap
         currency={data.monedaPredeterminadaISO}
         // 📜 Con muchos meses el gráfico scrollea y el **eje Y queda fijo**
         // (2026-10-09): el panel ya tiene 15 meses de histórico.
