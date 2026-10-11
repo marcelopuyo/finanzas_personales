@@ -259,36 +259,99 @@ export function EvolutionChart({
   }: DotItemDotProps) => {
     const xPunto = Number(cx);
     const yPunto = Number(cy);
-    // Area sends [base, value] to custom dots; labels use the actual result.
-    const valor = Array.isArray(value) ? value[1] : value;
-    const monto = Number(valor);
+    const monto = Number(Array.isArray(value) ? value[1] : value);
     if (!Number.isFinite(xPunto) || !Number.isFinite(yPunto) || !Number.isFinite(monto)) {
       return <g />;
     }
 
-    const simbolo = simboloMoneda(currency ?? "ARS");
-    const sufijo = Math.abs(monto) >= 1_000_000
-      ? "M"
-      : Math.abs(monto) >= 1_000
-        ? "k"
-        : "";
-    const divisor = sufijo === "M" ? 1_000_000 : sufijo === "k" ? 1_000 : 1;
-    const cifra = new Intl.NumberFormat("es-AR", {
-      maximumFractionDigits: sufijo ? 1 : 0,
-    }).format(Math.abs(monto) / divisor);
-    const texto = `${monto < 0 ? "−" : ""}${simbolo}${cifra}${sufijo}`;
-    const ancho = Math.max(26, texto.length * 5 + 10);
+    const formatearEtiqueta = (valorPunto: unknown) => {
+      const numero = Number(
+        Array.isArray(valorPunto) ? valorPunto[1] : valorPunto
+      );
+      const sufijo = Math.abs(numero) >= 1_000_000
+        ? "M"
+        : Math.abs(numero) >= 1_000
+          ? "k"
+          : "";
+      const divisor = sufijo === "M" ? 1_000_000 : sufijo === "k" ? 1_000 : 1;
+      const cifra = new Intl.NumberFormat("es-AR", {
+        maximumFractionDigits: sufijo ? 1 : 0,
+      }).format(Math.abs(numero) / divisor);
+      const simbolo = simboloMoneda(currency ?? "ARS");
+      const texto = `${numero < 0 ? "−" : ""}${simbolo}${cifra}${sufijo}`;
+      return { texto, ancho: Math.max(26, texto.length * 5 + 10) };
+    };
+
+    const altoGrafico = typeof height === "number" ? height : 300;
+    const altoEjeX = conScroll ? ALTO_EJE_X : 30;
+    const yMin = 60;
+    const yMax = Math.max(yMin, altoGrafico - altoEjeX - 22);
+    const filasDisponibles = Math.floor((yMax - yMin) / 22) + 1;
+    const offsetsY = [-28, 12, -50, 34, -72, 56];
+    const ubicaciones: {
+      x: number;
+      y: number;
+      ancho: number;
+    }[] = [];
+
+    for (let i = 0; i <= index; i += 1) {
+      const punto = points[i];
+      const puntoX = Number(punto?.x);
+      const puntoY = Number(punto?.y);
+      const puntoMonto = Number(
+        Array.isArray(punto?.value) ? punto.value[1] : punto?.value
+      );
+      if (
+        !Number.isFinite(puntoX) ||
+        !Number.isFinite(puntoY) ||
+        !Number.isFinite(puntoMonto)
+      ) {
+        ubicaciones.push({ x: Number.NaN, y: Number.NaN, ancho: 0 });
+        continue;
+      }
+
+      const { ancho } = formatearEtiqueta(punto?.value);
+      const posicionesY = [
+        ...offsetsY.map((offset) => puntoY + offset),
+        ...Array.from(
+          { length: filasDisponibles },
+          (_, fila) => yMin + fila * 22
+        ),
+      ];
+      const ubicacion = posicionesY
+        .map((y) => ({
+          x: puntoX,
+          y: Math.max(yMin, Math.min(yMax, y)),
+          ancho,
+        }))
+        .find((candidata) =>
+          ubicaciones.every((anterior) => {
+            if (!Number.isFinite(anterior.x) || !Number.isFinite(anterior.y)) {
+              return true;
+            }
+            const separacionHorizontal =
+              Math.abs(candidata.x - anterior.x) >=
+              (candidata.ancho + anterior.ancho) / 2 + 4;
+            const separacionVertical =
+              candidata.y + 18 <= anterior.y - 3 ||
+              anterior.y + 18 <= candidata.y - 3;
+            return separacionHorizontal || separacionVertical;
+          })
+        );
+
+      ubicaciones.push(
+        ubicacion ?? {
+          x: puntoX,
+          y: yMin,
+          ancho,
+        }
+      );
+    }
+
+    const etiqueta = formatearEtiqueta(value);
+    const { texto, ancho } = etiqueta;
+    const yEtiqueta = ubicaciones[index]?.y ?? yPunto - 28;
     const colorEtiqueta = monto < 0 ? "var(--danger)" : "var(--success)";
-    const coordenadasVecinas = [
-      points[index - 1]?.x,
-      points[index + 1]?.x,
-    ].filter((x): x is number => typeof x === "number" && Number.isFinite(x));
-    const separacion = coordenadasVecinas.length
-      ? Math.min(...coordenadasVecinas.map((x) => Math.abs(x - xPunto)))
-      : Number.POSITIVE_INFINITY;
-    const etiquetasJuntas = separacion < ancho + 8;
-    const yEtiqueta =
-      yPunto - (etiquetasJuntas && index % 2 === 1 ? 48 : 28);
 
     return (
       <g className="pointer-events-none" aria-hidden="true">
