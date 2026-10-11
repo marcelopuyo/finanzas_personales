@@ -253,7 +253,9 @@ export function EvolutionChart({
   const etiquetaResultado = ({ cx, cy, value }: DotItemDotProps) => {
     const xPunto = Number(cx);
     const yPunto = Number(cy);
-    const monto = Number(value);
+    // Area sends [base, value] to custom dots; labels use the actual result.
+    const valor = Array.isArray(value) ? value[1] : value;
+    const monto = Number(valor);
     if (!Number.isFinite(xPunto) || !Number.isFinite(yPunto) || !Number.isFinite(monto)) {
       return <g />;
     }
