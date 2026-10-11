@@ -13,8 +13,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
-  LabelList,
-  type LabelProps,
+  type DotItemDotProps,
 } from "recharts";
 import { ChartTooltip, type SerieTooltip } from "./chart-tooltip";
 import { useHideTooltipOnTouch } from "./use-hide-tooltip-on-touch";
@@ -251,9 +250,9 @@ export function EvolutionChart({
    */
   const mostrarPuntos = minimo && data.length <= 3;
 
-  const etiquetaResultado = ({ x, y, value }: LabelProps) => {
-    const xPunto = Number(x);
-    const yPunto = Number(y);
+  const etiquetaResultado = ({ cx, cy, value }: DotItemDotProps) => {
+    const xPunto = Number(cx);
+    const yPunto = Number(cy);
     const monto = Number(value);
     if (!Number.isFinite(xPunto) || !Number.isFinite(yPunto) || !Number.isFinite(monto)) {
       return <g />;
@@ -297,6 +296,7 @@ export function EvolutionChart({
         >
           {texto}
         </text>
+        <circle cx={xPunto} cy={yPunto} r={2.5} fill={color} />
       </g>
     );
   };
@@ -393,13 +393,14 @@ export function EvolutionChart({
             stroke={color}
             strokeWidth={2}
             fill="url(#evolutionArea)"
-            dot={mostrarPuntos ? { r: 2.5, fill: color } : false}
-            activeDot={{ r: 4, fill: color }}
-            label={
-              mostrarValores ? (
-                <LabelList dataKey="value" content={etiquetaResultado} />
-              ) : false
+            dot={
+              mostrarValores
+                ? etiquetaResultado
+                : mostrarPuntos
+                  ? { r: 2.5, fill: color }
+                  : false
             }
+            activeDot={{ r: 4, fill: color }}
           />
         </>
       ) : (
