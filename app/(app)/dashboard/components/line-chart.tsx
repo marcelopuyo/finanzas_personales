@@ -250,7 +250,13 @@ export function EvolutionChart({
    */
   const mostrarPuntos = minimo && data.length <= 3;
 
-  const etiquetaResultado = ({ cx, cy, value }: DotItemDotProps) => {
+  const etiquetaResultado = ({
+    cx,
+    cy,
+    index,
+    points,
+    value,
+  }: DotItemDotProps) => {
     const xPunto = Number(cx);
     const yPunto = Number(cy);
     // Area sends [base, value] to custom dots; labels use the actual result.
@@ -273,7 +279,16 @@ export function EvolutionChart({
     const texto = `${monto < 0 ? "−" : ""}${simbolo}${cifra}${sufijo}`;
     const ancho = Math.max(26, texto.length * 5 + 10);
     const colorEtiqueta = monto < 0 ? "var(--danger)" : "var(--success)";
-    const yEtiqueta = yPunto - 28;
+    const coordenadasVecinas = [
+      points[index - 1]?.x,
+      points[index + 1]?.x,
+    ].filter((x): x is number => typeof x === "number" && Number.isFinite(x));
+    const separacion = coordenadasVecinas.length
+      ? Math.min(...coordenadasVecinas.map((x) => Math.abs(x - xPunto)))
+      : Number.POSITIVE_INFINITY;
+    const etiquetasJuntas = separacion < ancho + 8;
+    const yEtiqueta =
+      yPunto - (etiquetasJuntas && index % 2 === 1 ? 48 : 28);
 
     return (
       <g className="pointer-events-none" aria-hidden="true">
@@ -522,7 +537,7 @@ export function EvolutionChart({
             <ResponsiveContainer width="100%" height={height}>
               <ComposedChart
                 data={data}
-                margin={mostrarValores ? { top: 34 } : undefined}
+                margin={mostrarValores ? { top: 58 } : undefined}
               >
                 {/* Reserva el MISMO alto de eje X que el gráfico que scrollea. */}
                 <XAxis
@@ -579,7 +594,7 @@ export function EvolutionChart({
               <ResponsiveContainer width="100%" height={height}>
                 <ComposedChart
                   data={data}
-                  margin={mostrarValores ? { top: 34 } : undefined}
+                  margin={mostrarValores ? { top: 58 } : undefined}
                 >
                   {cuerpo("oculto")}
                 </ComposedChart>
@@ -591,7 +606,7 @@ export function EvolutionChart({
         <ResponsiveContainer width="100%" height={height}>
           <ComposedChart
             data={data}
-            margin={mostrarValores ? { top: 34 } : undefined}
+            margin={mostrarValores ? { top: 58 } : undefined}
           >
             {cuerpo("visible")}
           </ComposedChart>
