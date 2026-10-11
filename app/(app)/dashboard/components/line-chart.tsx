@@ -13,11 +13,13 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  LabelList,
+  type LabelProps,
 } from "recharts";
 import { ChartTooltip, type SerieTooltip } from "./chart-tooltip";
 import { useHideTooltipOnTouch } from "./use-hide-tooltip-on-touch";
 import { mesAnioCorto } from "@/lib/mes-etiqueta";
-import { cn } from "@/lib/utils";
+import { cn, simboloMoneda } from "@/lib/utils";
 
 /** Una **serie secundaria** de `EvolutionChart` (comparación). */
 export interface SerieSecundaria {
@@ -47,6 +49,11 @@ interface EvolutionChartProps {
   area?: boolean;
   /** Código ISO para formatear el tooltip (default ARS). */
   currency?: string;
+  /**
+   * Muestra el valor de cada punto en una etiqueta compacta y oculta el tooltip.
+   * Está pensado para gráficos donde los valores deben quedar visibles.
+   */
+  mostrarValores?: boolean;
   /**
    * **Reemplaza TODO el encabezado del panel** (2026-10-01, `rediseno-ui`): el
    * rediseño deja dentro del panel solo su **selector de pestañas**, y el título,
@@ -174,6 +181,7 @@ export function EvolutionChart({
   badge,
   area = false,
   currency,
+  mostrarValores = false,
   encabezado,
   sinRecuadro = false,
   minimo = false,
@@ -243,6 +251,56 @@ export function EvolutionChart({
    */
   const mostrarPuntos = minimo && data.length <= 3;
 
+  const etiquetaResultado = ({ x, y, value }: LabelProps) => {
+    const xPunto = Number(x);
+    const yPunto = Number(y);
+    const monto = Number(value);
+    if (!Number.isFinite(xPunto) || !Number.isFinite(yPunto) || !Number.isFinite(monto)) {
+      return <g />;
+    }
+
+    const simbolo = simboloMoneda(currency ?? "ARS");
+    const sufijo = Math.abs(monto) >= 1_000_000
+      ? "M"
+      : Math.abs(monto) >= 1_000
+        ? "k"
+        : "";
+    const divisor = sufijo === "M" ? 1_000_000 : sufijo === "k" ? 1_000 : 1;
+    const cifra = new Intl.NumberFormat("es-AR", {
+      maximumFractionDigits: sufijo ? 1 : 0,
+    }).format(Math.abs(monto) / divisor);
+    const texto = `${monto < 0 ? "−" : ""}${simbolo}${cifra}${sufijo}`;
+    const ancho = Math.max(26, texto.length * 5 + 10);
+    const colorEtiqueta = monto < 0 ? "var(--danger)" : "var(--success)";
+    const yEtiqueta = yPunto - 28;
+
+    return (
+      <g className="pointer-events-none" aria-hidden="true">
+        <rect
+          x={xPunto - ancho / 2}
+          y={yEtiqueta}
+          width={ancho}
+          height={18}
+          rx={6}
+          fill={colorEtiqueta}
+          fillOpacity={0.12}
+          stroke={colorEtiqueta}
+          strokeOpacity={0.35}
+        />
+        <text
+          x={xPunto}
+          y={yEtiqueta + 12}
+          textAnchor="middle"
+          fontSize={9}
+          fontWeight={600}
+          fill={colorEtiqueta}
+        >
+          {texto}
+        </text>
+      </g>
+    );
+  };
+
   /** Series que hay que declarar en cada gráfico para que **compartan escala**. */
   const clavesDeSeries = ["value", ...(seriesSecundarias ?? []).map((s) => s.key)];
 
@@ -297,7 +355,9 @@ export function EvolutionChart({
       ) : (
         <YAxis hide />
       )}
-      <Tooltip content={<ChartTooltip currency={currency} series={series} />} />
+      {!mostrarValores && (
+        <Tooltip content={<ChartTooltip currency={currency} series={series} />} />
+      )}
       {/* Secundarias PRIMERO: en recharts el orden de los hijos es el orden de
           pintado ⇒ la principal (área o línea) queda por encima. Trazo fino y
           sin relleno: la jerarquía la marca el trazo, no el sombreado. */}
@@ -335,6 +395,11 @@ export function EvolutionChart({
             fill="url(#evolutionArea)"
             dot={mostrarPuntos ? { r: 2.5, fill: color } : false}
             activeDot={{ r: 4, fill: color }}
+            label={
+              mostrarValores ? (
+                <LabelList dataKey="value" content={etiquetaResultado} />
+              ) : false
+            }
           />
         </>
       ) : (
@@ -452,7 +517,10 @@ export function EvolutionChart({
           {/* ── Eje Y FIJO: sólo el eje, del ancho justo de sus rótulos ── */}
           <div className="shrink-0" style={{ width: ANCHO_EJE_Y }}>
             <ResponsiveContainer width="100%" height={height}>
-              <ComposedChart data={data}>
+              <ComposedChart
+                data={data}
+                margin={mostrarValores ? { top: 34 } : undefined}
+              >
                 {/* Reserva el MISMO alto de eje X que el gráfico que scrollea. */}
                 <XAxis
                   dataKey="name"
@@ -506,14 +574,24 @@ export function EvolutionChart({
               style={{ width: `${(data.length / MESES_VISIBLES) * 100}%` }}
             >
               <ResponsiveContainer width="100%" height={height}>
-                <ComposedChart data={data}>{cuerpo("oculto")}</ComposedChart>
+                <ComposedChart
+                  data={data}
+                  margin={mostrarValores ? { top: 34 } : undefined}
+                >
+                  {cuerpo("oculto")}
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           </div>
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={height}>
-          <ComposedChart data={data}>{cuerpo("visible")}</ComposedChart>
+          <ComposedChart
+            data={data}
+            margin={mostrarValores ? { top: 34 } : undefined}
+          >
+            {cuerpo("visible")}
+          </ComposedChart>
         </ResponsiveContainer>
       )}
     </div>
