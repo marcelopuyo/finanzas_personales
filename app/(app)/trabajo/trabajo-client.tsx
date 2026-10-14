@@ -34,8 +34,9 @@ import type { ItemEditable } from "./tipos";
  * lo que falta cobrar, **blanco** lo ya cobrado.
  *
  * Cada fila se **abre** (acordeón): en las pendientes se ven sus ítems con
- * **Editar / Eliminar** (no están congelados); en las cobradas, sus ítems en
- * **sólo lectura** (un ítem liquidado se corrige anulando el cobro y recobrando).
+ * **Editar / Eliminar mediante swipe** (no están congelados); en las cobradas,
+ * sus ítems en **sólo lectura** (un ítem liquidado se corrige anulando el cobro
+ * y recobrando).
  *
  * El ⋯ del encabezado **ya no existe** (decisión del usuario 2026-09-26): el
  * circuito (cobrar / cargar jornada / cargar tarea) vive en el **FAB ➕ con

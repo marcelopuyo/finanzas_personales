@@ -1,9 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, FileDown, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import { NavSpinner } from "@/components/ui/nav-progress";
+import {
+  SwipeRowActions,
+  type SwipeRowAction,
+} from "@/components/crud/SwipeRowActions";
 import type {
   ItemPendienteOut,
   LiquidacionOut,
@@ -100,8 +106,9 @@ function detalleItem(i: ItemPendienteOut): string {
  * El diseño de fila es el mismo en los dos casos (título + monto, subtítulo de
  * fechas, chevron) y **no es una tarjeta**: filas separadas por una línea dentro
  * de un único panel. Al abrir, la fila despliega sus ítems: en las pendientes
- * con **Editar / Eliminar** (no están congeladas), en las cobradas **sólo
- * lectura** (un ítem liquidado se corrige anulando el cobro y recobrando).
+ * con **Editar / Eliminar mediante swipe** (no están congeladas), en las
+ * cobradas **sólo lectura** (un ítem liquidado se corrige anulando el cobro y
+ * recobrando).
  *
  * - **Los pendientes van SIEMPRE ARRIBA** (pedido del usuario 2026-09-26),
  *   ordenados por la fecha de su ítem más reciente; debajo, las cobradas en el
@@ -309,6 +316,40 @@ export function PeriodosGrid({
     return () => obs.disconnect();
   }, [cargarMas, hayMas, pestana]);
 
+  const itemsPorSwipeId = new Map<string, ItemPendienteOut>();
+  for (const seccion of secciones) {
+    for (const item of [
+      ...(seccion.porCobrar?.items ?? []),
+      ...(seccion.enCurso?.items ?? []),
+      ...seccion.sinPeriodo,
+    ]) {
+      itemsPorSwipeId.set(`${item.tipo}:${item.id}`, item);
+    }
+  }
+  const accionesFila = (rowId: string): SwipeRowAction[] | null => {
+    const item = itemsPorSwipeId.get(rowId);
+    if (!item) return null;
+    const acciones: SwipeRowAction[] = [];
+    if (onEditar) {
+      acciones.push({
+        key: "edit",
+        label: "Editar",
+        icon: Pencil,
+        onClick: () => onEditar(item),
+      });
+    }
+    if (onEliminar) {
+      acciones.push({
+        key: "delete",
+        label: "Eliminar",
+        icon: Trash2,
+        tone: "danger",
+        onClick: () => onEliminar(item),
+      });
+    }
+    return acciones.length ? acciones : null;
+  };
+
   // ── Filas: PRIMERO los pendientes (**una por ventana** de cada trabajo),
   //    después las cobradas ──
   const filasPendientes: FilaPendiente[] = [];
@@ -437,45 +478,128 @@ export function PeriodosGrid({
       : pestana === "porCobrar"
         ? "No hay períodos por cobrar"
         : "No hay períodos en curso";
+  const exportarPeriodo = (fila: Fila) => {
+    try {
+      const doc = new jsPDF();
+      const propinas =
+        fila.tipo === "pendiente"
+          ? fila.lista.reduce((total, item) => total + item.montoPropina, 0)
+          : fila.liquidacion.jornadas.reduce(
+              (total, jornada) => total + (jornada.montoPropina ?? 0),
+              0
+            );
+      const estado =
+        fila.tipo === "cobrado"
+          ? "Cobrado"
+          : fila.fecha?.tipo === "enCurso"
+            ? "En curso"
+            : "Por cobrar";
+      const items =
+        fila.tipo === "pendiente"
+          ? fila.lista.map((item) => ({
+              fecha: item.fecha,
+              detalle: detalleItem(item),
+              monto: item.monto,
+              propina: item.montoPropina,
+            }))
+          : [
+              ...fila.liquidacion.jornadas.map((jornada) => ({
+                fecha: isoFecha(jornada.fechaJornada),
+                detalle: `${decimalToTime(jornada.horaDesde)} a ${decimalToTime(jornada.horaHasta)}`,
+                monto: jornada.montoJornada ?? 0,
+                propina: jornada.montoPropina ?? 0,
+              })),
+              ...fila.liquidacion.tareas.map((tarea) => ({
+                fecha: isoFecha(tarea.fechaTarea),
+                detalle: `${tarea.descripcion?.trim() || "Tarea"}${tarea.horasTarea ? ` · ${tarea.horasTarea} h` : ""}`,
+                monto: tarea.montoTarea ?? 0,
+                propina: 0,
+              })),
+            ].sort((a, b) => a.fecha.localeCompare(b.fecha));
+      const filasExport = items.length
+        ? items.map((item) => [
+            diaMes(item.fecha),
+            item.detalle,
+            numberToCurrency(item.monto, currency),
+            item.propina > 0 ? numberToCurrency(item.propina, currency) : "—",
+          ])
+        : [["—", "Sin jornadas ni tareas detalladas", "—", "—"]];
+
+      doc.setFontSize(16);
+      doc.text(fila.titulo, 14, 18);
+      doc.setFontSize(10);
+      const info = [
+        `Estado: ${estado}`,
+        `Período: ${fila.subtitulo}`,
+        `${fila.tipo === "cobrado" ? "Monto cobrado" : "Total"}: ${numberToCurrency(fila.monto, currency)}`,
+        `Propinas: ${numberToCurrency(propinas, currency)}`,
+      ];
+      if (fila.tipo === "cobrado" && fila.liquidacion.fechaDeCobro) {
+        info.push(`Fecha de cobro: ${diaMesLocal(fila.liquidacion.fechaDeCobro)}`);
+      }
+      doc.text(info, 14, 26);
+      autoTable(doc, {
+        startY: 30 + info.length * 5,
+        head: [["Fecha", "Detalle", "Importe", "Propina"]],
+        body: filasExport,
+        styles: { fontSize: 9, cellPadding: 2 },
+        headStyles: { fillColor: [76, 110, 245], textColor: 255 },
+        alternateRowStyles: { fillColor: [245, 247, 250] },
+        margin: { left: 14, right: 14 },
+      });
+      const nombreSeguro = fila.titulo
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      doc.save(`periodo-${nombreSeguro || "trabajo"}-${fila.key.replace(/[^a-z0-9-]/gi, "-")}.pdf`);
+    } catch (error) {
+      console.error("No se pudo exportar el período", error);
+      toast.error("No se pudo exportar el período");
+    }
+  };
 
   return (
     <>
-      <div className="rounded-2xl border border-border bg-card px-3">
-        <div className="flex justify-center border-b border-border py-2">
-          <Tabs
-            tabs={[
-              {
-                id: "enCurso",
-                label: `En curso${pestana === "enCurso" ? ` · ${numberToCurrency(enCurso.monto, currency)}` : ""}`,
-              },
-              {
-                id: "porCobrar",
-                label: `Por cobrar${pestana === "porCobrar" ? ` · ${numberToCurrency(porCobrar.monto, currency)}` : ""}`,
-              },
-              { id: "cobrados", label: "Cobrados" },
-            ]}
-            activeTab={pestana}
-            onTabChange={setPestana}
-          />
-        </div>
-        {filasVisibles.length === 0 ? (
-          <div className="flex min-h-24 items-center justify-center text-[13px] text-subtitle">
-            {etiquetaVacia}
+      <SwipeRowActions actionsFor={accionesFila}>
+        <div className="overflow-hidden rounded-2xl border border-border bg-card px-3">
+          <div className="flex justify-center border-b border-border py-2">
+            <Tabs
+              tabs={[
+                {
+                  id: "enCurso",
+                  label: `En curso${pestana === "enCurso" ? ` · ${numberToCurrency(enCurso.monto, currency)}` : ""}`,
+                },
+                {
+                  id: "porCobrar",
+                  label: `Por cobrar${pestana === "porCobrar" ? ` · ${numberToCurrency(porCobrar.monto, currency)}` : ""}`,
+                },
+                { id: "cobrados", label: "Cobrados" },
+              ]}
+              activeTab={pestana}
+              onTabChange={setPestana}
+            />
           </div>
-        ) : filasVisibles.map((f) => {
+          {filasVisibles.length === 0 ? (
+            <div className="flex min-h-24 items-center justify-center text-[13px] text-subtitle">
+              {etiquetaVacia}
+            </div>
+          ) : filasVisibles.map((f) => {
           const esPendiente = f.tipo === "pendiente";
           const isAbierta = esPendiente || abierta === f.key;
           return (
             <div key={f.key} className="border-b border-border last:border-b-0">
-              <button
-                type="button"
-                onClick={() => {
-                  if (!esPendiente) setAbierta(isAbierta ? null : f.key);
-                }}
-                disabled={esPendiente}
-                aria-expanded={isAbierta}
-                className="flex w-full items-start gap-2.5 py-2.5 text-left [-webkit-tap-highlight-color:transparent]"
-              >
+              <div className="flex items-start gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!esPendiente) setAbierta(isAbierta ? null : f.key);
+                  }}
+                  disabled={esPendiente}
+                  aria-expanded={isAbierta}
+                  className="flex min-w-0 flex-1 items-start gap-2.5 py-2.5 text-left [-webkit-tap-highlight-color:transparent]"
+                >
                 <span className="min-w-0 flex-1">
                   {/* Título + la **fecha estimada de cobro**: dice cuándo cierra
                       la ventana (ámbar) o cuándo cerró (verde). Reemplaza al
@@ -548,13 +672,27 @@ export function PeriodosGrid({
                     )}
                   />
                 )}
-              </button>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => exportarPeriodo(f)}
+                  aria-label={`Exportar período de ${f.titulo}`}
+                  title="Exportar período a PDF"
+                  className="mt-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-subtitle transition-colors hover:bg-muted hover:text-header"
+                >
+                  <FileDown className="h-4 w-4" />
+                </button>
+              </div>
 
               {isAbierta && (
                 <div className="pb-2.5 pl-3">
                   {f.tipo === "pendiente" ? (
                     f.lista.map((i) => (
-                      <div key={i.id} className="flex items-start gap-2 py-1.5">
+                      <div
+                        key={`${i.tipo}:${i.id}`}
+                        data-row-id={`${i.tipo}:${i.id}`}
+                        className="flex items-start gap-2 py-1.5"
+                      >
                         <p className="min-w-0 flex-1 text-[12px] leading-4 break-words text-card-foreground">
                           <span className="tabular-nums text-subtitle">
                             {diaMes(i.fecha)}
@@ -575,30 +713,6 @@ export function PeriodosGrid({
                         >
                           {numberToCurrency(i.monto || 0, currency)}
                         </span>
-                        <div className="flex shrink-0 items-center gap-0.5">
-                          {onEditar && (
-                            <button
-                              type="button"
-                              onClick={() => onEditar(i)}
-                              aria-label="Editar"
-                              title="Editar"
-                              className="rounded-lg p-1.5 text-subtitle transition-colors hover:bg-muted hover:text-header"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </button>
-                          )}
-                          {onEliminar && (
-                            <button
-                              type="button"
-                              onClick={() => onEliminar(i)}
-                              aria-label="Eliminar"
-                              title="Eliminar"
-                              className="rounded-lg p-1.5 text-subtitle transition-colors hover:bg-muted hover:text-danger"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          )}
-                        </div>
                       </div>
                     ))
                   ) : (
@@ -656,8 +770,9 @@ export function PeriodosGrid({
               )}
             </div>
           );
-        })}
-      </div>
+          })}
+        </div>
+      </SwipeRowActions>
 
       {/* Centinela del scroll infinito: al entrar en pantalla (con `PRELOAD_PX`
           de margen) se pide la tanda siguiente de cobradas. Con una lista de otro
