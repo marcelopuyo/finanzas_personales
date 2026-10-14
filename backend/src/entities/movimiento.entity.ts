@@ -48,9 +48,9 @@ export class Movimiento {
   @Column({ type: "uuid", nullable: true })
   grupoId?: string | null;
 
-  /** Motivo de la transferencia: uno de los 5 presets o el texto que escribió el
-   * usuario. `null` en el resto de los movimientos y en las filas anteriores a
-   * la migración (el historial cae entonces al nombre del concepto). */
+  /** Motivo de transferencia o ajuste de cuenta. `null` en el resto de los
+   * movimientos y en las filas anteriores a la migración (el historial cae
+   * entonces al nombre del concepto). */
   @Column({ type: "varchar", length: 60, nullable: true })
   motivo?: string | null;
 

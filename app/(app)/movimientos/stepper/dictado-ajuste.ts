@@ -67,6 +67,12 @@ export function crearDictadoAjuste({
         disparadores: ["fecha", "el dia"],
       },
       {
+        campo: "motivo",
+        tipo: "texto",
+        etiqueta: "Motivo",
+        disparadores: ["motivo"],
+      },
+      {
         campo: "cuentaOrigen",
         tipo: "opcion",
         etiqueta: "Cuenta",

@@ -37,6 +37,7 @@ import { useUltimoDictado } from "@/components/voz/dictado-pantalla";
 import { useVoz } from "@/components/voz/voz-provider";
 import { correccionesDeDictado } from "@/lib/voz/vocabulario";
 import { invalidarHistoriales } from "@/lib/historial-cuentas";
+import { motivoAjusteFinal } from "@/lib/motivos-ajuste";
 
 export function Confirmacion() {
   const { data, navigateTo, resetData, options, direct, volverA } =
@@ -140,6 +141,7 @@ export function Confirmacion() {
   } else if (concepto === "AjusteCuenta") {
     filas.push(
       { label: "Fecha", value: formatFecha(data.fecha) },
+      { label: "Motivo", value: motivoAjusteFinal(data.motivo) },
       { label: "Cuenta", value: cuentaNombre(data.cuentaOrigen) },
       {
         label: "Monto",
@@ -260,6 +262,7 @@ export function Confirmacion() {
             fecha: data.fecha,
             monto: data.montoOrigen,
             idCuenta: data.cuentaOrigen,
+            motivo: data.motivo,
           });
           break;
         case "PagoGasto":

@@ -7,11 +7,17 @@ import {
   HeroeFintech,
   BotonPrincipal,
   DateField,
+  Campo,
   SelectField,
   NumberField,
+  inputCls,
 } from "./ui";
 import { STEP_CONFIRMACION, type MovimientoData } from "./types";
 import { numberToCurrency, simboloMoneda } from "@/lib/utils";
+import {
+  motivoAjusteFinal,
+  MOTIVO_AJUSTE_TEXTO_MAX,
+} from "@/lib/motivos-ajuste";
 import { crearDictadoAjuste } from "./dictado-ajuste";
 import { aplicarDictadoSimple, escribirEnPantalla } from "./dictado-comun";
 import { useAliasDeCampo } from "@/components/voz/voz-provider";
@@ -24,7 +30,9 @@ import {
 export function AjusteCuenta() {
   const { data, handleSetData, navigateTo, options } = useMovimientoStepper();
 
-  const isValid = data.cuentaOrigen > 0 && data.montoOrigen !== 0;
+  const isValid =
+    data.cuentaOrigen > 0 &&
+    data.montoOrigen !== 0;
 
   // Cuenta seleccionada y su moneda: el monto del ajuste se aplica DIRECTAMENTE
   // al saldo de esa cuenta (backend: `cuenta.saldo += data.monto`), así que el
@@ -128,6 +136,20 @@ export function AjusteCuenta() {
           value={data.fecha}
           onChange={(v) => handleSetData({ fecha: v })}
         />
+
+        <Campo label="Motivo (opcional)">
+          <input
+            type="text"
+            value={data.motivo}
+            onChange={(e) => handleSetData({ motivo: e.target.value })}
+            maxLength={MOTIVO_AJUSTE_TEXTO_MAX}
+            placeholder="Ej. Corrección de saldo"
+            className={inputCls}
+          />
+          <p className="mt-1 text-[11px] text-subtitle">
+            Se guardará como “{motivoAjusteFinal(data.motivo)}”.
+          </p>
+        </Campo>
 
         <SelectField
           label="Cuenta"

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MOTIVO_AJUSTE_TEXTO_MAX } from "../../../lib/motivos-ajuste";
 
 // Reemplaza a class-validator. Reglas equivalentes a los DTOs del backend NestJS.
 
@@ -24,6 +25,15 @@ export const movimiento1Schema = z.object({
   idPeriodoTrabajo: z.number().optional(),
   idGasto: z.string().optional(),
   idPrestamo: z.string().optional(),
+});
+
+/** El motivo del ajuste es opcional; cuando falta, se guarda solo "Ajuste". */
+export const ajusteCuentaSchema = movimiento1Schema.extend({
+  motivo: z
+    .string()
+    .trim()
+    .max(MOTIVO_AJUSTE_TEXTO_MAX)
+    .optional(),
 });
 
 // Movimiento tipo 2 — Transferencia

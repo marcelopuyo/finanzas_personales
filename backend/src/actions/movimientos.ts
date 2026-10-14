@@ -26,8 +26,10 @@ import {
   modalidadAdmiteTareas,
 } from "../lib/jornadas";
 import { montoEnMonedaPredeterminada } from "../lib/cotizaciones";
+import { motivoAjusteFinal } from "../../../lib/motivos-ajuste";
 import { motivoTransferenciaFinal } from "../../../lib/motivos-transferencia";
 import {
+  ajusteCuentaSchema,
   cobrarTrabajoSchema,
   editarJornadaSchema,
   editarTareaSchema,
@@ -331,9 +333,9 @@ export async function pagarPrestamo(input: z.infer<typeof movimiento1Schema>) {
 // 3) AJUSTE CUENTA
 // 3) AJUSTE CUENTA
 // ============================================================
-export async function ajustarCuenta(input: z.infer<typeof movimiento1Schema>) {
+export async function ajustarCuenta(input: z.infer<typeof ajusteCuentaSchema>) {
   const userId = await requireUserId();
-  const data = movimiento1Schema.parse(input);
+  const data = ajusteCuentaSchema.parse(input);
 
   // Conversión a la moneda predeterminada del usuario (fuera del tx).
   const montoPredeterminada = await montoEnMonedaPredeterminada(
@@ -367,6 +369,7 @@ export async function ajustarCuenta(input: z.infer<typeof movimiento1Schema>) {
         fecha: data.fecha,
         monto: montoPredeterminada,
         montoCuentaMonedaOrigen: data.monto,
+        motivo: motivoAjusteFinal(data.motivo ?? ""),
         cuenta,
         concepto,
       })
