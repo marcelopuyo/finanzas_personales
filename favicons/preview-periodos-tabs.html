@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Preview · Totales en pestañas de períodos</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 24px; color: #e2e4f0; background: #111113; font: 14px/1.45 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      h1 { margin: 0 0 8px; color: white; font-size: 20px; }
+      .intro { max-width: 760px; margin: 0 0 22px; color: #a1a1aa; }
+      .previews { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr)); gap: 18px; align-items: start; }
+      .option { min-width: 0; }
+      .option h2 { margin: 0 0 4px; color: white; font-size: 14px; }
+      .option > p { min-height: 36px; margin: 0 0 9px; color: #929298; font-size: 12px; }
+      .panel { overflow: hidden; border: 1px solid #3e3f42; border-radius: 16px; background: #353638; }
+      .tabs { display: flex; justify-content: center; gap: 3px; padding: 8px 5px; border-bottom: 1px solid #4a4b4e; background: #29292b; }
+      .tab { min-width: 0; flex: none; border: 0; border-radius: 999px; padding: 6px 8px; color: #a1a1aa; background: transparent; font: inherit; font-size: 11px; cursor: pointer; }
+      .tab[aria-selected="true"] { color: #e2e4f0; background: #454548; box-shadow: 0 1px 2px #0007; }
+      .amount { color: #51cf66; font-variant-numeric: tabular-nums; font-weight: 650; white-space: nowrap; }
+      .amber .amount, .amber .row-amount { color: #fcc419; }
+      .rows { padding: 0 12px; }
+      .row { display: flex; align-items: flex-start; justify-content: space-between; gap: 9px; padding: 10px 2px; border-bottom: 1px solid #4a4b4e; }
+      .row:last-child { border-bottom: 0; }
+      .row-main { min-width: 0; flex: 1; }
+      .work { color: white; font-size: 13px; font-weight: 550; }
+      .date { margin-top: 2px; color: #9b9ba1; font-size: 11px; }
+      .detail { margin-top: 5px; color: #c4c4c9; font-size: 11px; }
+      .row-amount { color: #51cf66; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+      @media (max-width: 480px) { body { padding: 16px; } .option > p { min-height: 0; } }
+    </style>
+  </head>
+  <body>
+    <h1>El total forma parte de la pestaña</h1>
+    <p class="intro">Elige una pestaña para ver cómo su propio rótulo muestra el total; no hay una tarjeta o resumen aparte. En “Cobrados” se conserva solo el nombre. Las tres vistas son alternativas de formato para el mismo comportamiento.</p>
+    <main class="previews">
+      <section class="option" data-style="hyphen">
+        <h2>Opción A · Nombre - monto</h2>
+        <p>La variante solicitada: el monto sigue al nombre en la misma línea.</p>
+        <div class="panel"><nav class="tabs" aria-label="Períodos"></nav><div class="rows"></div></div>
+      </section>
+      <section class="option" data-style="dot">
+        <h2>Opción B · Nombre · monto</h2>
+        <p>El separador en punto distingue visualmente el importe sin añadir otra línea.</p>
+        <div class="panel"><nav class="tabs" aria-label="Períodos"></nav><div class="rows"></div></div>
+      </section>
+      <section class="option" data-style="stack">
+        <h2>Opción C · Monto debajo del nombre</h2>
+        <p>La pestaña activa crece en alto; permite un importe más largo en pantallas angostas.</p>
+        <div class="panel"><nav class="tabs" aria-label="Períodos"></nav><div class="rows"></div></div>
+      </section>
+    </main>
+    <script>
+      const data = {
+        enCurso: {
+          name: "En curso", amount: "$ 1.240,00", tone: "amber",
+          rows: [["Duffys Bar", "3 jornadas · 10-10 → 13-10", "13-10 · 09:00 a 17:00", "$ 420,00"], ["Diseño Norte", "1 jornada · 12-10", "12-10 · 10:00 a 16:00", "$ 820,00"]],
+        },
+        porCobrar: {
+          name: "Por cobrar", amount: "$ 860,00", tone: "",
+          rows: [["Duffys Bar", "2 jornadas · 03-10 → 07-10", "07-10 · 09:00 a 17:00", "$ 430,00"], ["Taller Sur", "1 tarea · 08-10", "08-10 · Instalación", "$ 430,00"]],
+        },
+        cobrados: {
+          name: "Cobrados", amount: "", tone: "",
+          rows: [["Duffys Bar", "Período 20-09 → 30-09 · cobrado 08-10", "2 jornadas · Solo lectura", "$ 1.800,00"], ["Diseño Norte", "Período 15-09 → 25-09 · cobrado 04-10", "1 jornada · Solo lectura", "$ 1.660,00"]],
+        },
+      };
+      const tabsData = [["enCurso", "En curso"], ["porCobrar", "Por cobrar"], ["cobrados", "Cobrados"]];
+      for (const preview of document.querySelectorAll(".option")) {
+        const tabs = preview.querySelector(".tabs");
+        const rows = preview.querySelector(".rows");
+        function render(active) {
+          const selected = data[active];
+          preview.classList.toggle("amber", active === "enCurso");
+          tabs.innerHTML = tabsData.map(([id, title]) => {
+            const amount = id === active ? data[id].amount : "";
+            const style = preview.dataset.style;
+            const label = amount
+              ? style === "stack"
+                ? `${title}<br><span class="amount">${amount}</span>`
+                : `${title} ${style === "dot" ? "·" : "-"} ${amount}`
+              : title;
+            return `<button class="tab" type="button" data-id="${id}" aria-selected="${id === active}">${label}</button>`;
+          }).join("");
+          rows.innerHTML = selected.rows.map(([work, date, detail, amount]) =>
+            `<article class="row"><div class="row-main"><div class="work">${work}</div><div class="date">${date}</div><div class="detail">${detail}</div></div><span class="row-amount">${amount}</span></article>`
+          ).join("");
+        }
+        tabs.addEventListener("click", (event) => {
+          const button = event.target.closest("button[data-id]");
+          if (button) render(button.dataset.id);
+        });
+        render("enCurso");
+      }
+    </script>
+  </body>
+</html>

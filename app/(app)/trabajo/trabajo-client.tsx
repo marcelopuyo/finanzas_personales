@@ -15,7 +15,6 @@ import type {
   LiquidacionOut,
 } from "@/backend/src/queries/trabajos";
 import { dateTimeToString, numberToCurrency } from "@/lib/utils";
-import { etiquetaCantidadItems } from "@/lib/trabajo-texto";
 import { SIN_TRABAJO } from "@/lib/filtros-dashboard";
 import { useVentanasCobro } from "./components/use-ventanas-cobro";
 import { obtenerItemEditable } from "./actions";
@@ -160,63 +159,6 @@ export function TrabajoClient({
     }
   };
 
-  /**
-   * **Resumen de las tandas**: una línea por ventana estimada, con su **monto** y
-   * su **cantidad de ítems**.
-   *
-   * 🔑 2026-10-04 (pedido del usuario): "Por cobrar" (ventana ya cerrada ⇒
-   * cobrable ahora) y "En curso" (ventana en curso o futura ⇒ todavía no). Se
-   * **sacaron** el total "Pendiente" y la cantidad de cobrados (los cobrados ya
-   * tienen su propio listado) y **no** se muestran los ítems **sin período
-   * estimado** (`sinPeriodo`): si no se puede estimar, no hay sección. Cada línea
-   * pinta su monto con el color de su sección —verde lo cobrable, ámbar lo que
-   * falta (§211), mismo criterio que las filas y el panel "Trabajo"— y **solo
-   * aparece si tiene ítems**.
-   *
-   * 🔑 Desde el 2026-10-03 viaja **dentro del panel** de la grilla en el modo
-   * embebido (antes flotaba sobre el fondo, junto al título "Trabajo").
-   */
-  const resumenTandas = (
-    <div className="flex flex-col gap-1 text-[12.5px] text-subtitle">
-      {porCobrar.items > 0 && (
-        <div>
-          Por cobrar{" "}
-          <span className="tabular-nums text-success">
-            {numberToCurrency(porCobrar.monto, monedaISO)}
-          </span>
-          {" · "}
-          {etiquetaCantidadItems(porCobrar.items)}
-        </div>
-      )}
-      {enCurso.items > 0 && (
-        <div>
-          En curso{" "}
-          <span className="tabular-nums text-warning">
-            {numberToCurrency(enCurso.monto, monedaISO)}
-          </span>
-          {" · "}
-          {etiquetaCantidadItems(enCurso.items)}
-        </div>
-      )}
-    </div>
-  );
-
-  /** ¿Hay algo que resumir? (ítems fuera de toda ventana ⇒ no hay líneas). */
-  const hayResumen = porCobrar.items > 0 || enCurso.items > 0;
-
-  /**
-   * **Encabezado de la sección de trabajo** para el modo **embebido** (Ingresos):
-   * solo el **resumen de tandas**, **dentro del panel** de la grilla (2026-10-03).
-   *
-   * ⚠️ **Sin título y sin ⋯** (pedido del usuario, mismo día): el título "Trabajo" se
-   * eliminó y el **⋯ pasó al mini-panel superior** de la pantalla (junto a los
-   * Filtros y al monto del mes). Sin líneas de resumen no se pinta el encabezado
-   * (quedaría una franja vacía con su borde).
-   */
-  const encabezadoSeccion = hayResumen ? (
-    <div className="border-b border-border pb-2.5 pt-2.5">{resumenTandas}</div>
-  ) : undefined;
-
   return (
     <div className={embebido ? undefined : "mx-auto max-w-5xl pb-24 pt-4 lg:pt-0"}>
       {!embebido && (
@@ -240,8 +182,6 @@ export function TrabajoClient({
         </>
       )}
 
-      {!embebido && hayResumen && resumenTandas}
-
       {/* En Ingresos se mantienen visibles las pestañas aunque no haya datos,
           para que cada estado tenga su propio estado vacío. */}
       {pendientesFiltrados.length === 0 &&
@@ -258,9 +198,10 @@ export function TrabajoClient({
           cobradosIniciales={cobradosIniciales}
           hayMasCobrados={hayMasCobrados}
           currency={monedaISO}
+          enCurso={enCurso}
+          porCobrar={porCobrar}
           onEditar={(i) => void abrirEdicion(i)}
           onEliminar={setAEliminar}
-          encabezado={embebido ? encabezadoSeccion : undefined}
           filtroTrabajos={filtroTrabajos}
           onTotalCobrados={setTotalCobradosFiltrado}
         />

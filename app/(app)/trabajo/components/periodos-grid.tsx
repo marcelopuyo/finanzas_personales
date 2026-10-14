@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { NavSpinner } from "@/components/ui/nav-progress";
@@ -175,9 +175,10 @@ export function PeriodosGrid({
   cobradosIniciales,
   hayMasCobrados,
   currency,
+  enCurso,
+  porCobrar,
   onEditar,
   onEliminar,
-  encabezado,
   filtroTrabajos,
   onTotalCobrados,
 }: {
@@ -202,12 +203,10 @@ export function PeriodosGrid({
   onEditar?: (item: ItemPendienteOut) => void;
   /** Pide confirmación para eliminar un ítem pendiente. */
   onEliminar?: (item: ItemPendienteOut) => void;
-  /**
-   * **Encabezado de la sección**, pintado **dentro** de este panel (2026-10-03):
-   * lleva el título + el ⋯ y el resumen de tandas. Antes iban **fuera** del
-   * recuadro, con el título flotando sobre el fondo.
-   */
-  encabezado?: ReactNode;
+  /** Resumen de los ítems de la ventana en curso. */
+  enCurso: { monto: number; items: number };
+  /** Resumen de los ítems cuya ventana ya cerró. */
+  porCobrar: { monto: number; items: number };
   /**
    * **Filtro por trabajo** (2026-10-03): el listado respeta el mismo filtro que el
    * gráfico del panel de Ingresos (**sin** las fechas). Los **pendientes** ya
@@ -442,12 +441,17 @@ export function PeriodosGrid({
   return (
     <>
       <div className="rounded-2xl border border-border bg-card px-3">
-        {encabezado}
         <div className="flex justify-center border-b border-border py-2">
           <Tabs
             tabs={[
-              { id: "enCurso", label: "En curso" },
-              { id: "porCobrar", label: "Por cobrar" },
+              {
+                id: "enCurso",
+                label: `En curso${pestana === "enCurso" ? ` · ${numberToCurrency(enCurso.monto, currency)}` : ""}`,
+              },
+              {
+                id: "porCobrar",
+                label: `Por cobrar${pestana === "porCobrar" ? ` · ${numberToCurrency(porCobrar.monto, currency)}` : ""}`,
+              },
               { id: "cobrados", label: "Cobrados" },
             ]}
             activeTab={pestana}
