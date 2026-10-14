@@ -27,10 +27,10 @@ import type { ItemEditable } from "./tipos";
  * Pantalla **"Períodos de trabajo"** (`/trabajo`) — destino del panel "Trabajo"
  * del dashboard.
  *
- * **Una sola grilla** (decisión del usuario 2026-09-26): las dos cosas que sabe
- * hacer la pantalla conviven en la misma lista y con el **mismo diseño de fila**
- * (sin tarjetas) — un **trabajo con jornadas/tareas pendientes** y una
- * **liquidación ya cobrada** —, ordenadas por la fecha más reciente de cada fila.
+ * Los períodos pendientes y las liquidaciones cobradas comparten el **mismo
+ * diseño de fila** (sin tarjetas) y se separan en pestañas al mostrarse embebidos
+ * en Ingresos: **En curso**, **Por cobrar** y **Cobrados**. Dentro de cada pestaña
+ * se ordenan por la fecha más reciente.
  * Lo único que las distingue estéticamente es el **color del monto**: **verde**
  * lo que falta cobrar, **blanco** lo ya cobrado.
  *
@@ -242,14 +242,13 @@ export function TrabajoClient({
 
       {!embebido && hayResumen && resumenTandas}
 
-      {/* UNA sola grilla: primero los pendientes (monto verde) y después las
-          cobradas (monto blanco), con el mismo diseño de fila y scroll
-          infinito para lo cobrado. En el modo **embebido** el encabezado de la
-          sección (título + ⋯ + resumen) viaja DENTRO de este panel. */}
+      {/* En Ingresos se mantienen visibles las pestañas aunque no haya datos,
+          para que cada estado tenga su propio estado vacío. */}
       {pendientesFiltrados.length === 0 &&
       (filtroTrabajos?.length
         ? totalCobradosFiltrado === 0
-        : totalCobrados === 0) ? (
+        : totalCobrados === 0) &&
+      !embebido ? (
         <div className="flex h-32 items-center justify-center rounded-lg border border-border bg-card text-[13px] text-subtitle">
           Sin datos disponibles
         </div>

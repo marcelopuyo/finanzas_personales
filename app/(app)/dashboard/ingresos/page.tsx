@@ -21,10 +21,10 @@ const PAGE = 20;
  * 2. **Panel de gráficos** con su selector (Resumen · Histórico) y, dentro, el
  *    **resumen de las tandas** (por cobrar · en curso · sin período, con montos y
  *    cantidades).
- * 3. **Listado unificado debajo**: la grilla de `TrabajoClient` **embebida**
- *    —pendientes por trabajo (que se despliegan ítem por ítem, con edición y
- *    borrado) **y** las liquidaciones cobradas con scroll infinito— más el FAB ➕
- *    de acciones del circuito.
+ * 3. **Listado debajo**: la grilla de `TrabajoClient` **embebida**, separada en
+ *    pestañas **En curso · Por cobrar · Cobrados**. Los pendientes se despliegan
+ *    ítem por ítem (con edición y borrado); los cobrados mantienen su scroll
+ *    infinito. También incluye el FAB ➕ de acciones del circuito.
  *
  * `/trabajo` deja de ser una pantalla propia y **redirige** acá.
  */

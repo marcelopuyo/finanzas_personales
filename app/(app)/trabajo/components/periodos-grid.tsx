@@ -12,6 +12,7 @@ import { cn, decimalToTime, numberToCurrency } from "@/lib/utils";
 import type { RepartoPendientes } from "@/lib/cobros-estimados";
 import { SIN_TRABAJO } from "@/lib/filtros-dashboard";
 import { etiquetaConteoItems } from "@/lib/trabajo-texto";
+import { Tabs } from "@/components/ui/tabs";
 import { getLiquidacionesCobradasPaginaAction } from "../actions";
 
 /** Filas por tanda del scroll infinito (el backend acota el valor a 1..100). */
@@ -219,6 +220,7 @@ export function PeriodosGrid({
 }) {
   // Fila abierta (por `key`): el desglose se muestra de a una.
   const [abierta, setAbierta] = useState<string | null>(null);
+  const [pestana, setPestana] = useState("enCurso");
   // ⚠️ La primera tanda de cobradas es SOLO la semilla: a partir del montaje la
   // lista la maneja el cliente (tandas acumuladas con el scroll). No se
   // sincroniza con cambios posteriores de la prop a propósito: si no, cada
@@ -295,6 +297,7 @@ export function PeriodosGrid({
   // El observer se rearma al terminar cada tanda (cambia `cargarMas`), así que si
   // el centinela sigue a la vista encadena la próxima tanda.
   useEffect(() => {
+    if (pestana !== "cobrados") return;
     const el = centinelaRef.current;
     if (!el || !hayMas) return;
     const obs = new IntersectionObserver(
@@ -305,7 +308,7 @@ export function PeriodosGrid({
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [cargarMas, hayMas]);
+  }, [cargarMas, hayMas, pestana]);
 
   // ── Filas: PRIMERO los pendientes (**una por ventana** de cada trabajo),
   //    después las cobradas ──
@@ -420,18 +423,52 @@ export function PeriodosGrid({
       };
     }),
   ];
+  const filasVisibles = filas.filter((f) => {
+    if (pestana === "cobrados") return f.tipo === "cobrado";
+    if (pestana === "porCobrar") {
+      // Los pendientes sin período estimado conservan la categoría cobrable,
+      // igual que su color verde en la grilla original.
+      return f.tipo === "pendiente" && !esEnCurso(f);
+    }
+    return esEnCurso(f);
+  });
+  const etiquetaVacia =
+    pestana === "cobrados"
+      ? "No hay períodos cobrados"
+      : pestana === "porCobrar"
+        ? "No hay períodos por cobrar"
+        : "No hay períodos en curso";
 
   return (
     <>
       <div className="rounded-2xl border border-border bg-card px-3">
         {encabezado}
-        {filas.map((f) => {
-          const isAbierta = abierta === f.key;
+        <div className="flex justify-center border-b border-border py-2">
+          <Tabs
+            tabs={[
+              { id: "enCurso", label: "En curso" },
+              { id: "porCobrar", label: "Por cobrar" },
+              { id: "cobrados", label: "Cobrados" },
+            ]}
+            activeTab={pestana}
+            onTabChange={setPestana}
+          />
+        </div>
+        {filasVisibles.length === 0 ? (
+          <div className="flex min-h-24 items-center justify-center text-[13px] text-subtitle">
+            {etiquetaVacia}
+          </div>
+        ) : filasVisibles.map((f) => {
+          const esPendiente = f.tipo === "pendiente";
+          const isAbierta = esPendiente || abierta === f.key;
           return (
             <div key={f.key} className="border-b border-border last:border-b-0">
               <button
                 type="button"
-                onClick={() => setAbierta(isAbierta ? null : f.key)}
+                onClick={() => {
+                  if (!esPendiente) setAbierta(isAbierta ? null : f.key);
+                }}
+                disabled={esPendiente}
                 aria-expanded={isAbierta}
                 className="flex w-full items-start gap-2.5 py-2.5 text-left [-webkit-tap-highlight-color:transparent]"
               >
@@ -499,12 +536,14 @@ export function PeriodosGrid({
                     {numberToCurrency(f.monto, currency)}
                   </span>
                 </span>
-                <ChevronDown
-                  className={cn(
-                    "mt-0.5 h-4 w-4 shrink-0 text-subtitle transition-transform",
-                    isAbierta && "rotate-180"
-                  )}
-                />
+                {!esPendiente && (
+                  <ChevronDown
+                    className={cn(
+                      "mt-0.5 h-4 w-4 shrink-0 text-subtitle transition-transform",
+                      isAbierta && "rotate-180"
+                    )}
+                  />
+                )}
               </button>
 
               {isAbierta && (
@@ -619,8 +658,10 @@ export function PeriodosGrid({
       {/* Centinela del scroll infinito: al entrar en pantalla (con `PRELOAD_PX`
           de margen) se pide la tanda siguiente de cobradas. Con una lista de otro
           filtro (`listaVieja`) no se pagina: se espera la recarga con el nuevo. */}
-      <div ref={centinelaRef} aria-hidden="true" className="h-px" />
-      {hayMas && cargando && !listaVieja && (
+      {pestana === "cobrados" && (
+        <div ref={centinelaRef} aria-hidden="true" className="h-px" />
+      )}
+      {pestana === "cobrados" && hayMas && cargando && !listaVieja && (
         <div className="flex justify-center py-3">
           <p className="flex items-center gap-2 text-[12px] text-subtitle">
             <NavSpinner className="text-primary" />
@@ -628,7 +669,7 @@ export function PeriodosGrid({
           </p>
         </div>
       )}
-      {hayMas && !cargando && !listaVieja && (
+      {pestana === "cobrados" && hayMas && !cargando && !listaVieja && (
         <div className="flex justify-center py-3">
           {/* Respaldo para teclado / pantallas donde el centinela ya está
               visible sin scrollear. */}
