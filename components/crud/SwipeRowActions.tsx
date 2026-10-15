@@ -388,9 +388,9 @@ export function SwipeRowActions({
     // en 2 (etiqueta más larga que `ITEM_MAX_W`), la franja crece para no
     // recortarla.
     const h = stripHeight(strip, menu.rowH, menu.compact);
-    const extra = (h - menu.rowH) / 2;
-    strip.style.top = `${menu.rowTop - extra}px`;
+    strip.style.top = `${menu.rowTop + menu.rowH / 2}px`;
     strip.style.height = `${h}px`;
+    strip.style.transform = "translateY(-50%)";
   }, [menu, paintStrip]);
 
   /** Empieza un gesto sobre `target` (touch o mouse). */
@@ -565,10 +565,12 @@ export function SwipeRowActions({
           // Alto REAL del contenido (la etiqueta puede estar en 2 líneas).
           const compact = stripRef.current.dataset.compact === "true";
           const h = stripHeight(stripRef.current, rect.height, compact);
-          const extra = (h - rect.height) / 2;
           stripRef.current.style.top = `${
-            rect.top - (wrapRect.top + wrapper.clientTop) - extra
+            rect.top -
+            (wrapRect.top + wrapper.clientTop) +
+            rect.height / 2
           }px`;
+          stripRef.current.style.transform = "translateY(-50%)";
           stripRef.current.style.height = `${h}px`;
           stripRef.current.style.right = `${Math.max(
             0,
@@ -771,9 +773,10 @@ export function SwipeRowActions({
           style={{
             // Estimación: el alto definitivo lo fija el `useLayoutEffect`
             // midiendo el contenido (etiquetas de 2 líneas).
-            top: menu.rowTop - stripExtra(menu.rowH, menu.compact),
+            top: menu.rowTop + menu.rowH / 2,
             height: menu.rowH + stripExtra(menu.rowH, menu.compact) * 2,
             right: menu.right,
+            transform: "translateY(-50%)",
           }}
           data-compact={menu.compact}
           // SIN fondo: la franja es transparente y solo se ven los círculos con
