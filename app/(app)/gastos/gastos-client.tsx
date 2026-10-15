@@ -383,7 +383,13 @@ export function GastosClient({
         <>
           {/* ── MOBILE (<sm): filas multilínea + swipe + scroll infinito ── */}
           <div className="sm:hidden">
-            <SwipeRowActions actionsFor={accionesFila}>
+            <SwipeRowActions
+              actionsFor={accionesFila}
+              onRowTap={(rowId) => {
+                const gasto = rows.find((row) => row.id === rowId);
+                if (gasto) setDetalle(gasto);
+              }}
+            >
               {/* `overflow-hidden` recorta la fila cuando se corre para revelar
                   las acciones. */}
               <div className="overflow-hidden rounded-lg border border-border bg-card">
