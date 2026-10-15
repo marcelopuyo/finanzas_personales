@@ -67,7 +67,7 @@ export function TrabajosActionsMenu() {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-20 mt-1 w-52 overflow-hidden rounded-lg border border-border bg-card shadow-lg"
+          className="absolute right-0 top-full z-20 mt-1 w-52 overflow-hidden rounded-lg border border-border bg-background shadow-lg"
         >
           <Link
             // `origen=ingresos`: la flecha "volver" del CRUD regresa a ESTA

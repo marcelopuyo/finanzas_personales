@@ -55,7 +55,7 @@ export function CuentasActionsMenu() {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-20 mt-1 w-52 overflow-hidden rounded-lg border border-border bg-card shadow-lg"
+          className="absolute right-0 top-full z-20 mt-1 w-52 overflow-hidden rounded-lg border border-border bg-background shadow-lg"
         >
           {/* El ítem es un `<Link>` (2026-09-17): Next prefetchea el CRUD apenas
               se abre el menú, así el toque entra casi al instante. */}

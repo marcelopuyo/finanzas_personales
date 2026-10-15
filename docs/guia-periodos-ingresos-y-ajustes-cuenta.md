@@ -1,0 +1,80 @@
+# Períodos de ingresos y ajustes de cuenta
+
+Guía funcional de las pestañas de períodos en Ingresos y del motivo de los
+ajustes manuales de cuenta.
+
+## Períodos dentro de Ingresos
+
+La pantalla `/dashboard/ingresos` presenta el listado de períodos en tres
+pestañas:
+
+- **En curso**: períodos estimados cuya ventana de cobro continúa abierta. El
+  total de sus ítems pendientes aparece en el propio rótulo de la pestaña
+  seleccionada, por ejemplo `En curso · $ 1.240,00`.
+- **Por cobrar**: períodos estimados cuya ventana ya cerró y períodos pendientes
+  sin una ventana estimada. El total aparece en el rótulo al seleccionar la
+  pestaña, por ejemplo `Por cobrar · $ 860,00`.
+- **Cobrados**: liquidaciones con cobro. El rótulo no añade un total.
+
+Las pestañas muestran únicamente las filas de su categoría y un mensaje vacío
+propio cuando no hay filas. El cambio de pestaña no modifica los datos ni el
+estado de cobro.
+
+### Detalle y acciones de las filas
+
+Los períodos **En curso** y **Por cobrar** muestran sus jornadas y tareas
+desplegadas directamente debajo del período. No tienen un control para
+colapsarlas. Las acciones de **Editar** y **Eliminar** están disponibles al
+deslizar horizontalmente desde cualquier parte de una fila de jornada o tarea.
+Los botones de swipe usan un formato compacto y quedan centrados verticalmente
+respecto de la fila; eliminar conserva el diálogo de confirmación existente.
+
+Los períodos **Cobrados** conservan el acordeón: al abrir una fila se ve el
+detalle de la liquidación en modo de solo lectura. Para corregir un ítem cobrado
+se debe anular el cobro y volver a cobrarlo. El listado de cobrados utiliza
+paginación incremental (scroll infinito y botón **Cargar más** cuando aplica).
+
+### Exportar un período
+
+Cada fila de período tiene un botón para exportarla a PDF. El documento incluye:
+
+- nombre del trabajo y estado del período;
+- rango de fechas y monto total;
+- fecha de cobro, si se trata de una liquidación cobrada con fecha disponible;
+- detalle de jornadas y tareas, con fecha, descripción, importe y propina.
+
+Si una liquidación no tiene jornadas ni tareas detalladas, el PDF lo indica y
+mantiene el rango y el monto declarados. La descarga se genera en el navegador.
+
+## Motivo del ajuste de cuenta
+
+En el flujo **Ajuste de cuenta**, el campo **Motivo** es opcional. El monto y la
+cuenta siguen siendo necesarios para continuar.
+
+El motivo persistido en `movimiento.motivo` sigue estas reglas:
+
+| Texto ingresado | Texto guardado y mostrado |
+| --- | --- |
+| `Corrección de saldo` | `Ajuste - Corrección de saldo` |
+| `Ajuste - Corrección de saldo` | `Ajuste - Corrección de saldo` |
+| vacío u omitido | `Ajuste` |
+
+La normalización se aplica en la acción de servidor, es idempotente y limita el
+texto para que el motivo completo no exceda los 60 caracteres de la columna
+`movimiento.motivo`. La pantalla muestra una vista previa del texto final y la
+confirmación presenta ese mismo texto. El campo también está disponible en la
+configuración de dictado por voz.
+
+El motivo se comparte con el historial de movimientos de la cuenta, que ya lee
+`movimiento.motivo` como descripción antes de recurrir al concepto.
+
+## Referencias de implementación
+
+- Pestañas, filas, swipe y exportación: [`app/(app)/trabajo/components/periodos-grid.tsx`](../app/(app)/trabajo/components/periodos-grid.tsx)
+- Integración de períodos y cálculo de ventanas: [`app/(app)/trabajo/trabajo-client.tsx`](../app/(app)/trabajo/trabajo-client.tsx) y [`app/(app)/trabajo/components/use-ventanas-cobro.ts`](../app/(app)/trabajo/components/use-ventanas-cobro.ts)
+- Entrada del panel Ingresos: [`app/(app)/dashboard/ingresos/page.tsx`](../app/(app)/dashboard/ingresos/page.tsx)
+- Motivo y vista previa del ajuste: [`app/(app)/movimientos/stepper/ajuste-cuenta.tsx`](../app/(app)/movimientos/stepper/ajuste-cuenta.tsx)
+- Confirmación y guardado desde el wizard: [`app/(app)/movimientos/stepper/confirmacion.tsx`](../app/(app)/movimientos/stepper/confirmacion.tsx)
+- Validación y persistencia del ajuste: [`backend/src/validation/movimientos.ts`](../backend/src/validation/movimientos.ts) y [`backend/src/actions/movimientos.ts`](../backend/src/actions/movimientos.ts)
+- Normalización del motivo: [`lib/motivos-ajuste.ts`](../lib/motivos-ajuste.ts)
+- Gestos de swipe compartidos: [`components/crud/SwipeRowActions.tsx`](../components/crud/SwipeRowActions.tsx)

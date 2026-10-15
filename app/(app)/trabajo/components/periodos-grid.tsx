@@ -335,6 +335,7 @@ export function PeriodosGrid({
         key: "edit",
         label: "Editar",
         icon: Pencil,
+        size: "compact",
         onClick: () => onEditar(item),
       });
     }
@@ -344,6 +345,7 @@ export function PeriodosGrid({
         label: "Eliminar",
         icon: Trash2,
         tone: "danger",
+        size: "compact",
         onClick: () => onEliminar(item),
       });
     }
@@ -562,7 +564,7 @@ export function PeriodosGrid({
 
   return (
     <>
-      <SwipeRowActions actionsFor={accionesFila}>
+      <SwipeRowActions actionsFor={accionesFila} swipeFromAnywhere>
         <div className="overflow-hidden rounded-2xl border border-border bg-card px-3">
           <div className="flex justify-center border-b border-border py-2">
             <Tabs
