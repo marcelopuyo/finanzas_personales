@@ -747,6 +747,8 @@ export function DashboardClient({
           currency={data.monedaPredeterminadaISO}
           // 📜 Mismo scroll horizontal que el histórico de Gastos.
           scrollDesde={MESES_SCROLL}
+          anchoEjeY={44}
+          tamanoEjeY={10}
         />
       )}
       </div>

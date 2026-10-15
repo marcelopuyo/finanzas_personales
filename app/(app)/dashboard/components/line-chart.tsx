@@ -100,6 +100,10 @@ interface EvolutionChartProps {
    * el arrastre sigue reservado para navegar el historial.
    */
   scrollDesde?: number;
+  /** Ancho reservado al eje Y, útil para compactarlo en gráficos concretos. */
+  anchoEjeY?: number;
+  /** Tamaño de fuente de las etiquetas del eje Y. */
+  tamanoEjeY?: number;
 }
 
 /** Ancho del carril del **eje Y fijo** (los rótulos tipo `-250000` entran justos). */
@@ -184,6 +188,8 @@ export function EvolutionChart({
   seriesSecundarias,
   etiquetaPrincipal = "Total",
   scrollDesde,
+  anchoEjeY = ANCHO_EJE_Y,
+  tamanoEjeY = 12,
 }: EvolutionChartProps) {
   /** Wrapper: con `sinRecuadro` queda transparente (banda de Inicio). */
   const caja = sinRecuadro
@@ -295,7 +301,8 @@ export function EvolutionChart({
           // Con los ejes ocultos la serie toca los bordes: se le deja aire.
           padding={minimo ? { top: 12, bottom: 12 } : undefined}
           domain={dominio}
-          tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+          width={anchoEjeY - 6}
+          tick={{ fontSize: tamanoEjeY, fill: "var(--muted-foreground)" }}
           axisLine={false}
           tickLine={false}
         />
@@ -456,7 +463,7 @@ export function EvolutionChart({
       {conScroll ? (
         <div className="flex">
           {/* ── Eje Y FIJO: sólo el eje, del ancho justo de sus rótulos ── */}
-          <div className="shrink-0" style={{ width: ANCHO_EJE_Y }}>
+          <div className="shrink-0" style={{ width: anchoEjeY }}>
             <ResponsiveContainer width="100%" height={height}>
               <ComposedChart data={data}>
                 {/* Reserva el MISMO alto de eje X que el gráfico que scrollea. */}
@@ -468,8 +475,8 @@ export function EvolutionChart({
                   tickLine={false}
                 />
                 <YAxis
-                  width={ANCHO_EJE_Y - 6}
-                  tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                  width={anchoEjeY - 6}
+                  tick={{ fontSize: tamanoEjeY, fill: "var(--muted-foreground)" }}
                   axisLine={false}
                   tickLine={false}
                 />
