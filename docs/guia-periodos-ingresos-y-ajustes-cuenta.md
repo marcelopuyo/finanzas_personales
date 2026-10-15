@@ -23,8 +23,9 @@ estado de cobro.
 ### Detalle y acciones de las filas
 
 Los períodos **En curso** y **Por cobrar** muestran sus jornadas y tareas
-desplegadas directamente debajo del período. No tienen un control para
-colapsarlas. Las acciones de **Editar** y **Eliminar** están disponibles al
+desplegadas directamente debajo del período; cada período aparece en su propio
+subpanel para distinguirlo de los demás. No tienen un control para colapsarlas.
+Las acciones de **Editar** y **Eliminar** están disponibles al
 deslizar horizontalmente desde cualquier parte de una fila de jornada o tarea.
 Los botones de swipe usan un formato compacto y se muestran centrados en la
 altura de la fila; eliminar conserva el diálogo de confirmación existente.

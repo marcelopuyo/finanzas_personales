@@ -591,7 +591,14 @@ export function PeriodosGrid({
           const esPendiente = f.tipo === "pendiente";
           const isAbierta = esPendiente || abierta === f.key;
           return (
-            <div key={f.key} className="border-b border-border last:border-b-0">
+            <div
+              key={f.key}
+              className={
+                f.tipo === "pendiente"
+                  ? "mb-2 first:mt-2 rounded-xl border border-border bg-muted/40 px-2"
+                  : "border-b border-border last:border-b-0"
+              }
+            >
               <div className="flex items-start gap-1">
                 <button
                   type="button"
