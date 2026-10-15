@@ -611,7 +611,9 @@ export function PeriodosGrid({
                       "mt-0.5 block text-subtitle",
                       f.tipo === "pendiente" && f.fecha
                         ? "whitespace-nowrap text-[10px] leading-[15px]"
-                        : "text-[11px] leading-[15px]"
+                        : f.tipo === "cobrado"
+                          ? "whitespace-nowrap text-[10px] leading-[15px]"
+                          : "text-[11px] leading-[15px]"
                     )}
                   >
                     {f.subtitulo}

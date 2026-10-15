@@ -36,6 +36,8 @@ Los períodos **Cobrados** conservan el acordeón: al abrir una fila se ve el
 detalle de la liquidación en modo de solo lectura. Para corregir un ítem cobrado
 se debe anular el cobro y volver a cobrarlo. El listado de cobrados utiliza
 paginación incremental (scroll infinito y botón **Cargar más** cuando aplica).
+En cada fila, el rango de fechas y la fecha de cobro se muestran en una sola
+línea.
 
 ### Exportar un período
 
