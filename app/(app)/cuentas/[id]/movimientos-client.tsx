@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowLeft, Eye, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import { DataTable } from "@/components/ui/data-table";
@@ -61,8 +61,9 @@ const PRELOAD_PX = 240;
  * cronológico y la eliminación de un movimiento con confirmación— y **ninguna
  * acción sobre la cuenta**.
  *
- * - **Mobile (<640px)**: filas multilínea (`MovimientoRow`) con **swipe** para
- *   eliminar y **scroll infinito** (IntersectionObserver sobre un centinela).
+ * - **Mobile (<640px)**: filas multilínea (`MovimientoRow`), toque para ver
+ *   detalles, swipe para eliminar y **scroll infinito** (IntersectionObserver
+ *   sobre un centinela).
  * - **Desde 640px**: la tabla de siempre (`DataTable`), con un botón "Cargar más"
  *   cuando quedan movimientos.
  * - Las siguientes tandas se piden con una Server Action
@@ -209,17 +210,11 @@ export function MovimientosCuentaClient({
     }
   };
 
-  /** Acciones del swipe de una fila mobile: solo Eliminar, como el resto de la app. */
+  /** Acción del swipe de una fila mobile: solo Eliminar, como en gastos. */
   const accionesFila = (rowId: string): SwipeRowAction[] | null => {
     const mov = rows.find((m) => m.id === rowId);
     if (!mov) return null;
     return [
-      {
-        key: "details",
-        label: "Detalles",
-        icon: Eye,
-        onClick: () => setDetalleMovimiento(mov),
-      },
       {
         key: "delete",
         label: "Eliminar",
@@ -358,7 +353,14 @@ export function MovimientosCuentaClient({
         <>
           {/* ── MOBILE (<sm): filas multilínea + swipe + scroll infinito ── */}
           <div className="sm:hidden">
-            <SwipeRowActions actionsFor={accionesFila} swipeFromAnywhere>
+            <SwipeRowActions
+              actionsFor={accionesFila}
+              swipeFromAnywhere
+              onRowTap={(rowId) => {
+                const mov = rows.find((row) => row.id === rowId);
+                if (mov) setDetalleMovimiento(mov);
+              }}
+            >
               {/* `overflow-hidden` recorta la fila cuando se corre para
                   revelar las acciones. */}
               <div className="overflow-hidden rounded-lg border border-border bg-card">

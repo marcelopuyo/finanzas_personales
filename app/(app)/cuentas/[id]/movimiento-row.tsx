@@ -31,8 +31,8 @@ interface MovimientoRowProps {
  * de un vistazo entre filas y **nunca** se recortan. El que se recorta es el
  * motivo, así el alto de la fila no depende de lo largo del texto.
  *
- * La acción de la fila NO va en la fila (no hay columna de acciones): la revela
- * el swipe de la lista (`SwipeRowActions`), como en el resto de la app.
+ * Un toque simple abre el detalle; el swipe de la lista (`SwipeRowActions`)
+ * revela la acción para eliminar.
  */
 export function MovimientoRow({
   movimiento,
