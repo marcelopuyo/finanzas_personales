@@ -91,6 +91,8 @@ export function GastosClient({
   const [aplicada, setAplicada] = useState("");
   /** Gasto seleccionado para confirmar su eliminación. */
   const [pendiente, setPendiente] = useState<GastoOut | null>(null);
+  /** Gasto cuyos detalles se están mostrando. */
+  const [detalle, setDetalle] = useState<GastoOut | null>(null);
   const [eliminando, setEliminando] = useState(false);
   /** Centinela del scroll infinito (mobile). */
   const centinelaRef = useRef<HTMLDivElement | null>(null);
@@ -280,7 +282,10 @@ export function GastosClient({
         <div className="flex items-center justify-center">
           <button
             type="button"
-            onClick={() => setPendiente(row.original)}
+            onClick={(event) => {
+              event.stopPropagation();
+              setPendiente(row.original);
+            }}
             disabled={eliminando}
             className="rounded p-1 text-subtitle transition-colors hover:bg-muted hover:text-danger"
             aria-label="Eliminar gasto"
@@ -390,7 +395,12 @@ export function GastosClient({
                 )}
                 <ul>
                   {rows.map((g) => (
-                    <GastoRow key={g.id} gasto={g} monedaISO={monedaISO} />
+                    <GastoRow
+                      key={g.id}
+                      gasto={g}
+                      monedaISO={monedaISO}
+                      onSelect={setDetalle}
+                    />
                   ))}
                 </ul>
               </div>
@@ -411,7 +421,12 @@ export function GastosClient({
             <div className="rounded-lg border border-border bg-card p-4">
               {embebido && campoBusqueda}
               {embebido && contadorGastos}
-              <DataTable columns={columns} data={rows} pageSize={PAGE} />
+              <DataTable
+                columns={columns}
+                data={rows}
+                pageSize={PAGE}
+                onRowClick={setDetalle}
+              />
             </div>
             {hayMas && (
               <div className="mt-3 flex justify-center">
@@ -429,6 +444,77 @@ export function GastosClient({
           </div>
         </>
       )}
+
+      <Modal
+        open={detalle !== null}
+        onClose={() => setDetalle(null)}
+        title="Detalle del gasto"
+        className="sm:max-w-md"
+      >
+        {detalle && (
+          <div className="space-y-1.5 rounded-lg border border-border bg-muted p-3 text-[13px]">
+            <div className="flex justify-between gap-3">
+              <span className="shrink-0 text-subtitle">Descripción</span>
+              <span className="text-right font-medium text-card-foreground">
+                {detalle.descripcion || "Sin descripción"}
+              </span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="shrink-0 text-subtitle">Categoría</span>
+              <span className="text-right text-card-foreground">
+                {detalle.categoria?.nombre ?? "Sin categoría"}
+              </span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="shrink-0 text-subtitle">Cuenta</span>
+              <span className="text-right text-card-foreground">
+                {detalle.cuenta ?? "—"}
+              </span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="shrink-0 text-subtitle">Importe</span>
+              <span className="text-right text-card-foreground">
+                {numberToCurrency(Number(detalle.monto), monedaISO)}
+              </span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="shrink-0 text-subtitle">Pagado</span>
+              <span className="text-right text-card-foreground">
+                {numberToCurrency(
+                  Math.max(0, Number(detalle.monto) - Number(detalle.saldo)),
+                  monedaISO
+                )}
+              </span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="shrink-0 text-subtitle">Saldo pendiente</span>
+              <span className="text-right text-card-foreground">
+                {numberToCurrency(Number(detalle.saldo), monedaISO)}
+              </span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="shrink-0 text-subtitle">Fecha de pago</span>
+              <span className="text-right text-card-foreground">
+                {detalle.fechaPago ? dateTimeToString(detalle.fechaPago) : "—"}
+              </span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="shrink-0 text-subtitle">Vencimiento</span>
+              <span className="text-right text-card-foreground">
+                {detalle.fechaVencimiento
+                  ? dateTimeToString(detalle.fechaVencimiento)
+                  : "—"}
+              </span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="shrink-0 text-subtitle">Periodicidad</span>
+              <span className="text-right text-card-foreground">
+                {detalle.isPeriodico ? "Periódico" : "Único"}
+              </span>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Confirmación de eliminación (misma interacción que la pantalla de una
           cuenta al eliminar un movimiento). */}

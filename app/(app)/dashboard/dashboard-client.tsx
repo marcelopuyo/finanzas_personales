@@ -698,6 +698,9 @@ export function DashboardClient({
           // 📜 Con muchos meses el gráfico scrollea y el eje Y queda fijo
           // (2026-10-09): si no, en el celular los meses se comprimen.
           scrollDesde={MESES_SCROLL}
+          className="!pl-2"
+          anchoEjeY={36}
+          tamanoEjeY={10}
         />
       )}
       </div>
