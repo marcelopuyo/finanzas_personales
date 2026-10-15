@@ -126,8 +126,8 @@ function esActivo(href: string, ruta: string): boolean {
 export default function BottomNav() {
   const ruta = usePathname() ?? "";
   const router = useRouter();
-  // Prefetch al primer contacto (mismo patrón que el resto de la app): el tab se
-  // siente instantáneo cuando el resto viaja en `staleTimes: 30`.
+  // Prefetch adicional al primer contacto; los cuatro tabs principales también
+  // solicitan el payload completo en cuanto están visibles.
   const prefetch = usePrefetchNav();
   /** Popup del botón "Más" (no navega: es un disparador). */
   const [abierto, setAbierto] = useState(false);
@@ -174,6 +174,7 @@ export default function BottomNav() {
           <Link
             key={t.href}
             href={t.href}
+            prefetch
             aria-current={activo ? "page" : undefined}
             onPointerEnter={() => prefetch(t.href)}
             onTouchStartCapture={() => prefetch(t.href)}

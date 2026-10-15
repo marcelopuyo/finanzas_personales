@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Fingerprint, Loader2, Lock } from "lucide-react";
 import Logo from "@/components/layout/logo";
 import { clearAllCaches } from "@/lib/pwa";
+import { DASHBOARD_CACHE_REFRESH_EVENT } from "@/lib/dashboard-cache";
 import { servidorResponde } from "@/lib/net";
 import { leerGraciaMs } from "@/lib/app-lock-prefs";
 import { NO_REMEMBER, PENDING_CLEAR } from "@/lib/session-flags";
@@ -174,6 +175,7 @@ export function AppLock({ habilitado }: { habilitado: boolean }) {
         marcarSinServidor(false);
         ultimoExito.current = Date.now();
         soltar();
+        window.dispatchEvent(new Event(DASHBOARD_CACHE_REFRESH_EVENT));
       } finally {
         ceremonia.current = false;
         setCargando(false);

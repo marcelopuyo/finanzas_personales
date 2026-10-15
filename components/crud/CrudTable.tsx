@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { cn, dateTimeToString, numberToCurrency } from "@/lib/utils";
+import { solicitarActualizacionDashboard } from "@/lib/dashboard-cache";
 
 interface CrudTableProps<T, TId = number> {
   title: string;
@@ -298,6 +299,7 @@ export function CrudTable<T, TId = number>({
     setDeleting(true);
     try {
       await deleteItem(deleteId);
+      solicitarActualizacionDashboard();
       toast.success("Item eliminado correctamente");
       setDeleteId(null);
       setSelectedId(null);

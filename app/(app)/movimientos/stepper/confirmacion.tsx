@@ -37,6 +37,7 @@ import { useUltimoDictado } from "@/components/voz/dictado-pantalla";
 import { useVoz } from "@/components/voz/voz-provider";
 import { correccionesDeDictado } from "@/lib/voz/vocabulario";
 import { invalidarHistoriales } from "@/lib/historial-cuentas";
+import { solicitarActualizacionDashboard } from "@/lib/dashboard-cache";
 import { motivoAjusteFinal } from "@/lib/motivos-ajuste";
 
 export function Confirmacion() {
@@ -321,6 +322,7 @@ export function Confirmacion() {
         }
       }
       toast.success("Movimiento guardado correctamente");
+      solicitarActualizacionDashboard();
       // El movimiento pudo cambiar los saldos/movimientos de una o dos cuentas:
       // se descarta su 1ª página cacheada (la del carrusel de Inicio) para que se
       // vuelva a pedir. Sin esto, al volver a Inicio la caché quedaría vieja.

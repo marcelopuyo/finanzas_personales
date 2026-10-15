@@ -19,6 +19,7 @@ import type {
   HistorialPagina,
 } from "@/backend/src/queries/movimientos";
 import { invalidarHistoriales, guardarPrimeraPagina } from "@/lib/historial-cuentas";
+import { solicitarActualizacionDashboard } from "@/lib/dashboard-cache";
 import { cn, dateTimeToString, numberToCurrency } from "@/lib/utils";
 import { MovimientoRow } from "./movimiento-row";
 
@@ -198,6 +199,7 @@ export function MovimientosCuentaClient({
       // La cuenta cambió: se descarta su 1ª página cacheada (el `recargar` de
       // abajo la vuelve a dejar al día).
       invalidarHistoriales([cuenta.id]);
+      solicitarActualizacionDashboard();
       await recargar();
       // Los saldos de la cuenta cambiaron: refresca el server (dashboard).
       router.refresh();

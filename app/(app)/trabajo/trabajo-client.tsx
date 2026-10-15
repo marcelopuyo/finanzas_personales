@@ -17,6 +17,7 @@ import type {
 import { dateTimeToString, numberToCurrency } from "@/lib/utils";
 import { SIN_TRABAJO } from "@/lib/filtros-dashboard";
 import { useVentanasCobro } from "./components/use-ventanas-cobro";
+import { solicitarActualizacionDashboard } from "@/lib/dashboard-cache";
 import { obtenerItemEditable } from "./actions";
 import { ItemEditModal } from "./components/item-edit-modal";
 import { PeriodosGrid } from "./components/periodos-grid";
@@ -150,6 +151,7 @@ export function TrabajoClient({
       toast.success(
         aEliminar.tipo === "jornada" ? "Jornada eliminada" : "Tarea eliminada"
       );
+      solicitarActualizacionDashboard();
       setAEliminar(null);
     } catch (err) {
       toast.error(
@@ -220,7 +222,10 @@ export function TrabajoClient({
           item={itemEditando}
           cuentas={cuentas}
           onClose={() => setItemEditando(null)}
-          onSaved={() => setItemEditando(null)}
+          onSaved={() => {
+            setItemEditando(null);
+            solicitarActualizacionDashboard();
+          }}
         />
       )}
 

@@ -16,6 +16,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { solicitarActualizacionDashboard } from "@/lib/dashboard-cache";
 import { Check } from "lucide-react";
 import { cn, dateTimeToString, numberToCurrency, simboloMoneda } from "@/lib/utils";
 import { sufijoOrigen } from "@/lib/origen-crud";
@@ -174,6 +175,7 @@ export function TrabajoWizard({
         ...(porHora ? { precioHora: Number(estado.precioHora) } : {}),
         memos: estado.memos.trim() || undefined,
       });
+      solicitarActualizacionDashboard();
       toast.success("Trabajo creado correctamente");
       router.push(destino);
     } catch (err) {

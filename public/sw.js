@@ -18,9 +18,8 @@
  * - NAVEGACIONES (documentos) → network-first SIN timeout: si la red responde,
  *   siempre se ven datos frescos; la caché entra solo cuando la red falla.
  * - `/api/**` y POST (Server Actions) → red siempre, nunca caché.
- * - Cada ingreso a una pantalla REFRESCA el documento guardado de esa ruta
- *   (`fp:cache-route`, lo pide `RouteCache` en cada cambio de pantalla): el
- *   snapshot offline es siempre el del ÚLTIMO ingreso, no el del primero.
+ * - Al abrir una sección principal se guardan sus cuatro documentos; luego se
+ *   revalidan únicamente después de una escritura local o al desbloquear.
  * - La caché de documentos (`fp-data-*`) es HTML con montos y nombres del
  *   usuario: se BORRA ENTERA en el logout explícito (decisión 2026-09-15).
  *   ⚠️ NO se borra al caer en `/login` (ahí solo venció la sesión).
@@ -52,11 +51,15 @@ const PRECACHE = [
 ];
 
 /**
- * Documentos de arranque: se precachean al instalar (con la sesión activa) para
- * que la app tenga una pantalla de entrada incluso sin haberla visitado antes.
+ * Documentos de arranque: se precachean al instalar (con la sesión activa).
  * Si el servidor responde con un redirect (sesión vencida → /login) se descarta.
  */
-const PRECACHE_DOCS = ["/dashboard"];
+const PRECACHE_DOCS = [
+  "/dashboard",
+  "/dashboard/gastos",
+  "/dashboard/ingresos",
+  "/dashboard/resultados",
+];
 
 /**
  * Tope de documentos cacheados (los más viejos se van descartando). Se cuentan
@@ -407,12 +410,11 @@ async function documentTimestamp(href) {
 /**
  * Guarda (o refresca) el documento de una ruta que la app está mostrando.
  *
- * Lo pide `RouteCache` en cada cambio de pantalla, así el snapshot offline es
- * siempre el del ÚLTIMO ingreso. El fetch lo hace el SW (mismo origen ⇒ manda la
- * cookie de sesión), por eso funciona aunque la navegación haya sido de cliente
- * (RSC, sin petición de documento).
+ * Lo pide `RouteCache` al abrir las secciones o después de una invalidación.
+ * El fetch lo hace el SW (mismo origen ⇒ manda la cookie de sesión), por eso
+ * funciona aunque la navegación haya sido de cliente (RSC, sin petición de documento).
  */
-async function cacheRoute(rawUrl) {
+async function cacheRoute(rawUrl, force = false) {
   if (typeof rawUrl !== "string" || !rawUrl.startsWith("/")) return;
 
   let url;
@@ -427,19 +429,28 @@ async function cacheRoute(rawUrl) {
 
   // Si su propia navegación lo acaba de guardar, no hace falta re-pedirlo.
   const at = await documentTimestamp(url.href);
-  if (at && Date.now() - at < FRESH_MS) return;
+  if (!force && at && Date.now() - at < FRESH_MS) return;
 
-  try {
-    const request = new Request(url.href, {
-      credentials: "same-origin",
-      cache: "no-store",
-    });
-    const response = await fetch(request);
-    if (response.ok && response.type === "basic" && !response.redirected) {
-      await storeDocument(request, response.clone());
+  const request = new Request(url.href, {
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  for (let intento = 0; intento < 3; intento++) {
+    try {
+      const response = await fetch(request.clone());
+      if (response.ok && response.type === "basic" && !response.redirected) {
+        await storeDocument(request, response.clone());
+        return;
+      }
+      // Un redirect suele indicar que la sesión ya no es válida; no cachear ni
+      // reintentar esa respuesta.
+      if (response.redirected || response.status < 500) return;
+    } catch {
+      // Se conserva el documento anterior y se reintenta abajo.
     }
-  } catch {
-    /* sin red: se conserva el documento que ya estaba */
+    if (intento < 2) {
+      await new Promise((resolve) => setTimeout(resolve, 1000 * (intento + 1)));
+    }
   }
 }
 
@@ -489,7 +500,7 @@ self.addEventListener("message", (event) => {
 
   // La app avisa qué pantalla está mostrando: se guarda/refresca su documento.
   if (data.type === MSG_CACHE_ROUTE) {
-    event.waitUntil(cacheRoute(data.url));
+    event.waitUntil(cacheRoute(data.url, data.force === true));
     return;
   }
 

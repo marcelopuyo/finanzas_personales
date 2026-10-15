@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { DateFieldInput } from "@/components/ui/date-picker";
 import { QuickCreateModal } from "@/components/ui/quick-create-modal";
+import { solicitarActualizacionDashboard } from "@/lib/dashboard-cache";
 import type { ZodSchema } from "zod";
 
 export interface FormField {
@@ -146,6 +147,7 @@ export function CrudForm({
     setSubmitting(true);
     try {
       await onSubmit(data);
+      solicitarActualizacionDashboard();
       toast.success(successMessage);
       router.push(successHref ?? cancelHref);
     } catch (err) {

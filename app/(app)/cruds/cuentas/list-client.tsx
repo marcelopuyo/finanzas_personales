@@ -13,6 +13,7 @@ import {
 import { actualizarIncluirPrestamosEnBalance } from "@/backend/src/actions/cuenta";
 import type { ColumnDef } from "@tanstack/react-table";
 import { numberToCurrency } from "@/lib/utils";
+import { solicitarActualizacionDashboard } from "@/lib/dashboard-cache";
 import { sufijoOrigen, volverDeOrigen } from "@/lib/origen-crud";
 import { Switch } from "@/components/ui/switch";
 import { CurrencyFlag } from "@/components/ui/currency-flag";
@@ -155,6 +156,7 @@ export function CuentasListClient({
     setPendingId(id);
     try {
       await actualizarCuenta(id, { incluirEnBalance: nuevoValor });
+      solicitarActualizacionDashboard();
     } catch {
       setCuentas((prev) =>
         prev.map((c) =>
@@ -174,6 +176,7 @@ export function CuentasListClient({
     setPendingPrestamos(true);
     try {
       await actualizarIncluirPrestamosEnBalance({ incluir: nuevoValor });
+      solicitarActualizacionDashboard();
     } catch {
       setIncluirPrestamos(!nuevoValor);
       toast.error("Error al actualizar el neto de préstamos en el balance");
@@ -309,6 +312,7 @@ export function CuentasListClient({
         }}
         onDone={() => {
           setReorderMode(false);
+          solicitarActualizacionDashboard();
           router.refresh();
         }}
       />

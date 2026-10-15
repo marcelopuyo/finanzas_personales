@@ -16,6 +16,7 @@ import { cambiarPassword, actualizarMonedaPredeterminada } from "@/backend/src/a
 import type { CredencialWebauthnOut } from "@/backend/src/queries/webauthn";
 import { NO_REMEMBER, PENDING_CLEAR } from "@/lib/session-flags";
 import { clearAllCaches } from "@/lib/pwa";
+import { solicitarActualizacionDashboard } from "@/lib/dashboard-cache";
 import { versionLabel } from "@/lib/version";
 import { cn } from "@/lib/utils";
 
@@ -102,6 +103,7 @@ export default function PerfilClient({
     setSavingMoneda(true);
     try {
       await actualizarMonedaPredeterminada({ monedaId });
+      solicitarActualizacionDashboard();
       toast.success("Moneda predeterminada actualizada");
     } catch (err) {
       toast.error((err as Error).message);

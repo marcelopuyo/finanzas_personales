@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ArrowLeft, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -18,6 +17,7 @@ import type { GastoOut, GastosPagina } from "@/backend/src/queries/gastos";
 import { cn, dateTimeToString, numberToCurrency } from "@/lib/utils";
 import { invalidarHistoriales } from "@/lib/historial-cuentas";
 import { useTap } from "@/lib/tap";
+import { solicitarActualizacionDashboard } from "@/lib/dashboard-cache";
 import { GastoRow } from "./gasto-row";
 
 /** Filas por tanda del scroll infinito (el backend acota el valor a 1..100). */
@@ -74,7 +74,6 @@ export function GastosClient({
   embebido = false,
   filtros,
 }: GastosClientProps) {
-  const router = useRouter();
   const { go } = usePendingNav();
 
   // ⚠️ La primera tanda es SOLO la semilla: a partir del montaje la lista la
@@ -219,8 +218,8 @@ export function GastosClient({
       // El gasto revertido tocó saldos de cuentas: descarta la 1ª página cacheada
       // del carrusel de Inicio (no se conoce la cuenta acá ⇒ se invalidan todas).
       invalidarHistoriales();
-      // Los saldos de las cuentas cambiaron: refresca los datos del server.
-      router.refresh();
+      // Los saldos de las cuentas también afectan Inicio y Resultados.
+      solicitarActualizacionDashboard();
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "No se pudo eliminar el gasto"
