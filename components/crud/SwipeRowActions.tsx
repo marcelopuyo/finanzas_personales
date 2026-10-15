@@ -84,7 +84,7 @@ const COMPACT_ITEM_EST_W = 60;
 /** Alto MÍNIMO de la franja (px): el que necesita el contenido cuando TODAS las
     etiquetas entran en una línea (círculo + aire + etiqueta). */
 const STRIP_MIN_H = 56;
-const COMPACT_STRIP_MIN_H = 62;
+const COMPACT_STRIP_MIN_H = 48;
 /** Alto del círculo/píldora, en px (`h-10`). */
 const CIRCLE_H = 40;
 const COMPACT_CIRCLE_H = 32;
@@ -140,13 +140,10 @@ function stripHeight(
   });
   const circleHeight = compact ? COMPACT_CIRCLE_H : CIRCLE_H;
   const minHeight = compact ? COMPACT_STRIP_MIN_H : STRIP_MIN_H;
-  const contentHeight = compact
-    ? 2 * (circleHeight / 2 + LABEL_GAP + maxLabel + STRIP_PAD)
-    : circleHeight + LABEL_GAP + maxLabel + STRIP_PAD;
   return Math.max(
     rowHeight,
     minHeight,
-    contentHeight
+    circleHeight + LABEL_GAP + maxLabel + STRIP_PAD
   );
 }
 
@@ -391,9 +388,9 @@ export function SwipeRowActions({
     // en 2 (etiqueta más larga que `ITEM_MAX_W`), la franja crece para no
     // recortarla.
     const h = stripHeight(strip, menu.rowH, menu.compact);
-    strip.style.top = `${menu.rowTop + menu.rowH / 2}px`;
+    const extra = (h - menu.rowH) / 2;
+    strip.style.top = `${menu.rowTop - extra}px`;
     strip.style.height = `${h}px`;
-    strip.style.transform = "translateY(-50%)";
   }, [menu, paintStrip]);
 
   /** Empieza un gesto sobre `target` (touch o mouse). */
@@ -568,12 +565,10 @@ export function SwipeRowActions({
           // Alto REAL del contenido (la etiqueta puede estar en 2 líneas).
           const compact = stripRef.current.dataset.compact === "true";
           const h = stripHeight(stripRef.current, rect.height, compact);
+          const extra = (h - rect.height) / 2;
           stripRef.current.style.top = `${
-            rect.top -
-            (wrapRect.top + wrapper.clientTop) +
-            rect.height / 2
+            rect.top - (wrapRect.top + wrapper.clientTop) - extra
           }px`;
-          stripRef.current.style.transform = "translateY(-50%)";
           stripRef.current.style.height = `${h}px`;
           stripRef.current.style.right = `${Math.max(
             0,
@@ -776,10 +771,9 @@ export function SwipeRowActions({
           style={{
             // Estimación: el alto definitivo lo fija el `useLayoutEffect`
             // midiendo el contenido (etiquetas de 2 líneas).
-            top: menu.rowTop + menu.rowH / 2,
+            top: menu.rowTop - stripExtra(menu.rowH, menu.compact),
             height: menu.rowH + stripExtra(menu.rowH, menu.compact) * 2,
             right: menu.right,
-            transform: "translateY(-50%)",
           }}
           data-compact={menu.compact}
           // SIN fondo: la franja es transparente y solo se ven los círculos con
@@ -820,14 +814,8 @@ export function SwipeRowActions({
                       a.size === "compact" ? COMPACT_ITEM_MIN_W : ITEM_MIN_W,
                     maxWidth:
                       a.size === "compact" ? COMPACT_ITEM_MAX_W : ITEM_MAX_W,
-                    position: a.size === "compact" ? "relative" : undefined,
                   }}
-                  className={cn(
-                    "h-full flex-none px-1 text-center",
-                    a.size === "compact"
-                      ? "block"
-                      : "flex flex-col items-center justify-center gap-0.5"
-                  )}
+                  className="flex h-full flex-none flex-col items-center justify-center gap-0.5 px-1 text-center"
                 >
                   {/* Círculo de color (o PÍLDORA ancha si `wide`) + ícono
                       blanco, con la etiqueta debajo (estética del swipe del Mail
@@ -836,8 +824,6 @@ export function SwipeRowActions({
                     className={cn(
                       "flex shrink-0 items-center justify-center rounded-full text-white transition-opacity active:opacity-80",
                       a.size === "compact" ? "h-8" : "h-10",
-                      a.size === "compact" &&
-                        "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2",
                       a.wide
                         ? "w-full"
                         : a.size === "compact"
@@ -857,14 +843,9 @@ export function SwipeRowActions({
                     className={cn(
                       "max-w-full font-medium wrap-break-word text-card-foreground",
                       a.size === "compact"
-                        ? "absolute left-1/2 w-full -translate-x-1/2 text-[9px] leading-[11px]"
+                        ? "text-[9px] leading-[11px]"
                         : "text-[10px] leading-3"
                     )}
-                    style={
-                      a.size === "compact"
-                        ? { top: `calc(50% + ${COMPACT_CIRCLE_H / 2 + LABEL_GAP}px)` }
-                        : undefined
-                    }
                   >
                     {a.label}
                   </span>

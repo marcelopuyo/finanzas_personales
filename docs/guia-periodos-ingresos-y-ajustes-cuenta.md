@@ -26,9 +26,8 @@ Los períodos **En curso** y **Por cobrar** muestran sus jornadas y tareas
 desplegadas directamente debajo del período. No tienen un control para
 colapsarlas. Las acciones de **Editar** y **Eliminar** están disponibles al
 deslizar horizontalmente desde cualquier parte de una fila de jornada o tarea.
-Los botones de swipe usan un formato compacto: el círculo de acción se centra
-sobre la línea de la fila y su etiqueta queda debajo; eliminar conserva el
-diálogo de confirmación existente.
+Los botones de swipe usan un formato compacto y se muestran centrados en la
+altura de la fila; eliminar conserva el diálogo de confirmación existente.
 
 Los períodos **Cobrados** conservan el acordeón: al abrir una fila se ve el
 detalle de la liquidación en modo de solo lectura. Para corregir un ítem cobrado
