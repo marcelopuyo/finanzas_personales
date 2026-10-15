@@ -792,6 +792,9 @@ export function DashboardClient({
         // 📜 Con muchos meses el gráfico scrollea y el **eje Y queda fijo**
         // (2026-10-09): el panel ya tiene 15 meses de histórico.
         scrollDesde={MESES_SCROLL}
+        className="!pl-2"
+        anchoEjeY={36}
+        tamanoEjeY={10}
       />
       </div>
       {/* Listado mes a mes (mismo dato que el gráfico), movido acá desde la
