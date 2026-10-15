@@ -385,6 +385,7 @@ export function GastosClient({
           <div className="sm:hidden">
             <SwipeRowActions
               actionsFor={accionesFila}
+              swipeFromAnywhere
               onRowTap={(rowId) => {
                 const gasto = rows.find((row) => row.id === rowId);
                 if (gasto) setDetalle(gasto);

@@ -1,7 +1,7 @@
-# Períodos de ingresos y ajustes de cuenta
+# Guía funcional: períodos, gastos y movimientos de cuentas
 
-Guía funcional de las pestañas de períodos en Ingresos y del motivo de los
-ajustes manuales de cuenta.
+Guía funcional de los paneles de Ingresos y Gastos, los movimientos de cuentas
+y el motivo de los ajustes manuales de cuenta.
 
 ## Períodos dentro de Ingresos
 
@@ -39,6 +39,35 @@ se debe anular el cobro y volver a cobrarlo. El listado de cobrados utiliza
 paginación incremental (scroll infinito y botón **Cargar más** cuando aplica).
 En cada fila, el rango de fechas y la fecha de cobro se muestran en una sola
 línea.
+
+## Gráficos históricos del dashboard
+
+Los gráficos **Histórico** de Ingresos y Gastos, y el gráfico de **Resultados**,
+usan una reserva compacta para el eje Y (36 px), etiquetas de 10 px y un padding
+izquierdo de 8 px. El ajuste se aplica a estos gráficos sin alterar los demás
+gráficos del dashboard. En los gráficos con desplazamiento horizontal, el eje Y
+permanece fijo mientras se desplaza el historial.
+
+## Detalle de gastos
+
+Al tocar una fila de gasto se abre el popup **Detalle del gasto**, tanto en la
+lista móvil como en la tabla de escritorio. Muestra descripción, categoría,
+cuenta, importe y fecha. El área de datos se presenta directamente sobre el
+popup, sin un recuadro de fondo adicional.
+
+En móvil, el deslizamiento horizontal de la fila conserva la acción **Eliminar**
+y puede comenzar desde cualquier parte de la fila. Un toque simple abre los
+detalles; no reemplaza ni interfiere con el gesto de swipe. El campo de búsqueda
+usa el placeholder **Buscar**.
+
+## Movimientos de cuentas
+
+En la lista móvil de movimientos, el swipe puede iniciarse desde cualquier parte
+de la fila. Las acciones reveladas son **Detalles** y **Eliminar**. **Detalles**
+abre un popup con el motivo, categoría, fecha, importe en la moneda de la cuenta,
+su equivalente en la moneda predeterminada cuando corresponde y el saldo
+posterior. **Eliminar** mantiene el diálogo de confirmación y la reversión del
+movimiento.
 
 ### Exportar un período
 
@@ -79,6 +108,9 @@ El motivo se comparte con el historial de movimientos de la cuenta, que ya lee
 - Pestañas, filas, swipe y exportación: [`app/(app)/trabajo/components/periodos-grid.tsx`](../app/(app)/trabajo/components/periodos-grid.tsx)
 - Integración de períodos y cálculo de ventanas: [`app/(app)/trabajo/trabajo-client.tsx`](../app/(app)/trabajo/trabajo-client.tsx) y [`app/(app)/trabajo/components/use-ventanas-cobro.ts`](../app/(app)/trabajo/components/use-ventanas-cobro.ts)
 - Entrada del panel Ingresos: [`app/(app)/dashboard/ingresos/page.tsx`](../app/(app)/dashboard/ingresos/page.tsx)
+- Gráficos históricos, márgenes del eje y y paneles de Gastos/Resultados: [`app/(app)/dashboard/dashboard-client.tsx`](../app/(app)/dashboard/dashboard-client.tsx) y [`app/(app)/dashboard/components/line-chart.tsx`](../app/(app)/dashboard/components/line-chart.tsx)
+- Popup de detalle de gastos y filas: [`app/(app)/gastos/gastos-client.tsx`](../app/(app)/gastos/gastos-client.tsx) y [`app/(app)/gastos/gasto-row.tsx`](../app/(app)/gastos/gasto-row.tsx)
+- Historial, acciones y popup de movimientos de cuentas: [`app/(app)/cuentas/[id]/movimientos-client.tsx`](../app/(app)/cuentas/[id]/movimientos-client.tsx) y [`app/(app)/cuentas/[id]/movimiento-row.tsx`](../app/(app)/cuentas/[id]/movimiento-row.tsx)
 - Motivo y vista previa del ajuste: [`app/(app)/movimientos/stepper/ajuste-cuenta.tsx`](../app/(app)/movimientos/stepper/ajuste-cuenta.tsx)
 - Confirmación y guardado desde el wizard: [`app/(app)/movimientos/stepper/confirmacion.tsx`](../app/(app)/movimientos/stepper/confirmacion.tsx)
 - Validación y persistencia del ajuste: [`backend/src/validation/movimientos.ts`](../backend/src/validation/movimientos.ts) y [`backend/src/actions/movimientos.ts`](../backend/src/actions/movimientos.ts)
