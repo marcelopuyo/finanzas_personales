@@ -61,8 +61,9 @@ const TAP_MS = 500;
  * Elementos INTERACTIVOS: un gesto que arranca sobre uno de ellos es del
  * CONTROL, no de la fila — si no, el toque del switch de una tarjeta abriría el
  * detalle/edición de la fila. Se resuelve por semántica (no por coordenadas), así
- * el control sigue funcionando con su propio `click`. `[data-row-ignore]` queda
- * como escotilla para marcar cualquier otro elemento a mano.
+ * el control sigue funcionando con su propio `click`. `[data-row-ignore]` excluye
+ * controles manualmente y `[data-row-swipe]` permite swipe sobre una fila que
+ * también es un botón de detalle.
  */
 const SELECTOR_INTERACTIVO =
   "button, a, input, select, textarea, [role='switch'], [data-row-ignore]";
@@ -420,7 +421,10 @@ export function SwipeRowActions({
     }
     // Un toque sobre un control interactivo (switch, botón, link) es del CONTROL:
     // el gesto de fila no se inicia (ni swipe ni navegación por toque).
-    if (target.closest(SELECTOR_INTERACTIVO)) {
+    if (
+      target.closest(SELECTOR_INTERACTIVO) &&
+      !target.closest("[data-row-swipe]")
+    ) {
       stripStartRef.current = null;
       return;
     }

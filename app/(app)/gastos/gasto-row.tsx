@@ -39,6 +39,7 @@ export function GastoRow({ gasto, monedaISO, onSelect }: GastoRowProps) {
       <button
         type="button"
         onClick={() => onSelect(gasto)}
+        data-row-swipe
         aria-label={`Ver detalles de ${gasto.descripcion || "gasto sin descripción"}`}
         className="w-full px-3 py-2.5 text-left transition-colors hover:bg-muted/30"
       >
