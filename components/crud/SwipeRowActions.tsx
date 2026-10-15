@@ -167,6 +167,17 @@ function findScrollerX(
   return null;
 }
 
+function topWithinWrapper(row: HTMLElement, wrapper: HTMLElement): number {
+  if (row.offsetParent === wrapper) return row.offsetTop;
+
+  const wrapperRect = wrapper.getBoundingClientRect();
+  return (
+    row.getBoundingClientRect().top -
+    wrapperRect.top -
+    wrapper.clientTop
+  );
+}
+
 /**
  * Menú deslizante por fila (estilo WhatsApp) para las grillas mobile.
  *
@@ -480,7 +491,7 @@ export function SwipeRowActions({
       id,
       actions,
       compact: actions.every((action) => action.size === "compact"),
-      rowTop: rect.top - (wrapRect.top + wrapper.clientTop),
+      rowTop: topWithinWrapper(fila, wrapper),
       rowH: rect.height,
       // Anclada al borde DERECHO de la fila; si la grilla desbordara la tarjeta,
       // se la clava al borde VISIBLE para que las acciones nunca queden fuera.
@@ -566,7 +577,7 @@ export function SwipeRowActions({
           const h = stripHeight(stripRef.current, rect.height, compact);
           const extra = (h - rect.height) / 2;
           stripRef.current.style.top = `${
-            rect.top - (wrapRect.top + wrapper.clientTop) - extra
+            topWithinWrapper(row, wrapper) - extra
           }px`;
           stripRef.current.style.height = `${h}px`;
           stripRef.current.style.right = `${Math.max(
