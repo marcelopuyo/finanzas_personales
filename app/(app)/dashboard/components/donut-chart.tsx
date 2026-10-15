@@ -217,6 +217,7 @@ export function DonutChart({
                   paddingAngle={2}
                   stroke="var(--card)"
                   strokeWidth={2}
+                  isAnimationActive={false}
                 >
                   {slices.map((s) => (
                     <Cell key={s.name} fill={s.color} />

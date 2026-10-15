@@ -126,8 +126,7 @@ function esActivo(href: string, ruta: string): boolean {
 export default function BottomNav() {
   const ruta = usePathname() ?? "";
   const router = useRouter();
-  // Prefetch adicional al primer contacto; los cuatro tabs principales también
-  // solicitan el payload completo en cuanto están visibles.
+  // Los destinos de la barra usan prefetch completo de Next al estar visibles.
   const prefetch = usePrefetchNav();
   /** Popup del botón "Más" (no navega: es un disparador). */
   const [abierto, setAbierto] = useState(false);
@@ -176,8 +175,6 @@ export default function BottomNav() {
             href={t.href}
             prefetch
             aria-current={activo ? "page" : undefined}
-            onPointerEnter={() => prefetch(t.href)}
-            onTouchStartCapture={() => prefetch(t.href)}
             className={cn(
               // `justify-end`: el contenido se apoya arriba del padding del
               // safe-area ⇒ queda siempre a la misma distancia del borde inferior.

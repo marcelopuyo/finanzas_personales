@@ -275,6 +275,7 @@ export function PrestamosChart({
               strokeWidth={2}
               radius={[0, 0, 0, 0]}
               activeBar={false}
+              isAnimationActive={false}
             />
           ))}
         </BarChart>

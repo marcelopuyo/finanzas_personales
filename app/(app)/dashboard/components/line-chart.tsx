@@ -323,6 +323,7 @@ export function EvolutionChart({
           strokeWidth={GROSOR_SECUNDARIA}
           strokeOpacity={OPACIDAD_SECUNDARIA}
           dot={false}
+          isAnimationActive={false}
           activeDot={{
             r: 2.5,
             fill: colorSecundaria(s),
@@ -346,6 +347,7 @@ export function EvolutionChart({
             strokeWidth={2}
             fill="url(#evolutionArea)"
             dot={mostrarPuntos ? { r: 2.5, fill: color } : false}
+            isAnimationActive={false}
             activeDot={{ r: 4, fill: color }}
           />
         </>
@@ -356,6 +358,7 @@ export function EvolutionChart({
           stroke={color}
           strokeWidth={2}
           dot={mostrarPuntos ? { r: 2.5, fill: color } : false}
+          isAnimationActive={false}
           activeDot={{ r: 4, fill: color }}
         />
       )}
@@ -621,6 +624,7 @@ export function MultiLineChart({
             strokeWidth={2}
             dot={false}
             activeDot={{ r: 4 }}
+            isAnimationActive={false}
           />
           <Line
             type="monotone"
@@ -630,6 +634,7 @@ export function MultiLineChart({
             strokeWidth={2}
             dot={false}
             activeDot={{ r: 4 }}
+            isAnimationActive={false}
           />
           <Line
             type="monotone"
@@ -639,6 +644,7 @@ export function MultiLineChart({
             strokeWidth={2}
             dot={false}
             activeDot={{ r: 4 }}
+            isAnimationActive={false}
           />
         </LineChart>
       </ResponsiveContainer>
