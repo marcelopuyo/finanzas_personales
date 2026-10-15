@@ -452,7 +452,7 @@ export function GastosClient({
         className="sm:max-w-md"
       >
         {detalle && (
-          <div className="space-y-1.5 rounded-lg border border-border bg-muted p-3 text-[13px]">
+          <div className="space-y-2 text-[13px]">
             <div className="flex justify-between gap-3">
               <span className="shrink-0 text-subtitle">Descripción</span>
               <span className="text-right font-medium text-card-foreground">
@@ -478,38 +478,9 @@ export function GastosClient({
               </span>
             </div>
             <div className="flex justify-between gap-3">
-              <span className="shrink-0 text-subtitle">Pagado</span>
-              <span className="text-right text-card-foreground">
-                {numberToCurrency(
-                  Math.max(0, Number(detalle.monto) - Number(detalle.saldo)),
-                  monedaISO
-                )}
-              </span>
-            </div>
-            <div className="flex justify-between gap-3">
-              <span className="shrink-0 text-subtitle">Saldo pendiente</span>
-              <span className="text-right text-card-foreground">
-                {numberToCurrency(Number(detalle.saldo), monedaISO)}
-              </span>
-            </div>
-            <div className="flex justify-between gap-3">
-              <span className="shrink-0 text-subtitle">Fecha de pago</span>
+              <span className="shrink-0 text-subtitle">Fecha</span>
               <span className="text-right text-card-foreground">
                 {detalle.fechaPago ? dateTimeToString(detalle.fechaPago) : "—"}
-              </span>
-            </div>
-            <div className="flex justify-between gap-3">
-              <span className="shrink-0 text-subtitle">Vencimiento</span>
-              <span className="text-right text-card-foreground">
-                {detalle.fechaVencimiento
-                  ? dateTimeToString(detalle.fechaVencimiento)
-                  : "—"}
-              </span>
-            </div>
-            <div className="flex justify-between gap-3">
-              <span className="shrink-0 text-subtitle">Periodicidad</span>
-              <span className="text-right text-card-foreground">
-                {detalle.isPeriodico ? "Periódico" : "Único"}
               </span>
             </div>
           </div>
