@@ -603,51 +603,46 @@ export function PeriodosGrid({
                   className="flex min-w-0 flex-1 items-start gap-2.5 py-2.5 text-left [-webkit-tap-highlight-color:transparent]"
                 >
                 <span className="min-w-0 flex-1">
-                  {/* Título + la **fecha estimada de cobro**: dice cuándo cierra
-                      la ventana (ámbar) o cuándo cerró (verde). Reemplaza al
-                      chip de ventana (2026-10-02). */}
-                  <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                    <span className="text-[13.5px] break-words text-header">
-                      {f.titulo}
-                    </span>
-                    {f.tipo === "pendiente" && f.fecha && (
-                      <>
-                        {/* Cuándo cerró (o cierra) el período. Va **sin año**
-                            (`dd-mm`, como el resto de las fechas de la grilla) para
-                            que entre con el chip de pago en el ancho de un celular.
-                            El verbo es **"cerró"** y no "venció" (pedido del usuario,
-                            2026-10-07): un período no vence, cierra. */}
+                  <span className="block text-[13.5px] break-words text-header">
+                    {f.titulo}
+                  </span>
+                  <span
+                    className={cn(
+                      "mt-0.5 block text-subtitle",
+                      f.tipo === "pendiente" && f.fecha
+                        ? "whitespace-nowrap text-[10px] leading-[15px]"
+                        : "text-[11px] leading-[15px]"
+                    )}
+                  >
+                    {f.subtitulo}
+                  </span>
+                  {f.tipo === "pendiente" && f.fecha && (
+                    <span className="mt-0.5 flex items-center justify-between gap-2 whitespace-nowrap text-[10px] leading-[14px] font-medium">
+                      {/* Un renglón propio mantiene el cierre a la izquierda y
+                          la fecha estimada de pago alineada a la derecha. */}
+                      <span
+                        className={
+                          f.fecha.tipo === "enCurso"
+                            ? "text-warning"
+                            : "text-success"
+                        }
+                      >
+                        {f.fecha.tipo === "enCurso" ? "cierra el " : "cerró el "}
+                        {diaMes(f.fecha.cierre)}
+                      </span>
+                      {f.fecha.pago && (
                         <span
-                          className={cn(
-                            "shrink-0 text-[10.5px] font-medium whitespace-nowrap",
+                          className={
                             f.fecha.tipo === "enCurso"
                               ? "text-warning"
                               : "text-success"
-                          )}
+                          }
                         >
-                          {f.fecha.tipo === "enCurso" ? "cierra el " : "cerró el "}
-                          {diaMes(f.fecha.cierre)}
+                          pago ~{diaMes(f.fecha.pago)}
                         </span>
-                        {/* Cuándo **llega la plata**: el cierre + el "día de pago" del
-                            trabajo (2026-10-07). Sólo si el retraso se pudo inferir. */}
-                        {f.fecha.pago && (
-                          <span
-                            className={cn(
-                              "shrink-0 text-[10.5px] font-medium whitespace-nowrap",
-                              f.fecha.tipo === "enCurso"
-                                ? "text-warning"
-                                : "text-success"
-                            )}
-                          >
-                            pago ~{diaMes(f.fecha.pago)}
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </span>
-                  <span className="mt-0.5 block text-[11px] leading-[15px] text-subtitle">
-                    {f.subtitulo}
-                  </span>
+                      )}
+                    </span>
+                  )}
                 </span>
                 <span className="shrink-0 text-right">
                   {/* Verde = pendiente de una ventana **cerrada** (se cobra ya) ·
