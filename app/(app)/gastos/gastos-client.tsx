@@ -315,7 +315,7 @@ export function GastosClient({
           if (e.key === "Enter") aplicarYa(busqueda);
           if (e.key === "Escape" && busqueda) limpiarBusqueda();
         }}
-        placeholder="Buscar por descripción, categoría o cuenta..."
+        placeholder="Buscar"
         aria-label="Buscar gasto"
         enterKeyHint="search"
         // En el panel el campo va con `bg-muted` (el panel ya es `bg-card`: si no,
