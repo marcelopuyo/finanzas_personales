@@ -349,7 +349,7 @@ export function MovimientosCuentaClient({
         <>
           {/* ── MOBILE (<sm): filas multilínea + swipe + scroll infinito ── */}
           <div className="sm:hidden">
-            <SwipeRowActions actionsFor={accionesFila}>
+            <SwipeRowActions actionsFor={accionesFila} swipeFromAnywhere>
               {/* `overflow-hidden` recorta la fila cuando se corre para
                   revelar las acciones. */}
               <div className="overflow-hidden rounded-lg border border-border bg-card">
