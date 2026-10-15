@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, Eye, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import { DataTable } from "@/components/ui/data-table";
@@ -87,6 +87,9 @@ export function MovimientosCuentaClient({
   const [cargando, setCargando] = useState(false);
   /** Movimiento seleccionado para confirmar su eliminación. */
   const [pendingAnular, setPendingAnular] =
+    useState<HistorialMovimientoOut | null>(null);
+  /** Movimiento seleccionado para consultar sus detalles. */
+  const [detalleMovimiento, setDetalleMovimiento] =
     useState<HistorialMovimientoOut | null>(null);
   const [reverting, setReverting] = useState(false);
   /** Centinela del scroll infinito (mobile). */
@@ -211,6 +214,12 @@ export function MovimientosCuentaClient({
     const mov = rows.find((m) => m.id === rowId);
     if (!mov) return null;
     return [
+      {
+        key: "details",
+        label: "Detalles",
+        icon: Eye,
+        onClick: () => setDetalleMovimiento(mov),
+      },
       {
         key: "delete",
         label: "Eliminar",
@@ -406,6 +415,75 @@ export function MovimientosCuentaClient({
           </div>
         </>
       )}
+
+      <Modal
+        open={detalleMovimiento !== null}
+        onClose={() => setDetalleMovimiento(null)}
+        title="Detalle del movimiento"
+        className="sm:max-w-md"
+      >
+        {detalleMovimiento && (() => {
+          const esEgreso =
+            (detalleMovimiento.categoria ?? "").toLowerCase() === "egreso";
+          return (
+            <div className="space-y-2 text-[13px]">
+              <div className="flex justify-between gap-3">
+                <span className="shrink-0 text-subtitle">Motivo</span>
+                <span className="text-right text-card-foreground">
+                  {detalleMovimiento.motivo}
+                </span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="shrink-0 text-subtitle">Categoría</span>
+                <span className="text-right text-card-foreground">
+                  {detalleMovimiento.categoria ?? "—"}
+                </span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="shrink-0 text-subtitle">Fecha</span>
+                <span className="text-right text-card-foreground">
+                  {dateTimeToString(detalleMovimiento.fecha)}
+                </span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="shrink-0 text-subtitle">Importe</span>
+                <span className={cn("text-right", esEgreso ? "text-danger" : "text-success")}>
+                  {numberToCurrency(
+                    esEgreso
+                      ? -Math.abs(Number(detalleMovimiento.monto))
+                      : Math.abs(Number(detalleMovimiento.monto)),
+                    cuenta.monedaISO
+                  )}
+                </span>
+              </div>
+              {mostrarMonedaPredeterminada && (
+                <div className="flex justify-between gap-3">
+                  <span className="shrink-0 text-subtitle">
+                    Importe en tu moneda
+                  </span>
+                  <span className="text-right text-card-foreground">
+                    {numberToCurrency(
+                      esEgreso
+                        ? -Math.abs(Number(detalleMovimiento.montoPredeterminada))
+                        : Math.abs(Number(detalleMovimiento.montoPredeterminada)),
+                      monedaPredeterminadaISO
+                    )}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between gap-3">
+                <span className="shrink-0 text-subtitle">Saldo posterior</span>
+                <span className="text-right text-card-foreground">
+                  {numberToCurrency(
+                    Number(detalleMovimiento.saldoPosterior),
+                    cuenta.monedaISO
+                  )}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
 
       {/* Confirmación de eliminación (mismo diálogo que tenía el popup) */}
       <Modal
