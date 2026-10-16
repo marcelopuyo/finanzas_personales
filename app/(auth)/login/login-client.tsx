@@ -392,8 +392,8 @@ export default function LoginClient({
         </section>
 
           <footer
-            className="mt-auto pb-8 text-center text-[13px] text-[#99aaa9]"
-            style={{ paddingBottom: "calc(2rem + env(safe-area-inset-bottom))" }}
+            className="mt-auto text-center text-[13px] text-[#99aaa9]"
+            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
           >
             ¿No tenés cuenta?{" "}
             <Link

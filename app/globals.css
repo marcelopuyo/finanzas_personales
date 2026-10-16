@@ -325,16 +325,22 @@ html.fp-sin-red [data-app-lock] {
    única de las salidas probadas que devolvía la barra a su lugar.
 
    ⚠️ Con el teclado abierto se vuelve a `dvh`: ahí el layout **sí** coincide con
-   el teclado y el shell no debe desbordar (si no, la página scrollea mientras se
-   escribe). Lo marca `anclaje-barras.tsx` en `<html data-teclado>`.
+   el teclado y no debe desbordar. En el shell lo marca `anclaje-barras.tsx`; en
+   el login se detecta mientras un campo está enfocado.
 
    En un navegador estas reglas no aplican: sin app instalada no hay franja y el
-   shell sigue siendo `h-dvh` de siempre. */
+   shell/login siguen usando `dvh` de siempre. */
 @media (display-mode: standalone) {
   [data-app-shell] {
     height: 100lvh;
   }
+  [data-login-screen] {
+    height: 100lvh;
+  }
   html[data-teclado] [data-app-shell] {
+    height: 100dvh;
+  }
+  html:has([data-login-screen] input:focus) [data-login-screen] {
     height: 100dvh;
   }
 }
