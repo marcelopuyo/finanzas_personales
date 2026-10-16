@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Comparación de layouts de login · Finanzas</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --page: #0a0f13;
+        --surface: #11191f;
+        --line: #26343b;
+        --text: #f2f5f3;
+        --muted: #9aa9aa;
+        --lime: #c5ef55;
+      }
+      * { box-sizing: border-box; }
+      @font-face {
+        font-family: Inter;
+        src: url("./preview-inter.woff2") format("woff2");
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        padding: 38px 24px 56px;
+        background:
+          radial-gradient(ellipse at 50% -15%, #1d302b 0, transparent 42%),
+          var(--page);
+        color: var(--text);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .page { width: min(100%, 1420px); margin: 0 auto; }
+      .intro { margin-bottom: 26px; }
+      .eyebrow {
+        margin: 0 0 9px;
+        color: var(--lime);
+        font-size: 11px;
+        font-weight: 750;
+        letter-spacing: .15em;
+        text-transform: uppercase;
+      }
+      h1 { margin: 0; font-size: clamp(26px, 3vw, 36px); letter-spacing: -.04em; }
+      .intro p:last-child {
+        max-width: 760px;
+        margin: 9px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      .comparison {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+        align-items: start;
+      }
+      .column { min-width: 0; }
+      .column-head { min-height: 61px; margin: 0 2px 9px; }
+      .column-head h2 { margin: 0; font-size: 14px; }
+      .column-head p { margin: 4px 0 0; color: #899896; font-size: 11px; line-height: 1.45; }
+      .device {
+        min-height: 650px;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid #2c393e;
+        border-radius: 26px;
+        box-shadow: 0 22px 60px #0005, inset 0 1px #ffffff08;
+      }
+      .device-inner { position: relative; z-index: 1; min-height: 650px; }
+      .tiny { font-size: 10px; }
+      .muted { color: var(--muted); }
+      .link { color: var(--lime); text-decoration: none; font-weight: 650; }
+      button, input { font: inherit; }
+      button { cursor: default; }
+
+      .finanzas { height: 650px; background: #10171b; }
+      .fp-device {
+        position: relative;
+        display: flex;
+        min-height: 100%;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        padding: 23px 14px;
+        background:
+          radial-gradient(ellipse at 50% 0%, #1d302b 0, transparent 54%),
+          linear-gradient(160deg, #10171b, #0d1317 76%);
+        color: var(--text);
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+      .fp-device::before {
+        position: absolute;
+        inset: 10px;
+        border: 1px solid #ffffff08;
+        border-radius: 23px;
+        content: "";
+        pointer-events: none;
+      }
+      .fp-brand {
+        position: absolute;
+        top: 78px;
+        right: 23px;
+        left: 23px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 13px;
+        color: var(--text);
+      }
+      .fp-wordmark {
+        font-family: "Unbounded", ui-sans-serif, system-ui, sans-serif;
+        font-size: 28px;
+        font-weight: 600;
+        letter-spacing: -.01em;
+      }
+      .fp-badge {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 7px;
+        padding: 7px 11px;
+        background: #fff;
+        color: #0f172a;
+        font-size: 16px;
+        font-weight: 400;
+        line-height: 1;
+      }
+      .fp-content {
+        width: 100%;
+        margin: auto 0;
+        padding: 19px 16px;
+        border: 1px solid #ffffff14;
+        border-radius: 20px;
+        background: #11191fbb;
+        box-shadow: 0 20px 50px #0003, inset 0 1px #ffffff08;
+        backdrop-filter: blur(12px);
+      }
+      .fp-content h3 {
+        margin: 0 0 29px;
+        text-align: center;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        font-size: 23px;
+        font-weight: 400;
+        line-height: 1.15;
+        letter-spacing: normal;
+      }
+      .fp-content button {
+        display: flex;
+        width: 100%;
+        min-height: 44px;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        border: 1px solid #c5ef5550;
+        border-radius: 14px;
+        background: #c5ef5517;
+        box-shadow: inset 0 1px #ffffff12;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 700;
+        backdrop-filter: blur(10px);
+      }
+      .fp-content button svg { width: 17px; height: 17px; flex: 0 0 auto; }
+      .fp-divider {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 15px 0;
+        color: #73827f;
+        font-size: 11px;
+      }
+      .fp-divider::before, .fp-divider::after { content: ""; height: 1px; flex: 1; background: var(--line); }
+      .fp-register {
+        margin: 0;
+        color: var(--muted);
+        text-align: center;
+        font-size: 12px;
+      }
+      .fp-register a { color: var(--lime); text-decoration: none; font-weight: 700; }
+
+      /* Revolut: phone-first, identity question plus many alternate methods. */
+      .revolut {
+        background:
+          radial-gradient(ellipse at 8% 10%, #063665 0, transparent 42%),
+          #000d18;
+        font-family: Arial, sans-serif;
+      }
+      .revolut .device-inner { display: flex; flex-direction: column; padding: 0 19px 16px; }
+      .brand-revolut { padding-top: 25px; text-align: center; font-size: 17px; font-weight: 700; letter-spacing: -.06em; }
+      .revolut-main { width: 100%; margin: auto 0; padding: 25px 0; }
+      .revolut h3 { margin: 0 0 11px; font-size: 22px; letter-spacing: -.04em; }
+      .revolut .sub { margin: 0 0 17px; color: #aab6c2; font-size: 12px; line-height: 1.45; }
+      .phone { display: grid; grid-template-columns: 70px 1fr; gap: 6px; }
+      .phone > * {
+        min-width: 0;
+        height: 46px;
+        border: 0;
+        border-radius: 12px;
+        background: #1c2b3a;
+        color: white;
+        font-size: 11px;
+      }
+      .phone button { font-weight: 700; }
+      .phone input { padding: 0 10px; }
+      .revolut .recovery { display: block; margin: 12px 0 15px; color: #91aefa; font-size: 10px; text-decoration: none; }
+      .revolut .continue {
+        width: 100%;
+        height: 38px;
+        border: 0;
+        border-radius: 10px;
+        background: #7599ff;
+        color: #07142b;
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .revolut .or { color: #9aabb9; }
+      .revolut .or::before, .revolut .or::after { background: #33414e; }
+      .revolut .methods { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+      .revolut .method { min-width: 0; text-align: center; color: #cbd4db; font-size: 8px; }
+      .revolut .method i {
+        display: grid;
+        width: 32px;
+        height: 32px;
+        margin: 0 auto 4px;
+        place-items: center;
+        border: 1px solid #283948;
+        border-radius: 9px;
+        background: #132231;
+        font-size: 12px;
+        font-style: normal;
+      }
+      .revolut .register { color: #aab6c2; }
+      .revolut .link { color: #91aefa; }
+
+      /* Stripe: card-first, email/password and explicit federated sign-ins. */
+      .stripe {
+        background:
+          radial-gradient(ellipse at 88% 5%, #fb68a8 0, transparent 34%),
+          radial-gradient(ellipse at 70% 0%, #ffb446 0, transparent 38%),
+          radial-gradient(ellipse at 40% 0%, #bd83ff 0, transparent 44%),
+          #f7f8fc;
+        color: #303846;
+        font-family: Arial, sans-serif;
+      }
+      .stripe .device-inner { display: flex; flex-direction: column; padding: 0 15px 12px; }
+      .brand-stripe {
+        height: 62px;
+        display: flex;
+        align-items: center;
+        color: #1b2736;
+        font-size: 22px;
+        font-weight: 800;
+        letter-spacing: -.07em;
+      }
+      .stripe-card {
+        width: 100%;
+        margin: auto 0;
+        padding: 17px 14px 15px;
+        border: 1px solid #e1e4eb;
+        border-radius: 16px;
+        background: #fff;
+        box-shadow: 0 15px 40px #1e2b481f;
+      }
+      .stripe h3 { margin: 0 0 14px; font-size: 17px; font-weight: 600; letter-spacing: -.035em; }
+      .stripe .label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 4px; margin: 11px 0 5px; font-size: 10px; font-weight: 650; }
+      .stripe a { color: #635bdb; text-decoration: none; }
+      .stripe input {
+        display: block;
+        width: 100%;
+        height: 37px;
+        padding: 0 9px;
+        border: 1px solid #c9d0db;
+        border-radius: 7px;
+        background: white;
+        font-size: 10px;
+      }
+      .stripe .remember { display: flex; gap: 6px; align-items: center; margin: 10px 0; color: #4d5866; font-size: 9px; }
+      .stripe .remember i { width: 11px; height: 11px; border: 1px solid #9ba5b3; border-radius: 3px; background: #635bdb; box-shadow: inset 0 0 0 2px white; }
+      .stripe .submit {
+        width: 100%;
+        min-height: 36px;
+        border: 0;
+        border-radius: 7px;
+        background: #635bdb;
+        color: white;
+        font-size: 10px;
+        font-weight: 700;
+      }
+      .stripe .or { color: #7e8794; }
+      .stripe .or::before, .stripe .or::after { background: #e1e4eb; }
+      .stripe .alt { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+      .stripe .alt span {
+        padding: 8px 2px;
+        border: 1px solid #d4dae3;
+        border-radius: 7px;
+        color: #303846;
+        text-align: center;
+        font-size: 8px;
+        font-weight: 650;
+      }
+      .stripe .register { color: #586474; }
+      .stripe .register a { color: #635bdb; }
+
+      /* N26: minimal logo, broad outlined fields, recovery attached to password. */
+      .n26 {
+        background: #0b0b0b;
+        color: #f5f5f5;
+        font-family: Arial, sans-serif;
+      }
+      .n26 .device-inner { display: flex; flex-direction: column; padding: 0 18px 13px; }
+      .brand-n26 { padding-top: 32px; text-align: center; font-family: Georgia, serif; font-size: 24px; letter-spacing: .02em; }
+      .n26-main { width: 100%; margin: auto 0; padding: 24px 0; }
+      .n26 h3 { margin: 0 0 19px; font-size: 18px; font-weight: 500; }
+      .n26 .field {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 5px;
+        min-height: 51px;
+        margin-bottom: 11px;
+        padding: 0 11px;
+        border: 1px solid #444;
+        border-radius: 11px;
+        background: #171717;
+        color: #d8d8d8;
+        font-size: 13px;
+      }
+      .n26 .field a { flex: 0 0 auto; color: #32bdaf; font-size: 10px; text-decoration: none; font-weight: 700; }
+      .n26 .submit {
+        width: 100%;
+        height: 38px;
+        margin-top: 4px;
+        border: 0;
+        border-radius: 7px;
+        background: #2cb5a9;
+        color: #062521;
+        font-size: 10px;
+        font-weight: 750;
+      }
+      .n26 .register { color: #b6b6b6; }
+      .n26 .register a { color: #39c3b4; }
+      .n26 .legal { margin: 7px 0 0; color: #777; text-align: center; font-size: 8px; }
+
+      @media (max-width: 1080px) {
+        .comparison { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+        .device, .device-inner { min-height: 680px; }
+        .column-head { min-height: 54px; }
+        .finanzas { height: 680px; }
+        .stripe h3, .n26 h3 { font-size: 20px; }
+        .stripe .label-row { font-size: 11px; }
+        .stripe input { height: 40px; font-size: 11px; }
+        .stripe .remember { font-size: 9px; }
+        .stripe .submit, .n26 .submit { min-height: 40px; font-size: 11px; }
+        .revolut h3 { font-size: 24px; }
+        .revolut .sub, .revolut .recovery, .n26 .field { font-size: 13px; }
+        .phone > * { height: 50px; font-size: 13px; }
+        .n26 .field { min-height: 58px; }
+        .stripe .alt span { font-size: 10px; }
+      }
+      @media (max-width: 650px) {
+        body { padding: 28px 16px 42px; }
+        .comparison { grid-template-columns: 1fr; gap: 24px; }
+        .column-head { min-height: 0; }
+        .device {
+          width: min(100%, 390px);
+          min-height: 690px;
+          margin: 0 auto;
+          border-radius: 28px;
+        }
+        .device-inner { min-height: 690px; }
+        .finanzas { height: 690px; }
+        .stripe h3, .n26 h3 { font-size: 23px; }
+        .stripe .label-row { font-size: 12px; }
+        .stripe input { height: 45px; font-size: 12px; }
+        .stripe .remember { font-size: 10px; }
+        .stripe .submit, .n26 .submit { min-height: 44px; font-size: 12px; }
+        .revolut .device-inner { padding-left: 24px; padding-right: 24px; }
+        .brand-revolut { padding-top: 31px; font-size: 20px; }
+        .revolut h3 { font-size: 27px; }
+        .revolut .sub, .revolut .recovery { font-size: 14px; }
+        .phone { grid-template-columns: 82px 1fr; }
+        .phone > * { height: 54px; font-size: 14px; }
+        .revolut .continue { height: 44px; font-size: 13px; }
+        .revolut .method { font-size: 9px; }
+        .revolut .method i { width: 38px; height: 38px; }
+        .brand-stripe { height: 74px; font-size: 27px; }
+        .stripe-card { padding: 21px 18px 18px; border-radius: 18px; }
+        .stripe .label-row { margin-top: 14px; }
+        .stripe .alt span { padding: 10px 3px; font-size: 10px; }
+        .brand-n26 { padding-top: 38px; font-size: 30px; }
+        .n26 .field { min-height: 60px; font-size: 15px; }
+        .n26 .field a { font-size: 11px; }
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        button { transition: filter .15s ease; }
+        button:hover { filter: brightness(1.06); }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="intro">
+        <p class="eyebrow">Comparación de composición · Login</p>
+        <h1>Cuatro layouts, una vista</h1>
+        <p>La primera pantalla muestra la opción de ingreso elegida para Finanzas Personales: biometría o email. Las pantallas de Revolut, Stripe y N26 son recreaciones de layout basadas en sus flujos públicos observados; no son capturas oficiales ni copias funcionales. En escritorio se comparan en paralelo y en móvil se apilan.</p>
+      </header>
+
+      <section class="comparison" aria-label="Comparación de pantallas de acceso">
+        <article class="column">
+          <header class="column-head">
+            <h2>Finanzas Personales · Actual</h2>
+            <p>Dos acciones claras: ingresar con biometría o con email y contraseña.</p>
+          </header>
+          <div class="device finanzas">
+            <div class="fp-device">
+              <div class="fp-brand">
+                <span class="fp-wordmark">finanzas</span>
+                <span class="fp-badge">personales</span>
+              </div>
+              <div class="fp-content">
+                <h3>Bienvenido de nuevo</h3>
+                <button type="button">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 12a5 5 0 0 1 10 0v2M4 13v-1a8 8 0 0 1 16 0v3M8 15v1a4 4 0 0 0 8 0v-4M12 12v6M5 17a7 7 0 0 0 14 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                  Ingresar con biometría
+                </button>
+                <div class="fp-divider">o</div>
+                <button type="button">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="m5 7 7 5.5L19 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  Ingresar con email y contraseña
+                </button>
+              </div>
+              <p class="fp-register">¿No tenés cuenta? <a href="#">Registrate</a></p>
+            </div>
+          </div>
+        </article>
+
+        <article class="column">
+          <header class="column-head">
+            <h2>Revolut · Teléfono primero</h2>
+            <p>Pregunta directa, botón principal y varios accesos alternativos.</p>
+          </header>
+          <div class="device revolut">
+            <div class="device-inner">
+              <div class="brand-revolut">Revolut</div>
+              <div class="revolut-main">
+                <h3>Welcome back</h3>
+                <p class="sub">Enter the phone number associated with your account</p>
+                <div class="phone">
+                  <button>🇺🇸 &nbsp; +1</button>
+                  <input aria-label="Phone number" placeholder="Phone number">
+                </div>
+                <a class="recovery" href="#">Lost access to your phone number</a>
+                <button class="continue">Continue</button>
+                <div class="or">or continue with</div>
+                <div class="methods">
+                  <div class="method"><i>✉</i>Email</div>
+                  <div class="method"><i>⌑</i>Passkey</div>
+                  <div class="method"><i>G</i>Google</div>
+                  <div class="method"><i>●</i>Apple</div>
+                  <div class="method"><i>▦</i>QR</div>
+                </div>
+              </div>
+              <p class="register">Don’t have an account? <a class="link" href="#">Create account</a></p>
+            </div>
+          </div>
+        </article>
+
+        <article class="column">
+          <header class="column-head">
+            <h2>Stripe · Tarjeta de acceso</h2>
+            <p>Formulario en una tarjeta; recuperación alineada con contraseña.</p>
+          </header>
+          <div class="device stripe">
+            <div class="device-inner">
+              <div class="brand-stripe">stripe</div>
+              <div class="stripe-card">
+                <h3>Sign in to your account</h3>
+                <div class="label-row"><span>Email</span></div>
+                <input aria-label="Stripe email" placeholder="">
+                <div class="label-row"><span>Password</span><a href="#">Forgot your password?</a></div>
+                <input aria-label="Stripe password" type="password" placeholder="">
+                <div class="remember"><i></i>Remember me on this device</div>
+                <button class="submit">Sign in</button>
+                <div class="or">Or sign in with</div>
+                <div class="alt"><span>Google</span><span>Passkey</span><span>SSO</span></div>
+              </div>
+              <p class="register">New to Stripe? <a href="#">Create account</a></p>
+            </div>
+          </div>
+        </article>
+
+        <article class="column">
+          <header class="column-head">
+            <h2>N26 · Minimalista</h2>
+            <p>Campos amplios y recuperación integrada en la fila de contraseña.</p>
+          </header>
+          <div class="device n26">
+            <div class="device-inner">
+              <div class="brand-n26">N26</div>
+              <div class="n26-main">
+                <h3>Login</h3>
+                <div class="field">Email</div>
+                <div class="field">Password <a href="#">Forgot?</a></div>
+                <button class="submit">Log in</button>
+              </div>
+              <p class="register">Don’t have an account? <a href="#">Create an account</a></p>
+              <p class="legal">Privacy Policy &nbsp; · &nbsp; Cookie Policy &nbsp; · &nbsp; Terms</p>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>
