@@ -196,10 +196,10 @@ export default function LoginClient({
       />
       <main
         data-login-screen
-        className="dark relative z-10 min-h-dvh overflow-y-auto px-5 text-[#f2f5f3]"
+        className="dark relative z-10 h-dvh overflow-hidden px-5 text-[#f2f5f3]"
         style={{ fontFamily: "var(--font-inter), Inter, sans-serif" }}
       >
-        <div className="relative mx-auto flex min-h-dvh w-full max-w-[430px] flex-col">
+        <div className="relative mx-auto flex h-full w-full max-w-[430px] flex-col">
           <header
             className="flex justify-center"
             style={{ paddingTop: "calc(env(safe-area-inset-top) + 78px)" }}
@@ -207,7 +207,7 @@ export default function LoginClient({
             <Logo size={28} />
           </header>
 
-          <section className="flex w-full flex-1 flex-col justify-center py-14">
+          <section className="flex min-h-0 w-full flex-1 flex-col justify-[safe_center] overflow-y-auto py-14">
             {!mostrarOpciones && (
               <div className="mb-10 text-center">
                 <h1 className="text-[22px] font-medium leading-tight tracking-[-0.03em]">
