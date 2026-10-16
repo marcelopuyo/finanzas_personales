@@ -8,6 +8,7 @@ import { SessionGuard } from "@/components/auth/session-guard";
 import { SessionExpiredWatcher } from "@/components/auth/session-expired-watcher";
 import { AppLock } from "@/components/auth/app-lock";
 import { SwRegister } from "@/components/pwa/sw-register";
+import { getSessionKind } from "@/backend/src/lib/auth";
 import { biometriaParaBloqueo } from "@/backend/src/queries/webauthn";
 import { THEME_COOKIE } from "@/lib/theme";
 import { ZOOM_ACTIVO } from "@/lib/zoom-contenido";
@@ -86,6 +87,9 @@ export default async function RootLayout({
   // app al reanudar desde segundo plano (components/auth/app-lock.tsx): sin una
   // passkey del usuario en ESTE equipo el bloqueo no se arma.
   const bloqueoBiometrico = await biometriaParaBloqueo();
+  // Una sesión persistente permite volver a abrir y usar la app sin volver a
+  // validar la biometría; el candado de app sigue aplicando a sesiones temporales.
+  const sesionPersistente = (await getSessionKind()) === "persistente";
 
   return (
     <html
@@ -136,7 +140,7 @@ export default async function RootLayout({
               app ya es la pantalla de bloqueo y no se ve ni un frame del
               dashboard mientras llega el resto del HTML (streaming). Mientras la
               app está desbloqueada no dibuja nada. */}
-          <AppLock habilitado={bloqueoBiometrico} />
+          <AppLock habilitado={bloqueoBiometrico && !sesionPersistente} />
           {/* PWA: registra el service worker (solo producción) y avisa cuando hay
               una versión nueva. No dibuja nada. */}
           <SwRegister />

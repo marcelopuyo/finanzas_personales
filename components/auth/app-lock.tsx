@@ -37,9 +37,9 @@ import {
  * **TODOS los dispositivos**, mobile y **escritorio**. Originalmente era solo
  * mobile —ahí "cerrar" la app no la termina y se reanudaba sin pedir nada—, pero
  * el usuario pidió extenderlo: en escritorio el candado se arma al volver de
- * otra pestaña/ventana (según la **gracia**) y **siempre** en un arranque en
- * frío. Se arma solo si este dispositivo tiene una passkey **del usuario
- * logueado** (`habilitado`, resuelto en el servidor): sin passkey, bloquear
+ * otra pestaña/ventana (según la **gracia**) y en un arranque en frío. Se arma
+ * solo si este dispositivo tiene una passkey **del usuario logueado**
+ * (`habilitado`, resuelto en el servidor): sin passkey, bloquear
  * sería dejar al usuario afuera.
  *
  * La **gracia** (cuánto puede estar en segundo plano sin bloquearse) es una
@@ -50,8 +50,9 @@ import {
  * renderiza este overlay ANTES del contenido) para que el primer paint ya sea el
  * bloqueo y no se vea ni un frame de la pantalla: el bug reportado el 2026-09-15
  * era justamente que el dashboard se veía 1-2 s hasta que el sistema avisaba el
- * `visibilitychange`. Ojo: **el arranque bloquea siempre**; la gracia aplica solo
- * al volver del segundo plano.
+ * `visibilitychange`. Una sesión persistente deshabilita el candado desde el
+ * layout raíz para respetar "mantener la sesión"; la gracia aplica al volver del
+ * segundo plano en sesiones temporales.
  *
  * ⚠️ Si la sesión venció por **inactividad** (1 h, `lib/session-idle.ts`), el
  * desbloqueo recibe 401 y la app manda a `/login`: ahí la biometría ya no alcanza
