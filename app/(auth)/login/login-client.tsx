@@ -156,31 +156,36 @@ export default function LoginClient({
   }
 
   return (
-    <main
-      className="dark relative min-h-dvh overflow-y-auto bg-[#0b1014] px-5 text-[#f2f5f3]"
-      style={{
-        fontFamily: "var(--font-inter), Inter, sans-serif",
-        background:
-          "radial-gradient(ellipse at 50% 0%, #1d302b 0, transparent 54%), linear-gradient(160deg, #10171b, #0d1317 76%)",
-      }}
-    >
-      <div className="relative mx-auto flex min-h-dvh w-full max-w-[430px] flex-col">
-        <header
-          className="flex justify-center"
-          style={{ paddingTop: "calc(env(safe-area-inset-top) + 62px)" }}
-        >
-          <Logo size={28} />
-        </header>
+    <>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 z-0 bg-[#0d1317]"
+        style={{
+          backgroundImage:
+            "radial-gradient(ellipse at 50% 0%, #1d302b 0, transparent 54%), linear-gradient(160deg, #10171b, #0d1317 76%)",
+        }}
+      />
+      <main
+        className="dark relative z-10 min-h-dvh overflow-y-auto px-5 text-[#f2f5f3]"
+        style={{ fontFamily: "var(--font-inter), Inter, sans-serif" }}
+      >
+        <div className="relative mx-auto flex min-h-dvh w-full max-w-[430px] flex-col">
+          <header
+            className="flex justify-center"
+            style={{ paddingTop: "calc(env(safe-area-inset-top) + 62px)" }}
+          >
+            <Logo size={28} />
+          </header>
 
-        <section className="my-auto w-full py-14">
-          <div className="mb-7 text-center">
-            <h1 className="text-[28px] font-semibold leading-tight tracking-[-0.04em]">
-              Bienvenido de nuevo
-            </h1>
-            <p className="mx-auto mt-2 max-w-[290px] text-[14px] leading-relaxed text-[#99aaa9]">
-              Elegí cómo querés ingresar.
-            </p>
-          </div>
+          <section className="my-auto w-full py-14">
+            <div className="mb-7 text-center">
+              <h1 className="text-[22px] font-medium leading-tight tracking-[-0.03em]">
+                Bienvenido de nuevo
+              </h1>
+              <p className="mx-auto mt-2 max-w-[290px] text-[14px] leading-relaxed text-[#99aaa9]">
+                Elegí cómo querés ingresar.
+              </p>
+            </div>
 
           {verificado && (
             <p className="mb-4 rounded-xl border border-[#51cf6640] bg-[#51cf6618] px-3.5 py-3 text-[13px] text-[#a7e5ae]">
@@ -347,16 +352,20 @@ export default function LoginClient({
           )}
         </section>
 
-        <p className="pb-8 text-center text-[13px] text-[#99aaa9]">
-          ¿No tenés cuenta?{" "}
-          <Link
-            href="/register"
-            className="font-semibold text-[#c5ef55] hover:underline"
+          <p
+            className="pb-8 text-center text-[13px] text-[#99aaa9]"
+            style={{ paddingBottom: "calc(2rem + env(safe-area-inset-bottom))" }}
           >
-            Registrate
-          </Link>
-        </p>
-      </div>
-    </main>
+            ¿No tenés cuenta?{" "}
+            <Link
+              href="/register"
+              className="font-semibold text-[#c5ef55] hover:underline"
+            >
+              Registrate
+            </Link>
+          </p>
+        </div>
+      </main>
+    </>
   );
 }
