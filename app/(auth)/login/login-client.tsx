@@ -68,6 +68,33 @@ export default function LoginClient({
     tienePasskey ? "opciones" : "credenciales"
   );
 
+  useEffect(() => {
+    const metas = Array.from(
+      document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
+    );
+    const coloresAnteriores = metas.map((meta) => meta.content);
+    let metaAgregada: HTMLMetaElement | null = null;
+
+    if (metas.length === 0) {
+      metaAgregada = document.createElement("meta");
+      metaAgregada.name = "theme-color";
+      document.head.append(metaAgregada);
+      metas.push(metaAgregada);
+    }
+
+    for (const meta of metas) meta.content = "#10171b";
+
+    return () => {
+      metas.forEach((meta, index) => {
+        if (meta === metaAgregada) {
+          meta.remove();
+        } else {
+          meta.content = coloresAnteriores[index];
+        }
+      });
+    };
+  }, []);
+
   // ¿Este dispositivo puede usar biometría? (API del navegador: no existe en el
   // servidor). Si no puede, el botón no se muestra y queda el login normal.
   useEffect(() => {
@@ -161,11 +188,14 @@ export default function LoginClient({
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 z-0 bg-[#0d1317]"
         style={{
+          bottom: "calc(-1 * env(safe-area-inset-bottom))",
+          backgroundColor: "#10171b",
           backgroundImage:
-            "radial-gradient(ellipse at 50% 0%, #1d302b 0, transparent 54%), linear-gradient(160deg, #10171b, #0d1317 76%)",
+            "radial-gradient(ellipse at 50% 0%, #1d302b 0, transparent 58%)",
         }}
       />
       <main
+        data-login-screen
         className="dark relative z-10 min-h-dvh overflow-y-auto px-5 text-[#f2f5f3]"
         style={{ fontFamily: "var(--font-inter), Inter, sans-serif" }}
       >

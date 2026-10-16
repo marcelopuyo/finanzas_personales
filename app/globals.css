@@ -135,6 +135,11 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+html:has([data-login-screen]),
+body:has([data-login-screen]) {
+  background-color: #10171b;
+}
+
 /* Recharts: evitar el recuadro/highlight del navegador al tocar los segmentos
    de las donas en móvil (tap-highlight de Android + anillo de foco). */
 .recharts-surface,
@@ -480,4 +485,3 @@ select,
 textarea {
   touch-action: manipulation;
 }
-
