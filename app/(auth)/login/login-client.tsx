@@ -202,20 +202,22 @@ export default function LoginClient({
         <div className="relative mx-auto flex min-h-dvh w-full max-w-[430px] flex-col">
           <header
             className="flex justify-center"
-            style={{ paddingTop: "calc(env(safe-area-inset-top) + 62px)" }}
+            style={{ paddingTop: "calc(env(safe-area-inset-top) + 78px)" }}
           >
             <Logo size={28} />
           </header>
 
           <section className="my-auto w-full py-14">
-            <div className="mb-7 text-center">
-              <h1 className="text-[22px] font-medium leading-tight tracking-[-0.03em]">
-                Bienvenido de nuevo
-              </h1>
-              <p className="mx-auto mt-2 max-w-[290px] text-[14px] leading-relaxed text-[#99aaa9]">
-                Elegí cómo querés ingresar.
-              </p>
-            </div>
+            {!mostrarOpciones && (
+              <div className="mb-7 text-center">
+                <h1 className="text-[22px] font-medium leading-tight tracking-[-0.03em]">
+                  Bienvenido de nuevo
+                </h1>
+                <p className="mx-auto mt-2 max-w-[290px] text-[14px] leading-relaxed text-[#99aaa9]">
+                  Elegí cómo querés ingresar.
+                </p>
+              </div>
+            )}
 
           {verificado && (
             <p className="mb-4 rounded-xl border border-[#51cf6640] bg-[#51cf6618] px-3.5 py-3 text-[13px] text-[#a7e5ae]">
@@ -235,38 +237,45 @@ export default function LoginClient({
           )}
 
           {mostrarOpciones ? (
-            <div className="space-y-4">
-              <button
-                type="button"
-                onClick={handleBiometria}
-                disabled={loadingBiometria || loading}
-                className={actionCls}
-              >
-                <Fingerprint className="h-5 w-5 shrink-0" aria-hidden="true" />
-                {loadingBiometria
-                  ? "Esperando biometría..."
-                  : "Ingresar con biometría"}
-              </button>
+            <>
+              <div className="-mx-1.5 rounded-[20px] border border-[#ffffff14] bg-[#11191fbb] px-4 py-[19px] shadow-[0_20px_50px_#0003,inset_0_1px_#ffffff08] backdrop-blur-xl">
+                <h1 className="mb-[29px] text-center text-[23px] font-normal leading-[1.15] tracking-normal">
+                  Bienvenido de nuevo
+                </h1>
+                <div className="space-y-[15px]">
+                  <button
+                    type="button"
+                    onClick={handleBiometria}
+                    disabled={loadingBiometria || loading}
+                    className="flex min-h-11 w-full items-center justify-center gap-2.5 rounded-[14px] border border-[#c5ef5550] bg-[#c5ef5517] px-4 text-[13px] font-bold text-[#f2f5f3] shadow-[inset_0_1px_#ffffff12] backdrop-blur transition-colors hover:bg-[#c5ef5528] disabled:cursor-wait disabled:opacity-55"
+                  >
+                    <Fingerprint className="h-[17px] w-[17px] shrink-0" aria-hidden="true" />
+                    {loadingBiometria
+                      ? "Esperando biometría..."
+                      : "Ingresar con biometría"}
+                  </button>
 
-              <div className="flex items-center gap-3 py-1 text-[12px] text-[#73827f]">
-                <span className="h-px flex-1 bg-[#27353c]" />
-                <span>o</span>
-                <span className="h-px flex-1 bg-[#27353c]" />
+                  <div className="flex items-center gap-3 text-[11px] text-[#73827f]">
+                    <span className="h-px flex-1 bg-[#27353c]" />
+                    <span>o</span>
+                    <span className="h-px flex-1 bg-[#27353c]" />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setErrorBiometria("");
+                      setModoIngreso("credenciales");
+                    }}
+                    className="flex min-h-11 w-full items-center justify-center gap-2.5 rounded-[14px] border border-[#c5ef5550] bg-[#c5ef5517] px-4 text-[13px] font-bold text-[#f2f5f3] shadow-[inset_0_1px_#ffffff12] backdrop-blur transition-colors hover:bg-[#c5ef5528]"
+                  >
+                    <Mail className="h-[17px] w-[17px] shrink-0" aria-hidden="true" />
+                    Ingresar con email y contraseña
+                  </button>
+                </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setErrorBiometria("");
-                  setModoIngreso("credenciales");
-                }}
-                className={actionCls}
-              >
-                <Mail className="h-5 w-5 shrink-0" aria-hidden="true" />
-                Ingresar con email y contraseña
-              </button>
-
-              <div className="pt-2">
+              <div className="mt-5 px-1">
                 <Checkbox
                   checked={recordar}
                   onChange={setRecordar}
@@ -275,11 +284,11 @@ export default function LoginClient({
                 />
               </div>
               {errorBiometria && (
-                <p role="alert" className="text-center text-[12px] text-[#ff9b9b]">
+                <p role="alert" className="mt-3 text-center text-[12px] text-[#ff9b9b]">
                   {errorBiometria}
                 </p>
               )}
-            </div>
+            </>
           ) : (
             <>
               {tienePasskey && webAuthn && (
