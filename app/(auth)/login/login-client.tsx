@@ -207,9 +207,9 @@ export default function LoginClient({
             <Logo size={28} />
           </header>
 
-          <section className="my-auto w-full py-14">
+          <section className="flex w-full flex-1 flex-col justify-center py-14">
             {!mostrarOpciones && (
-              <div className="mb-7 text-center">
+              <div className="mb-10 text-center">
                 <h1 className="text-[22px] font-medium leading-tight tracking-[-0.03em]">
                   Bienvenido de nuevo
                 </h1>
@@ -239,7 +239,7 @@ export default function LoginClient({
           {mostrarOpciones ? (
             <>
               <div className="-mx-1.5 rounded-[20px] border border-[#ffffff14] bg-[#11191fbb] px-4 py-[19px] shadow-[0_20px_50px_#0003,inset_0_1px_#ffffff08] backdrop-blur-xl">
-                <h1 className="mb-[29px] text-center text-[23px] font-normal leading-[1.15] tracking-normal">
+                <h1 className="mb-[40px] text-center text-[23px] font-normal leading-[1.15] tracking-normal">
                   Bienvenido de nuevo
                 </h1>
                 <div className="space-y-[15px]">
@@ -391,8 +391,8 @@ export default function LoginClient({
           )}
         </section>
 
-          <p
-            className="pb-8 text-center text-[13px] text-[#99aaa9]"
+          <footer
+            className="mt-auto pb-8 text-center text-[13px] text-[#99aaa9]"
             style={{ paddingBottom: "calc(2rem + env(safe-area-inset-bottom))" }}
           >
             ¿No tenés cuenta?{" "}
@@ -402,7 +402,7 @@ export default function LoginClient({
             >
               Registrate
             </Link>
-          </p>
+          </footer>
         </div>
       </main>
     </>
