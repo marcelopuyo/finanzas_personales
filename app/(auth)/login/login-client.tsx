@@ -207,7 +207,10 @@ export default function LoginClient({
             <Logo size={28} />
           </header>
 
-          <section className="flex min-h-0 w-full flex-1 flex-col justify-[safe_center] overflow-y-auto py-14">
+          {/* Centrado con márgenes automáticos (no `justify-center`): con scroll
+              propio, `justify-center` deja el contenido que desborda fuera del
+              área desplazable y el título se vuelve inalcanzable. */}
+          <section className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto py-14 [&>*:first-child]:mt-auto [&>*:last-child]:mb-auto">
             {!mostrarOpciones && (
               <div className="mb-10 text-center">
                 <h1 className="text-[22px] font-medium leading-tight tracking-[-0.03em]">
