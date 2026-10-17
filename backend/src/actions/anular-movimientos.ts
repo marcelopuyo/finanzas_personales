@@ -28,7 +28,9 @@ import { crearHistoricoCuenta, refresh } from "../lib/action-helpers";
  *  - Pago Gasto    → revierte saldo de cuenta + saldo/`fechaPago` del gasto
  *  - Gasto Directo → igual + soft-delete del gasto (deshace toda la operación)
  *  - Transferencia → revierte las 2 cuentas (vía `grupoId`) y anula ambos movimientos
- *  - Cobro Propina → revierte saldo
+ *  - Cobro Propina → **NO se anula desde acá**: se revierte editando o eliminando
+ *    la jornada que lo originó (así el monto de la jornada y la cuenta quedan
+ *    sincronizados). La acción devuelve un error explicativo.
  *
  * Limitaciones (decididas): las transferencias/cobros legacy (sin grupoId /
  * periodoTrabajoId) se anulan parcialmente: la transferencia legacy NO se puede
@@ -62,6 +64,22 @@ export async function anularMovimiento(movimientoId: string) {
     if (!mov) throw new Error("Movimiento no encontrado o ya anulado");
 
     const conceptoNombre = mov.concepto?.nombre ?? "";
+
+    // ============================================================
+    // COBRO PROPINA — no se anula desde el historial
+    // ============================================================
+    // El depósito de propina es parte de la jornada (`jornada.montoPropina` +
+    // este movimiento). Anularlo solo desde la cuenta dejaría la jornada
+    // mostrando una propina que ya no está depositada (y el devengo de ingresos
+    // seguiría contándola). La corrección tiene que pasar por la jornada:
+    // editarla (revierte y re-crea el depósito) o eliminarla.
+    if (conceptoNombre === "Cobro Propina") {
+      throw new Error(
+        mov.jornadaTrabajo
+          ? "Las propinas cobradas no pueden eliminarse manualmente. Para hacerlo, editá o eliminá la jornada asociada (si ya está cobrada, primero anulá el cobro)."
+          : "Las propinas cobradas no pueden eliminarse manualmente."
+      );
+    }
 
     // ============================================================
     // TRANSFERENCIA — revierte las 2 cuentas vía grupoId
@@ -188,7 +206,7 @@ export async function anularMovimiento(movimientoId: string) {
       }
       // Los cobros **legacy** (sin vínculo al período) sólo revierten el saldo.
     } else {
-      // ---- Cobro Propina / Ajuste (y cualquier otro de cuenta única) ----
+      // ---- Ajuste (y cualquier otro de cuenta única) ----
       // El monto de cuenta ya tiene el signo del efecto en la cuenta, así que
       // revertir es restar exactamente lo que se sumó (moneda de la cuenta).
       cuenta.saldo -= mov.montoCuentaMonedaOrigen;

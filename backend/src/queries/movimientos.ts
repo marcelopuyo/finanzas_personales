@@ -73,6 +73,12 @@ export interface HistorialMovimientoOut {
   motivo: string;
   categoria: string | null;
   saldoPosterior: number;
+  /**
+   * `true` si es el depósito de propina de una jornada (concepto "Cobro
+   * Propina"). Esos movimientos no se anulan desde el historial: se revierten
+   * editando o eliminando la jornada. La UI lo usa para explicarlo al usuario.
+   */
+  esPropina: boolean;
 }
 
 export async function getHistorialMovimientosCuenta(
@@ -154,6 +160,7 @@ export async function getHistorialMovimientosCuenta(
       // gasto y, por último, el nombre del concepto (filas legacy sin `motivo`).
       motivo: m.motivo ?? (desc ? desc : (m.concepto?.nombre ?? "")),
       categoria: m.concepto?.categoria ?? null,
+      esPropina: m.concepto?.nombre === "Cobro Propina",
       saldoPosterior: saldo,
     });
   }

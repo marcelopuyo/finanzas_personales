@@ -212,6 +212,23 @@ export function MovimientosCuentaClient({
     }
   };
 
+  /**
+   * Las propinas cobradas no se anulan desde el historial: se revierten
+   * editando o eliminando la jornada que las originó. Se avisa desde acá (la
+   * acción del backend también lo bloquea) para no abrir un diálogo de borrado
+   * que va a terminar en error.
+   */
+  const intentarEliminar = (mov: HistorialMovimientoOut) => {
+    if (mov.esPropina) {
+      toast.info(
+        "Las propinas cobradas no pueden eliminarse manualmente. Para hacerlo, editá o eliminá la jornada asociada (si ya está cobrada, primero anulá el cobro).",
+        { duration: 7000 }
+      );
+      return;
+    }
+    setPendingAnular(mov);
+  };
+
   /** Acción del swipe de una fila mobile: solo Eliminar, como en gastos. */
   const accionesFila = (rowId: string): SwipeRowAction[] | null => {
     const mov = rows.find((m) => m.id === rowId);
@@ -222,7 +239,7 @@ export function MovimientosCuentaClient({
         label: "Eliminar",
         icon: Trash2,
         tone: "danger",
-        onClick: () => setPendingAnular(mov),
+        onClick: () => intentarEliminar(mov),
       },
     ];
   };
@@ -296,7 +313,7 @@ export function MovimientosCuentaClient({
         <div className="flex items-center justify-center">
           <button
             type="button"
-            onClick={() => setPendingAnular(row.original)}
+            onClick={() => intentarEliminar(row.original)}
             disabled={reverting}
             className="rounded p-1 text-subtitle transition-colors hover:bg-muted hover:text-danger"
             aria-label="Eliminar movimiento"
