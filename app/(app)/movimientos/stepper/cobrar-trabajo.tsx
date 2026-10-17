@@ -9,8 +9,8 @@
 // **Orden de pantallas (2026-09-26, pedido del usuario).** La primera decisión es
 // el TRABAJO a cobrar y, según su modalidad:
 //  · `horas_variables` / `por_tarea` → **sub-paso 1**: tildar las jornadas/tareas
-//    (todas premarcadas) · **sub-paso 2**: fecha del día + cuenta + monto
-//    **precargado** con lo calculado (editable).
+//    (todas premarcadas) + el monto **precargado** con lo calculado (editable) ·
+//    **sub-paso 2**: fecha del día + cuenta + monto (editable).
 //  · `fijo` / `horas_fijas` → **una sola pantalla** con las opciones generales
 //    (rango declarado y, en horas fijas, las horas) + fecha + cuenta + monto.
 // Después sigue la CONFIRMACIÓN (paso del wizard) y el guardado.
@@ -21,7 +21,6 @@ import { useMovimientoStepper } from "./stepper-context";
 import {
   StepShellFintech,
   HeroeFintech,
-  HeroeValor,
   BotonPrincipal,
   BotonSecundario,
   DateField,
@@ -81,11 +80,18 @@ export function CobrarTrabajo() {
 
   // Monto **calculado** (lo que "correspondía"): Σ de los ítems tildados · horas ×
   // precio · el propio monto declarado en `fijo` (ahí calculado = cobrado).
+  const seleccionActual = seleccionDeItems(items, tildados);
   const calculado = declarada
     ? esHorasFijas
       ? Number((data.horasPeriodo * (trabajo?.precioHora ?? 0)).toFixed(2))
       : data.montoOrigen
-    : seleccionDeItems(items, tildados).monto;
+    : seleccionActual.monto;
+  /**
+   * ¿El usuario ajustó el monto a mano? En las variables se detecta porque difiere
+   * de la suma de lo tildado. El ajuste se **respeta** al tildar/destildar ítems
+   * (P2: el cobrado es un snapshot que puede no coincidir con el calculado).
+   */
+  const montoAjustado = !declarada && data.montoOrigen !== calculado;
 
   // Etiqueta del trabajo elegido (se muestra como dato en las pantallas siguientes,
   // donde ya no hay selector).
@@ -150,9 +156,11 @@ export function CobrarTrabajo() {
       idsTareas: s.idsTareas,
       fechaDesde: s.fechaDesde,
       fechaHasta: s.fechaHasta,
-      // El monto vuelve al calculado; después el usuario puede editarlo (la
-      // diferencia es sólo un snapshot, no se sigue ni ajusta el ingreso — P2).
-      montoOrigen: s.monto,
+      // El monto vuelve al calculado, **salvo que el usuario lo haya ajustado a
+      // mano** en el héroe: ese ajuste se conserva (P2: la diferencia es sólo un
+      // snapshot, no se sigue ni ajusta el ingreso). Sin ítems, va 0.
+      montoOrigen:
+        ids.length === 0 || !montoAjustado ? s.monto : data.montoOrigen,
     });
   };
 
@@ -313,8 +321,9 @@ export function CobrarTrabajo() {
 
   // ── Layout "fintech" (diseño D, 2026-10-03) ─────────────────────────────
   // El héroe cambia con la pantalla: la LISTA de trabajos no tiene número
-  // protagonista, la selección muestra el **total de lo tildado** (en vivo) y la
-  // última pantalla deja el **monto editable** en la zona del pulgar.
+  // protagonista, la selección muestra el **total de lo tildado** (en vivo y
+  // **editable**, con lo calculado como referencia) y la última pantalla deja el
+  // **monto editable** en la zona del pulgar.
   const isoCuenta =
     options.cuentas.find((c) => c.id === data.cuentaOrigen)?.moneda
       ?.codigoISO ?? "";
@@ -326,10 +335,22 @@ export function CobrarTrabajo() {
       total={1 + totalSubpasos}
       heroe={
         enTrabajo ? null : enSeleccion ? (
-          <HeroeFintech etiqueta="Total de lo tildado">
-            <HeroeValor>
-              {numberToCurrency(calculado, options.monedaISO)}
-            </HeroeValor>
+          /* El monto **calculado** (Σ de lo tildado) se precarga acá y queda
+             **editable**: el cobrado puede no coincidir (P2) y así el usuario no
+             tiene que ir a la pantalla siguiente para ajustarlo. */
+          <HeroeFintech
+            etiqueta={
+              montoAjustado
+                ? `Calculado: ${numberToCurrency(calculado, options.monedaISO)}`
+                : "Total de lo tildado · podés editarlo"
+            }
+          >
+            <NumberField
+              hero
+              label="Monto a cobrar"
+              value={data.montoOrigen}
+              onChange={(v) => handleSetData({ montoOrigen: v })}
+            />
           </HeroeFintech>
         ) : (
           <HeroeFintech
