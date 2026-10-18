@@ -41,6 +41,12 @@ interface SwipeRowActionsProps {
   onRowTap?: (rowId: string) => void;
   /** Permite iniciar el gesto horizontal desde cualquier parte de una fila con acciones. */
   swipeFromAnywhere?: boolean;
+  /**
+   * Apaga el gesto (touch **y** mouse) y cierra el menú si estaba abierto. Se usa
+   * en pantallas grandes, donde las acciones se ofrecen como botones visibles
+   * (`lg`), para que la fila no quede arrastrable con el mouse.
+   */
+  disabled?: boolean;
 }
 
 /** Recorrido mínimo antes de decidir si el gesto es horizontal (menú) o
@@ -268,6 +274,7 @@ export function SwipeRowActions({
   actionsFor,
   onRowTap,
   swipeFromAnywhere = false,
+  disabled = false,
 }: SwipeRowActionsProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
@@ -322,9 +329,9 @@ export function SwipeRowActions({
 
   // Callbacks/valor SIEMPRE frescos: los listeners nativos se registran una sola
   // vez (como en el pull-to-refresh) y leen de acá.
-  const cbRef = useRef({ actionsFor, onRowTap, swipeFromAnywhere });
+  const cbRef = useRef({ actionsFor, onRowTap, swipeFromAnywhere, disabled });
   useEffect(() => {
-    cbRef.current = { actionsFor, onRowTap, swipeFromAnywhere };
+    cbRef.current = { actionsFor, onRowTap, swipeFromAnywhere, disabled };
   });
 
   const paintStrip = useCallback((px: number) => {
@@ -380,6 +387,15 @@ export function SwipeRowActions({
     },
     [animateClose]
   );
+
+  // El gesto se apagó (p. ej. la ventana pasó a desktop) con un menú abierto: se
+  // cierra sin animación. Va en un `setTimeout` —no en el cuerpo del efecto—
+  // porque `closeOpen` hace `setState` (regla de lint de la app).
+  useEffect(() => {
+    if (!disabled) return;
+    const t = setTimeout(() => closeOpen(true), 0);
+    return () => clearTimeout(t);
+  }, [disabled, closeOpen]);
 
   // La franja se monta al empezar el gesto: acá se la deja en el ancho que
   // corresponde (0 si la fila estaba cerrada, el ancho total si ya estaba
@@ -723,7 +739,7 @@ export function SwipeRowActions({
   // (mismo patrón que `pull-to-refresh.tsx`).
   useEffect(() => {
     const el = wrapRef.current;
-    if (!el) return;
+    if (!el || disabled) return;
     const onStart = (e: TouchEvent) => {
       const t = e.touches[0];
       if (t) startDrag(e.target as HTMLElement, t.clientX, t.clientY);
@@ -745,21 +761,21 @@ export function SwipeRowActions({
       el.removeEventListener("touchend", onEnd);
       el.removeEventListener("touchcancel", onCancel);
     };
-  }, [startDrag, moveDrag, endDrag]);
+  }, [startDrag, moveDrag, endDrag, disabled]);
 
   // El mouse usa Pointer Events (con mouse no hay gesto de scroll que cancelar).
   // Los pointer events de un TOUCH se ignoran: de esos se ocupan los touch
   // listeners de arriba.
   const onPointerDown = (e: React.PointerEvent) => {
-    if (e.pointerType !== "mouse") return;
+    if (disabled || e.pointerType !== "mouse") return;
     startDrag(e.target as HTMLElement, e.clientX, e.clientY);
   };
   const onPointerMove = (e: React.PointerEvent) => {
-    if (e.pointerType !== "mouse") return;
+    if (disabled || e.pointerType !== "mouse") return;
     moveDrag(e.clientX, e.clientY);
   };
   const onPointerUp = (e: React.PointerEvent) => {
-    if (e.pointerType !== "mouse") return;
+    if (disabled || e.pointerType !== "mouse") return;
     endDrag(false);
   };
 

@@ -15,6 +15,7 @@ import type {
   LiquidacionOut,
 } from "@/backend/src/queries/trabajos";
 import { cn, decimalToTime, numberToCurrency } from "@/lib/utils";
+import { useMediaQuery } from "@/lib/use-cliente";
 import type { RepartoPendientes } from "@/lib/cobros-estimados";
 import { SIN_TRABAJO } from "@/lib/filtros-dashboard";
 import { etiquetaConteoItems } from "@/lib/trabajo-texto";
@@ -227,6 +228,12 @@ export function PeriodosGrid({
   // Fila abierta (por `key`): el desglose se muestra de a una.
   const [abierta, setAbierta] = useState<string | null>(null);
   const [pestana, setPestana] = useState("enCurso");
+  /**
+   * En `lg` y más (mismo breakpoint que el resto de la app) las acciones de un
+   * ítem son **botones visibles** en la fila: el gesto se apaga para que la fila
+   * no quede arrastrable con el mouse.
+   */
+  const esDesktop = useMediaQuery("(min-width: 1024px)");
   // ⚠️ La primera tanda de cobradas es SOLO la semilla: a partir del montaje la
   // lista la maneja el cliente (tandas acumuladas con el scroll). No se
   // sincroniza con cambios posteriores de la prop a propósito: si no, cada
@@ -564,7 +571,11 @@ export function PeriodosGrid({
 
   return (
     <>
-      <SwipeRowActions actionsFor={accionesFila} swipeFromAnywhere>
+      <SwipeRowActions
+        actionsFor={accionesFila}
+        swipeFromAnywhere
+        disabled={esDesktop}
+      >
         <div className="overflow-hidden rounded-2xl border border-border bg-card px-3">
           <div className="flex justify-center border-b border-border py-2">
             <Tabs
@@ -719,6 +730,34 @@ export function PeriodosGrid({
                         >
                           {numberToCurrency(i.monto || 0, currency)}
                         </span>
+                        {/* Acciones del ítem en pantallas grandes: en mobile las
+                            revela el swipe; acá van siempre visibles. */}
+                        {(onEditar || onEliminar) && (
+                          <div className="hidden shrink-0 items-center gap-1 lg:flex">
+                            {onEditar && (
+                              <button
+                                type="button"
+                                onClick={() => onEditar(i)}
+                                className="-my-1 rounded p-1 text-subtitle transition-colors hover:bg-muted hover:text-header"
+                                aria-label="Editar ítem"
+                                title="Editar"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                            {onEliminar && (
+                              <button
+                                type="button"
+                                onClick={() => onEliminar(i)}
+                                className="-my-1 rounded p-1 text-subtitle transition-colors hover:bg-muted hover:text-danger"
+                                aria-label="Eliminar ítem"
+                                title="Eliminar"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))
                   ) : (

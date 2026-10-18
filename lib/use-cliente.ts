@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import { leerUltimoEmail } from "./ultimo-email";
 
 /**
@@ -33,4 +33,28 @@ export function useMontado(): boolean {
  */
 export function useUltimoEmail(): string {
   return useSyncExternalStore(suscribirNada, leerUltimoEmail, () => "");
+}
+
+/**
+ * ¿La ventana cumple la media query? `false` en el SSR y en el render de
+ * hidratación (igual que `useMontado`) y el valor real apenas hidrata,
+ * actualizándose al redimensionar.
+ *
+ * A diferencia de las clases `lg:` de Tailwind, esto sirve para **comportamiento**
+ * (no para estilos): p. ej. apagar un gesto táctil en pantallas grandes.
+ */
+export function useMediaQuery(query: string): boolean {
+  const suscribir = useCallback(
+    (onChange: () => void) => {
+      const mql = window.matchMedia(query);
+      mql.addEventListener("change", onChange);
+      return () => mql.removeEventListener("change", onChange);
+    },
+    [query]
+  );
+  return useSyncExternalStore(
+    suscribir,
+    () => window.matchMedia(query).matches,
+    () => false
+  );
 }
