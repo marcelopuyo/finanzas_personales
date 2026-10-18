@@ -49,9 +49,13 @@ import { usePrefetchNav } from "@/components/ui/nav-progress";
  * opciones" (ej. Préstamos). En wizards, CRUDs y pantallas de detalle manda el `‹`
  * de la cabecera (§210), así no quedan 3 elementos fijos apilados en un celular.
  *
- * ⚠️ **Desktop**: por ahora la barra se ve en todos los tamaños (el sidebar de
- * `lg:` quedó parqueado para una segunda fase). Por eso va centrada y con ancho
- * máximo: en pantalla grande se lee como una barra flotante, no como un borde.
+ * ⚠️ **Desktop (2026-10-17)**: la barra sigue visible en todos los tamaños (el
+ * sidebar de `lg:` continúa parqueado para una segunda fase), pero en pantallas
+ * grandes pasa a ser un **dock flotante**: 464 px, centrado, despegado 1.5rem del
+ * borde, `rounded-full`, borde propio y sombra (ver el `@media (min-width: 1024px)`
+ * de `[data-barra-nav]` en `globals.css`). Antes heredaba la estética mobile
+ * —banda angosta pegada al borde con `border-t`— y se leía como una barra de
+ * celular flotando sobre la tabla. El ítem activo suma una "píldora" de fondo.
  *
  * 🔑 **Estado activo**: `/dashboard` matchea **exacto** (si no, cualquier
  * `/dashboard/*` marcaría también Inicio); el resto matchea **por prefijo**, así
@@ -140,23 +144,16 @@ export default function BottomNav() {
       // (misma idea que `data-barra-inferior`, ver `globals.css`).
       data-barra-nav=""
       aria-label="Secciones"
-      // ⚠️ Posición y alto (2026-10-03, reportado en un **iPhone Pro Max**, en el
-      // Pro se veía perfecto con el mismo build):
-      // · `height` = banda de contenido (3.5rem) + safe-area **topado** en 2.5rem:
-      //   el alto del viewport de iOS en algunos modelos/versiones no llega hasta
-      //   el borde físico de la pantalla y un inset enorme estiraba la barra.
-      // · `paddingBottom` = inset **entre 0.5 y 1.75rem**: mantiene el contenido a
-      //   una distancia fija (~28px) del borde inferior en TODOS los dispositivos
-      //   (sin tope, con un inset grande se iba al medio de la barra).
+      // ⚠️ Posición y alto: mobile y escritorio se resuelven en `globals.css`
+      // (`[data-barra-nav]` + su `@media (min-width: 1024px)`) para poder cambiar
+      // de banda pegada al borde a **dock flotante** sin `!important`.
+      // · mobile: alto = banda (3.5rem) + safe-area topado a 2.5rem; el
+      //   `padding-bottom` mantiene el contenido a ~28px del borde en todos los
+      //   dispositivos.
+      // · escritorio: dock centrado de 464px, despegado 1.5rem, `rounded-full`,
+      //   borde propio y sombra (2026-10-17: antes heredaba la estética mobile y se
+      //   leía como una barra de celular flotando sobre la tabla).
       className="fixed bottom-0 left-0 right-0 z-40 mx-auto flex max-w-lg items-stretch border-t border-border barra-nav-vidrio"
-      style={{
-        height: "calc(3.5rem + min(env(safe-area-inset-bottom), 2.5rem))",
-        paddingBottom: "clamp(0.75rem, env(safe-area-inset-bottom), 1.75rem)",
-        // Anclaje al borde **visible**: la variable la mantiene `AnclajeBarras`
-        // (vale `0px` en el caso normal ⇒ mismo comportamiento de siempre). Ver
-        // `components/layout/anclaje-barras.tsx`.
-        bottom: "var(--fp-desfase-inferior, 0px)",
-      }}
     >
       {/* Faldón: pinta el fondo de la barra **por debajo** de ella. Si el viewport
           de iOS termina antes que la pantalla (el caso del Pro Max), la franja que
@@ -164,7 +161,7 @@ export default function BottomNav() {
           se ve pegada al borde. Si no hay franja, queda fuera de pantalla. */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute left-0 right-0 top-full h-40 bg-sidebar"
+        className="pointer-events-none absolute left-0 right-0 top-full h-40 bg-sidebar lg:hidden"
       />
       {TABS.map((t) => {
         const activo = esActivo(t.href, ruta);
@@ -178,8 +175,12 @@ export default function BottomNav() {
             className={cn(
               // `justify-end`: el contenido se apoya arriba del padding del
               // safe-area ⇒ queda siempre a la misma distancia del borde inferior.
-              "flex flex-1 flex-col items-center justify-end gap-1 transition-colors",
-              activo ? "text-header" : "text-subtitle hover:text-label"
+              // En escritorio el dock lo centra y el activo se marca con una
+              // "píldora" de fondo (2026-10-17).
+              "flex flex-1 flex-col items-center justify-end gap-1 transition-colors lg:justify-center lg:rounded-full",
+              activo
+                ? "text-header lg:bg-white/10"
+                : "text-subtitle hover:text-label lg:hover:bg-white/5"
             )}
           >
             <Icono size={22} />
@@ -202,8 +203,10 @@ export default function BottomNav() {
         aria-haspopup="dialog"
         aria-expanded={abierto}
         className={cn(
-          "flex flex-1 flex-col items-center justify-end gap-1 transition-colors",
-          masActivo ? "text-header" : "text-subtitle hover:text-label"
+          "flex flex-1 flex-col items-center justify-end gap-1 transition-colors lg:justify-center lg:rounded-full",
+          masActivo
+            ? "text-header lg:bg-white/10"
+            : "text-subtitle hover:text-label lg:hover:bg-white/5"
         )}
       >
         {masActivo ? <HamburgerMenuDuotone size={22} /> : <HamburgerMenuLinear size={22} />}

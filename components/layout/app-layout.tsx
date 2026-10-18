@@ -59,12 +59,10 @@ export default function AppLayout({
             típicamente los botones "Siguiente"/"Guardar" de los formularios, que van
             EN EL FLUJO— nunca quede tapado. Va como elemento y no como
             `padding-bottom` del contenedor de scroll porque el padding de un
-            `overflow: auto` no es confiable en iOS. La altura suma el safe-area
-            porque la barra y los FAB también suben con él. */}
-        <div
-          aria-hidden="true"
-          style={{ height: "calc(8.75rem + env(safe-area-inset-bottom))" }}
-        />
+            `overflow: auto` no es confiable en iOS. El alto vive en el token
+            `--fp-espaciador-pie` (`globals.css`), que suma el safe-area en mobile y
+            se achica en `lg:` porque ahí la barra es un dock flotante más bajo. */}
+        <div aria-hidden="true" className="h-[var(--fp-espaciador-pie)]" />
       </PullToRefresh>
       {/* Barra inferior de navegación (2026-10-01, rama `rediseno-ui`): 5 destinos
           de primer nivel. Va FUERA de PullToRefresh para no participar del gesto. */}
