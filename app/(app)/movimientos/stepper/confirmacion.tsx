@@ -57,6 +57,10 @@ export function Confirmacion() {
   // según la moneda de la cuenta en la confirmación).
   const cuentaISO = (id: number) =>
     options.cuentas.find((c) => c.id === id)?.moneda?.codigoISO ?? "ARS";
+  // Saldo ACTUAL de una cuenta: la base sobre la que impacta el movimiento (el
+  // ajuste hace `saldo += monto`), para mostrar el saldo resultante.
+  const cuentaSaldo = (id: number) =>
+    options.cuentas.find((c) => c.id === id)?.saldo ?? 0;
 
   const prestamo = options.prestamos.find((p) => p.id === data.idPrestamo);
   const gasto = options.gastos.find((g) => g.id === data.idGasto);
@@ -140,6 +144,8 @@ export function Confirmacion() {
       }
     );
   } else if (concepto === "AjusteCuenta") {
+    const isoAjuste = cuentaISO(data.cuentaOrigen);
+    const saldoActual = cuentaSaldo(data.cuentaOrigen);
     filas.push(
       { label: "Fecha", value: formatFecha(data.fecha) },
       { label: "Motivo", value: motivoAjusteFinal(data.motivo) },
@@ -148,8 +154,20 @@ export function Confirmacion() {
         label: "Monto",
         value: `${data.montoOrigen > 0 ? "+" : ""}${numberToCurrency(
           data.montoOrigen,
-          cuentaISO(data.cuentaOrigen)
+          isoAjuste
         )}`,
+      },
+      // Saldo que quedará en la cuenta al guardar (mismo cálculo que el paso 2).
+      {
+        label: "Saldo actual",
+        value: numberToCurrency(saldoActual, isoAjuste),
+      },
+      {
+        label: "Saldo resultante",
+        value: numberToCurrency(
+          saldoActual + (data.montoOrigen || 0),
+          isoAjuste
+        ),
       }
     );
   } else if (concepto === "PagoGasto") {
