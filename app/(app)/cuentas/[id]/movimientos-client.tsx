@@ -313,7 +313,12 @@ export function MovimientosCuentaClient({
         <div className="flex items-center justify-center">
           <button
             type="button"
-            onClick={() => intentarEliminar(row.original)}
+            onClick={(event) => {
+              // La fila entera abre el detalle: el botón de eliminar no debe
+              // propagar el clic (abriría los dos diálogos a la vez).
+              event.stopPropagation();
+              intentarEliminar(row.original);
+            }}
             disabled={reverting}
             className="rounded p-1 text-subtitle transition-colors hover:bg-muted hover:text-danger"
             aria-label="Eliminar movimiento"
@@ -418,7 +423,12 @@ export function MovimientosCuentaClient({
               {embebido && (
                 <h2 className="mb-3 text-[15.5px] text-header">Movimientos</h2>
               )}
-              <DataTable columns={columns} data={rows} pageSize={PAGE} />
+              <DataTable
+                columns={columns}
+                data={rows}
+                pageSize={PAGE}
+                onRowClick={setDetalleMovimiento}
+              />
             </div>
             {hayMas && (
               <div className="mt-3 flex justify-center">
