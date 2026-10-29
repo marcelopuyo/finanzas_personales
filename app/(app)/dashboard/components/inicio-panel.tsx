@@ -79,6 +79,19 @@ const UMBRAL_SWIPE_DOTS_PX = 24;
  */
 const PASO_SWIPE_DOTS_PX = 56;
 
+/** Duración del "aterrizaje" de cada página del dial (ms). */
+const DURACION_PASO_DOTS_MS = 180;
+
+/** **Mini pausa** en cada página antes de encadenar la siguiente (ms). */
+const PAUSA_PASO_DOTS_MS = 90;
+
+/**
+ * Vibración por página (ms). La **Vibration API** existe en **Android/Chrome**;
+ * en **iOS Safari no existe** (y por lo tanto tampoco en la PWA del iPhone) ⇒
+ * ahí el dial simplemente no vibra.
+ */
+const VIBRACION_DOTS_MS = 8;
+
 /**
  * Eventos que **sólo** puede emitir un mouse (o iOS **emulándolo** después de un
  * toque). Mientras la banda está silenciada se cortan en la fase de captura: así no
@@ -131,6 +144,41 @@ function guardarFoco(indice: number) {
     /* sin sessionStorage simplemente no se restaura */
   }
 }
+
+/**
+ * **Clases de un punto del dial**. Viven acá (y no inline en el JSX) porque
+ * durante el gesto los dots se pintan **a mano, sin re-render** (`pintarDots`).
+ */
+const claseDot = (activo: boolean) =>
+  cn("block h-1.5 rounded-full", activo ? "w-4.5 bg-header" : "w-1.5 bg-border");
+
+/**
+ * Estado del **dial de los dots** (el gesto que se hace sobre el marcador de
+ * puntos de Inicio). Vive en un `ref`: durante el gesto **no puede haber ni un
+ * re-render** (§234/§255).
+ */
+type GestoDots = {
+  /** Apoyo horizontal (se re-basa al reconocer el gesto). */
+  x: number;
+  /** Apoyo vertical (para descartar el gesto vertical). */
+  y: number;
+  /** Último `clientX` del dedo: la demanda se recalcula siempre desde acá. */
+  xUltimo: number;
+  /** Tarjeta en foco cuando empezó el gesto (base del mapeo dedo → tarjeta). */
+  base: number;
+  /** Página a la que apunta el dial **ahora** (la que se está aterrizando). */
+  pagina: number;
+  /** ¿Ya se reconoció como tirón horizontal? */
+  activo: boolean;
+  /** El dedo se levantó: no se encadenan más pasos. */
+  soltado: boolean;
+  /** Hay un paso en curso (aterrizaje + mini pausa). */
+  ocupado: boolean;
+  /** rAF del aterrizaje en curso. */
+  raf?: number;
+  /** Timer de la mini pausa en curso. */
+  pausa?: number;
+};
 
 /**
  * **Chevron del carrusel de Inicio** (2026-10-07): navega una tarjeta a la vez.
@@ -227,14 +275,13 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
    */
   const arrastreRef = useRef<{ base: number; origen: number } | null>(null);
   /**
-   * **Toque sobre los dots**: estado del gesto del dial (`null` = no hay gesto).
-   * `x`/`y` son el punto de apoyo (se **re-basan** al reconocer el gesto, así el
-   * recorrido del umbral no mueve el carrusel) y `activo` si ya es un tirón
-   * horizontal reconocido.
+   * **Toque sobre los dots**: estado del dial (`null` = no hay gesto). Se guarda
+   * hasta que el último paso aterriza, porque el motor del dial sigue vivo unos
+   * milisegundos después de levantar el dedo.
    */
-  const gestoDotsRef = useRef<{ x: number; y: number; activo: boolean } | null>(
-    null
-  );
+  const gestoDotsRef = useRef<GestoDots | null>(null);
+  /** Contenedor de los dots: para pintarlos a mano durante el gesto. */
+  const dotsRef = useRef<HTMLDivElement | null>(null);
   /** Timer del "ya se asentó el desplazamiento" (devuelve el `scroll-snap`, §255). */
   const snapRef = useRef<number | undefined>(undefined);
   /**
@@ -391,7 +438,13 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
     // Desplazamiento programático en curso (ver `irACuenta`): el destino ya está
     // fijado ⇒ no se recalcula el foco con los pasos intermedios (evita que el
     // detalle de abajo se monte cuenta por cuenta durante la animación).
-    if (saltoRef.current) return;
+    //
+    // También se ignora con el **dial de los dots** en curso: el aterrizaje lo
+    // escribe a mano `darPasoDots` y el foco lo manda el dial (un re-render con el
+    // dedo apoyado atrasa la secuencia táctil). Se mira el gesto y no sólo
+    // `saltoRef` porque el `setTimeout` de 800 ms de un `irASlide` anterior puede
+    // soltar `saltoRef` en medio de un dial nuevo.
+    if (saltoRef.current || gestoDotsRef.current?.activo) return;
     sincronizarIndice();
   };
 
@@ -576,35 +629,149 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
    * **Dial de los dots** (2026-10-29). El marcador de puntos vive **fuera** del
    * track del carrusel (no está dentro del `overflow-x-auto`), así que deslizar
    * encima no movía nada. Acá el gesto **no** imita al de la tarjeta (un flick = una
-   * tarjeta): es **tirar del dial**. Mientras el dedo sigue apoyado, el carrusel
-   * **sigue al dedo** y pasa las tarjetas **una a una** —cada
-   * `PASO_SWIPE_DOTS_PX` de dedo equivale a una tarjeta entera— hasta que se
-   * levanta o se llega a un extremo.
+   * tarjeta): es **tirar del dial**, como los puntos de la pantalla de inicio de
+   * iOS (referencia que mandó el usuario en video).
    *
-   * 🔑 **Sentido invertido respecto del swipe de la tarjeta** (decisión del usuario
-   * tras probarlo en prod): tirar hacia la **izquierda** va a la tarjeta
-   * **anterior** (`Balance ←`) y el contenido rueda hacia la derecha; tirar hacia la
-   * **derecha** pasa a la **siguiente**. Es el modelo de una perilla: el indicador
-   * se queda con el dedo y el contenido va al revés.
+   * Mientras el dedo sigue apoyado y se mueve, el dial va pasando las tarjetas
+   * **una a una**, y en **cada** tarjeta hace una **mini pausa** antes de encadenar
+   * la siguiente, con una **vibración** por página (donde el navegador la tenga:
+   * Android sí, iOS no). Sigue hasta que se levanta el dedo o se llega a un extremo.
    *
-   * 🔑 Se mueve con **`arrastrarTarjeta`**, la misma ruta de §255: `scrollLeft` a
-   * mano y `scroll-snap` apagado mientras dura el gesto (lo devuelve
-   * `soltarArrastreTarjeta` al aterrizar). ⛔ **Nada de `scrollTo` con animación ni
-   * de estado de React durante el gesto**: cada paso que llamaba a `irASlide`
-   * disparaba un scroll animado y el sistema cortaba la secuencia táctil ⇒ solo se
-   * movía **una** tarjeta y había que empezar el gesto de nuevo (medido en prod el
-   * 2026-10-29). Los dots y el detalle de abajo se re-acomodan **al soltar**
-   * (`soltarArrastreTarjeta` → `irASlide`), que es cuando el gesto ya terminó.
+   * 🔑 **Sentido invertido respecto del swipe de la tarjeta**: tirar hacia la
+   * **izquierda** va a la tarjeta **anterior** (`Balance ←`) y tirar hacia la
+   * **derecha** pasa a la **siguiente**. El indicador se queda con el dedo y el
+   * contenido va al revés (modelo de perilla).
+   *
+   * ⛔ **Nada de `scrollTo({ behavior: "smooth" })` ni de estado de React durante el
+   * gesto.** Ese fue el bug del 2026-10-29 en prod: cada paso hacía un scroll
+   * animado y el sistema cortaba la secuencia táctil (`touchcancel`) ⇒ se movía una
+   * sola tarjeta y había que empezar de nuevo. El aterrizaje se anima **a mano con
+   * `requestAnimationFrame`** escribiendo `scrollLeft` (la ruta de §255, que con el
+   * dedo apoyado ya estaba probada en la franja del gráfico).
    */
+
+  /** Pinta los dots para la página `activo` **sin React** (ver `GestoDots`). */
+  const pintarDots = (activo: number) => {
+    const cont = dotsRef.current;
+    if (!cont) return;
+    for (let i = 0; i < cont.children.length; i++) {
+      (cont.children[i] as HTMLElement).className = claseDot(i === activo);
+    }
+  };
+
+  /** Vibración por página, si el navegador la soporta (iOS no). */
+  const vibrarDots = () => {
+    if (typeof navigator.vibrate !== "function") return;
+    try {
+      navigator.vibrate(VIBRACION_DOTS_MS);
+    } catch {
+      /* sin soporte/permiso: el dial funciona igual */
+    }
+  };
+
+  /**
+   * **Cierra el dial**: deja el track clavado en `g.pagina`, devuelve el
+   * `scroll-snap` y **recién ahí** mueve el foco de React (los dots y el detalle de
+   * abajo), que es lo único que se re-renderiza en todo el gesto.
+   */
+  const asentarDots = (g: GestoDots) => {
+    if (g.raf !== undefined) window.cancelAnimationFrame(g.raf);
+    if (g.pausa !== undefined) window.clearTimeout(g.pausa);
+    g.raf = undefined;
+    g.pausa = undefined;
+    g.ocupado = false;
+    const el = trackRef.current;
+    const slide = el?.children[g.pagina] as HTMLElement | undefined;
+    if (el) {
+      if (slide) el.scrollLeft = slide.offsetLeft;
+      el.style.scrollSnapType = "";
+    }
+    pintarDots(g.pagina);
+    if (gestoDotsRef.current === g) gestoDotsRef.current = null;
+    irASlide(g.pagina);
+  };
+
+  /**
+   * **Un paso del dial**: lleva el track a `destino` con **rAF** y, al aterrizar,
+   * deja la **mini pausa** antes de encadenar el próximo. La vibración se dispara
+   * al llegar, igual que el "click" de los puntos de iOS.
+   */
+  const darPasoDots = (g: GestoDots, destino: number) => {
+    const el = trackRef.current;
+    const slide = el?.children[destino] as HTMLElement | undefined;
+    if (!el || !slide) return;
+    g.ocupado = true;
+    // Con el snap obligatorio el navegador **revierte** el `scrollLeft` escrito a
+    // mano (§255): se apaga mientras dura el gesto y lo devuelve `asentarDots`.
+    el.style.scrollSnapType = "none";
+    const desde = el.scrollLeft;
+    const hasta = slide.offsetLeft;
+    // El reloj lo pone el primer cuadro del `rAF` (no `performance.now()` en el
+    // cuerpo del componente: `react-hooks/purity` lo considera llamada impura).
+    let inicio: number | null = null;
+    const cuadro = (ahora: number) => {
+      if (inicio === null) inicio = ahora;
+      const avance = Math.min(1, (ahora - inicio) / DURACION_PASO_DOTS_MS);
+      const suave = 1 - (1 - avance) * (1 - avance);
+      el.scrollLeft = desde + (hasta - desde) * suave;
+      if (avance < 1) {
+        g.raf = window.requestAnimationFrame(cuadro);
+        return;
+      }
+      g.raf = undefined;
+      g.pagina = destino;
+      pintarDots(destino);
+      vibrarDots();
+      g.pausa = window.setTimeout(() => {
+        g.pausa = undefined;
+        g.ocupado = false;
+        if (g.soltado) asentarDots(g);
+        else avanzarDots(g);
+      }, PAUSA_PASO_DOTS_MS);
+    };
+    g.raf = window.requestAnimationFrame(cuadro);
+  };
+
+  /**
+   * ¿El dedo pide otra página? Se avanza **de a una**: el ritmo lo marca la mini
+   * pausa de `darPasoDots`, y la demanda se recalcula desde el **último** `clientX`
+   * (no acumulando), así el dial nunca se "escapa" de lo que hizo el dedo.
+   */
+  const avanzarDots = (g: GestoDots) => {
+    if (g.soltado || g.ocupado) return;
+    const pasos = Math.trunc((g.xUltimo - g.x) / PASO_SWIPE_DOTS_PX);
+    const pedido = Math.min(totalTarjetas - 1, Math.max(0, g.base + pasos));
+    if (pedido === g.pagina) return;
+    darPasoDots(g, g.pagina + (pedido > g.pagina ? 1 : -1));
+  };
+
   const alTocarDots = (e: TouchEvent<HTMLDivElement>) => {
     const t = e.touches[0];
-    gestoDotsRef.current = t ? { x: t.clientX, y: t.clientY, activo: false } : null;
+    if (!t) {
+      gestoDotsRef.current = null;
+      return;
+    }
+    // Si el dial anterior quedó cerrando (su mini pausa o su aterrizaje), se cierra
+    // ya: si no, dos motores escribirían `scrollLeft` a la vez.
+    const previo = gestoDotsRef.current;
+    if (previo) asentarDots(previo);
+    gestoDotsRef.current = {
+      x: t.clientX,
+      y: t.clientY,
+      xUltimo: t.clientX,
+      base: indice,
+      pagina: indice,
+      activo: false,
+      soltado: false,
+      ocupado: false,
+    };
   };
 
   const alMoverDots = (e: TouchEvent<HTMLDivElement>) => {
     const g = gestoDotsRef.current;
     const t = e.touches[0];
-    if (!g || !t) return;
+    if (!g || !t || g.soltado) return;
+    g.xUltimo = t.clientX;
     if (!g.activo) {
       const dx = t.clientX - g.x;
       const dy = t.clientY - g.y;
@@ -613,27 +780,28 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
       if (Math.abs(dx) < UMBRAL_SWIPE_DOTS_PX || Math.abs(dx) <= Math.abs(dy)) {
         return;
       }
-      // Se re-basa acá: el recorrido gastado en el umbral no mueve el carrusel.
+      // Se re-basa acá: el recorrido gastado en el umbral no adelanta una página.
       g.activo = true;
+      g.base = indice;
+      g.pagina = indice;
       g.x = t.clientX;
+      // Mientras dura el dial el `onScroll` no debe re-sincronizar el foco: el
+      // ritmo lo marca el dial y, con el dedo apoyado, no puede haber re-render.
+      saltoRef.current = true;
     }
-    const el = trackRef.current;
-    if (!el) return;
-    // **Amplificación** del dial: `PASO_SWIPE_DOTS_PX` px de dedo recorren una
-    // tarjeta entera. El signo invertido es lo que hace que tirar a la izquierda
-    // vaya a la tarjeta anterior (`arrastrarTarjeta` resta el desplazamiento).
-    const amplificacion = (el.clientWidth || 1) / PASO_SWIPE_DOTS_PX;
-    arrastrarTarjeta((g.x - t.clientX) * amplificacion);
+    avanzarDots(g);
   };
 
-  /** Se soltó el dedo (o el navegador se quedó con el gesto): el dial aterriza. */
+  /** Se soltó el dedo (o el navegador se quedó con el gesto): no se encadena más. */
   const alTerminarDots = () => {
     const g = gestoDotsRef.current;
-    gestoDotsRef.current = null;
-    // Aterriza en la tarjeta más cercana, devuelve el snap y recién ahí mueve el
-    // foco (los dots y el detalle de abajo). Si el gesto no llegó a reconocerse,
-    // `soltarArrastreTarjeta` no hace nada.
-    if (g?.activo) soltarArrastreTarjeta();
+    if (!g || !g.activo) {
+      gestoDotsRef.current = null;
+      return;
+    }
+    g.soltado = true;
+    // Si el aterrizaje ya terminó (sólo quedaba la mini pausa) se cierra en el acto.
+    if (!g.ocupado || g.raf === undefined) asentarDots(g);
   };
 
   /**
@@ -700,6 +868,10 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
       if (snapRef.current !== undefined) {
         window.clearInterval(snapRef.current);
       }
+      // El motor del dial puede quedar vivo unos ms después de soltar el dedo.
+      const g = gestoDotsRef.current;
+      if (g?.raf !== undefined) window.cancelAnimationFrame(g.raf);
+      if (g?.pausa !== undefined) window.clearTimeout(g.pausa);
     },
     []
   );
@@ -817,6 +989,7 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
             `touch-pan-y`: el gesto **horizontal** lo toma este control (el dial que
             pasa de tarjeta) y el vertical lo sigue tomando la página. */}
         <div
+          ref={dotsRef}
           className="mt-3 flex touch-pan-y items-center justify-center gap-1.5 pb-1.5"
           onTouchStart={alTocarDots}
           onTouchMove={alMoverDots}
@@ -824,14 +997,7 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
           onTouchCancel={alTerminarDots}
         >
           {Array.from({ length: totalTarjetas }).map((_, i) => (
-            <i
-              key={i}
-              aria-hidden="true"
-              className={cn(
-                "block h-1.5 rounded-full",
-                i === indice ? "w-4.5 bg-header" : "w-1.5 bg-border"
-              )}
-            />
+            <i key={i} aria-hidden="true" className={claseDot(i === indice)} />
           ))}
         </div>
       </div>
