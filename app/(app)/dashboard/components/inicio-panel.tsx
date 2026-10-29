@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { TouchEvent } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { CuentaSlide } from "./cuenta-slide";
 import { AporteCuentasLista } from "./aporte-cuentas-lista";
@@ -62,6 +63,13 @@ const UMBRAL_TOPBAR_PX = 8;
  * Lo normal es que lo levante el toque siguiente.
  */
 const SILENCIO_MAX_MS = 2000;
+
+/**
+ * Recorrido horizontal (px) que convierte un toque sobre los **dots** en un swipe
+ * que pasa de tarjeta. Por debajo de esto es un toque (los dots no navegan) y por
+ * un gesto claramente vertical tampoco: ese es el scroll de la página.
+ */
+const UMBRAL_SWIPE_DOTS_PX = 24;
 
 /**
  * Eventos que **sólo** puede emitir un mouse (o iOS **emulándolo** después de un
@@ -210,6 +218,11 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
    * haber ni un re-render** (ver `silenciadoRef`).
    */
   const arrastreRef = useRef<{ base: number; origen: number } | null>(null);
+  /**
+   * **Toque sobre los dots**: origen del gesto (`clientX`/`clientY`) para medir el
+   * swipe que pasa de tarjeta. `null` = no hay gesto en curso.
+   */
+  const gestoDotsRef = useRef<{ x: number; y: number } | null>(null);
   /** Timer del "ya se asentó el desplazamiento" (devuelve el `scroll-snap`, §255). */
   const snapRef = useRef<number | undefined>(undefined);
   /**
@@ -548,6 +561,46 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
   }, [devolverSnapAlAsentarse, irASlide, totalTarjetas]);
 
   /**
+   * **Swipe sobre los dots** (2026-10-29). El marcador de puntos vive **fuera** del
+   * track del carrusel (no está dentro del `overflow-x-auto`), así que deslizar
+   * encima no movía nada. Ahora un deslizamiento horizontal sobre el control pasa
+   * **una** tarjeta con la misma animación que el resto: el indicador también sirve
+   * para navegar, que es donde el dedo cae naturalmente al venir del gráfico.
+   *
+   * Se resuelve recién al **soltar** (no en cada `touchmove`) y tomando como base la
+   * tarjeta en **foco** (`indice`, no `scrollLeft`): con swipes seguidos el carrusel
+   * puede venir a mitad de animación y `scrollLeft` redondearía a la tarjeta de
+   * origen (el 2º swipe no se vería).
+   */
+  const alTocarDots = (e: TouchEvent<HTMLDivElement>) => {
+    const t = e.touches[0];
+    gestoDotsRef.current = t ? { x: t.clientX, y: t.clientY } : null;
+  };
+
+  const alSoltarDots = (e: TouchEvent<HTMLDivElement>) => {
+    const origen = gestoDotsRef.current;
+    gestoDotsRef.current = null;
+    const t = e.changedTouches[0];
+    if (!origen || !t) return;
+    const dx = t.clientX - origen.x;
+    const dy = t.clientY - origen.y;
+    // Un toque, o un gesto vertical (ese es el scroll de la página): no se mueve nada.
+    if (Math.abs(dx) < UMBRAL_SWIPE_DOTS_PX || Math.abs(dx) <= Math.abs(dy)) {
+      return;
+    }
+    const destino = Math.min(
+      totalTarjetas - 1,
+      Math.max(0, indice + (dx < 0 ? 1 : -1))
+    );
+    if (destino !== indice) irASlide(destino);
+  };
+
+  /** El navegador se quedó con el gesto (scroll vertical): no cuenta como swipe. */
+  const alCancelarDots = () => {
+    gestoDotsRef.current = null;
+  };
+
+  /**
    * **Silencia la banda** (2026-10-05): mientras lo esté, los eventos que **sólo**
    * puede emitir un mouse quedan cortados (ver el efecto de abajo), así que los
    * `mouse*`/`pointer*` **emulados** que iOS emite después de soltar el dedo **no
@@ -724,8 +777,15 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
             azul de la barra y de este carrusel; el activo ahora es un blanco más
             ancho, igual que el tab activo de la barra inferior).
             `mt-3` (`12 px`, el doble de los 6 px que tenía) para despegarlos de los
-            rótulos de las acciones — pedido del 2026-10-07. */}
-        <div className="mt-3 flex items-center justify-center gap-1.5 pb-1.5">
+            rótulos de las acciones — pedido del 2026-10-07.
+            `touch-pan-y`: el gesto **horizontal** lo toma este control (swipe para
+            pasar de tarjeta) y el vertical lo sigue tomando la página. */}
+        <div
+          className="mt-3 flex touch-pan-y items-center justify-center gap-1.5 pb-1.5"
+          onTouchStart={alTocarDots}
+          onTouchEnd={alSoltarDots}
+          onTouchCancel={alCancelarDots}
+        >
           {Array.from({ length: totalTarjetas }).map((_, i) => (
             <i
               key={i}
