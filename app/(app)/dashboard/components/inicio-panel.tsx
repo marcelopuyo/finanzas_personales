@@ -72,8 +72,8 @@ const SILENCIO_MAX_MS = 2000;
 const UMBRAL_SWIPE_DOTS_PX = 24;
 
 /**
- * **Paso del dial de los dots**: cada `56 px` de recorrido horizontal el carrusel
- * pasa **una** tarjeta, y así sigue mientras el dedo no se levanta (no es un flick
+ * **Paso del dial de los dots**: `56 px` de **dedo** equivalen a **una tarjeta**
+ * entera de recorrido, y así sigue mientras el dedo no se levanta (no es un flick
  * de "una tarjeta por gesto" como el de la tarjeta). Si se siente corto o largo,
  * **este es el número que hay que mover**.
  */
@@ -228,18 +228,13 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
   const arrastreRef = useRef<{ base: number; origen: number } | null>(null);
   /**
    * **Toque sobre los dots**: estado del gesto del dial (`null` = no hay gesto).
-   * `x`/`y` son el punto de apoyo, `xBase` el origen del **recorrido** (se re-basa
-   * al reconocerse el gesto), `base` la tarjeta en foco al empezar, `destino` el
-   * último paso pedido y `activo` si ya se reconoció como swipe horizontal.
+   * `x`/`y` son el punto de apoyo (se **re-basan** al reconocer el gesto, así el
+   * recorrido del umbral no mueve el carrusel) y `activo` si ya es un tirón
+   * horizontal reconocido.
    */
-  const gestoDotsRef = useRef<{
-    x: number;
-    y: number;
-    xBase: number;
-    base: number;
-    destino: number;
-    activo: boolean;
-  } | null>(null);
+  const gestoDotsRef = useRef<{ x: number; y: number; activo: boolean } | null>(
+    null
+  );
   /** Timer del "ya se asentó el desplazamiento" (devuelve el `scroll-snap`, §255). */
   const snapRef = useRef<number | undefined>(undefined);
   /**
@@ -378,10 +373,6 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
    * **100 % del ancho** (sin *peek* y sin gap) ⇒ el paso es `clientWidth`.
    */
   const sincronizarIndice = useCallback(() => {
-    // Con el **dial de los dots** en curso manda el paso que pidió el gesto: el
-    // track va a mitad de animación y redondear el scroll devolvería el foco a una
-    // tarjeta intermedia (se ve parpadear el detalle de abajo y los propios dots).
-    if (gestoDotsRef.current?.activo) return;
     const el = trackRef.current;
     if (!el) return;
     const paso = el.clientWidth || 1;
@@ -584,41 +575,30 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
   /**
    * **Dial de los dots** (2026-10-29). El marcador de puntos vive **fuera** del
    * track del carrusel (no está dentro del `overflow-x-auto`), así que deslizar
-   * encima no movía nada. Acá el gesto **no** imita al de la tarjeta (un flick =
-   * una tarjeta): es **tirar del dial**. Mientras el dedo sigue apoyado y se mueve,
-   * el carrusel pasa **una tarjeta cada `PASO_SWIPE_DOTS_PX`** de recorrido, en los
-   * dos sentidos, las veces que haga falta **hasta que se levanta el dedo**. Al
-   * soltar no pasa nada más: queda la tarjeta a la que se llegó.
+   * encima no movía nada. Acá el gesto **no** imita al de la tarjeta (un flick = una
+   * tarjeta): es **tirar del dial**. Mientras el dedo sigue apoyado, el carrusel
+   * **sigue al dedo** y pasa las tarjetas **una a una** —cada
+   * `PASO_SWIPE_DOTS_PX` de dedo equivale a una tarjeta entera— hasta que se
+   * levanta o se llega a un extremo.
    *
    * 🔑 **Sentido invertido respecto del swipe de la tarjeta** (decisión del usuario
    * tras probarlo en prod): tirar hacia la **izquierda** va a la tarjeta
    * **anterior** (`Balance ←`) y el contenido rueda hacia la derecha; tirar hacia la
    * **derecha** pasa a la **siguiente**. Es el modelo de una perilla: el indicador
-   * se mueve con el dedo y el contenido va al revés.
+   * se queda con el dedo y el contenido va al revés.
    *
-   * 🔑 El destino se recalcula siempre desde el **recorrido total** (`xBase`) y la
-   * tarjeta de origen (`base`), no acumulando pasos: así ir y volver con el dedo
-   * devuelve el carrusel al punto de partida. Como el `xBase` se re-basa al
-   * reconocer el gesto, el recorrido gastado en el umbral tampoco adelanta un paso
-   * de más; y contra un extremo se vuelve a anclar, así que el arrastre que no
-   * movió nada no hay que deshacerlo.
-   *
-   * ⛔ No se toca `scrollLeft` ni el `scroll-snap`: el salto lo hace `irASlide`
-   * (misma animación y mismo guardado de foco que el resto), **una sola vez por
-   * paso** (`destino` evita repetirlo en cada `touchmove`).
+   * 🔑 Se mueve con **`arrastrarTarjeta`**, la misma ruta de §255: `scrollLeft` a
+   * mano y `scroll-snap` apagado mientras dura el gesto (lo devuelve
+   * `soltarArrastreTarjeta` al aterrizar). ⛔ **Nada de `scrollTo` con animación ni
+   * de estado de React durante el gesto**: cada paso que llamaba a `irASlide`
+   * disparaba un scroll animado y el sistema cortaba la secuencia táctil ⇒ solo se
+   * movía **una** tarjeta y había que empezar el gesto de nuevo (medido en prod el
+   * 2026-10-29). Los dots y el detalle de abajo se re-acomodan **al soltar**
+   * (`soltarArrastreTarjeta` → `irASlide`), que es cuando el gesto ya terminó.
    */
   const alTocarDots = (e: TouchEvent<HTMLDivElement>) => {
     const t = e.touches[0];
-    gestoDotsRef.current = t
-      ? {
-          x: t.clientX,
-          y: t.clientY,
-          xBase: t.clientX,
-          base: indice,
-          destino: indice,
-          activo: false,
-        }
-      : null;
+    gestoDotsRef.current = t ? { x: t.clientX, y: t.clientY, activo: false } : null;
   };
 
   const alMoverDots = (e: TouchEvent<HTMLDivElement>) => {
@@ -633,34 +613,27 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
       if (Math.abs(dx) < UMBRAL_SWIPE_DOTS_PX || Math.abs(dx) <= Math.abs(dy)) {
         return;
       }
+      // Se re-basa acá: el recorrido gastado en el umbral no mueve el carrusel.
       g.activo = true;
-      g.xBase = t.clientX;
-      g.base = indice;
-      g.destino = indice;
+      g.x = t.clientX;
     }
-    // `clientX - g.xBase` crece hacia la **derecha** ⇒ pasos positivos = siguiente.
-    // Es el gesto de **tirar del dial**: tirando hacia la izquierda se va a la
-    // tarjeta **anterior** (el contenido rueda hacia la derecha), al revés que el
-    // swipe sobre la tarjeta. Decisión del usuario tras probarlo en prod.
-    const pasos = Math.trunc((t.clientX - g.xBase) / PASO_SWIPE_DOTS_PX);
-    const crudo = g.base + pasos;
-    const destino = Math.min(totalTarjetas - 1, Math.max(0, crudo));
-    if (destino === g.destino) {
-      // El dedo siguió empujando contra un extremo: se re-ancla el recorrido para
-      // que volver no obligue a "deshacer" un arrastre que no movió nada.
-      if (crudo !== destino) {
-        g.base = destino;
-        g.xBase = t.clientX;
-      }
-      return;
-    }
-    g.destino = destino;
-    irASlide(destino);
+    const el = trackRef.current;
+    if (!el) return;
+    // **Amplificación** del dial: `PASO_SWIPE_DOTS_PX` px de dedo recorren una
+    // tarjeta entera. El signo invertido es lo que hace que tirar a la izquierda
+    // vaya a la tarjeta anterior (`arrastrarTarjeta` resta el desplazamiento).
+    const amplificacion = (el.clientWidth || 1) / PASO_SWIPE_DOTS_PX;
+    arrastrarTarjeta((g.x - t.clientX) * amplificacion);
   };
 
-  /** Se soltó el dedo (o el navegador se quedó con el gesto): el dial se apaga. */
+  /** Se soltó el dedo (o el navegador se quedó con el gesto): el dial aterriza. */
   const alTerminarDots = () => {
+    const g = gestoDotsRef.current;
     gestoDotsRef.current = null;
+    // Aterriza en la tarjeta más cercana, devuelve el snap y recién ahí mueve el
+    // foco (los dots y el detalle de abajo). Si el gesto no llegó a reconocerse,
+    // `soltarArrastreTarjeta` no hace nada.
+    if (g?.activo) soltarArrastreTarjeta();
   };
 
   /**
