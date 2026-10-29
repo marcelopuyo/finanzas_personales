@@ -585,10 +585,16 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
    * **Dial de los dots** (2026-10-29). El marcador de puntos vive **fuera** del
    * track del carrusel (no está dentro del `overflow-x-auto`), así que deslizar
    * encima no movía nada. Acá el gesto **no** imita al de la tarjeta (un flick =
-   * una tarjeta): mientras el dedo sigue apoyado y se mueve, el carrusel pasa
-   * **una tarjeta cada `PASO_SWIPE_DOTS_PX`** de recorrido, en los dos sentidos,
-   * las veces que haga falta **hasta que se levanta el dedo**. Al soltar no pasa
-   * nada más: queda la tarjeta a la que se llegó.
+   * una tarjeta): es **tirar del dial**. Mientras el dedo sigue apoyado y se mueve,
+   * el carrusel pasa **una tarjeta cada `PASO_SWIPE_DOTS_PX`** de recorrido, en los
+   * dos sentidos, las veces que haga falta **hasta que se levanta el dedo**. Al
+   * soltar no pasa nada más: queda la tarjeta a la que se llegó.
+   *
+   * 🔑 **Sentido invertido respecto del swipe de la tarjeta** (decisión del usuario
+   * tras probarlo en prod): tirar hacia la **izquierda** va a la tarjeta
+   * **anterior** (`Balance ←`) y el contenido rueda hacia la derecha; tirar hacia la
+   * **derecha** pasa a la **siguiente**. Es el modelo de una perilla: el indicador
+   * se mueve con el dedo y el contenido va al revés.
    *
    * 🔑 El destino se recalcula siempre desde el **recorrido total** (`xBase`) y la
    * tarjeta de origen (`base`), no acumulando pasos: así ir y volver con el dedo
@@ -632,8 +638,11 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
       g.base = indice;
       g.destino = indice;
     }
-    // `g.xBase - clientX` crece hacia la izquierda ⇒ pasos positivos = siguiente.
-    const pasos = Math.trunc((g.xBase - t.clientX) / PASO_SWIPE_DOTS_PX);
+    // `clientX - g.xBase` crece hacia la **derecha** ⇒ pasos positivos = siguiente.
+    // Es el gesto de **tirar del dial**: tirando hacia la izquierda se va a la
+    // tarjeta **anterior** (el contenido rueda hacia la derecha), al revés que el
+    // swipe sobre la tarjeta. Decisión del usuario tras probarlo en prod.
+    const pasos = Math.trunc((t.clientX - g.xBase) / PASO_SWIPE_DOTS_PX);
     const crudo = g.base + pasos;
     const destino = Math.min(totalTarjetas - 1, Math.max(0, crudo));
     if (destino === g.destino) {
