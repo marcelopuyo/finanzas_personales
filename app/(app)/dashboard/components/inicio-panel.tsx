@@ -65,19 +65,27 @@ const UMBRAL_TOPBAR_PX = 8;
 const SILENCIO_MAX_MS = 2000;
 
 /**
- * Recorrido horizontal (px) que hay que mover el dedo sobre los **dots** para que
- * el gesto cuente como swipe. Por debajo de esto es un toque y, si el gesto es
- * claramente vertical, es el scroll de la página: en los dos casos no se navega.
+ * **Zona muerta del dial de los dots** (px): cuánto tiene que apartarse el dedo del
+ * punto que agarró para que el dial arranque. Es **chica a propósito**: el usuario
+ * pidió que el gesto **se desencadene en el acto**, sin necesidad de salir de los
+ * límites del control (los puntos miden ~6 px de alto). Dentro de la zona muerta no
+ * se mueve nada y, si el dedo vuelve, el dial **se detiene**.
  */
-const UMBRAL_SWIPE_DOTS_PX = 24;
+const ZONA_MUERTA_DOTS_PX = 16;
 
 /**
- * **Paso del dial de los dots**: `56 px` de **dedo** equivalen a **una tarjeta**
- * entera de recorrido, y así sigue mientras el dedo no se levanta (no es un flick
- * de "una tarjeta por gesto" como el de la tarjeta). Si se siente corto o largo,
- * **este es el número que hay que mover**.
+ * Tolerancia (px) del **hit test** del punto activo: el dial **sólo** se arma si el
+ * dedo cae sobre el punto ancho/activo. Se agranda su caja a lo ancho (un dedo mide
+ * ~10 mm) y se acepta cualquier Y de la fila de puntos.
  */
-const PASO_SWIPE_DOTS_PX = 56;
+const TOLERANCIA_DOT_ACTIVO_PX = 20;
+
+/**
+ * Tolerancia vertical (px) del mismo hit test: la fila de puntos mide **~12 px** de
+ * alto, así que sin esto habría que acertarle a una franja muy fina. 10 px no llega
+ * a los rótulos de las acciones, que quedan más arriba.
+ */
+const TOLERANCIA_VERTICAL_DOTS_PX = 10;
 
 /** Duración del "aterrizaje" de cada página del dial (ms). */
 const DURACION_PASO_DOTS_MS = 180;
@@ -158,17 +166,15 @@ const claseDot = (activo: boolean) =>
  * re-render** (§234/§255).
  */
 type GestoDots = {
-  /** Apoyo horizontal (se re-basa al reconocer el gesto). */
+  /** Dónde apoyó el dedo (sobre el **punto activo**) = referencia de todo el gesto. */
   x: number;
   /** Apoyo vertical (para descartar el gesto vertical). */
   y: number;
-  /** Último `clientX` del dedo: la demanda se recalcula siempre desde acá. */
+  /** Último `clientX`: manda el **lado** en el que está el dedo respecto de `x`. */
   xUltimo: number;
-  /** Tarjeta en foco cuando empezó el gesto (base del mapeo dedo → tarjeta). */
-  base: number;
   /** Página a la que apunta el dial **ahora** (la que se está aterrizando). */
   pagina: number;
-  /** ¿Ya se reconoció como tirón horizontal? */
+  /** ¿Ya se salió de la zona muerta (el dial está armado)? */
   activo: boolean;
   /** El dedo se levantó: no se encadenan más pasos. */
   soltado: boolean;
@@ -629,18 +635,24 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
    * **Dial de los dots** (2026-10-29). El marcador de puntos vive **fuera** del
    * track del carrusel (no está dentro del `overflow-x-auto`), así que deslizar
    * encima no movía nada. Acá el gesto **no** imita al de la tarjeta (un flick = una
-   * tarjeta): es **tirar del dial**, como los puntos de la pantalla de inicio de
-   * iOS (referencia que mandó el usuario en video).
+   * tarjeta): es **agarrar el dial por su punto activo y tirar**, como los puntos de
+   * la pantalla de inicio de iOS (referencia que mandó el usuario en video).
    *
-   * Mientras el dedo sigue apoyado y se mueve, el dial va pasando las tarjetas
-   * **una a una**, y en **cada** tarjeta hace una **mini pausa** antes de encadenar
-   * la siguiente, con una **vibración** por página (donde el navegador la tenga:
-   * Android sí, iOS no). Sigue hasta que se levanta el dedo o se llega a un extremo.
+   * Reglas del gesto (pedido textual del usuario):
+   * 1. **Sólo se arma si el dedo cae sobre el punto activo** (el ancho y de otro
+   *    color). En cualquier otro lugar del control, el swipe no hace nada.
+   * 2. **Se desencadena en el acto**: apenas el dedo sale de la **zona muerta**
+   *    (`ZONA_MUERTA_DOTS_PX`, 16 px) hay que ver movimiento, **sin** necesidad de
+   *    salir de los límites del control (los puntos miden ~6 px de alto).
+   * 3. **Sigue solo**: mientras el dedo quede **a un lado** del punto que agarró, el
+   *    dial encadena página tras página, con una **mini pausa** + **vibración** en
+   *    cada una, hasta que el dedo se levanta, vuelve a la zona muerta o se llega a
+   *    un extremo.
    *
-   * 🔑 **Sentido invertido respecto del swipe de la tarjeta**: tirar hacia la
-   * **izquierda** va a la tarjeta **anterior** (`Balance ←`) y tirar hacia la
-   * **derecha** pasa a la **siguiente**. El indicador se queda con el dedo y el
-   * contenido va al revés (modelo de perilla).
+   * 🔑 **Sentido invertido respecto del swipe de la tarjeta**: dedo a la
+   * **izquierda** del punto ⇒ tarjeta **anterior** (`Balance ←`); a la **derecha**
+   * ⇒ **siguiente**. El indicador se queda con el dedo y el contenido va al revés
+   * (modelo de perilla).
    *
    * ⛔ **Nada de `scrollTo({ behavior: "smooth" })` ni de estado de React durante el
    * gesto.** Ese fue el bug del 2026-10-29 en prod: cada paso hacía un scroll
@@ -734,32 +746,48 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
 
   /**
    * ¿El dedo pide otra página? Se avanza **de a una**: el ritmo lo marca la mini
-   * pausa de `darPasoDots`, y la demanda se recalcula desde el **último** `clientX`
-   * (no acumulando), así el dial nunca se "escapa" de lo que hizo el dedo.
+   * pausa de `darPasoDots`.
+   *
+   * 🔑 Mientras el dedo **siga a un lado** del punto que agarró (fuera de la zona
+   * muerta), el dial **sigue solo**: al terminar la mini pausa se vuelve a llamar a
+   * esta función y pasa la página siguiente/anterior, hasta que el dedo se levanta,
+   * vuelve a la zona muerta o se llega a un extremo.
    */
   const avanzarDots = (g: GestoDots) => {
     if (g.soltado || g.ocupado) return;
-    const pasos = Math.trunc((g.xUltimo - g.x) / PASO_SWIPE_DOTS_PX);
-    const pedido = Math.min(totalTarjetas - 1, Math.max(0, g.base + pasos));
-    if (pedido === g.pagina) return;
-    darPasoDots(g, g.pagina + (pedido > g.pagina ? 1 : -1));
+    const dx = g.xUltimo - g.x;
+    if (Math.abs(dx) < ZONA_MUERTA_DOTS_PX) return;
+    // Dedo a la **derecha** del punto ⇒ siguiente; a la **izquierda** ⇒ anterior.
+    const destino = g.pagina + (dx > 0 ? 1 : -1);
+    if (destino < 0 || destino > totalTarjetas - 1) return;
+    darPasoDots(g, destino);
   };
 
   const alTocarDots = (e: TouchEvent<HTMLDivElement>) => {
     const t = e.touches[0];
-    if (!t) {
-      gestoDotsRef.current = null;
-      return;
-    }
     // Si el dial anterior quedó cerrando (su mini pausa o su aterrizaje), se cierra
     // ya: si no, dos motores escribirían `scrollLeft` a la vez.
     const previo = gestoDotsRef.current;
     if (previo) asentarDots(previo);
+    gestoDotsRef.current = null;
+    const cont = dotsRef.current;
+    const activo = cont?.children[indice] as HTMLElement | undefined;
+    if (!t || !cont || !activo) return;
+    // **El dial sólo se arma si el dedo cae sobre el punto activo** (el ancho y de
+    // otro color): en cualquier otro lugar del control el swipe **no** hace nada.
+    const fila = cont.getBoundingClientRect();
+    const caja = activo.getBoundingClientRect();
+    const sobreActivo =
+      t.clientX >= caja.left - TOLERANCIA_DOT_ACTIVO_PX &&
+      t.clientX <= caja.right + TOLERANCIA_DOT_ACTIVO_PX;
+    const enLaFila =
+      t.clientY >= fila.top - TOLERANCIA_VERTICAL_DOTS_PX &&
+      t.clientY <= fila.bottom + TOLERANCIA_VERTICAL_DOTS_PX;
+    if (!sobreActivo || !enLaFila) return;
     gestoDotsRef.current = {
       x: t.clientX,
       y: t.clientY,
       xUltimo: t.clientX,
-      base: indice,
       pagina: indice,
       activo: false,
       soltado: false,
@@ -775,18 +803,15 @@ export function InicioPanel({ data, historialesIniciales }: InicioPanelProps) {
     if (!g.activo) {
       const dx = t.clientX - g.x;
       const dy = t.clientY - g.y;
-      // Hasta que el gesto no es claramente horizontal no se toca el carrusel: el
-      // vertical es el scroll de la página.
-      if (Math.abs(dx) < UMBRAL_SWIPE_DOTS_PX || Math.abs(dx) <= Math.abs(dy)) {
+      // Se arma apenas el dedo sale de la zona muerta: **no** hay que salir del
+      // control para que el dial reaccione. El gesto vertical sigue siendo el scroll
+      // de la página.
+      if (Math.abs(dx) < ZONA_MUERTA_DOTS_PX || Math.abs(dx) <= Math.abs(dy)) {
         return;
       }
-      // Se re-basa acá: el recorrido gastado en el umbral no adelanta una página.
       g.activo = true;
-      g.base = indice;
-      g.pagina = indice;
-      g.x = t.clientX;
-      // Mientras dura el dial el `onScroll` no debe re-sincronizar el foco: el
-      // ritmo lo marca el dial y, con el dedo apoyado, no puede haber re-render.
+      // Con el dedo apoyado no puede haber re-render: el `onScroll` de nuestras
+      // escrituras de `scrollLeft` no debe re-sincronizar el foco.
       saltoRef.current = true;
     }
     avanzarDots(g);
