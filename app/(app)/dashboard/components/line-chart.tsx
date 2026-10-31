@@ -182,6 +182,38 @@ function anchoBadge(texto: string) {
 }
 
 /**
+ * Sombra del área **hasta el eje X** (2026-10-31).
+ *
+ * El gradiente por defecto de `EvolutionChart` es `objectBoundingBox`: se mapea
+ * al **bbox del path**, y con datos altos sobre un eje que arranca en 0 el
+ * degradado se apaga ~25 % **antes** del eje (medido: y≈426 contra un eje en
+ * y≈561) ⇒ la sombra "se corta" en una línea horizontal. Este gradiente va en
+ * **`userSpaceOnUse`**, del tope del área de dibujo al eje, así el degradado
+ * muere exactamente sobre el eje X.
+ */
+function SombraHastaEje({ color, id }: { color: string; id: string }) {
+  const plot = usePlotArea();
+  if (!plot) return null;
+  return (
+    <defs>
+      <linearGradient
+        id={id}
+        gradientUnits="userSpaceOnUse"
+        x1={0}
+        y1={plot.y}
+        x2={0}
+        y2={plot.y + plot.height}
+      >
+        <stop offset="0%" stopColor={color} stopOpacity={0.4} />
+        <stop offset="45%" stopColor={color} stopOpacity={0.26} />
+        <stop offset="80%" stopColor={color} stopOpacity={0.12} />
+        <stop offset="100%" stopColor={color} stopOpacity={0} />
+      </linearGradient>
+    </defs>
+  );
+}
+
+/**
  * Valor del badge **sin símbolo de moneda** (2026-10-31): con el símbolo no entra
  * en una columna de ~50 px. Sin decimales si no hacen falta (`1.980`), con hasta
  * dos cuando los hay (`12,5`).
@@ -467,7 +499,11 @@ export function EvolutionChart({
       ) : (
         <YAxis hide />
       )}
-      <Tooltip content={<ChartTooltip currency={currency} series={series} />} />
+      {/* Con `valoresPorMes` no hay tooltip: los valores ya están en pantalla
+          (2026-10-31, pedido del usuario). */}
+      {!valoresPorMes && (
+        <Tooltip content={<ChartTooltip currency={currency} series={series} />} />
+      )}
       {/* Secundarias PRIMERO: en recharts el orden de los hijos es el orden de
           pintado ⇒ la principal (área o línea) queda por encima. Trazo fino y
           sin relleno: la jerarquía la marca el trazo, no el sombreado. */}
@@ -492,18 +528,22 @@ export function EvolutionChart({
       ))}
       {area ? (
         <>
-          <defs>
-            <linearGradient id="evolutionArea" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={color} stopOpacity={0.35} />
-              <stop offset="100%" stopColor={color} stopOpacity={0} />
-            </linearGradient>
-          </defs>
+          {valoresPorMes ? (
+            <SombraHastaEje color={color} id="evolutionAreaEje" />
+          ) : (
+            <defs>
+              <linearGradient id="evolutionArea" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+                <stop offset="100%" stopColor={color} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+          )}
           <Area
             type="monotone"
             dataKey="value"
             stroke={color}
             strokeWidth={2}
-            fill="url(#evolutionArea)"
+            fill={valoresPorMes ? "url(#evolutionAreaEje)" : "url(#evolutionArea)"}
             dot={mostrarPuntos ? { r: 2.5, fill: color } : false}
             isAnimationActive={false}
             activeDot={{ r: 4, fill: color }}
