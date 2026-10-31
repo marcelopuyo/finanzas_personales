@@ -13,6 +13,9 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  usePlotArea,
+  useXAxisScale,
+  useYAxisScale,
 } from "recharts";
 import { ChartTooltip, type SerieTooltip } from "./chart-tooltip";
 import { useHideTooltipOnTouch } from "./use-hide-tooltip-on-touch";
@@ -104,6 +107,16 @@ interface EvolutionChartProps {
   anchoEjeY?: number;
   /** Tamaño de fuente de las etiquetas del eje Y. */
   tamanoEjeY?: number;
+  /**
+   * **Valor de cada mes dibujado sobre el gráfico** (2026-10-31, panel
+   * Resultados): un **separador vertical tenue** por mes (eje X → tope del área),
+   * una **vertical punteada** del eje X hasta cada punto y un **badge con el
+   * valor** encima del punto. Da la lectura "de un vistazo" sin abrir el tooltip.
+   * ⚠️ Con esta prop, en pantallas chicas se ven **5 meses** en vez de 8
+   * (`max-sm:[--meses-visibles:5]`): la columna pasa de ~36 px a ~50 px para que
+   * los badges de meses consecutivos no se toquen.
+   */
+  valoresPorMes?: boolean;
 }
 
 /** Ancho del carril del **eje Y fijo** (los rótulos tipo `-250000` entran justos). */
@@ -163,6 +176,141 @@ function TickMesAnio({
   );
 }
 
+/** Ancho aproximado del texto del badge a 9 px (los dígitos de Inter miden ~5 px). */
+function anchoBadge(texto: string) {
+  return Math.round(texto.length * 4.9 + 9);
+}
+
+/**
+ * Valor del badge **sin símbolo de moneda** (2026-10-31): con el símbolo no entra
+ * en una columna de ~50 px. Sin decimales si no hacen falta (`1.980`), con hasta
+ * dos cuando los hay (`12,5`).
+ */
+function valorCorto(valor: number) {
+  return valor.toLocaleString("es-AR", { maximumFractionDigits: 2 });
+}
+
+/**
+ * **Decoración por mes** del gráfico (2026-10-31, panel Resultados).
+ *
+ * - `solo="separadores"`: una línea vertical tenue por mes, del eje X al **tope**
+ *   del área de dibujo. Se pinta **antes** de las series para que quede detrás
+ *   (misma jerarquía que la grilla).
+ * - `solo="valores"`: la vertical **punteada** desde el eje X hasta cada punto y
+ *   el **badge con el valor** encima del punto. Se pinta **después**, arriba de
+ *   todo (si no, el área lo tapa).
+ *
+ * La geometría sale de los hooks públicos de recharts 3 (`usePlotArea` y las
+ * escalas de los ejes). ⛔ No usar `Customized`: está deprecado en v3 y
+ * desaparece en v4.
+ */
+function DecoracionPorMes({
+  data,
+  color,
+  solo,
+}: {
+  data: { name: string; value: number }[];
+  color: string;
+  solo: "separadores" | "valores";
+}) {
+  const plot = usePlotArea();
+  const xScale = useXAxisScale();
+  const yScale = useYAxisScale();
+
+  // Primer render: el chart todavía no midió ⇒ no hay geometría.
+  if (!plot || !xScale) return null;
+
+  /** Eje X: base del área de dibujo (no depende del dominio del eje Y). */
+  const base = plot.y + plot.height;
+
+  if (solo === "separadores") {
+    return (
+      <g aria-hidden>
+        {data.map((d) => {
+          const x = xScale(d.name);
+          if (x === undefined) return null;
+          return (
+            <line
+              key={`sep-${d.name}`}
+              x1={x}
+              y1={plot.y}
+              x2={x}
+              y2={base}
+              stroke="var(--border)"
+              strokeWidth={1}
+              strokeDasharray="3 3"
+              opacity={0.55}
+            />
+          );
+        })}
+      </g>
+    );
+  }
+
+  if (!yScale) return null;
+
+  const ALTO_BADGE = 15;
+
+  return (
+    <g aria-hidden>
+      {data.map((d) => {
+        const x = xScale(d.name);
+        const y = yScale(d.value);
+        if (x === undefined || y === undefined) return null;
+
+        const texto = valorCorto(d.value);
+        const ancho = anchoBadge(texto);
+        // El badge se mantiene **dentro del área de dibujo**: si no, el del
+        // primer y el del último mes se salen y el SVG los recorta.
+        const cx = Math.min(
+          Math.max(x, plot.x + ancho / 2),
+          plot.x + plot.width - ancho / 2
+        );
+        const cy = Math.max(y - 11, plot.y + ALTO_BADGE / 2);
+
+        return (
+          <g key={`val-${d.name}`}>
+            <line
+              x1={x}
+              y1={base}
+              x2={x}
+              y2={y}
+              stroke={color}
+              strokeWidth={1.2}
+              strokeDasharray="2 3"
+              strokeOpacity={0.38}
+              strokeLinecap="round"
+            />
+            {/* Fondo `--muted` (no `--card`): tiene que distinguirse del panel.
+                El borde va con `--muted-foreground` al 35 % porque `--border` se
+                pierde en tema claro. */}
+            <rect
+              x={cx - ancho / 2}
+              y={cy - ALTO_BADGE / 2}
+              width={ancho}
+              height={ALTO_BADGE}
+              rx={4}
+              fill="var(--muted)"
+              stroke="var(--muted-foreground)"
+              strokeOpacity={0.35}
+            />
+            <text
+              x={cx}
+              y={cy + 3.2}
+              textAnchor="middle"
+              fontSize={9}
+              fontWeight={500}
+              fill="var(--card-foreground)"
+            >
+              {texto}
+            </text>
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
 /**
  * **Umbral que usan los paneles del dashboard** para pasar `scrollDesde`: desde
  * **13 meses** el gráfico ya no entra cómodo en un celular (8 columnas visibles ⇒
@@ -190,6 +338,7 @@ export function EvolutionChart({
   scrollDesde,
   anchoEjeY = ANCHO_EJE_Y,
   tamanoEjeY = 12,
+  valoresPorMes = false,
 }: EvolutionChartProps) {
   /** Wrapper: con `sinRecuadro` queda transparente (banda de Inicio). */
   const caja = sinRecuadro
@@ -273,6 +422,11 @@ export function EvolutionChart({
           stroke="var(--border)"
         />
       )}
+      {/* Separadores por mes: van ANTES de las series para quedar detrás del
+          área, con el mismo criterio que la grilla horizontal. */}
+      {valoresPorMes && !minimo && (
+        <DecoracionPorMes data={data} color={color} solo="separadores" />
+      )}
       <XAxis
         dataKey="name"
         hide={minimo}
@@ -292,6 +446,10 @@ export function EvolutionChart({
             : { fontSize: 12, fill: "var(--muted-foreground)" }
         }
         interval={conScroll ? 0 : undefined}
+        // Con `valoresPorMes` se deja aire a los lados: el badge del primer y del
+        // último mes miden ~31 px y, sin padding, quedaban pegados al borde del
+        // área de dibujo (se veían cortados, 2026-10-31).
+        padding={valoresPorMes ? { left: 16, right: 16 } : undefined}
         axisLine={false}
         tickLine={false}
       />
@@ -361,6 +519,11 @@ export function EvolutionChart({
           isAnimationActive={false}
           activeDot={{ r: 4, fill: color }}
         />
+      )}
+      {/* Valores por mes: van DESPUÉS de las series para quedar por encima del
+          área y de la línea (si van antes, el relleno los tapa). */}
+      {valoresPorMes && (
+        <DecoracionPorMes data={data} color={color} solo="valores" />
       )}
     </>
   );
@@ -519,7 +682,18 @@ export function EvolutionChart({
             <div
               // Cada mes mide **1/8 del contenedor** (`MESES_VISIBLES`), así el
               // ancho visible es el mismo en cualquier pantalla y sin medir con JS.
-              style={{ width: `${(data.length / MESES_VISIBLES) * 100}%` }}
+              // Con `valoresPorMes` en pantallas chicas se ven **5** (columna de
+              // ~50 px en vez de ~36) para que los badges de meses consecutivos no
+              // se toquen (2026-10-31).
+              // ⚠️ El `5` va **literal** en la clase: Tailwind lee el código como
+              // texto y no resuelve `${…}`. Si cambia el número, cambialo acá y en
+              // el `var(--meses-visibles, …)` de abajo.
+              className={
+                valoresPorMes ? "max-sm:[--meses-visibles:5]" : undefined
+              }
+              style={{
+                width: `calc(100% * ${data.length} / var(--meses-visibles, ${MESES_VISIBLES}))`,
+              }}
             >
               <ResponsiveContainer width="100%" height={height}>
                 <ComposedChart data={data}>

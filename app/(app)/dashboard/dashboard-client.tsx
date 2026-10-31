@@ -786,6 +786,10 @@ export function DashboardClient({
       <EvolutionChart
         encabezado={resultadosPanelHeader}
         data={data.evolucionResultados}
+        // 📊 Valor de cada mes sobre el gráfico (2026-10-31): separador vertical
+        // por mes + vertical punteada del eje X al punto + badge con el valor.
+        // Reemplaza la lectura "sólo tooltip" del histórico.
+        valoresPorMes
         // 📟 Verde: es **la misma serie** que el gráfico de la tarjeta de Balance
         // en Inicio ⇒ mismo color (pedido del usuario, 2026-10-03).
         color="var(--success)"
