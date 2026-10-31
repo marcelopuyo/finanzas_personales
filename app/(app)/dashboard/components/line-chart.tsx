@@ -252,8 +252,12 @@ function DecoracionPorMes({
   // Primer render: el chart todavía no midió ⇒ no hay geometría.
   if (!plot || !xScale) return null;
 
-  /** Eje X: base del área de dibujo (no depende del dominio del eje Y). */
-  const base = plot.y + plot.height;
+  /**
+   * Eje X "real" = **la línea del cero**. Con datos negativos el dominio baja de
+   * 0 y el borde del área de dibujo ya no es el eje: el tallo de cada mes tiene
+   * que nacer en `y(0)` (con todo positivo coincide con el borde).
+   */
+  const base = yScale?.(0) ?? plot.y + plot.height;
 
   if (solo === "separadores") {
     return (
@@ -282,6 +286,12 @@ function DecoracionPorMes({
   if (!yScale) return null;
 
   const ALTO_BADGE = 15;
+  /**
+   * Aire entre el punto y el badge. **Positivos:** el badge va arriba de la
+   * línea (por fuera del área sombreada). **Negativos:** va **debajo** del punto,
+   * también por fuera del área (2026-10-31).
+   */
+  const SEPARACION_BADGE = 16;
 
   return (
     <g aria-hidden>
@@ -298,7 +308,10 @@ function DecoracionPorMes({
           Math.max(x, plot.x + ancho / 2),
           plot.x + plot.width - ancho / 2
         );
-        const cy = Math.max(y - 11, plot.y + ALTO_BADGE / 2);
+        const negativo = d.value < 0;
+        const cy = negativo
+          ? Math.min(y + SEPARACION_BADGE, plot.y + plot.height - ALTO_BADGE / 2)
+          : Math.max(y - SEPARACION_BADGE, plot.y + ALTO_BADGE / 2);
 
         return (
           <g key={`val-${d.name}`}>
