@@ -12,7 +12,7 @@ import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { DateFieldInput } from "@/components/ui/date-picker";
 import { QuickCreateModal } from "@/components/ui/quick-create-modal";
 import { solicitarActualizacionDashboard } from "@/lib/dashboard-cache";
-import type { ZodSchema } from "zod";
+import type { ZodType } from "zod";
 
 export interface FormField {
   name: string;
@@ -57,7 +57,7 @@ export interface FormField {
 interface CrudFormProps {
   title: string;
   fields: FormField[];
-  schema: ZodSchema;
+  schema: ZodType<Record<string, unknown>, Record<string, unknown>>;
   defaultValues?: Record<string, unknown>;
   onSubmit: (data: Record<string, unknown>) => Promise<void>;
   /** Destino de Cancelar / volver (flecha). */
@@ -228,7 +228,7 @@ export function CrudForm({
                     <select
                       id={field.name}
                       name={controllerField.name}
-                      value={controllerField.value ?? ""}
+                      value={(controllerField.value as string) ?? ""}
                       onChange={(e) => controllerField.onChange(e.target.value)}
                       onBlur={controllerField.onBlur}
                       ref={controllerField.ref}
@@ -263,7 +263,7 @@ export function CrudForm({
                     <Combobox
                       id={field.name}
                       name={controllerField.name}
-                      value={controllerField.value ?? ""}
+                      value={(controllerField.value as string) ?? ""}
                       onBlur={controllerField.onBlur}
                       onChange={(v) => controllerField.onChange(v)}
                       options={asyncOptions[field.name] || field.options || []}

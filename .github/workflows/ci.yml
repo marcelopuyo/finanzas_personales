@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint-y-build:
+    name: Lint y build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          # Debe coincidir con `engines.node` de package.json.
+          node-version: 26.x
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          # El build evalúa módulos que exigen estas variables al importarse
+          # (`envRequerida` en backend/src/lib/cotizaciones.ts). Son valores
+          # dummy: el build no llama a la API ni a la base de datos.
+          FX_API_URL: "https://example.invalid/fx"
+          FX_MARKET_OPEN_HOUR: "10"
+          JWT_SECRET: "ci-dummy-secret"
+          APP_URL: "https://example.invalid"
+          PG_HOST: "localhost"
+          PG_PORT: "5432"
+          PG_USERNAME: "ci"
+          PG_PASSWORD: "ci"
+          PG_DATABASE: "ci"

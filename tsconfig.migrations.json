@@ -3,6 +3,12 @@
   "compilerOptions": {
     "module": "commonjs",
     "moduleResolution": "node",
+    // ts-node ejecuta con la API de TS 6 (alias `typescript`), donde
+    // "node"/node10 ya está deprecado: sin esto el CLI de migraciones falla
+    // con TS5107. No se puede pasar a `node16` porque `jose` es ESM-only y el
+    // build de migraciones es CommonJS (TS1479).
+    "ignoreDeprecations": "6.0",
+    "types": ["node"],
     "target": "ES2020",
     "lib": ["ES2020"],
     "noEmit": false,

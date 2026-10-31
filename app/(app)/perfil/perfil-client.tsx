@@ -95,7 +95,10 @@ export default function PerfilClient({
       // no restaure la sesión tras el logout explícito.
       sessionStorage.removeItem(NO_REMEMBER);
       sessionStorage.removeItem(PENDING_CLEAR);
-      window.location.href = "/login";
+      // Recarga dura (no `router.push`): tras el logout no debe quedar estado en
+      // memoria ni la página anterior en el historial. Mismo patrón que
+      // `session-guard` y `app-lock`.
+      window.location.replace("/login");
     }
   }
 

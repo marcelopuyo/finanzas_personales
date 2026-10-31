@@ -8,7 +8,7 @@ export const prestamoSchema = z.object({
   detalle: z.string().optional(),
   fecha: z.string().min(1, "Fecha requerida"),
   monto: z.coerce.number().positive("Debe ser positivo"),
-  sentido: z.enum(["otorgado", "obtenido"], { errorMap: () => ({ message: "Seleccione un sentido" }) }),
+  sentido: z.enum(["otorgado", "obtenido"], { error: "Seleccione un sentido" }),
   // Una sola persona: la CONTRAPARTE (la otra parte es el usuario).
   personaContraparte: z.string().min(1, "Seleccione una persona"),
   cuenta: z.string().min(1, "Seleccione una cuenta"),

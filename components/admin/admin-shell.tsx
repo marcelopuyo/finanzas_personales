@@ -60,7 +60,10 @@ export default function AdminShell({
       // PWA: el logout es VOLUNTARIO → se borra TODO el caché (documentos con
       // montos y nombres incluidos) y no queda nada del usuario en el dispositivo.
       await clearAllCaches();
-      window.location.href = "/login";
+      // Recarga dura (no `router.push`): tras el logout no debe quedar estado en
+      // memoria ni la página anterior en el historial. Mismo patrón que
+      // `session-guard` y `app-lock`.
+      window.location.replace("/login");
     }
   }
 

@@ -4,7 +4,7 @@ import { z } from "zod";
 export const conceptoSchema = z.object({
   nombre: z.string().min(1, "El nombre es requerido"),
   categoria: z.enum(["Ingreso", "Egreso"], {
-    errorMap: () => ({ message: "Seleccione una categoría" }),
+    error: "Seleccione una categoría",
   }),
 });
 
