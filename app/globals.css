@@ -418,9 +418,11 @@ html[data-zoom="on"] [data-app-shell] main {
    La barra deja de ser una **banda pegada al borde** y pasa a ser, en todos los
    tamaños, una **pastilla flotante** de vidrio:
 
-   · **Vidrio**: fondo casi sin tinte (10 % en oscuro / 30 % en claro) +
-     `backdrop-filter: blur(30-32px) saturate(~180%)` ⇒ lo que scrollea por detrás
-     se ve esmerilado, no tapado.
+   · **Vidrio**: fondo casi sin tinte (4 % en oscuro / 22 % en claro) +
+     `backdrop-filter: blur(14px) saturate(170%)` ⇒ lo que scrollea por detrás se
+     ve **desenfocado pero reconocible**. ⚠️ Con blur muy alto (se probó 30-34 px)
+     el fondo se aplana y la barra se lee como una banda opaca: el “vidrio” lo da
+     el desenfoque, no el relleno.
    · **Brillo especular**: un halo radial arriba a la izquierda + un degradé a
      168° en el `background`, más el `inset` de 1 px de arriba. Es lo que hace
      que se lea como vidrio y no como un rectángulo gris.
@@ -463,20 +465,23 @@ html[data-zoom="on"] [data-app-shell] main {
   border-radius: 999px;
   /* Recorta el indicador y el halo del vidrio a la forma de la pastilla. */
   overflow: hidden;
+  /* 🔑 El vidrio es el **desenfoque**, no el relleno: si se le pone tinte
+     opaco, el contenido de atrás se aplana y la barra se lee como una banda
+     sólida (era el reclamo del 2026-11-01: “la transparencia no se nota”). */
   background:
     radial-gradient(
       120% 90% at 22% -30%,
-      rgba(255, 255, 255, 0.6),
+      rgba(255, 255, 255, 0.5),
       transparent 62%
     ),
     linear-gradient(
       168deg,
-      rgba(255, 255, 255, 0.35) 0%,
+      rgba(255, 255, 255, 0.3) 0%,
       rgba(255, 255, 255, 0) 46%
     ),
-    color-mix(in srgb, var(--background) 30%, transparent);
-  -webkit-backdrop-filter: blur(30px) saturate(180%);
-  backdrop-filter: blur(30px) saturate(180%);
+    color-mix(in srgb, var(--background) 22%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(170%);
+  backdrop-filter: blur(14px) saturate(170%);
   box-shadow:
     inset 0 1px 0 var(--fr-brillo),
     inset 0 -1px 1px color-mix(in srgb, var(--header) 8%, transparent),
@@ -493,17 +498,17 @@ html[data-zoom="on"] [data-app-shell] main {
   background:
     radial-gradient(
       120% 90% at 22% -30%,
-      rgba(255, 255, 255, 0.06),
+      rgba(255, 255, 255, 0.05),
       transparent 62%
     ),
     linear-gradient(
       168deg,
-      rgba(255, 255, 255, 0.035) 0%,
+      rgba(255, 255, 255, 0.025) 0%,
       rgba(255, 255, 255, 0) 46%
     ),
-    color-mix(in srgb, var(--background) 10%, transparent);
-  -webkit-backdrop-filter: blur(34px) saturate(190%);
-  backdrop-filter: blur(34px) saturate(190%);
+    color-mix(in srgb, var(--background) 4%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(170%);
+  backdrop-filter: blur(14px) saturate(170%);
   box-shadow:
     inset 0 1.5px 0 var(--fr-brillo),
     inset 0 -1px 1px rgba(255, 255, 255, 0.06),
