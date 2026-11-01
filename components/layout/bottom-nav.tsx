@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 // 🎨 **Set de iconos de la barra: Solar** (decisión del usuario, 2026-10-02).
@@ -138,6 +138,9 @@ function esActivo(href: string, ruta: string): boolean {
   return href === "/dashboard" ? ruta === "/dashboard" : ruta.startsWith(href);
 }
 
+/** Cantidad de slots de la barra: las 4 secciones + el botón "Más". */
+const SLOTS = TABS.length + 1;
+
 /**
  * Posición del indicador deslizante: `0..TABS.length-1` para las secciones y
  * `TABS.length` para el botón "Más" (que también se marca cuando estamos en
@@ -161,23 +164,85 @@ export default function BottomNav() {
   const masActivo = OPCIONES_MAS.some((o) => ruta.startsWith(o.href));
   /** Índice del indicador deslizante según la ruta (ver `indiceDeRuta`). */
   const indice = indiceDeRuta(ruta);
-  /**
-   * Ref del indicador: al tocar un tab se lo mueve **ya** (antes de que la
-   * navegación cambie `usePathname`), que es lo que hace que el gesto se sienta
-   * inmediato. No usa estado propio porque el valor "verdadero" siempre es la
-   * ruta; si el push falla, el próximo render con otra ruta lo reacomoda.
-   */
+
+  const navRef = useRef<HTMLElement | null>(null);
   const indicadorRef = useRef<HTMLSpanElement | null>(null);
-  const moverIndicador = (i: number) => {
-    const el = indicadorRef.current;
-    if (!el) return;
-    el.style.transform = `translateX(${i}00%)`;
-    el.style.opacity = "1";
-  };
+  /** Contenido (icono + texto) de cada ítem: es lo que el indicador debe cubrir. */
+  const contenidosRef = useRef<(HTMLSpanElement | null)[]>([]);
+  const primeraVez = useRef(true);
+
+  /**
+   * Pone el indicador sobre el ítem `i` **midiendo su contenido**, no sobre un
+   * quinto fijo de la barra: WhatsApp hace eso y es lo que evita que un label
+   * largo (“Resultados”) se salga del resalte. El ancho es el del slot como
+   * mínimo (así los 5 se ven parejos) y crece “ligeramente ovalado” cuando el
+   * texto lo necesita; el `left` se acota para que nunca se corte contra el
+   * borde redondeado de la pastilla.
+   */
+  const ubicarIndicador = useCallback((i: number) => {
+    const nav = navRef.current;
+    const ind = indicadorRef.current;
+    if (!nav || !ind) return;
+    if (i < 0) {
+      ind.style.opacity = "0";
+      return;
+    }
+    const anchoNav = nav.clientWidth;
+    if (anchoNav === 0) return;
+
+    const slot = anchoNav / SLOTS;
+    const texto = contenidosRef.current[i]?.offsetWidth ?? 0;
+    const ancho = Math.min(
+      anchoNav - 8,
+      Math.max(slot - 8, texto + 24) // 24 px = 12 px de aire por lado del label
+    );
+    const centro = slot * i + slot / 2;
+    const izq = Math.min(Math.max(4, centro - ancho / 2), anchoNav - ancho - 4);
+
+    // En el primer acomodo no se anima: el indicador tiene que “aparecer” ya en
+    // su lugar, no viajar desde el 0.
+    if (primeraVez.current) {
+      primeraVez.current = false;
+      ind.style.transition = "none";
+      requestAnimationFrame(() => {
+        if (indicadorRef.current) indicadorRef.current.style.transition = "";
+      });
+    }
+
+    ind.style.width = `${ancho}px`;
+    ind.style.transform = `translateX(${izq}px)`;
+    ind.style.opacity = "1";
+  }, []);
+
+  // Acomodo inicial, en cada cambio de sección y cuando cambia el ancho de la
+  // barra (rotación, ventana, barra de scroll). Las fuentes también lo cambian:
+  // el texto se mide con la fuente definitiva recién cuando termina de cargar.
+  useLayoutEffect(() => {
+    ubicarIndicador(indice);
+    const nav = navRef.current;
+    const observador = new ResizeObserver(() => ubicarIndicador(indice));
+    if (nav) observador.observe(nav);
+    const alRedimensionar = () => ubicarIndicador(indice);
+    window.addEventListener("resize", alRedimensionar);
+    document.fonts?.ready.then(alRedimensionar).catch(() => {});
+    return () => {
+      observador.disconnect();
+      window.removeEventListener("resize", alRedimensionar);
+    };
+  }, [indice, ubicarIndicador]);
+
+  /**
+   * Al tocar un tab el indicador se mueve **ya** (antes de que la navegación
+   * cambie `usePathname`), que es lo que hace que el gesto se sienta inmediato.
+   * No usa estado propio porque el valor "verdadero" siempre es la ruta; si el
+   * push falla, el próximo render con otra ruta lo reacomoda.
+   */
+  const moverIndicador = (i: number) => ubicarIndicador(i);
 
   return (
     <>
     <nav
+      ref={navRef}
       // `data-barra-nav` lo usan el FAB "+" y la barra de acciones para apilarse
       // por encima (misma idea que `data-barra-inferior`, ver `globals.css`).
       data-barra-nav=""
@@ -187,22 +252,13 @@ export default function BottomNav() {
       // y los FAB compartan las mismas medidas (`--fp-barra-alto` / `-sep`).
       className="fixed z-40 mx-auto flex max-w-lg items-stretch"
     >
-      {/* Indicador deslizante del activo (2026-11-01): UN solo elemento que se
-          mueve con `translateX(índice × 100%)` de su propio ancho. Como los 5
-          ítems son `flex-1`, cada uno mide 1/5 de la barra y el indicador cae
-          siempre exacto arriba del ítem activo. `opacity: 0` cuando la ruta no
-          pertenece a ninguna sección (p. ej. `/perfil`). */}
-      <span
-        ref={indicadorRef}
-        aria-hidden="true"
-        data-barra-indicador=""
-        style={{
-          transform: `translateX(${Math.max(indice, 0)}00%)`,
-          opacity: indice < 0 ? 0 : 1,
-        }}
-      >
-        <span className="barra-nav-capsula" />
-      </span>
+      {/* Indicador del activo (2026-11-01): UN solo elemento que se desliza.
+          Su `width`/`transform` los escribe `ubicarIndicador` en px midiendo el
+          contenido del ítem, así cubre siempre el texto completo; el ancho viaja
+          junto con la posición ⇒ la cápsula se estira y se encoge al cambiar de
+          sección (el gesto “líquido” de WhatsApp). Arranca invisible hasta el
+          primer acomodo para que no se vea en el lugar equivocado. */}
+      <span ref={indicadorRef} aria-hidden="true" data-barra-indicador="" />
 
       {TABS.map((t, i) => {
         const activo = esActivo(t.href, ruta);
@@ -215,21 +271,28 @@ export default function BottomNav() {
             aria-current={activo ? "page" : undefined}
             // Mueve el indicador ya mismo (el estado "real" sigue siendo la ruta).
             onClick={() => moverIndicador(i)}
-            className={cn(
-              // `relative z-10`: los ítems van por encima del indicador.
-              "relative z-10 flex flex-1 flex-col items-center justify-center gap-1 transition-colors",
-              activo ? "text-header" : "text-subtitle hover:text-label"
-            )}
+            className="relative z-10 flex flex-1 items-center justify-center transition-colors"
           >
-            <Icono
-              size={22}
-              // Micro-pop del icono al quedar activo (mismo gesto que WhatsApp).
+            {/* Este span es lo que se mide para el ancho del indicador. */}
+            <span
+              ref={(el) => {
+                contenidosRef.current[i] = el;
+              }}
               className={cn(
-                "transition-transform duration-300",
-                activo && "scale-105"
+                "flex flex-col items-center gap-1",
+                activo ? "text-header" : "text-subtitle hover:text-label"
               )}
-            />
-            <span className="text-[11px] font-medium leading-none">{t.label}</span>
+            >
+              <Icono
+                size={22}
+                // Micro-pop del icono al quedar activo (mismo gesto que WhatsApp).
+                className={cn(
+                  "transition-transform duration-300",
+                  activo && "scale-105"
+                )}
+              />
+              <span className="text-[11px] font-medium leading-none">{t.label}</span>
+            </span>
           </Link>
         );
       })}
@@ -250,13 +313,20 @@ export default function BottomNav() {
         // ⚠️ **No** mueve el indicador: este botón no navega (abre el popup). El
         // indicador se corre a "Más" recién cuando se entra a una de sus
         // pantallas (`masActivo` ⇒ `indiceDeRuta` devuelve `TABS.length`).
-        className={cn(
-          "relative z-10 flex flex-1 flex-col items-center justify-center gap-1 transition-colors",
-          masActivo ? "text-header" : "text-subtitle hover:text-label"
-        )}
+        className="relative z-10 flex flex-1 items-center justify-center transition-colors"
       >
-        {masActivo ? <HamburgerMenuDuotone size={22} /> : <HamburgerMenuLinear size={22} />}
-        <span className="text-[11px] font-medium leading-none">Más</span>
+        <span
+          ref={(el) => {
+            contenidosRef.current[TABS.length] = el;
+          }}
+          className={cn(
+            "flex flex-col items-center gap-1",
+            masActivo ? "text-header" : "text-subtitle hover:text-label"
+          )}
+        >
+          {masActivo ? <HamburgerMenuDuotone size={22} /> : <HamburgerMenuLinear size={22} />}
+          <span className="text-[11px] font-medium leading-none">Más</span>
+        </span>
       </button>
     </nav>
 

@@ -71,14 +71,15 @@
       env(safe-area-inset-bottom)
   );
 
-  /* BARRA INFERIOR FLOTANTE (2026-11-01): alto de la pastilla y separación con
-     el borde del shell. Son la **única** fuente de estas dos medidas: las
-     consumen la propia barra (`[data-barra-nav]`), la barra de acciones
-     (`[data-barra-inferior]`) y los FAB de Inicio (`ESTILO_FAB` en
+  /* BARRA INFERIOR FLOTANTE (2026-11-01): alto de la pastilla, margen lateral y
+     separación con el borde inferior del shell. Son la **única** fuente de estas
+     medidas: las consumen la propia barra (`[data-barra-nav]`), la barra de
+     acciones (`[data-barra-inferior]`) y los FAB de Inicio (`ESTILO_FAB` en
      `components/movimientos/fab-nuevo.tsx`). Si cambian, no hay nada más que
      tocar. */
   --fp-barra-alto: 4.375rem; /* 70 px */
-  --fp-barra-sep: 0.75rem; /* 12 px */
+  --fp-barra-sep: 0.5rem; /* 8 px — qué tan abajo se apoya la pastilla */
+  --fp-barra-lado: 0.75rem; /* 12 px — margen lateral */
 
   /* Desfase de anclaje de las barras fijas (2026-10-04). Valen `0px` en el caso
      normal —mismo comportamiento de siempre— y las escribe `AnclajeBarras`
@@ -414,17 +415,18 @@ html[data-zoom="on"] [data-app-shell] main {
    La barra deja de ser una **banda pegada al borde** y pasa a ser, en todos los
    tamaños, una **pastilla flotante** de vidrio:
 
-   · **Vidrio**: fondo semitransparente (34 % en oscuro / 55 % en claro) +
-     `backdrop-filter: blur(30px) saturate(180%)` ⇒ lo que scrollea por detrás se
-     ve esmerilado, no tapado.
+   · **Vidrio**: fondo semitransparente (18 % en oscuro / 42 % en claro) +
+     `backdrop-filter: blur(30-32px) saturate(~180%)` ⇒ lo que scrollea por detrás
+     se ve esmerilado, no tapado.
    · **Brillo especular**: un halo radial arriba a la izquierda + un degradé a
      168° en el `background`, más el `inset` de 1 px de arriba. Es lo que hace
      que se lea como vidrio y no como un rectángulo gris.
    · **Borde de 1 px** translúcido y sombra profunda debajo (en el tema claro la
      sombra es más suave: la versión oscura se ve “sucia” sobre blanco).
-   · **Indicador deslizante** (`[data-barra-indicador]` + `.barra-nav-capsula`):
-     UNA sola cápsula que se corre con `translateX` entre los 5 ítems, con una
-     curva de overshoot leve para que el movimiento tenga “peso” (WhatsApp).
+   · **Indicador deslizante** (`[data-barra-indicador]`): UNA sola cápsula que se
+     corre con `translateX` entre los 5 ítems y **se estira/encoge** con el texto
+     del destino, con una curva de overshoot leve para que el movimiento tenga
+     “peso” (WhatsApp). El ancho y la posición los escribe `bottom-nav.tsx` en px.
 
    ⚠️ **Medidas**: alto y separación salen de `--fp-barra-alto` / `--fp-barra-sep`
    (`:root`) porque las comparten:
@@ -450,8 +452,8 @@ html[data-zoom="on"] [data-app-shell] main {
   --fr-capsula: rgba(15, 23, 42, 0.075);
   --fr-capsula-brillo: rgba(255, 255, 255, 0.85);
 
-  left: var(--fp-barra-sep);
-  right: var(--fp-barra-sep);
+  left: var(--fp-barra-lado);
+  right: var(--fp-barra-lado);
   bottom: calc(
     var(--fp-barra-sep) + env(safe-area-inset-bottom) +
       var(--fp-desfase-inferior, 0px)
@@ -464,15 +466,15 @@ html[data-zoom="on"] [data-app-shell] main {
   background:
     radial-gradient(
       120% 90% at 22% -30%,
-      rgba(255, 255, 255, 0.75),
+      rgba(255, 255, 255, 0.7),
       transparent 62%
     ),
     linear-gradient(
       168deg,
-      rgba(255, 255, 255, 0.55) 0%,
+      rgba(255, 255, 255, 0.45) 0%,
       rgba(255, 255, 255, 0) 46%
     ),
-    color-mix(in srgb, var(--background) 55%, transparent);
+    color-mix(in srgb, var(--background) 42%, transparent);
   -webkit-backdrop-filter: blur(30px) saturate(180%);
   backdrop-filter: blur(30px) saturate(180%);
   box-shadow:
@@ -483,25 +485,25 @@ html[data-zoom="on"] [data-app-shell] main {
 }
 
 .dark [data-barra-nav] {
-  --fr-borde: rgba(255, 255, 255, 0.14);
-  --fr-brillo: rgba(255, 255, 255, 0.22);
+  --fr-borde: rgba(255, 255, 255, 0.13);
+  --fr-brillo: rgba(255, 255, 255, 0.2);
   --fr-capsula: rgba(255, 255, 255, 0.16);
   --fr-capsula-brillo: rgba(255, 255, 255, 0.3);
 
   background:
     radial-gradient(
       120% 90% at 22% -30%,
-      rgba(255, 255, 255, 0.16),
+      rgba(255, 255, 255, 0.11),
       transparent 62%
     ),
     linear-gradient(
       168deg,
-      rgba(255, 255, 255, 0.09) 0%,
+      rgba(255, 255, 255, 0.07) 0%,
       rgba(255, 255, 255, 0) 46%
     ),
-    color-mix(in srgb, var(--background) 34%, transparent);
-  -webkit-backdrop-filter: blur(30px) saturate(180%) brightness(1.08);
-  backdrop-filter: blur(30px) saturate(180%) brightness(1.08);
+    color-mix(in srgb, var(--background) 18%, transparent);
+  -webkit-backdrop-filter: blur(32px) saturate(185%) brightness(1.06);
+  backdrop-filter: blur(32px) saturate(185%) brightness(1.06);
   box-shadow:
     inset 0 1.5px 0 var(--fr-brillo),
     inset 0 -1px 1px rgba(255, 255, 255, 0.06),
@@ -509,33 +511,31 @@ html[data-zoom="on"] [data-app-shell] main {
     0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* Indicador deslizante: UN elemento de 1/5 de ancho que se corre con
-   `translateX(<índice>00%)` (el % es de **su propio** ancho). El overshoot de la
-   curva (1.12) es lo que le da el “peso” al movimiento, como en WhatsApp. */
+/* Indicador del activo (2026-11-01): una sola cápsula que se desliza entre los
+   ítems. `bottom-nav.tsx` le escribe `width` y `transform` en **px** midiendo el
+   contenido de cada slot (así cubre el texto completo, “ligeramente ovalada”
+   cuando el label es largo). El `width` de acá es sólo el respaldo previo a la
+   primera medición; el `opacity: 0` evita verla en el lugar equivocado. */
 [data-barra-indicador] {
   position: absolute;
-  top: 0;
-  bottom: 0;
+  top: 0.4375rem;
+  bottom: 0.4375rem;
   left: 0;
   width: calc(100% / 5);
-  padding: 0.4375rem 0.25rem;
+  border-radius: 999px;
+  opacity: 0;
   z-index: 0;
   pointer-events: none;
-  will-change: transform;
-  transition:
-    transform 400ms cubic-bezier(0.22, 1.12, 0.36, 1),
-    opacity 180ms ease;
-}
-
-.barra-nav-capsula {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
   background: var(--fr-capsula);
   box-shadow:
     inset 0 1px 0 var(--fr-capsula-brillo),
     inset 0 0 0 1px color-mix(in srgb, var(--header) 6%, transparent),
     0 4px 12px rgba(0, 0, 0, 0.12);
+  will-change: transform, width;
+  transition:
+    transform 400ms cubic-bezier(0.22, 1.12, 0.36, 1),
+    width 400ms cubic-bezier(0.22, 1.12, 0.36, 1),
+    opacity 180ms ease;
 }
 
 /* Accesibilidad: con "reducir movimiento" el indicador salta sin animar. */
