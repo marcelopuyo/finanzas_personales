@@ -62,24 +62,27 @@
   --app-top: calc(3.5rem + env(safe-area-inset-top));
 
   /* Espaciador del pie del contenido (`app-layout.tsx`): reserva el alto de la
-     barra inferior flotante + su separación con el borde + la franja de los FAB
-     para que el último elemento no quede tapado. En escritorio el dock flota más
+     barra inferior flotante + su distancia al borde + la franja de los FAB para
+     que el último elemento no quede tapado. En escritorio el dock flota más
      arriba, es más bajo y va despegado del borde ⇒ reserva menos (ver el
      `@media` de `[data-barra-nav]`). */
   --fp-espaciador-pie: calc(
-    var(--fp-barra-alto) + var(--fp-barra-sep) + 5.25rem +
-      env(safe-area-inset-bottom)
+    var(--fp-barra-bottom) + var(--fp-barra-alto) + 5.25rem
   );
 
   /* BARRA INFERIOR FLOTANTE (2026-11-01): alto de la pastilla, margen lateral y
-     separación con el borde inferior del shell. Son la **única** fuente de estas
-     medidas: las consumen la propia barra (`[data-barra-nav]`), la barra de
-     acciones (`[data-barra-inferior]`) y los FAB de Inicio (`ESTILO_FAB` en
+     **dónde apoya su borde inferior**. Son la única fuente de estas medidas: las
+     consumen la propia barra (`[data-barra-nav]`), la barra de acciones
+     (`[data-barra-inferior]`) y los FAB de Inicio (`ESTILO_FAB` en
      `components/movimientos/fab-nuevo.tsx`). Si cambian, no hay nada más que
      tocar. */
   --fp-barra-alto: 4.375rem; /* 70 px */
-  --fp-barra-sep: 0.5rem; /* 8 px — qué tan abajo se apoya la pastilla */
   --fp-barra-lado: 0.75rem; /* 12 px — margen lateral */
+  /* **Casi pegado al borde** (4 px). En iOS se le descuentan 8 px al safe-area
+     para que la pastilla no quede “flotando” sobre el home indicator (que se
+     dibuja ENCIMA y es translúcido): así queda a la altura del tab bar de
+     WhatsApp, no más arriba. */
+  --fp-barra-bottom: max(0.25rem, env(safe-area-inset-bottom) - 0.5rem);
 
   /* Desfase de anclaje de las barras fijas (2026-10-04). Valen `0px` en el caso
      normal —mismo comportamiento de siempre— y las escribe `AnclajeBarras`
@@ -325,8 +328,8 @@ html.fp-sin-red [data-app-lock] {
      medidas salen de los mismos tokens que usa `[data-barra-nav]`. */
   html:has([data-barra-nav]) [data-barra-inferior] {
     bottom: calc(
-      var(--fp-barra-alto) + var(--fp-barra-sep) +
-        env(safe-area-inset-bottom) + var(--fp-desfase-inferior, 0px)
+      var(--fp-barra-bottom) + var(--fp-barra-alto) +
+        var(--fp-desfase-inferior, 0px)
     );
     padding-bottom: 0.75rem;
   }
@@ -415,7 +418,7 @@ html[data-zoom="on"] [data-app-shell] main {
    La barra deja de ser una **banda pegada al borde** y pasa a ser, en todos los
    tamaños, una **pastilla flotante** de vidrio:
 
-   · **Vidrio**: fondo semitransparente (18 % en oscuro / 42 % en claro) +
+   · **Vidrio**: fondo casi sin tinte (10 % en oscuro / 30 % en claro) +
      `backdrop-filter: blur(30-32px) saturate(~180%)` ⇒ lo que scrollea por detrás
      se ve esmerilado, no tapado.
    · **Brillo especular**: un halo radial arriba a la izquierda + un degradé a
@@ -428,8 +431,8 @@ html[data-zoom="on"] [data-app-shell] main {
      del destino, con una curva de overshoot leve para que el movimiento tenga
      “peso” (WhatsApp). El ancho y la posición los escribe `bottom-nav.tsx` en px.
 
-   ⚠️ **Medidas**: alto y separación salen de `--fp-barra-alto` / `--fp-barra-sep`
-   (`:root`) porque las comparten:
+   ⚠️ **Medidas**: alto y distancia al borde salen de `--fp-barra-alto` /
+   `--fp-barra-bottom` (`:root`) porque las comparten:
      · el espaciador del pie (`--fp-espaciador-pie`),
      · la barra de acciones (`[data-barra-inferior]`, más arriba),
      · los FAB de Inicio (`ESTILO_FAB`, `components/movimientos/fab-nuevo.tsx`).
@@ -454,10 +457,7 @@ html[data-zoom="on"] [data-app-shell] main {
 
   left: var(--fp-barra-lado);
   right: var(--fp-barra-lado);
-  bottom: calc(
-    var(--fp-barra-sep) + env(safe-area-inset-bottom) +
-      var(--fp-desfase-inferior, 0px)
-  );
+  bottom: calc(var(--fp-barra-bottom) + var(--fp-desfase-inferior, 0px));
   height: var(--fp-barra-alto);
   border: 1px solid var(--fr-borde);
   border-radius: 999px;
@@ -466,15 +466,15 @@ html[data-zoom="on"] [data-app-shell] main {
   background:
     radial-gradient(
       120% 90% at 22% -30%,
-      rgba(255, 255, 255, 0.7),
+      rgba(255, 255, 255, 0.6),
       transparent 62%
     ),
     linear-gradient(
       168deg,
-      rgba(255, 255, 255, 0.45) 0%,
+      rgba(255, 255, 255, 0.35) 0%,
       rgba(255, 255, 255, 0) 46%
     ),
-    color-mix(in srgb, var(--background) 42%, transparent);
+    color-mix(in srgb, var(--background) 30%, transparent);
   -webkit-backdrop-filter: blur(30px) saturate(180%);
   backdrop-filter: blur(30px) saturate(180%);
   box-shadow:
@@ -485,7 +485,7 @@ html[data-zoom="on"] [data-app-shell] main {
 }
 
 .dark [data-barra-nav] {
-  --fr-borde: rgba(255, 255, 255, 0.13);
+  --fr-borde: rgba(255, 255, 255, 0.15);
   --fr-brillo: rgba(255, 255, 255, 0.2);
   --fr-capsula: rgba(255, 255, 255, 0.16);
   --fr-capsula-brillo: rgba(255, 255, 255, 0.3);
@@ -493,17 +493,17 @@ html[data-zoom="on"] [data-app-shell] main {
   background:
     radial-gradient(
       120% 90% at 22% -30%,
-      rgba(255, 255, 255, 0.11),
+      rgba(255, 255, 255, 0.06),
       transparent 62%
     ),
     linear-gradient(
       168deg,
-      rgba(255, 255, 255, 0.07) 0%,
+      rgba(255, 255, 255, 0.035) 0%,
       rgba(255, 255, 255, 0) 46%
     ),
-    color-mix(in srgb, var(--background) 18%, transparent);
-  -webkit-backdrop-filter: blur(32px) saturate(185%) brightness(1.06);
-  backdrop-filter: blur(32px) saturate(185%) brightness(1.06);
+    color-mix(in srgb, var(--background) 10%, transparent);
+  -webkit-backdrop-filter: blur(34px) saturate(190%);
+  backdrop-filter: blur(34px) saturate(190%);
   box-shadow:
     inset 0 1.5px 0 var(--fr-brillo),
     inset 0 -1px 1px rgba(255, 255, 255, 0.06),
@@ -546,8 +546,10 @@ html[data-zoom="on"] [data-app-shell] main {
 }
 
 /* Escritorio: mismo material y misma pastilla, pero más angosta (464 px),
-   centrada y despegada 1.5rem (2026-10-17). El `mx-auto` del componente la
-   centra con `left/right: 0`. */
+   centrada y despegada del borde (2026-10-17). El `mx-auto` del componente la
+   centra con `left/right: 0`. ⚠️ El `bottom` **también** se baja acá: si sólo se
+   cambiara el de mobile, en una ventana ≥1024 px la barra no se movía (era el
+   caso reportado el 2026-11-01). */
 @media (min-width: 1024px) {
   :root {
     --fp-espaciador-pie: 7rem;
@@ -556,7 +558,7 @@ html[data-zoom="on"] [data-app-shell] main {
   [data-barra-nav] {
     left: 0;
     right: 0;
-    bottom: calc(1.5rem + var(--fp-desfase-inferior, 0px));
+    bottom: calc(0.75rem + var(--fp-desfase-inferior, 0px));
     width: 29rem;
     max-width: calc(100% - 3rem);
     height: 3.75rem;
