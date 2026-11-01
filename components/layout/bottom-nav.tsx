@@ -60,13 +60,16 @@ import { usePrefetchNav } from "@/components/ui/nav-progress";
  * (ver abajo). Medidas y material viven en `[data-barra-nav]` (`globals.css`).
  *
  * 🎞️ **Indicador deslizante**: es **un solo** elemento (`data-barra-indicador`)
- * que se mueve con `translateX` —no una píldora por ítem—, así el movimiento se
- * ve continuo al cambiar de sección, como en WhatsApp. Los 5 ítems son `flex-1`
- * ⇒ cada uno mide exactamente 1/5 de la barra y el indicador se posiciona con
- * `translateX(<índice>00%)` (porcentaje de **su propio** ancho). Al tocar se
- * mueve **al instante** (`moverIndicador`, sin esperar a que llegue la página) y
- * después el índice vuelve a derivarse de la ruta: si la navegación se cancela,
- * el próximo render lo corrige.
+ * que se desliza —no una píldora por ítem—, así el movimiento se ve continuo al
+ * cambiar de sección, como en WhatsApp. Su `width`/`transform` se escriben en
+ * **px** desde `ubicarIndicador`, midiendo el contenido (icono + label) de cada
+ * slot: el ancho mínimo es el del slot (los 5 se ven parejos) y **crece si el
+ * texto es largo** (“Resultados” queda “ligeramente ovalado”, como en WhatsApp,
+ * en vez de que el label se salga del resalte). Ese ancho también anima ⇒ la
+ * cápsula se estira y se encoge mientras viaja. Al tocar se mueve **al
+ * instante** (`moverIndicador`, sin esperar a que llegue la página) y después el
+ * índice vuelve a derivarse de la ruta: si la navegación se cancela, el próximo
+ * render lo reacomoda.
  *
  * 🔑 **Estado activo**: `/dashboard` matchea **exacto** (si no, cualquier
  * `/dashboard/*` marcaría también Inicio); el resto matchea **por prefijo**, así
