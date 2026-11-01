@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 // 🎨 **Set de iconos de la barra: Solar** (decisión del usuario, 2026-10-02).
@@ -49,13 +49,24 @@ import { usePrefetchNav } from "@/components/ui/nav-progress";
  * opciones" (ej. Préstamos). En wizards, CRUDs y pantallas de detalle manda el `‹`
  * de la cabecera (§210), así no quedan 3 elementos fijos apilados en un celular.
  *
- * ⚠️ **Desktop (2026-10-17)**: la barra sigue visible en todos los tamaños (el
- * sidebar de `lg:` continúa parqueado para una segunda fase), pero en pantallas
- * grandes pasa a ser un **dock flotante**: 464 px, centrado, despegado 1.5rem del
- * borde, `rounded-full`, borde propio y sombra (ver el `@media (min-width: 1024px)`
- * de `[data-barra-nav]` en `globals.css`). Antes heredaba la estética mobile
- * —banda angosta pegada al borde con `border-t`— y se leía como una barra de
- * celular flotando sobre la tabla. El ítem activo suma una "píldora" de fondo.
+ * 🔑 **Estética “liquid glass” (2026-11-01, pedido del usuario sobre la captura
+ * del tab bar de WhatsApp)**: la barra **flota** —despegada de los bordes, forma
+ * de pastilla— en mobile y en escritorio (acá además se angosta a 464 px,
+ * centrada). El vidrio es **semi-transparente**: `backdrop-filter` con desenfoque
+ * + saturación, brillo especular arriba y borde de 1 px. Antes en mobile era una
+ * banda pegada al borde con `border-t` y el activo sólo cambiaba de color
+ * (mobile) o sumaba una píldora (escritorio) ⇒ ahora la estética es **la misma en
+ * los dos**: el activo lo marca un **indicador que se desliza** entre secciones
+ * (ver abajo). Medidas y material viven en `[data-barra-nav]` (`globals.css`).
+ *
+ * 🎞️ **Indicador deslizante**: es **un solo** elemento (`data-barra-indicador`)
+ * que se mueve con `translateX` —no una píldora por ítem—, así el movimiento se
+ * ve continuo al cambiar de sección, como en WhatsApp. Los 5 ítems son `flex-1`
+ * ⇒ cada uno mide exactamente 1/5 de la barra y el indicador se posiciona con
+ * `translateX(<índice>00%)` (porcentaje de **su propio** ancho). Al tocar se
+ * mueve **al instante** (`moverIndicador`, sin esperar a que llegue la página) y
+ * después el índice vuelve a derivarse de la ruta: si la navegación se cancela,
+ * el próximo render lo corrige.
  *
  * 🔑 **Estado activo**: `/dashboard` matchea **exacto** (si no, cualquier
  * `/dashboard/*` marcaría también Inicio); el resto matchea **por prefijo**, así
@@ -127,6 +138,18 @@ function esActivo(href: string, ruta: string): boolean {
   return href === "/dashboard" ? ruta === "/dashboard" : ruta.startsWith(href);
 }
 
+/**
+ * Posición del indicador deslizante: `0..TABS.length-1` para las secciones y
+ * `TABS.length` para el botón "Más" (que también se marca cuando estamos en
+ * alguna de sus pantallas). `-1` = ninguna sección activa (p. ej. `/perfil`):
+ * ahí el indicador se apaga.
+ */
+function indiceDeRuta(ruta: string): number {
+  const i = TABS.findIndex((t) => esActivo(t.href, ruta));
+  if (i >= 0) return i;
+  return OPCIONES_MAS.some((o) => ruta.startsWith(o.href)) ? TABS.length : -1;
+}
+
 export default function BottomNav() {
   const ruta = usePathname() ?? "";
   const router = useRouter();
@@ -136,34 +159,52 @@ export default function BottomNav() {
   const [abierto, setAbierto] = useState(false);
   /** ¿Estamos en alguna de las pantallas que cuelgan de "Más"? */
   const masActivo = OPCIONES_MAS.some((o) => ruta.startsWith(o.href));
+  /** Índice del indicador deslizante según la ruta (ver `indiceDeRuta`). */
+  const indice = indiceDeRuta(ruta);
+  /**
+   * Ref del indicador: al tocar un tab se lo mueve **ya** (antes de que la
+   * navegación cambie `usePathname`), que es lo que hace que el gesto se sienta
+   * inmediato. No usa estado propio porque el valor "verdadero" siempre es la
+   * ruta; si el push falla, el próximo render con otra ruta lo reacomoda.
+   */
+  const indicadorRef = useRef<HTMLSpanElement | null>(null);
+  const moverIndicador = (i: number) => {
+    const el = indicadorRef.current;
+    if (!el) return;
+    el.style.transform = `translateX(${i}00%)`;
+    el.style.opacity = "1";
+  };
 
   return (
     <>
     <nav
-      // `data-barra-nav` lo usan el FAB "+" y el 🎤 para apilarse por encima
-      // (misma idea que `data-barra-inferior`, ver `globals.css`).
+      // `data-barra-nav` lo usan el FAB "+" y la barra de acciones para apilarse
+      // por encima (misma idea que `data-barra-inferior`, ver `globals.css`).
       data-barra-nav=""
       aria-label="Secciones"
-      // ⚠️ Posición y alto: mobile y escritorio se resuelven en `globals.css`
-      // (`[data-barra-nav]` + su `@media (min-width: 1024px)`) para poder cambiar
-      // de banda pegada al borde a **dock flotante** sin `!important`.
-      // · mobile: alto = banda (3.5rem) + safe-area topado a 2.5rem; el
-      //   `padding-bottom` mantiene el contenido a ~28px del borde en todos los
-      //   dispositivos.
-      // · escritorio: dock centrado de 464px, despegado 1.5rem, `rounded-full`,
-      //   borde propio y sombra (2026-10-17: antes heredaba la estética mobile y se
-      //   leía como una barra de celular flotando sobre la tabla).
-      className="fixed bottom-0 left-0 right-0 z-40 mx-auto flex max-w-lg items-stretch border-t border-border barra-nav-vidrio"
+      // ⚠️ Posición, alto y material: TODO en `globals.css` (`[data-barra-nav]` +
+      // su `@media (min-width: 1024px)`), para que la barra, la barra de acciones
+      // y los FAB compartan las mismas medidas (`--fp-barra-alto` / `-sep`).
+      className="fixed z-40 mx-auto flex max-w-lg items-stretch"
     >
-      {/* Faldón: pinta el fondo de la barra **por debajo** de ella. Si el viewport
-          de iOS termina antes que la pantalla (el caso del Pro Max), la franja que
-          queda debajo muestra el fondo de la barra y no el de la página ⇒ la barra
-          se ve pegada al borde. Si no hay franja, queda fuera de pantalla. */}
+      {/* Indicador deslizante del activo (2026-11-01): UN solo elemento que se
+          mueve con `translateX(índice × 100%)` de su propio ancho. Como los 5
+          ítems son `flex-1`, cada uno mide 1/5 de la barra y el indicador cae
+          siempre exacto arriba del ítem activo. `opacity: 0` cuando la ruta no
+          pertenece a ninguna sección (p. ej. `/perfil`). */}
       <span
+        ref={indicadorRef}
         aria-hidden="true"
-        className="pointer-events-none absolute left-0 right-0 top-full h-40 bg-sidebar lg:hidden"
-      />
-      {TABS.map((t) => {
+        data-barra-indicador=""
+        style={{
+          transform: `translateX(${Math.max(indice, 0)}00%)`,
+          opacity: indice < 0 ? 0 : 1,
+        }}
+      >
+        <span className="barra-nav-capsula" />
+      </span>
+
+      {TABS.map((t, i) => {
         const activo = esActivo(t.href, ruta);
         const Icono = activo ? t.iconoActivo : t.icono;
         return (
@@ -172,18 +213,22 @@ export default function BottomNav() {
             href={t.href}
             prefetch
             aria-current={activo ? "page" : undefined}
+            // Mueve el indicador ya mismo (el estado "real" sigue siendo la ruta).
+            onClick={() => moverIndicador(i)}
             className={cn(
-              // `justify-end`: el contenido se apoya arriba del padding del
-              // safe-area ⇒ queda siempre a la misma distancia del borde inferior.
-              // En escritorio el dock lo centra y el activo se marca con una
-              // "píldora" de fondo (2026-10-17).
-              "flex flex-1 flex-col items-center justify-end gap-1 transition-colors lg:justify-center lg:rounded-full",
-              activo
-                ? "text-header lg:bg-white/10"
-                : "text-subtitle hover:text-label lg:hover:bg-white/5"
+              // `relative z-10`: los ítems van por encima del indicador.
+              "relative z-10 flex flex-1 flex-col items-center justify-center gap-1 transition-colors",
+              activo ? "text-header" : "text-subtitle hover:text-label"
             )}
           >
-            <Icono size={22} />
+            <Icono
+              size={22}
+              // Micro-pop del icono al quedar activo (mismo gesto que WhatsApp).
+              className={cn(
+                "transition-transform duration-300",
+                activo && "scale-105"
+              )}
+            />
             <span className="text-[11px] font-medium leading-none">{t.label}</span>
           </Link>
         );
@@ -202,11 +247,12 @@ export default function BottomNav() {
         onClick={() => setAbierto(true)}
         aria-haspopup="dialog"
         aria-expanded={abierto}
+        // ⚠️ **No** mueve el indicador: este botón no navega (abre el popup). El
+        // indicador se corre a "Más" recién cuando se entra a una de sus
+        // pantallas (`masActivo` ⇒ `indiceDeRuta` devuelve `TABS.length`).
         className={cn(
-          "flex flex-1 flex-col items-center justify-end gap-1 transition-colors lg:justify-center lg:rounded-full",
-          masActivo
-            ? "text-header lg:bg-white/10"
-            : "text-subtitle hover:text-label lg:hover:bg-white/5"
+          "relative z-10 flex flex-1 flex-col items-center justify-center gap-1 transition-colors",
+          masActivo ? "text-header" : "text-subtitle hover:text-label"
         )}
       >
         {masActivo ? <HamburgerMenuDuotone size={22} /> : <HamburgerMenuLinear size={22} />}

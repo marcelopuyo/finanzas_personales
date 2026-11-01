@@ -54,14 +54,15 @@ export default function AppLayout({
             espaciador del pie, que tiene que seguir midiendo lo mismo que la barra
             inferior **sin** escalar. Se apaga con `ZOOM_ACTIVO = false`. */}
         <ZoomContenido>{children}</ZoomContenido>
-        {/* Espaciador del pie: reserva la **barra inferior** (4rem) + la franja de
-            los FAB (el "+" de Inicio) para que el último elemento del contenido —
-            típicamente los botones "Siguiente"/"Guardar" de los formularios, que van
-            EN EL FLUJO— nunca quede tapado. Va como elemento y no como
+        {/* Espaciador del pie: reserva la **barra inferior** (pastilla flotante
+            + su separación con el borde) + la franja de los FAB (el "+" de
+            Inicio) para que el último elemento del contenido —típicamente los
+            botones "Siguiente"/"Guardar" de los formularios, que van EN EL
+            FLUJO— nunca quede tapado. Va como elemento y no como
             `padding-bottom` del contenedor de scroll porque el padding de un
             `overflow: auto` no es confiable en iOS. El alto vive en el token
-            `--fp-espaciador-pie` (`globals.css`), que suma el safe-area en mobile y
-            se achica en `lg:` porque ahí la barra es un dock flotante más bajo. */}
+            `--fp-espaciador-pie` (`globals.css`), que suma el safe-area en mobile
+            y se achica en `lg:` porque ahí la pastilla es un dock más bajo. */}
         <div aria-hidden="true" className="h-[var(--fp-espaciador-pie)]" />
       </PullToRefresh>
       {/* Barra inferior de navegación (2026-10-01, rama `rediseno-ui`): 5 destinos

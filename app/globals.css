@@ -62,10 +62,23 @@
   --app-top: calc(3.5rem + env(safe-area-inset-top));
 
   /* Espaciador del pie del contenido (`app-layout.tsx`): reserva el alto de la
-     barra inferior + la franja de los FAB para que el último elemento no quede
-     tapado. En escritorio el dock flota, es más bajo y va despegado del borde ⇒
-     reserva menos (ver el `@media` de `[data-barra-nav]`). */
-  --fp-espaciador-pie: calc(8.75rem + env(safe-area-inset-bottom));
+     barra inferior flotante + su separación con el borde + la franja de los FAB
+     para que el último elemento no quede tapado. En escritorio el dock flota más
+     arriba, es más bajo y va despegado del borde ⇒ reserva menos (ver el
+     `@media` de `[data-barra-nav]`). */
+  --fp-espaciador-pie: calc(
+    var(--fp-barra-alto) + var(--fp-barra-sep) + 5.25rem +
+      env(safe-area-inset-bottom)
+  );
+
+  /* BARRA INFERIOR FLOTANTE (2026-11-01): alto de la pastilla y separación con
+     el borde del shell. Son la **única** fuente de estas dos medidas: las
+     consumen la propia barra (`[data-barra-nav]`), la barra de acciones
+     (`[data-barra-inferior]`) y los FAB de Inicio (`ESTILO_FAB` en
+     `components/movimientos/fab-nuevo.tsx`). Si cambian, no hay nada más que
+     tocar. */
+  --fp-barra-alto: 4.375rem; /* 70 px */
+  --fp-barra-sep: 0.75rem; /* 12 px */
 
   /* Desfase de anclaje de las barras fijas (2026-10-04). Valen `0px` en el caso
      normal —mismo comportamiento de siempre— y las escribe `AnclajeBarras`
@@ -292,8 +305,8 @@ html.fp-sin-red [data-app-lock] {
    `padding-bottom: env(safe-area-inset-bottom)` venía **inline** desde el componente
    y el `bottom` de acá también lo sumaba ⇒ se aplicaba dos veces. Por eso el
    padding vive **sólo acá** y cuando la barra de navegación está presente se
-   reduce a la separación visual entre las dos barras, porque la franja del home
-   indicator ya la cubre la de navegación. */
+   reduce a la separación visual entre las dos barras (la pastilla de navegación
+   ya se apoya sobre el safe-area: ver `[data-barra-nav]`). */
 /* Barras fijas: el anclaje se mide contra el borde VISIBLE, no contra el layout
    viewport (ver `components/layout/anclaje-barras.tsx`). Sin desfase las dos
    variables valen `0px` ⇒ mismo resultado que antes. Después de la importación de
@@ -306,10 +319,13 @@ html.fp-sin-red [data-app-lock] {
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
 }
 @media (max-width: 1023.98px) {
+  /* La barra de acciones se apoya justo arriba de la pastilla de navegación: el
+     `bottom` es el **techo** de la barra (alto + separación + safe-area). Las
+     medidas salen de los mismos tokens que usa `[data-barra-nav]`. */
   html:has([data-barra-nav]) [data-barra-inferior] {
     bottom: calc(
-      3.5rem + min(env(safe-area-inset-bottom), 2.5rem) +
-        var(--fp-desfase-inferior, 0px)
+      var(--fp-barra-alto) + var(--fp-barra-sep) +
+        env(safe-area-inset-bottom) + var(--fp-desfase-inferior, 0px)
     );
     padding-bottom: 0.75rem;
   }
@@ -392,76 +408,158 @@ html[data-zoom="on"] [data-app-shell] main {
    voz, que se apila sobre la barra de navegación con las reglas de arriba.) */
 
 /* ─────────────────────────────────────────────────────────────────────────
-   BARRA INFERIOR semitransparente (2026-10-03 · pedido del usuario: "igual que
-   la superior")
+   BARRA INFERIOR “LIQUID GLASS” (2026-11-01 · pedido del usuario sobre la
+   captura del tab bar de WhatsApp)
 
-   Mismo criterio que `html.fp-inicio-scrolled .topbar-inicio`: 78% del color
-   propio + desenfoque de lo que pasa por detrás, en vez de un fondo opaco. Se
-   aplica al `<nav>`; el **faldón** (la franja que tapa el viewport cuando termina
-   antes que la pantalla) queda opaco para tapar sin transparencias.
-   ───────────────────────────────────────────────────────────────────────── */
-.barra-nav-vidrio {
-  background-color: color-mix(in srgb, var(--sidebar) 78%, transparent);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
-}
+   La barra deja de ser una **banda pegada al borde** y pasa a ser, en todos los
+   tamaños, una **pastilla flotante** de vidrio:
 
-/* ─────────────────────────────────────────────────────────────────────────
-   DOCK DE NAVEGACIÓN EN ESCRITORIO (2026-10-17 · pedido del usuario)
+   · **Vidrio**: fondo semitransparente (34 % en oscuro / 55 % en claro) +
+     `backdrop-filter: blur(30px) saturate(180%)` ⇒ lo que scrollea por detrás se
+     ve esmerilado, no tapado.
+   · **Brillo especular**: un halo radial arriba a la izquierda + un degradé a
+     168° en el `background`, más el `inset` de 1 px de arriba. Es lo que hace
+     que se lea como vidrio y no como un rectángulo gris.
+   · **Borde de 1 px** translúcido y sombra profunda debajo (en el tema claro la
+     sombra es más suave: la versión oscura se ve “sucia” sobre blanco).
+   · **Indicador deslizante** (`[data-barra-indicador]` + `.barra-nav-capsula`):
+     UNA sola cápsula que se corre con `translateX` entre los 5 ítems, con una
+     curva de overshoot leve para que el movimiento tenga “peso” (WhatsApp).
 
-   En mobile la barra sigue siendo la **banda pegada al borde** (alto = 3.5rem +
-   safe-area topado, `padding-bottom` con el inset): esos valores viven acá y no
-   inline en `bottom-nav.tsx` para poder sobreescribirlos en `lg:` sin
-   `!important`.
+   ⚠️ **Medidas**: alto y separación salen de `--fp-barra-alto` / `--fp-barra-sep`
+   (`:root`) porque las comparten:
+     · el espaciador del pie (`--fp-espaciador-pie`),
+     · la barra de acciones (`[data-barra-inferior]`, más arriba),
+     · los FAB de Inicio (`ESTILO_FAB`, `components/movimientos/fab-nuevo.tsx`).
+   Cambiar los tokens mueve las cuatro cosas juntas.
 
-   A partir de 1024 px pasa a ser un **dock flotante** centrado: 464 px de ancho,
-   despegado 1.5rem del borde, `rounded-full`, borde propio (en vez del `border-t`
-   que se leía como un corte de pantalla) y sombra profunda. El "faldón" del pie
-   se oculta (solo tiene sentido con el viewport recortado de iOS).
+   🔑 **No responde al zoom**: este elemento vive FUERA de la capa de zoom del
+   contenido (`components/layout/zoom-contenido.tsx`) y el `<meta viewport>` con
+   `maximum-scale=1` (`app/layout.tsx`) bloquea el pinch nativo ⇒ ni el zoom
+   propio ni el del navegador le cambian el tamaño.
 
-   ⚠️ El alto mobile (`3.5rem + min(inset, 2.5rem)`) lo replica la regla de
-   `[data-barra-inferior]` de más arriba: si cambia, cambiar las dos.
+   ⚠️ Se eliminó el **faldón** (la franja `bg-sidebar` que se pintaba debajo de la
+   barra para tapar la franja muerta de iOS): como la pastilla ya no toca el
+   borde, ese bloque habría quedado como una mancha sólida flotando abajo. Esa
+   franja la sigue pintando `AnclajeBarras` con el fondo del documento.
    ───────────────────────────────────────────────────────────────────────── */
 [data-barra-nav] {
-  height: calc(3.5rem + min(env(safe-area-inset-bottom), 2.5rem));
-  padding-bottom: clamp(0.75rem, env(safe-area-inset-bottom), 1.75rem);
-  bottom: var(--fp-desfase-inferior, 0px);
+  /* Material (tema claro; `.dark` lo sobreescribe abajo). */
+  --fr-borde: color-mix(in srgb, var(--header) 10%, transparent);
+  --fr-brillo: rgba(255, 255, 255, 0.9);
+  --fr-capsula: rgba(15, 23, 42, 0.075);
+  --fr-capsula-brillo: rgba(255, 255, 255, 0.85);
+
+  left: var(--fp-barra-sep);
+  right: var(--fp-barra-sep);
+  bottom: calc(
+    var(--fp-barra-sep) + env(safe-area-inset-bottom) +
+      var(--fp-desfase-inferior, 0px)
+  );
+  height: var(--fp-barra-alto);
+  border: 1px solid var(--fr-borde);
+  border-radius: 999px;
+  /* Recorta el indicador y el halo del vidrio a la forma de la pastilla. */
+  overflow: hidden;
+  background:
+    radial-gradient(
+      120% 90% at 22% -30%,
+      rgba(255, 255, 255, 0.75),
+      transparent 62%
+    ),
+    linear-gradient(
+      168deg,
+      rgba(255, 255, 255, 0.55) 0%,
+      rgba(255, 255, 255, 0) 46%
+    ),
+    color-mix(in srgb, var(--background) 55%, transparent);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(180%);
+  box-shadow:
+    inset 0 1px 0 var(--fr-brillo),
+    inset 0 -1px 1px color-mix(in srgb, var(--header) 8%, transparent),
+    0 16px 40px rgba(15, 23, 42, 0.14),
+    0 2px 8px rgba(15, 23, 42, 0.08);
 }
 
+.dark [data-barra-nav] {
+  --fr-borde: rgba(255, 255, 255, 0.14);
+  --fr-brillo: rgba(255, 255, 255, 0.22);
+  --fr-capsula: rgba(255, 255, 255, 0.16);
+  --fr-capsula-brillo: rgba(255, 255, 255, 0.3);
+
+  background:
+    radial-gradient(
+      120% 90% at 22% -30%,
+      rgba(255, 255, 255, 0.16),
+      transparent 62%
+    ),
+    linear-gradient(
+      168deg,
+      rgba(255, 255, 255, 0.09) 0%,
+      rgba(255, 255, 255, 0) 46%
+    ),
+    color-mix(in srgb, var(--background) 34%, transparent);
+  -webkit-backdrop-filter: blur(30px) saturate(180%) brightness(1.08);
+  backdrop-filter: blur(30px) saturate(180%) brightness(1.08);
+  box-shadow:
+    inset 0 1.5px 0 var(--fr-brillo),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.06),
+    0 18px 44px rgba(0, 0, 0, 0.55),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Indicador deslizante: UN elemento de 1/5 de ancho que se corre con
+   `translateX(<índice>00%)` (el % es de **su propio** ancho). El overshoot de la
+   curva (1.12) es lo que le da el “peso” al movimiento, como en WhatsApp. */
+[data-barra-indicador] {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: calc(100% / 5);
+  padding: 0.4375rem 0.25rem;
+  z-index: 0;
+  pointer-events: none;
+  will-change: transform;
+  transition:
+    transform 400ms cubic-bezier(0.22, 1.12, 0.36, 1),
+    opacity 180ms ease;
+}
+
+.barra-nav-capsula {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--fr-capsula);
+  box-shadow:
+    inset 0 1px 0 var(--fr-capsula-brillo),
+    inset 0 0 0 1px color-mix(in srgb, var(--header) 6%, transparent),
+    0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+/* Accesibilidad: con "reducir movimiento" el indicador salta sin animar. */
+@media (prefers-reduced-motion: reduce) {
+  [data-barra-indicador] {
+    transition: none;
+  }
+}
+
+/* Escritorio: mismo material y misma pastilla, pero más angosta (464 px),
+   centrada y despegada 1.5rem (2026-10-17). El `mx-auto` del componente la
+   centra con `left/right: 0`. */
 @media (min-width: 1024px) {
   :root {
     --fp-espaciador-pie: 7rem;
   }
 
   [data-barra-nav] {
-    bottom: calc(var(--fp-desfase-inferior, 0px) + 1.5rem);
+    left: 0;
+    right: 0;
+    bottom: calc(1.5rem + var(--fp-desfase-inferior, 0px));
     width: 29rem;
     max-width: calc(100% - 3rem);
     height: 3.75rem;
-    padding: 0.375rem;
-    border: 1px solid color-mix(in srgb, var(--header) 12%, transparent);
-    border-radius: 999px;
-    box-shadow:
-      inset 0 1px 0 color-mix(in srgb, var(--header) 8%, transparent),
-      0 18px 44px rgba(0, 0, 0, 0.55),
-      0 2px 8px rgba(0, 0, 0, 0.4);
-  }
-
-  /* Tema claro: la misma sombra se ve “sucia” sobre fondo blanco ⇒ más suave. */
-  html:not(.dark) [data-barra-nav] {
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.75),
-      0 16px 40px rgba(15, 23, 42, 0.14),
-      0 2px 8px rgba(15, 23, 42, 0.08);
-  }
-
-  /* Material "vibrancy" estilo Apple (2026-10-18): mucha transparencia + blur
-     alto con saturación ⇒ el contenido de atrás se ve como vidrio esmerilado.
-     El `inset` del box-shadow (arriba) es el brillo de 1px del borde superior. */
-  .barra-nav-vidrio {
-    background-color: color-mix(in srgb, var(--sidebar) 58%, transparent);
-    -webkit-backdrop-filter: blur(30px) saturate(180%);
-    backdrop-filter: blur(30px) saturate(180%);
   }
 }
 

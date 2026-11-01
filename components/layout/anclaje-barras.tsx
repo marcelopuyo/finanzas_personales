@@ -105,13 +105,14 @@ export function AnclajeBarras() {
      * alto real** (706).
      *
      * Esa franja la pinta el **fondo del documento**, no un elemento nuestro: el
-     * faldón de la barra (`bg-sidebar`) y el contenido **no** se ven ahí. Se
-     * comprobó en el celular pintando el fondo de magenta: la franja se pinta,
-     * el contenido no (o sea que la franja está fuera del layout, pero dentro del
-     * área que el motor pinta).
+     * contenido **no** se ve ahí. Se comprobó en el celular pintando el fondo de
+     * magenta: la franja se pinta, el contenido no (o sea que la franja está
+     * fuera del layout, pero dentro del área que el motor pinta).
      *
-     * Como no se puede poner contenido ahí, se pinta la franja **con el color de
-     * la barra**: el conjunto se lee como una sola barra pegada al borde.
+     * Como no se puede poner contenido ahí, se pinta la franja **con el color
+     * del pie**: el conjunto se lee como una sola superficie pegada al borde.
+     * (Desde el 2026-11-01 la barra de navegación es una pastilla flotante y ya
+     * no trae su propio “faldón”; esta es la única capa que tapa esa franja.)
      *
      * ⚠️ Desde que el shell se estira a `100lvh` (`globals.css`, §224) esta franja
      * ya no queda descubierta en el iPhone del caso: esto queda como **red de

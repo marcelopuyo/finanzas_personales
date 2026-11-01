@@ -26,9 +26,11 @@ function claseFab(visible: boolean) {
   );
 }
 
-/** `bottom` del FAB: por encima de la barra inferior (4rem) + su safe-area. */
+/** `bottom` del FAB: por encima de la barra inferior flotante (alto + separación,
+    ambos en `globals.css`) + 1.25rem de aire + su safe-area. */
 const ESTILO_FAB = {
-  bottom: "calc(4.75rem + env(safe-area-inset-bottom))",
+  bottom:
+    "calc(var(--fp-barra-alto) + var(--fp-barra-sep) + 1.25rem + env(safe-area-inset-bottom))",
 } as const;
 
 /** Ruta del CRUD de cuentas (la única acción de la tarjeta de resumen). */
