@@ -56,6 +56,13 @@
   --danger: #dc2626;
   --warning: #d97706;
 
+  /* **Etiqueta del valor mensual** de los gráficos (`valoresPorMes`): fondo,
+     borde y texto del badge con el monto sobre cada punto. Tokens propios para
+     poder subirle el contraste en la paleta oscura sin tocar `--muted`. */
+  --chart-value-bg: #eef1f5;
+  --chart-value-fg: #1e293b;
+  --chart-value-border: rgba(100, 116, 139, 0.35);
+
   /* PWA (standalone): alto de la top bar + área segura superior (notch / barra de
      estado con viewport-fit: cover). Es el offset que compensan el scroll
      (app-layout.tsx), el banner "sin conexión" y el indicador del pull-to-refresh. */
@@ -124,6 +131,13 @@
   --success: #51cf66;
   --danger: #ff6b6b;
   --warning: #ffd43b;
+
+  /* Etiqueta del valor mensual: **chip claro con texto oscuro** (2026-11-06).
+     Es el máximo contraste posible sobre la tarjeta oscura y sobre el área
+     sombreada; el `--muted` de antes (#1e1e20) casi no se distinguía del fondo. */
+  --chart-value-bg: #e8eaf0;
+  --chart-value-fg: #14151a;
+  --chart-value-border: rgba(255, 255, 255, 0.55);
 
   /* DeepSeek semantic tokens — Dark */
   --sidebar: #1b1b1c;

@@ -176,9 +176,9 @@ function TickMesAnio({
   );
 }
 
-/** Ancho aproximado del texto del badge a 9 px (los dígitos de Inter miden ~5 px). */
+/** Ancho aproximado del texto del badge a 10 px (los dígitos de Inter miden ~5,4 px). */
 function anchoBadge(texto: string) {
-  return Math.round(texto.length * 4.9 + 9);
+  return Math.round(texto.length * 5.45 + 10);
 }
 
 /**
@@ -285,13 +285,13 @@ function DecoracionPorMes({
 
   if (!yScale) return null;
 
-  const ALTO_BADGE = 15;
+  const ALTO_BADGE = 16;
   /**
    * Aire entre el punto y el badge. **Positivos:** el badge va arriba de la
    * línea (por fuera del área sombreada). **Negativos:** va **debajo** del punto,
    * también por fuera del área (2026-10-31).
    */
-  const SEPARACION_BADGE = 16;
+  const SEPARACION_BADGE = 17;
 
   return (
     <g aria-hidden>
@@ -326,26 +326,26 @@ function DecoracionPorMes({
               strokeOpacity={0.38}
               strokeLinecap="round"
             />
-            {/* Fondo `--muted` (no `--card`): tiene que distinguirse del panel.
-                El borde va con `--muted-foreground` al 35 % porque `--border` se
-                pierde en tema claro. */}
+            {/* Fondo y borde propios (`--chart-value-*`, no `--muted`/`--border`):
+                el chip tiene que distinguirse del panel y del área sombreada en
+                las DOS paletas. En oscuro es más claro que la tarjeta y el texto
+                va en blanco pleno (2026-11-06, pedido del usuario). */}
             <rect
               x={cx - ancho / 2}
               y={cy - ALTO_BADGE / 2}
               width={ancho}
               height={ALTO_BADGE}
               rx={4}
-              fill="var(--muted)"
-              stroke="var(--muted-foreground)"
-              strokeOpacity={0.35}
+              fill="var(--chart-value-bg)"
+              stroke="var(--chart-value-border)"
             />
             <text
               x={cx}
-              y={cy + 3.2}
+              y={cy + 3.6}
               textAnchor="middle"
-              fontSize={9}
-              fontWeight={500}
-              fill="var(--card-foreground)"
+              fontSize={10}
+              fontWeight={600}
+              fill="var(--chart-value-fg)"
             >
               {texto}
             </text>
