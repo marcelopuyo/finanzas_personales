@@ -8,7 +8,7 @@ import {
   actualizarJornadaTrabajo,
   actualizarTareaTrabajo,
 } from "@/backend/src/actions/movimientos";
-import { timeToDecimal } from "@/lib/utils";
+import { decimalToTime, isoADdMmAa, timeToDecimal } from "@/lib/utils";
 import type { ItemEditable } from "../tipos";
 
 const inputCls =
@@ -68,11 +68,28 @@ export function ItemEditModal({
   const propinaNum = aNumero(propina);
   const montoNum = aNumero(monto);
   const horasNum = aNumero(horas);
+  const rangoValido = !!horaDesde && !!horaHasta && horaDesde < horaHasta;
+  /**
+   * Solapamiento con OTRA jornada del mismo trabajo: mismo criterio que el
+   * backend (`encontrarJornadaSuperpuesta`), mismo día y horas superpuestas —
+   * las contiguas (08–12 y 12–16) NO cuentan. Así el aviso aparece acá en vez
+   * de fallar recién al guardar.
+   */
+  const desdeNum = timeToDecimal(horaDesde);
+  const hastaNum = timeToDecimal(horaHasta);
+  const jornadaSolapada =
+    esJornada && !!fecha && rangoValido
+      ? item.otrasJornadas.find(
+          (j) =>
+            j.fecha === fecha &&
+            j.horaDesde < hastaNum &&
+            j.horaHasta > desdeNum
+        )
+      : undefined;
   const puedeGuardar = esJornada
     ? !!fecha &&
-      !!horaDesde &&
-      !!horaHasta &&
-      horaDesde < horaHasta &&
+      rangoValido &&
+      !jornadaSolapada &&
       (propinaNum <= 0 || !!cuentaId)
     : !!fecha && montoNum > 0;
 
@@ -186,6 +203,17 @@ export function ItemEditModal({
                 />
               </div>
             </div>
+
+            {jornadaSolapada && (
+              <div className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[13px] text-danger">
+                Ya existe una jornada
+                {item.trabajoNombre ? ` de "${item.trabajoNombre}"` : ""} el{" "}
+                {isoADdMmAa(fecha)} de{" "}
+                {decimalToTime(jornadaSolapada.horaDesde)} a{" "}
+                {decimalToTime(jornadaSolapada.horaHasta)}. No se pueden
+                superponer horas del mismo trabajo.
+              </div>
+            )}
 
             <div>
               <label

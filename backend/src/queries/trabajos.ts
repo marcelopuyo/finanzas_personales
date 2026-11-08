@@ -7,6 +7,7 @@ import { Liquidacion } from "../entities/periodo-trabajo.entity";
 import { TareaTrabajo } from "../entities/tarea-trabajo.entity";
 import { Trabajo } from "../entities/trabajo.entity";
 import { SIN_TRABAJO } from "@/lib/filtros-dashboard";
+import { isoDeFecha } from "@/lib/utils";
 
 // ============================================================
 // Tipos de salida (coinciden con los Response DTOs del backend)
@@ -470,7 +471,12 @@ export async function getAllJornadasTrabajo(): Promise<
 export async function getJornadaTrabajoById(
   id: string
 ): Promise<
-  (JornadaTrabajoOut & { periodoTrabajoId?: number; cuentaPropinaId?: number }) | null
+  (JornadaTrabajoOut & {
+    periodoTrabajoId?: number;
+    cuentaPropinaId?: number;
+    trabajoId?: number;
+    trabajoNombre?: string;
+  }) | null
 > {
   const userId = await requireUserId();
   const ds = await getDb();
@@ -488,6 +494,8 @@ export async function getJornadaTrabajoById(
   const duenio =
     r?.trabajo?.usuario?.id ?? r?.periodoTrabajo?.trabajo?.usuario?.id;
   if (!r || duenio !== userId) return null;
+  // El trabajo del ítem: el vínculo propio y, para los viejos, el del período.
+  const trabajo = r.trabajo ?? r.periodoTrabajo?.trabajo;
   // Cuenta donde se depositó la propina (movimiento "Cobro Propina" vinculado
   // a la jornada). Se usa para preseleccionar el select al editar.
   const mov = await ds.getRepository(Movimiento).findOne({
@@ -499,7 +507,50 @@ export async function getJornadaTrabajoById(
     ...mapJornada(r),
     periodoTrabajoId: r.periodoTrabajo?.id,
     cuentaPropinaId: mov?.cuenta?.id ?? undefined,
+    trabajoId: trabajo?.id,
+    trabajoNombre: trabajo?.nombre,
   };
+}
+
+/**
+ * Jornadas **del mismo trabajo** (no eliminadas), con lo mínimo para que el
+ * cliente pre-valide el solapamiento al **editar** un ítem (mismo criterio que
+ * `encontrarJornadaSuperpuesta`, que sigue siendo el guard real). `excluirId`
+ * descarta la propia jornada.
+ *
+ * El trabajo se resuelve como en el backend: por el **`trabajoId` propio** del
+ * ítem y, para las filas viejas, por el de su período.
+ */
+export async function getJornadasDelTrabajo(
+  trabajoId: number,
+  excluirId?: string
+): Promise<
+  { id: string; fecha: string; horaDesde: number; horaHasta: number }[]
+> {
+  const userId = await requireUserId();
+  const ds = await getDb();
+  const qb = ds
+    .createQueryBuilder(JornadaTrabajo, "jt")
+    .leftJoin("periodo_trabajo", "pt", "pt.id = jt.periodoTrabajoId")
+    .where('COALESCE(jt."trabajoId", pt."trabajoId") = :trabajoId', {
+      trabajoId,
+    })
+    .andWhere("jt.eliminado = false")
+    .andWhere("(pt.id IS NULL OR pt.eliminado = false)")
+    // Multi-tenant: el trabajo tiene que ser del usuario de la sesión.
+    .andWhere(
+      'COALESCE(jt."trabajoId", pt."trabajoId") IN (SELECT t.id FROM trabajo t WHERE t."usuarioId" = :userId)',
+      { userId }
+    )
+    .orderBy("jt.fechaJornada", "DESC");
+  if (excluirId) qb.andWhere("jt.id <> :excluirId", { excluirId });
+  const rows = await qb.getMany();
+  return rows.map((r) => ({
+    id: r.id,
+    fecha: isoDeFecha(r.fechaJornada),
+    horaDesde: r.horaDesde,
+    horaHasta: r.horaHasta,
+  }));
 }
 
 // ============================================================

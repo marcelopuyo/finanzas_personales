@@ -29,4 +29,18 @@ export interface ItemEditable {
   horasTarea: number | null;
   /** Monto del ítem (jornada: calculado; tarea: cargado a mano). */
   monto: number;
+  /** Trabajo del ítem (nombre): lo usa el aviso de solapamiento. Tarea: `null`. */
+  trabajoNombre: string | null;
+  /**
+   * Jornadas **del mismo trabajo** (sin la propia) con `fecha` "YYYY-MM-DD" y
+   * horas decimales del backend. El modal pre-valida el solapamiento con el
+   * mismo criterio que `actualizarJornadaTrabajo` (el guard real sigue en el
+   * servidor). Tarea: lista vacía.
+   */
+  otrasJornadas: {
+    id: string;
+    fecha: string;
+    horaDesde: number;
+    horaHasta: number;
+  }[];
 }

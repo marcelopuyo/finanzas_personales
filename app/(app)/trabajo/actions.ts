@@ -3,6 +3,7 @@
 import { decimalToTime } from "@/lib/utils";
 import {
   getJornadaTrabajoById,
+  getJornadasDelTrabajo,
   getLiquidacionesCobradasPaginado,
   getTareaTrabajoById,
 } from "@/backend/src/queries/trabajos";
@@ -56,6 +57,12 @@ export async function obtenerItemEditable(
       descripcion: null,
       horasTarea: null,
       monto: j.montoJornada ?? 0,
+      trabajoNombre: j.trabajoNombre ?? null,
+      // Jornadas del MISMO trabajo (sin la propia): el modal pre-valida el
+      // solapamiento antes de guardar, igual que el wizard de carga.
+      otrasJornadas: j.trabajoId
+        ? await getJornadasDelTrabajo(j.trabajoId, j.id)
+        : [],
     };
   }
 
@@ -78,6 +85,9 @@ export async function obtenerItemEditable(
     descripcion: t.descripcion ?? null,
     horasTarea: t.horasTarea ?? null,
     monto: t.montoTarea ?? 0,
+    // Las tareas no tienen horas inicio/fin: no hay solapamiento que validar.
+    trabajoNombre: null,
+    otrasJornadas: [],
   };
 }
 
