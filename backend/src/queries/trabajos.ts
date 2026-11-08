@@ -424,30 +424,47 @@ export async function getItemsPendientesCobro(): Promise<ItemPendienteOut[]> {
 // ============================================================
 // Jornadas de trabajo
 // ============================================================
+/**
+ * Todas las jornadas del usuario (las liquidadas y las **pendientes**).
+ *
+ * ⚠️ El ítem puede estar pendiente (`periodoTrabajoId = NULL`): en el modelo nuevo
+ * cuelga del **`trabajo`** propio. Antes se filtraba SÓLO por el período ⇒ las
+ * jornadas pendientes no llegaban al wizard y su pre-validación de solapamiento
+ * no las veía (el "Siguiente" quedaba habilitado y el error saltaba recién al
+ * guardar). Las filas viejas sin `trabajoId` siguen resolviéndose por el período.
+ */
 export async function getAllJornadasTrabajo(): Promise<
   (JornadaTrabajoOut & {
     periodoTrabajo: { id: number; trabajo: string } | null;
     trabajo: string;
+    trabajoId: number | null;
   })[]
 > {
   const userId = await requireUserId();
   const ds = await getDb();
   const rows = await ds.getRepository(JornadaTrabajo).find({
-    where: { periodoTrabajo: { trabajo: { usuario: { id: userId } } }, eliminado: false },
-    relations: { periodoTrabajo: { trabajo: true } },
+    where: [
+      { trabajo: { usuario: { id: userId } }, eliminado: false },
+      { periodoTrabajo: { trabajo: { usuario: { id: userId } } }, eliminado: false },
+    ],
+    relations: { trabajo: true, periodoTrabajo: { trabajo: true } },
     order: { fechaJornada: "DESC", fechaCarga: "DESC" },
   });
-  return rows.map((r) => ({
-    ...mapJornada(r),
-    periodoTrabajo: r.periodoTrabajo
-      ? {
-          id: r.periodoTrabajo.id,
-          trabajo: r.periodoTrabajo.trabajo?.nombre ?? "Sin trabajo",
-        }
-      : null,
-    // El dashboard usa `trabajo` como nombre del trabajo
-    trabajo: r.periodoTrabajo?.trabajo?.nombre ?? "Sin trabajo",
-  }));
+  return rows.map((r) => {
+    const trabajo = r.trabajo ?? r.periodoTrabajo?.trabajo;
+    return {
+      ...mapJornada(r),
+      periodoTrabajo: r.periodoTrabajo
+        ? {
+            id: r.periodoTrabajo.id,
+            trabajo: r.periodoTrabajo.trabajo?.nombre ?? "Sin trabajo",
+          }
+        : null,
+      trabajoId: trabajo?.id ?? null,
+      // El dashboard usa `trabajo` como nombre del trabajo
+      trabajo: trabajo?.nombre ?? "Sin trabajo",
+    };
+  });
 }
 
 export async function getJornadaTrabajoById(

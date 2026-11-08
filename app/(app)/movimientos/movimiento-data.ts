@@ -69,6 +69,7 @@ export async function getMovimientoOptions(): Promise<MovimientoOptions> {
       fechaJornada: j.fechaJornada,
       horaDesde: j.horaDesde,
       horaHasta: j.horaHasta,
+      trabajoId: j.trabajoId,
       trabajo: j.trabajo,
     })),
     // Solo períodos SIN fecha de cobro (null o fecha centinela < 1901-01-02),

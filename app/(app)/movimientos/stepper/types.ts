@@ -70,6 +70,8 @@ export interface JornadaWizardOut {
   fechaJornada: Date;
   horaDesde: number;
   horaHasta: number;
+  /** Trabajo de la jornada (el vínculo propio del ítem; fallback al período). */
+  trabajoId: number | null;
   trabajo: string;
 }
 

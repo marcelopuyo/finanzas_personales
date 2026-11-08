@@ -37,6 +37,22 @@ export function isoADdMmAa(iso?: string | null): string {
 }
 
 /**
+ * "YYYY-MM-DD" de una fecha que llega del backend.
+ *
+ * - Un **string** ISO se corta tal cual (nunca se parsea).
+ * - Un `Date` de una columna `date` (el driver lo entrega como medianoche
+ *   **LOCAL**) se rearma con sus componentes locales: `String(date)` daría
+ *   "Tue May 19" y `toISOString()` se correría de día en zonas negativas.
+ */
+export function isoDeFecha(v: Date | string): string {
+  if (typeof v === "string") return v.slice(0, 10);
+  if (Number.isNaN(v.getTime())) return "";
+  const mes = String(v.getMonth() + 1).padStart(2, "0");
+  const dia = String(v.getDate()).padStart(2, "0");
+  return `${v.getFullYear()}-${mes}-${dia}`;
+}
+
+/**
  * Rótulo de fecha de un **tooltip de gráfico**: si el texto es una fecha ISO
  * ("2026-09-10", con o sin hora) se muestra como **`dd-mm-aa`** —el formato
  * ÚNICO de la app (§192)— y si ya viene formateado (`sep-2026`, el nombre de una

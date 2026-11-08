@@ -18,6 +18,7 @@ import {
 import { STEP_CONFIRMACION, type MovimientoData } from "./types";
 import {
   decimalToTime,
+  isoDeFecha,
   numberToCurrency,
   timeToDecimal,
   todayLocalISODate,
@@ -132,12 +133,17 @@ export function JornadaTrabajo() {
   )?.nombre;
   const desdeNum = timeToDecimal(data.horaDesde);
   const hastaNum = timeToDecimal(data.horaHasta);
+  // Mismo criterio que el backend (`encontrarJornadaSuperpuesta`): mismo trabajo
+  // —por **id**, el vínculo propio del ítem—, mismo día y horas solapadas (las
+  // contiguas NO cuentan). `isoDeFecha` normaliza la fecha que manda el server
+  // (el tipo declara `Date` y TypeORM entrega el string ISO): comparar
+  // `String(fecha).slice(0, 10)` se rompía si llegaba como `Date`.
   const jornadaSolapada =
-    !!data.fecha && !!trabajoNombre && horaValida
+    !!data.fecha && !!data.idTrabajo && horaValida
       ? options.jornadas.find(
           (j) =>
-            j.trabajo === trabajoNombre &&
-            String(j.fechaJornada).slice(0, 10) === data.fecha &&
+            j.trabajoId === data.idTrabajo &&
+            isoDeFecha(j.fechaJornada) === data.fecha &&
             j.horaDesde < hastaNum &&
             j.horaHasta > desdeNum
         )
