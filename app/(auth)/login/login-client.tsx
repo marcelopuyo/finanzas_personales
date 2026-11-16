@@ -13,7 +13,7 @@ import { entrarConBiometria, estadoBiometria } from "@/lib/webauthn-client";
 
 /** Contenedor del campo: el icono y el input comparten el recuadro y el foco. */
 const fieldBoxCls =
-  "flex h-[50px] items-center gap-2.5 rounded-[14px] border border-[#ffffff14] bg-[#ffffff08] px-3.5 transition focus-within:border-[#c5ef5580] focus-within:bg-[#c5ef550f] focus-within:ring-2 focus-within:ring-[#c5ef5514]";
+  "flex h-[46px] items-center gap-2.5 rounded-[14px] border border-[#ffffff14] bg-[#ffffff08] px-3.5 transition focus-within:border-[#c5ef5580] focus-within:bg-[#c5ef550f] focus-within:ring-2 focus-within:ring-[#c5ef5514]";
 
 const inputCls =
   "min-w-0 flex-1 bg-transparent text-[16px] text-[#f2f5f3] placeholder:text-[#6f817d] outline-none";
@@ -22,7 +22,7 @@ const inputCls =
  *  `shrink-0`: la sección del login es un flex column con scroll y, sin esto, el
  *  botón se comprimía hasta el alto del texto en pantallas bajas. */
 const ghostCls =
-  "flex h-[52px] w-full shrink-0 items-center justify-center gap-2.5 rounded-[14px] border border-[#ffffff1c] bg-[#ffffff08] px-4 text-[14px] font-semibold text-[#eef3f0] transition-colors hover:bg-[#ffffff12] disabled:cursor-wait disabled:opacity-55";
+  "flex h-[50px] w-full shrink-0 items-center justify-center gap-2.5 rounded-[14px] border border-[#ffffff1c] bg-[#ffffff08] px-4 text-[14px] font-semibold text-[#eef3f0] transition-colors hover:bg-[#ffffff12] disabled:cursor-wait disabled:opacity-55";
 
 /**
  * El botón de biometría se muestra siempre que la ceremonia se pueda intentar
@@ -222,11 +222,11 @@ export default function LoginClient({
               Los espaciados usan `dvh` porque `vh` en el móvil cuenta el alto
               con la barra del navegador oculta: el ritmo se veía mucho más
               apretado que en el escritorio. */}
-          <section className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto pb-[clamp(12px,2dvh,24px)]">
-            <h1 className="mt-[clamp(20px,5.5dvh,52px)] shrink-0 text-[clamp(24px,6.8vw,30px)] font-medium leading-[1.1] tracking-[-0.03em]">
+          <section className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto pb-[clamp(8px,1.3dvh,16px)]">
+            <h1 className="mt-[clamp(18px,4.6dvh,48px)] shrink-0 text-[clamp(22px,6.8vw,28px)] font-medium leading-[1.1] tracking-[-0.03em]">
               Bienvenido
             </h1>
-            <p className="mt-2 shrink-0 text-[14px] leading-relaxed text-[#93a3a0]">
+            <p className="mt-1.5 shrink-0 text-[14px] leading-relaxed text-[#93a3a0]">
               Ingresá a la aplicación
             </p>
 
@@ -250,10 +250,10 @@ export default function LoginClient({
               </p>
             )}
 
-            <form onSubmit={onSubmit} className="mt-[clamp(16px,2.4dvh,24px)] shrink-0">
+            <form onSubmit={onSubmit} className="mt-[clamp(12px,1.8dvh,20px)] shrink-0">
               <label
                 htmlFor="login-email"
-                className="mb-2 block text-[12.5px] font-semibold text-[#cbd5d1]"
+                className="mb-1 block text-[12.5px] font-semibold text-[#cbd5d1]"
               >
                 Email
               </label>
@@ -274,7 +274,7 @@ export default function LoginClient({
                 />
               </div>
 
-              <div className="mt-[clamp(12px,1.8dvh,16px)] flex items-center justify-between">
+              <div className="mt-[clamp(8px,1.2dvh,12px)] flex items-center justify-between">
                 <label
                   htmlFor="login-password"
                   className="text-[12.5px] font-semibold text-[#cbd5d1]"
@@ -288,7 +288,7 @@ export default function LoginClient({
                   ¿Olvidaste?
                 </Link>
               </div>
-              <div className={`${fieldBoxCls} mt-2`}>
+              <div className={`${fieldBoxCls} mt-1`}>
                 <Lock
                   className="h-[17px] w-[17px] shrink-0 text-[#7b8d89]"
                   aria-hidden="true"
@@ -321,7 +321,7 @@ export default function LoginClient({
                 </button>
               </div>
 
-              <div className="mt-[clamp(12px,1.8dvh,16px)]">
+              <div className="mt-[clamp(8px,1.2dvh,12px)]">
                 <Checkbox
                   checked={recordar}
                   onChange={setRecordar}
@@ -333,7 +333,7 @@ export default function LoginClient({
               <button
                 type="submit"
                 disabled={loading}
-                className="mt-[clamp(14px,2dvh,20px)] h-[52px] w-full rounded-[14px] bg-[#c5ef55] text-[15px] font-bold text-[#17210a] shadow-[0_12px_32px_#c5ef5529] transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-55"
+                className="mt-[clamp(10px,1.5dvh,16px)] h-[50px] w-full rounded-[14px] bg-[#c5ef55] text-[15px] font-bold text-[#17210a] shadow-[0_12px_32px_#c5ef5529] transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-55"
               >
                 {loading ? "Ingresando..." : "Iniciar sesión"}
               </button>
@@ -341,7 +341,7 @@ export default function LoginClient({
 
             {webAuthn && (
               <>
-                <div className="my-[clamp(10px,1.6dvh,16px)] flex shrink-0 items-center gap-3 text-[11px] text-[#71817d]">
+                <div className="my-[clamp(6px,1.1dvh,12px)] flex shrink-0 items-center gap-3 text-[11px] text-[#71817d]">
                   <span className="h-px flex-1 bg-[#26343a]" />
                   <span>o</span>
                   <span className="h-px flex-1 bg-[#26343a]" />
@@ -372,7 +372,7 @@ export default function LoginClient({
             )}
 
             <footer
-              className="mt-auto shrink-0 pt-[clamp(14px,2.4dvh,28px)] text-center text-[13px] text-[#8d9c98]"
+              className="mt-auto shrink-0 pt-[clamp(10px,1.7dvh,20px)] text-center text-[13px] text-[#8d9c98]"
               style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
             >
               ¿No tenés cuenta?{" "}
