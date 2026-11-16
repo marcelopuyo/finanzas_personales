@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Fingerprint, Mail } from "lucide-react";
+import { Eye, EyeOff, Fingerprint, Lock, Mail } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import Logo from "@/components/layout/logo";
 import { NO_REMEMBER, PENDING_CLEAR } from "@/lib/session-flags";
@@ -11,11 +11,16 @@ import { guardarUltimoEmail } from "@/lib/ultimo-email";
 import { useUltimoEmail } from "@/lib/use-cliente";
 import { entrarConBiometria, estadoBiometria } from "@/lib/webauthn-client";
 
-const inputCls =
-  "w-full rounded-xl border border-[#35434a] bg-[#141d22] px-3.5 py-3 text-[14px] text-[#f2f5f3] placeholder:text-[#71817f] outline-none transition focus:border-[#c5ef5580] focus:ring-2 focus:ring-[#c5ef5520]";
+/** Contenedor del campo: el icono y el input comparten el recuadro y el foco. */
+const fieldBoxCls =
+  "flex h-[50px] items-center gap-2.5 rounded-[14px] border border-[#ffffff14] bg-[#ffffff08] px-3.5 transition focus-within:border-[#c5ef5580] focus-within:bg-[#c5ef550f] focus-within:ring-2 focus-within:ring-[#c5ef5514]";
 
-const actionCls =
-  "flex min-h-[54px] w-full items-center justify-center gap-2.5 rounded-[14px] border border-[#c5ef5550] bg-[#c5ef5517] px-4 text-[14px] font-semibold text-[#f2f5f3] shadow-[inset_0_1px_#ffffff12] backdrop-blur transition-colors hover:bg-[#c5ef5528] disabled:cursor-wait disabled:opacity-55";
+const inputCls =
+  "min-w-0 flex-1 bg-transparent text-[14px] text-[#f2f5f3] placeholder:text-[#6f817d] outline-none";
+
+/** Acción secundaria (biometría): contorno suave, sin competir con el CTA lima. */
+const ghostCls =
+  "flex h-[52px] w-full items-center justify-center gap-2.5 rounded-[14px] border border-[#ffffff1c] bg-[#ffffff08] px-4 text-[14px] font-semibold text-[#eef3f0] transition-colors hover:bg-[#ffffff12] disabled:cursor-wait disabled:opacity-55";
 
 /**
  * El botón de biometría se muestra siempre que la ceremonia se pueda intentar
@@ -64,9 +69,8 @@ export default function LoginClient({
   const [webAuthn, setWebAuthn] = useState(tienePasskey);
   const [loadingBiometria, setLoadingBiometria] = useState(false);
   const [errorBiometria, setErrorBiometria] = useState("");
-  const [modoIngreso, setModoIngreso] = useState<"opciones" | "credenciales">(
-    tienePasskey ? "opciones" : "credenciales"
-  );
+  /** Ojo del campo Contraseña: alterna texto/oculto sin perder el valor. */
+  const [verPassword, setVerPassword] = useState(false);
 
   useEffect(() => {
     const metas = Array.from(
@@ -118,10 +122,7 @@ export default function LoginClient({
     const activo = document.activeElement;
     if (activo && activo !== document.body) return;
     passwordRef.current?.focus({ preventScroll: true });
-  }, [ultimoEmail, modoIngreso]);
-
-  const mostrarOpciones =
-    tienePasskey && webAuthn && modoIngreso === "opciones";
+  }, [ultimoEmail]);
 
   async function handleBiometria() {
     setErrorBiometria("");
@@ -201,123 +202,55 @@ export default function LoginClient({
       >
         <div className="relative mx-auto flex h-full w-full max-w-[430px] flex-col">
           <header
-            className="flex justify-center"
-            style={{ paddingTop: "calc(env(safe-area-inset-top) + 78px)" }}
+            className="flex justify-start"
+            style={{ paddingTop: "calc(env(safe-area-inset-top) + 58px)" }}
           >
-            <Logo size={28} />
+            <Logo size={22} />
           </header>
 
-          {/* Centrado con márgenes automáticos (no `justify-center`): con scroll
-              propio, `justify-center` deja el contenido que desborda fuera del
-              área desplazable y el título se vuelve inalcanzable. */}
-          <section className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto py-14 [&>*:first-child]:mt-auto [&>*:last-child]:mb-auto">
-            {!mostrarOpciones && (
-              <div className="mb-10 text-center">
-                <h1 className="text-[22px] font-medium leading-tight tracking-[-0.03em]">
-                  Bienvenido de nuevo
-                </h1>
-                <p className="mx-auto mt-2 max-w-[290px] text-[14px] leading-relaxed text-[#99aaa9]">
-                  Elegí cómo querés ingresar.
-                </p>
-              </div>
+          {/* Scroll propio (no `justify-center`): con contenido que desborda,
+              el centrado deja el título fuera del área desplazable. El footer se
+              ancla abajo con `mt-auto`. */}
+          <section className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto pb-6">
+            <h1 className="mt-[56px] text-[30px] font-medium leading-[1.1] tracking-[-0.03em]">
+              Bienvenido
+            </h1>
+            <p className="mt-2 text-[14px] leading-relaxed text-[#93a3a0]">
+              Ingresá a la aplicación
+            </p>
+
+            {verificado && (
+              <p className="mt-5 rounded-xl border border-[#51cf6640] bg-[#51cf6618] px-3.5 py-3 text-[13px] text-[#a7e5ae]">
+                Email verificado. Ya podés iniciar sesión.
+              </p>
+            )}
+            {expirada && (
+              <p className="mt-5 rounded-xl border border-[#ffffff1a] bg-[#ffffff08] px-3.5 py-3 text-[13px] text-[#c2ceca]">
+                Tu sesión se cerró por inactividad. Volvé a ingresar para seguir
+                donde estabas.
+              </p>
+            )}
+            {error && (
+              <p
+                role="alert"
+                className="mt-5 rounded-xl border border-[#ff6b6b50] bg-[#ff6b6b18] px-3.5 py-3 text-[13px] text-[#ff9b9b]"
+              >
+                {error}
+              </p>
             )}
 
-          {verificado && (
-            <p className="mb-4 rounded-xl border border-[#51cf6640] bg-[#51cf6618] px-3.5 py-3 text-[13px] text-[#a7e5ae]">
-              Email verificado. Ya podés iniciar sesión.
-            </p>
-          )}
-          {expirada && (
-            <p className="mb-4 rounded-xl border border-[#ffffff1a] bg-[#ffffff08] px-3.5 py-3 text-[13px] text-[#c2ceca]">
-              Tu sesión se cerró por inactividad. Volvé a ingresar para seguir
-              donde estabas.
-            </p>
-          )}
-          {error && (
-            <p className="mb-4 rounded-xl border border-[#ff6b6b50] bg-[#ff6b6b18] px-3.5 py-3 text-[13px] text-[#ff9b9b]">
-              {error}
-            </p>
-          )}
-
-          {mostrarOpciones ? (
-            <>
-              <div className="-mx-1.5 rounded-[20px] border border-[#ffffff14] bg-[#11191fbb] px-4 py-[19px] shadow-[0_20px_50px_#0003,inset_0_1px_#ffffff08] backdrop-blur-xl">
-                <h1 className="mb-[40px] text-center text-[23px] font-normal leading-[1.15] tracking-normal">
-                  Bienvenido de nuevo
-                </h1>
-                <div className="space-y-[15px]">
-                  <button
-                    type="button"
-                    onClick={handleBiometria}
-                    disabled={loadingBiometria || loading}
-                    className="flex min-h-11 w-full items-center justify-center gap-2.5 rounded-[14px] border border-[#c5ef5550] bg-[#c5ef5517] px-4 text-[13px] font-bold text-[#f2f5f3] shadow-[inset_0_1px_#ffffff12] backdrop-blur transition-colors hover:bg-[#c5ef5528] disabled:cursor-wait disabled:opacity-55"
-                  >
-                    <Fingerprint className="h-[17px] w-[17px] shrink-0" aria-hidden="true" />
-                    {loadingBiometria
-                      ? "Esperando biometría..."
-                      : "Ingresar con biometría"}
-                  </button>
-
-                  <div className="flex items-center gap-3 text-[11px] text-[#73827f]">
-                    <span className="h-px flex-1 bg-[#27353c]" />
-                    <span>o</span>
-                    <span className="h-px flex-1 bg-[#27353c]" />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setErrorBiometria("");
-                      setModoIngreso("credenciales");
-                    }}
-                    className="flex min-h-11 w-full items-center justify-center gap-2.5 rounded-[14px] border border-[#c5ef5550] bg-[#c5ef5517] px-4 text-[13px] font-bold text-[#f2f5f3] shadow-[inset_0_1px_#ffffff12] backdrop-blur transition-colors hover:bg-[#c5ef5528]"
-                  >
-                    <Mail className="h-[17px] w-[17px] shrink-0" aria-hidden="true" />
-                    Ingresar con email y contraseña
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-5 px-1">
-                <Checkbox
-                  checked={recordar}
-                  onChange={setRecordar}
-                  label="Mantener la sesión iniciada en este dispositivo"
-                  className="[&>span]:!text-[#c2ceca]"
-                />
-              </div>
-              {errorBiometria && (
-                <p role="alert" className="mt-3 text-center text-[12px] text-[#ff9b9b]">
-                  {errorBiometria}
-                </p>
-              )}
-            </>
-          ) : (
-            <>
-              {tienePasskey && webAuthn && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setError("");
-                    setModoIngreso("opciones");
-                  }}
-                  className="mb-4 flex items-center gap-2 px-1 py-1 text-[13px] font-medium text-[#c5ef55] hover:underline"
-                >
-                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                  Volver a las opciones
-                </button>
-              )}
-
-              <form
-                onSubmit={onSubmit}
-                className="rounded-2xl border border-[#ffffff14] bg-[#11191f] p-5 shadow-[0_24px_70px_#0005,inset_0_1px_#ffffff08]"
+            <form onSubmit={onSubmit} className="mt-6">
+              <label
+                htmlFor="login-email"
+                className="mb-2 block text-[12.5px] font-semibold text-[#cbd5d1]"
               >
-                <label
-                  htmlFor="login-email"
-                  className="mb-1.5 block text-[13px] font-medium text-[#e3e9e6]"
-                >
-                  Email
-                </label>
+                Email
+              </label>
+              <div className={fieldBoxCls}>
+                <Mail
+                  className="h-[17px] w-[17px] shrink-0 text-[#7b8d89]"
+                  aria-hidden="true"
+                />
                 <input
                   id="login-email"
                   type="email"
@@ -328,17 +261,31 @@ export default function LoginClient({
                   placeholder="tu@email.com"
                   className={inputCls}
                 />
+              </div>
 
+              <div className="mt-4 flex items-center justify-between">
                 <label
                   htmlFor="login-password"
-                  className="mb-1.5 mt-4 block text-[13px] font-medium text-[#e3e9e6]"
+                  className="text-[12.5px] font-semibold text-[#cbd5d1]"
                 >
                   Contraseña
                 </label>
+                <Link
+                  href="/recuperar"
+                  className="text-[12px] font-medium text-[#a9b6b2] transition-colors hover:text-[#c5ef55] hover:underline"
+                >
+                  ¿Olvidaste?
+                </Link>
+              </div>
+              <div className={`${fieldBoxCls} mt-2`}>
+                <Lock
+                  className="h-[17px] w-[17px] shrink-0 text-[#7b8d89]"
+                  aria-hidden="true"
+                />
                 <input
                   id="login-password"
                   ref={passwordRef}
-                  type="password"
+                  type={verPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -346,66 +293,86 @@ export default function LoginClient({
                   placeholder="••••••••"
                   className={inputCls}
                 />
-
-                <div className="mt-4">
-                  <Checkbox
-                    checked={recordar}
-                    onChange={setRecordar}
-                    label="Mantener la sesión iniciada en este dispositivo"
-                    className="[&>span]:!text-[#c2ceca]"
-                  />
-                </div>
-
                 <button
-                  type="submit"
-                  disabled={loading}
-                  className="mt-6 w-full rounded-xl bg-[#c5ef55] py-3 text-[14px] font-bold text-[#17210a] shadow-[0_8px_28px_#c5ef5526] transition-opacity hover:opacity-90 disabled:opacity-50"
+                  type="button"
+                  onClick={() => setVerPassword((v) => !v)}
+                  aria-label={
+                    verPassword ? "Ocultar contraseña" : "Mostrar contraseña"
+                  }
+                  aria-pressed={verPassword}
+                  className="-mr-1 grid h-7 w-7 shrink-0 place-items-center rounded-[7px] text-[#7b8d89] transition-colors hover:bg-[#ffffff0d] hover:text-[#c3cfcb]"
                 >
-                  {loading ? "Ingresando..." : "Iniciar sesión"}
-                </button>
-              </form>
-
-              {webAuthn && !tienePasskey && (
-                <div className="mt-4">
-                  <div className="flex items-center gap-3">
-                    <span className="h-px flex-1 bg-[#27353c]" />
-                    <span className="text-[12px] text-[#73827f]">o</span>
-                    <span className="h-px flex-1 bg-[#27353c]" />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleBiometria}
-                    disabled={loadingBiometria || loading}
-                    className={`${actionCls} mt-4`}
-                  >
-                    <Fingerprint className="h-5 w-5 shrink-0" aria-hidden="true" />
-                    {loadingBiometria
-                      ? "Esperando biometría..."
-                      : "Ingresar con biometría"}
-                  </button>
-                  {errorBiometria && (
-                    <p role="alert" className="mt-2 text-center text-[12px] text-[#ff9b9b]">
-                      {errorBiometria}
-                    </p>
+                  {verPassword ? (
+                    <EyeOff className="h-[17px] w-[17px]" aria-hidden="true" />
+                  ) : (
+                    <Eye className="h-[17px] w-[17px]" aria-hidden="true" />
                   )}
-                </div>
-              )}
-            </>
-          )}
-        </section>
+                </button>
+              </div>
 
-          <footer
-            className="mt-auto text-center text-[13px] text-[#99aaa9]"
-            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-          >
-            ¿No tenés cuenta?{" "}
-            <Link
-              href="/register"
-              className="font-semibold text-[#c5ef55] hover:underline"
+              <div className="mt-4">
+                <Checkbox
+                  checked={recordar}
+                  onChange={setRecordar}
+                  label="Mantener la sesión iniciada en este dispositivo"
+                  className="[&>span]:!text-[#c2ceca]"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="mt-5 h-[52px] w-full rounded-[14px] bg-[#c5ef55] text-[15px] font-bold text-[#17210a] shadow-[0_12px_32px_#c5ef5529] transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-55"
+              >
+                {loading ? "Ingresando..." : "Iniciar sesión"}
+              </button>
+            </form>
+
+            {webAuthn && (
+              <>
+                <div className="my-4 flex items-center gap-3 text-[11px] text-[#71817d]">
+                  <span className="h-px flex-1 bg-[#26343a]" />
+                  <span>o</span>
+                  <span className="h-px flex-1 bg-[#26343a]" />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleBiometria}
+                  disabled={loadingBiometria || loading}
+                  className={ghostCls}
+                >
+                  <Fingerprint
+                    className="h-[18px] w-[18px] shrink-0 text-[#c5ef55]"
+                    aria-hidden="true"
+                  />
+                  {loadingBiometria
+                    ? "Esperando biometría..."
+                    : "Ingresar con biometría"}
+                </button>
+                {errorBiometria && (
+                  <p
+                    role="alert"
+                    className="mt-2 text-center text-[12px] text-[#ff9b9b]"
+                  >
+                    {errorBiometria}
+                  </p>
+                )}
+              </>
+            )}
+
+            <footer
+              className="mt-auto pt-8 text-center text-[13px] text-[#8d9c98]"
+              style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
             >
-              Registrate
-            </Link>
-          </footer>
+              ¿No tenés cuenta?{" "}
+              <Link
+                href="/register"
+                className="font-semibold text-[#c5ef55] hover:underline"
+              >
+                Registrate
+              </Link>
+            </footer>
+          </section>
         </div>
       </main>
     </>
